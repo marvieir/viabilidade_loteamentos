@@ -1,14 +1,7 @@
 # Backend FastAPI — Pré-Viabilidade de Loteamento
+# Os wheels manylinux de shapely/pyproj/lxml já trazem GEOS, PROJ e libxml2
+# embutidos — não é preciso instalar libs de sistema via apt.
 FROM python:3.11-slim
-
-# Dependências de sistema para shapely/pyproj/lxml
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgeos-dev \
-    proj-bin \
-    libproj-dev \
-    libxml2-dev \
-    libxslt1-dev \
-    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
