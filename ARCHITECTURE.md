@@ -1,0 +1,194 @@
+# ARCHITECTURE.md — Pré-Viabilidade de Loteamento
+
+> Documento de decisões **transversais e estáveis**. Vale para todas as fases.
+> As specs de cada fase (`docs/fase-N-*.md`) referenciam este arquivo e não o contradizem.
+> Quando uma fase é concluída, atualize a seção "Histórico de decisões" ao final.
+
+---
+
+## 1. O que o produto é (e o que não é)
+
+MVP de **pré-viabilidade / triagem** de áreas de loteamento. Recebe o KMZ de uma
+gleba e produz uma análise que orienta **onde gastar com due diligence** — não
+decide aprovação.
+
+**O tool NÃO decide:**
+- Aprovação municipal do parcelamento (depende de protocolo na prefeitura e de campo).
+- Diretrizes específicas da gleba emitidas por projeto (art. 6º da Lei 6.766/79:
+  traçado viário, áreas reservadas para aquela área específica).
+- Condições que exigem campo/engenheiro (solo, lençol freático, sondagem).
+
+O tool **faz triagem** sobre regras gerais (federais/estaduais/municipais) e
+geometria. Tudo que não é calculável é **declarado pelo incorporador** ou marcado
+como **julgamento externo**.
+
+---
+
+## 2. Princípio inegociável: determinismo e proveniência
+
+1. **Todo cálculo numérico mora no backend Python.** Nunca no frontend, nunca via LLM.
+2. **LLM é opcional e desligável**, e só para *narrar em prosa* números já calculados
+   (resumo executivo). Jamais no caminho do número.
+3. **Todo número carrega proveniência**: qual perfil de jurisdição, qual base legal,
+   qual data de referência, quem validou. O relatório é auditável.
+4. O frontend **apenas renderiza JSON**. Geo-matemática em JavaScript é proibida.
+
+Critério de não-regressão: a mesma entrada produz sempre a mesma saída, e cada
+saída é rastreável até a fonte.
+
+---
+
+## 3. Stack
+
+| Camada | Tecnologia | Papel |
+|---|---|---|
+| Backend | FastAPI (Python) | Parse KMZ, geometria, declividade, jurisdição, cálculo financeiro |
+| Geo | shapely, pyproj, rasterio | Geometria, CRS/geodésico, DEM |
+| Frontend | Next.js (React) + Tailwind + shadcn/ui | UI por cards; só renderiza JSON |
+| Mapa | react-leaflet (MVP) → MapLibre GL (evolução) | Polígono + buffers + WMS oficiais |
+| Deploy | Lightsail + Docker Compose (api + web) | Igual ao padrão HomeEye |
+
+Decisão de mapa: react-leaflet no MVP porque o requisito dominante é **sobrepor
+WMS dos geoserviços do governo** (INDE/ANA/ICMBio) ao polígono e aos buffers —
+first-class no Leaflet (`TileLayer.WMS` + `GeoJSON`). MapLibre fica para polimento
+vetorial posterior, sem mexer no backend.
+
+**Convenção de portas (este projeto):** frontend em porta **> 3700**; backend em
+porta **> 8700**.
+
+---
+
+## 4. Modelo de jurisdição: três camadas + degradação graciosa
+
+Abrangência nacional é propriedade do **motor e do schema**, não de ter o Brasil
+pré-carregado. Roda em qualquer KMZ desde o dia 1; o que varia é a profundidade.
+
+| Camada | Cobertura | Esforço de popular | Quando |
+|---|---|---|---|
+| Federal + geoespacial nacional | Brasil inteiro | wire **uma vez** | já |
+| Estadual (órgão licenciador, lote mín. estadual, APA/manancial) | 27 UFs | leve | por UF, sob demanda |
+| Municipal (zoneamento/LUOS por zona) | ~5.570 | pesado — sem base nacional | por cidade, sob demanda |
+
+**Resolvedor:** centróide do polígono → código IBGE do município → UF → carrega os
+perfis disponíveis. Sem perfil, **não bloqueia e não inventa** — degrada para o nível
+federal e rotula a cobertura:
+
+- `BASE_FEDERAL` — só piso nacional + geoespacial.
+- `PARCIAL_UF` — federal + estadual; falta zoneamento municipal.
+- `COMPLETA` — federal + estadual + zona municipal.
+
+O relatório estampa o nível e diz explicitamente o que não foi considerado.
+
+### Backbone de dados nacional (carrega uma vez, via geoserviços INDE)
+- Limites municipais — IBGE.
+- Hidrografia — base ANA/IBGE (para buffers de APP).
+- Unidades de conservação — ICMBio/CNUC (federal/estadual/municipal/RPPN), WMS/WFS.
+- DEM — SRTM (MVP) ou Copernicus GLO-30 (evolução); fonte trocável por config.
+
+---
+
+## 5. Parâmetros legais verificados (piso nacional)
+
+Fontes cruzadas com legislação. Valores federais são **constantes**; o resto é
+**parâmetro** do perfil de jurisdição.
+
+| Parâmetro | Valor / regra | Tipo | Fonte |
+|---|---|---|---|
+| Lote mínimo | 125 m² (piso); alvo configurável | constante + input | Lei 6.766 art. 4º II |
+| Frente mínima | 5 m | constante | Lei 6.766 art. 4º II |
+| Declividade — flag | ≥30% = vedação (salvo exigência específica) | constante (flag) | Lei 6.766 art. 3º §ún III |
+| Faixa não-edificável | 15 m de cada lado (águas/rodovia/ferrovia) | buffer auto | Lei 6.766 art. 4º III |
+| Doação pública | piso de fato ~35%; bases A/B/C | **input municipal** | Lei 9.785/99 + prática |
+| APP curso d'água | 30/50/100/200/500 m por largura | buffer (fase geo) | Lei 12.651 art. 4º I |
+| APP nascente | 50 m de raio | buffer (fase geo) | Lei 12.651 art. 4º IV |
+| Servidão LT | 20/40/70 m conforme 69/230/500 kV | **input por tensão** | NBR 5422 |
+| Aproveitamento desmembramento | ~74% (regra de mercado, NÃO lei) | **default editável** | aulas de modalidade |
+| Aproveitamento loteamento | 57–65% conforme base de doação | derivado | Aula 09 + Lei 9.785 |
+
+**Variação por estado é real** (competência concorrente, art. 24 CF): normas
+estaduais podem ser **mais restritivas**, e o licenciamento de loteamento costuma
+ser **estadual** (CETESB-SP, INEA-RJ, IAT-PR...) salvo município habilitado (LC 140/2011).
+Regra do motor: aplicar o **mais restritivo aplicável** entre as camadas, **como
+triagem conservadora** (não como veredito jurídico) e marcar para verificação.
+
+### Bases de doação (aproveitamento de loteamento) — VALORES-OURO
+Exemplo da Aula 09: área 50.000 m², vias 11.500 m², doação 20%, lote 200 m².
+
+| Base | Fórmula | Resultado | % | Lotes |
+|---|---|---|---|---|
+| A — sobre área total | área − vias − (doação% × área) | 28.500 m² | 57,0% | 142 |
+| B — sobre área líquida | bruto=área−vias; bruto − (doação% × bruto) | 30.800 m² | 61,6% | 154 |
+| C — vias+doação combinados | área × (1 − combinado% 35%) | 32.500 m² | 65,0% | 162 |
+
+Estes três números são critério de aceite do motor de aproveitamento.
+
+---
+
+## 6. Costura de dados entre dimensões
+
+Confirmada pela planilha financeira do curso (12 abas). A dependência **não é arbitrária**:
+
+```
+Motor de Aproveitamento ──(aproveitamento %, total de lotes)──▶ Financeira
+Financeira ──(fluxo de caixa)──▶ Econômica (VPL / TIR / TMA / Retorno de Capital)
+```
+
+A aba `Dados do Parcelamento de Solo` parte de `Aproveitamento %`, `Área Útil =
+Área × Aproveitamento` e `Total de Lotes = Área Útil ÷ Metragem do Lote` — exatamente
+a saída do motor. Por isso a ordem de construção respeita essa cascata.
+
+---
+
+## 7. Dimensões de viabilidade: o que cada uma entrega e COMO
+
+| Dimensão (aula) | Entrega | Produção | Fonte |
+|---|---|---|---|
+| Aproveitamento (motor) | área, perímetro, declividade, lotes por modalidade | determinístico geométrico | KMZ + DEM + regras |
+| Ambiental (06) | APP, UC, hidrografia, declividade ≥30%, faixa não-edificável | determinístico geoespacial | ANA, ICMBio, Cód. Florestal |
+| Jurídica (09) | lote mín., doação, via, infra vs. perfil; checklist documentação | auto (perfil) + declarado | perfil municipal/estadual |
+| Técnica (07) | declividade auto; solo, lençol, ETE/EEE, LT como campos guiados | misto auto + declarado | DEM + incorporador |
+| Financeira (02) | preço/lote, carteira, custo, parceria, ponto de equilíbrio | determinístico de cálculo | **lotes do motor** + inputs |
+| Econômica (03) | VPL, TIR, TMA, Retorno de Capital | determinístico financeiro | fluxo da financeira |
+| Localização (05) | população, renda, PIB, faixa etária | auto (enriquecimento) | IBGE (nacional) |
+| Mercadológica (04) | concorrentes, perfil comprador, fornecedores | declarado + IBGE parcial | incorporador + IBGE |
+| Operacional (08) | mão de obra, máquinas, insumos, redes | declarado | incorporador |
+| Política (01) | isenção IPTU, relação prefeitura, benefícios | externo (relacional) | fora do tool |
+
+---
+
+## 8. Ordem de construção (fases)
+
+A casca compartilhada vem antes de qualquer dimensão; depois, por valor × automatização,
+respeitando a cascata de dados.
+
+1. **Fase 1 — Casca + Aproveitamento** (mapa, upload KMZ, resolvedor de jurisdição,
+   moldura de relatório, motor de aproveitamento geométrico).
+2. Fase 2 — Ambiental (overlays geoespaciais nacionais).
+3. Fase 3 — Jurídica (perfil municipal/estadual; liga aproveitamento aos limites legais).
+4. Fase 4 — Financeira (consome lotes do motor).
+5. Fase 5 — Econômica (consome fluxo da financeira).
+6. Fase 6 — Localização (enriquecimento IBGE).
+7. Fase 7+ — Técnica / Operacional / Mercadológica / Política (guiadas).
+
+Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma sem tocar nas outras.
+
+---
+
+## 9. Correções registradas (não repetir os erros do material do curso)
+
+- **RET 1% / 4% NÃO se aplica a loteamento** — é restrito a incorporação de edifícios.
+  Loteamento usa Lucro Presumido ou Lucro Real. O `5,93%` que aparece na planilha é a
+  faixa de **incorporação no lucro presumido** (art. 4º Lei 10.931/2004), não de loteamento.
+  → Na Fase Financeira/Econômica, tributação é **parâmetro validável**, não constante.
+- **Servidão de LT não é 70 m fixo** — varia por tensão (20/40/70 m para 69/230/500 kV).
+- **Aproveitamento ~74% / ~60% não tem âncora legal** — é regra de mercado; default editável com aviso.
+- **APP urbana**: divergência 15 m (Lei 6.766) × 30 m (Cód. Florestal), modulada pela
+  Lei 14.285/2021. Aplicar o maior buffer como triagem e marcar "verificar legislação municipal".
+
+---
+
+## Histórico de decisões
+
+| Data | Decisão | Fase |
+|---|---|---|
+| (preencher ao concluir cada fase) | | |
