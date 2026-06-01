@@ -20,9 +20,17 @@ uma gleba e produz uma análise determinística — **não decide aprovação mu
 - Backend FastAPI: **8700**
 - Frontend Next.js: **3700**
 
-## Rodar com Docker Compose
+## Rodar com Compose (Podman ou Docker)
+
+O `docker-compose.yml` é agnóstico de engine — funciona com `podman-compose` ou `docker compose`.
+
 ```bash
+# Podman
+podman-compose up --build
+
+# Docker (alternativa)
 docker compose up --build
+
 # web  → http://localhost:3700
 # api  → http://localhost:8700  (docs em /docs)
 ```
