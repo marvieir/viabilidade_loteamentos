@@ -1,0 +1,21 @@
+# Pré-Viabilidade de Loteamento — dois serviços (CLAUDE.md / ARCHITECTURE.md §3).
+# Portas: backend > 8700, frontend > 3700.
+services:
+  api:
+    build: ./backend
+    ports:
+      - "8700:8700"
+    environment:
+      CORS_ORIGINS: "http://localhost:3700"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE: "http://localhost:8700"
+    ports:
+      - "3700:3700"
+    depends_on:
+      - api
+    restart: unless-stopped
