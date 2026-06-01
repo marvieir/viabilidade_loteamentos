@@ -151,6 +151,44 @@ export async function calcularAproveitamento(
   return jsonOrThrow(res);
 }
 
+// ----- Fase 2 — Ambiental -----
+
+export type TipoAlerta =
+  | "MINERACAO"
+  | "UNIDADE_CONSERVACAO"
+  | "APP_HIDROGRAFIA"
+  | "FAIXA_NAO_EDIFICAVEL";
+
+export interface ProvenienciaAmbiental {
+  camada: string;
+  data_referencia: string | null;
+  ressalva: string;
+}
+
+export interface AlertaAmbiental {
+  tipo: TipoAlerta;
+  severidade: "ALERTA" | "INFORMATIVO";
+  intersecta: boolean;
+  area_afetada_m2?: number | null;
+  largura_confirmada?: boolean | null;
+  detalhe: string;
+  proveniencia: ProvenienciaAmbiental;
+}
+
+export type ChaveOverlay = "app" | "faixa_nao_edificavel" | "uc" | "mineracao";
+
+export interface Ambiental {
+  alertas: AlertaAmbiental[];
+  geojson_overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
+  avisos: string[];
+  sem_alertas: boolean;
+}
+
+export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/ambiental`);
+  return jsonOrThrow(res);
+}
+
 // Conveniência: busca as três bases (cada uma é um cálculo do backend).
 export async function calcularTodasBases(
   analiseId: string,

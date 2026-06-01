@@ -5,7 +5,9 @@ import zipfile
 
 import pytest
 from fastapi.testclient import TestClient
+from shapely.geometry import LineString, Polygon
 
+from app.core.camadas import Camadas, get_fonte_camadas
 from app.core.jurisdicao import get_resolvedor_municipio
 from app.core.store import STORE
 from app.main import app
@@ -99,6 +101,44 @@ LINHA_AUTOINTERSEC = [_BL, _TR, _BR, _TL]
 def resolver_sao_roque(lon, lat):
     """De-para de TESTE — nunca usado em produção."""
     return ("São Roque", "SP", "3550605")
+
+
+# ----- Fixtures de CAMADAS ambientais (Fase 2) — stubs offline e determinísticos -----
+# Geometrias-stub posicionadas em relação ao RET_RETANGULO (a gleba de teste):
+# gleba = (-47.140, -23.530) a (-47.120, -23.520).
+DATA_REF = "2026-05-31"
+
+# Rio horizontal que CRUZA a gleba (de ponta a ponta, em lat média).
+RIO_CRUZA = LineString([(-47.145, -23.525), (-47.115, -23.525)])
+# UC que cobre toda a gleba.
+UC_COBRE = Polygon(
+    [(-47.145, -23.535), (-47.115, -23.535), (-47.115, -23.515), (-47.145, -23.515)]
+)
+# Processo minerário que sobrepõe parte da gleba.
+MINA_SOBREPOE = Polygon(
+    [(-47.135, -23.528), (-47.125, -23.528), (-47.125, -23.522), (-47.135, -23.522)]
+)
+
+
+class StubFonte:
+    """Fonte de camadas de TESTE — devolve Camadas fixas, sem rede."""
+
+    def __init__(self, camadas: Camadas):
+        self._camadas = camadas
+
+    def coletar(self, bbox, uf):  # assinatura de FonteCamadas
+        return self._camadas
+
+
+@pytest.fixture
+def fonte():
+    """Injeta uma fonte-stub. Uso: ``fonte(Camadas(...))`` dentro do teste."""
+
+    def _set(camadas: Camadas):
+        app.dependency_overrides[get_fonte_camadas] = lambda: StubFonte(camadas)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_camadas, None)
 
 
 @pytest.fixture(autouse=True)

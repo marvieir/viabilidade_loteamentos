@@ -5,13 +5,14 @@ import dynamic from "next/dynamic";
 import { UploadKmz } from "@/components/UploadKmz";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
+import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Analise } from "@/lib/api";
+import type { Analise, ChaveOverlay } from "@/lib/api";
 
 // Leaflet só roda no cliente.
 const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
@@ -28,6 +29,14 @@ const m2 = (v: number) =>
 
 export default function Home() {
   const [analise, setAnalise] = useState<Analise | null>(null);
+  const [overlays, setOverlays] = useState<
+    Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
+  >({});
+
+  function onAnalise(a: Analise | null) {
+    setAnalise(a);
+    setOverlays({}); // nova gleba → limpa overlays ambientais do mapa
+  }
 
   return (
     <main className="mx-auto max-w-5xl space-y-6 p-6">
@@ -44,7 +53,7 @@ export default function Home() {
           <CardTitle>1 · KMZ da gleba</CardTitle>
         </CardHeader>
         <CardContent>
-          <UploadKmz onAnalise={setAnalise} />
+          <UploadKmz onAnalise={onAnalise} />
         </CardContent>
       </Card>
 
@@ -56,7 +65,10 @@ export default function Home() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="h-80 overflow-hidden rounded-lg border border-slate-200">
-                <MapaLeaflet geojson={analise.geometria.geojson} />
+                <MapaLeaflet
+                  geojson={analise.geometria.geojson}
+                  overlays={overlays}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <Metrica titulo="Área" valor={m2(analise.geometria.area_m2)} />
@@ -91,6 +103,11 @@ export default function Home() {
           </Card>
 
           <CardAproveitamento analiseId={analise.analise_id} />
+
+          <CardAmbiental
+            analiseId={analise.analise_id}
+            onOverlays={setOverlays}
+          />
         </>
       )}
     </main>

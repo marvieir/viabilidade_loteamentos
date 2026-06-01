@@ -70,3 +70,30 @@ class LoteamentoOut(ModalidadeOut):
 class AproveitamentoOut(BaseModel):
     desmembramento: ModalidadeOut
     loteamento: LoteamentoOut
+
+
+# ----- GET /api/analises/{id}/ambiental (Fase 2) -----
+
+class ProvenienciaAmbientalOut(BaseModel):
+    camada: str
+    data_referencia: Optional[str]
+    ressalva: str
+
+
+class AlertaAmbientalOut(BaseModel):
+    tipo: Literal[
+        "MINERACAO", "UNIDADE_CONSERVACAO", "APP_HIDROGRAFIA", "FAIXA_NAO_EDIFICAVEL"
+    ]
+    severidade: Literal["ALERTA", "INFORMATIVO"]
+    intersecta: bool
+    area_afetada_m2: Optional[float] = None
+    largura_confirmada: Optional[bool] = None  # só em APP_HIDROGRAFIA
+    detalhe: str
+    proveniencia: ProvenienciaAmbientalOut
+
+
+class AmbientalOut(BaseModel):
+    alertas: list[AlertaAmbientalOut] = []
+    geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, uc, mineracao}
+    avisos: list[str] = []
+    sem_alertas: bool
