@@ -9,10 +9,12 @@ import hashlib
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 from shapely.geometry import mapping
 
 from app.core import aproveitamento as motor
 from app.core import geometria
+from app.core import ingestao as ingestao_mod
 from app.core import kmz as kmz_parser
 from app.core.jurisdicao import (
     ResolvedorMunicipio,
@@ -40,26 +42,41 @@ def _jurisdicao_to_schema(jur) -> schemas.JurisdicaoOut:
 
 @router.post("/analises", response_model=schemas.AnaliseOut)
 async def criar_analise(
-    kmz: UploadFile = File(...),
+    kmz: UploadFile | None = File(None),
+    kml: UploadFile | None = File(None),
     resolvedor: ResolvedorMunicipio | None = Depends(get_resolvedor_municipio),
 ):
-    conteudo = await kmz.read()
-    if not conteudo:
-        raise HTTPException(422, "Arquivo KMZ vazio.")
+    upload = kmz or kml
+    if upload is None:
+        raise HTTPException(422, "Envie um arquivo KMZ ou KML.")
 
+    conteudo = await upload.read()
+    if not conteudo:
+        raise HTTPException(422, "Arquivo vazio.")
+
+    # Camada de ingestão (Fase 1.5): classifica por conteúdo.
     try:
-        poligonos = kmz_parser.extrair_poligonos(conteudo)
+        res = ingestao_mod.ingerir(conteudo)
     except kmz_parser.KmzInvalido as exc:
         raise HTTPException(422, str(exc))
 
-    if not poligonos:
-        raise HTTPException(422, "Nenhum polígono encontrado no KMZ.")
+    # Recusa diagnóstica (TOPOGRAFIA_CAD / sem geometria) → 422 com corpo estruturado.
+    if not res.ok:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "erro": res.erro,
+                "rota": res.rota,
+                "diagnostico": res.diagnostico,
+                "orientacao": res.orientacao,
+            },
+        )
 
-    avisos: list[str] = []
+    avisos: list[str] = list(res.avisos)
 
     # Mede todos; geometria inválida → 422 (não 500, não silêncio).
     medidos = []
-    for poly in poligonos:
+    for poly in res.poligonos:
         try:
             area, perimetro = geometria.medir(poly)
         except geometria.GeometriaInvalida as exc:
@@ -95,6 +112,9 @@ async def criar_analise(
             geojson=mapping(poly),
         ),
         jurisdicao=_jurisdicao_to_schema(jur),
+        origem_geometria=schemas.OrigemGeometriaOut(
+            rota=res.rota, descricao=res.descricao
+        ),
         avisos=avisos,
     )
 

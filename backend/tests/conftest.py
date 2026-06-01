@@ -17,6 +17,9 @@ _PLACEMARK = (
     "<coordinates>{coords}</coordinates>"
     "</LinearRing></outerBoundaryIs></Polygon></Placemark>"
 )
+_PLACEMARK_LINHA = (
+    "<Placemark><LineString><coordinates>{coords}</coordinates></LineString></Placemark>"
+)
 
 
 def _coords(anel):
@@ -27,14 +30,23 @@ def _fechar(anel):
     return anel if anel[0] == anel[-1] else [*anel, anel[0]]
 
 
-def make_kmz(aneis):
-    """Gera bytes de um KMZ com um polígono por anel informado."""
-    placemarks = "".join(_PLACEMARK.format(coords=_coords(_fechar(a))) for a in aneis)
-    kml = _KML.format(placemarks=placemarks)
+def _zip_kml(kml: str) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("doc.kml", kml)
     return buf.getvalue()
+
+
+def make_kmz(aneis):
+    """Gera bytes de um KMZ com um polígono por anel informado."""
+    placemarks = "".join(_PLACEMARK.format(coords=_coords(_fechar(a))) for a in aneis)
+    return _zip_kml(_KML.format(placemarks=placemarks))
+
+
+def make_kmz_linhas(linhas):
+    """Gera bytes de um KMZ com uma <LineString> por lista de coords (sem auto-fechar)."""
+    placemarks = "".join(_PLACEMARK_LINHA.format(coords=_coords(l)) for l in linhas)
+    return _zip_kml(_KML.format(placemarks=placemarks))
 
 
 # Retângulo conhecido perto de São Roque/SP. ~0.02° lon × ~0.01° lat.
@@ -61,6 +73,27 @@ RET_INVALIDO = [
     (LON0 + 0.02, LAT0),
     (LON0, LAT0 + 0.01),
 ]
+
+# ----- Fixtures de LINHA para a camada de ingestão (Fase 1.5) -----
+# Cantos do retângulo (sentido anti-horário): BL, BR, TR, TL.
+_BL, _BR, _TR, _TL = (
+    (LON0, LAT0),
+    (LON0 + 0.02, LAT0),
+    (LON0 + 0.02, LAT0 + 0.01),
+    (LON0, LAT0 + 0.01),
+)
+# 1 grau de latitude ≈ 111.320 m.
+_DLAT_GAP_OK = 2.7e-6      # ~0,30 m  (≤ 1,0 m → fecha)
+_DLAT_GAP_GRANDE = 4.5e-5  # ~5,0 m   (> 1,0 m → recusa)
+
+# LineString simples FECHADA (último == primeiro) → LINHA_FECHAVEL.
+LINHA_FECHADA = [_BL, _BR, _TR, _TL, _BL]
+# LineString simples ABERTA com gap pequeno → fecha + aviso.
+LINHA_GAP_OK = [_BL, _BR, _TR, _TL, (LON0, LAT0 + _DLAT_GAP_OK)]
+# LineString simples ABERTA com gap grande → TOPOGRAFIA_CAD / linha_aberta.
+LINHA_GAP_GRANDE = [_BL, _BR, _TR, _TL, (LON0, LAT0 + _DLAT_GAP_GRANDE)]
+# LineString auto-intersectada (bowtie) → TOPOGRAFIA_CAD / auto_intersecao.
+LINHA_AUTOINTERSEC = [_BL, _TR, _BR, _TL]
 
 
 def resolver_sao_roque(lon, lat):

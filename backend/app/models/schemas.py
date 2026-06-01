@@ -22,10 +22,18 @@ class JurisdicaoOut(BaseModel):
     nao_considerado: list[str] = []
 
 
+class OrigemGeometriaOut(BaseModel):
+    """Proveniência da rota de ingestão (Fase 1.5)."""
+
+    rota: Literal["POLYGON_DIRETO", "LINHA_FECHAVEL"]
+    descricao: str
+
+
 class AnaliseOut(BaseModel):
     analise_id: str
     geometria: GeometriaOut
     jurisdicao: JurisdicaoOut
+    origem_geometria: OrigemGeometriaOut
     avisos: list[str] = []
 
 

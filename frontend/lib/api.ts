@@ -21,11 +21,39 @@ export interface Jurisdicao {
   nao_considerado: string[];
 }
 
+export interface OrigemGeometria {
+  rota: "POLYGON_DIRETO" | "LINHA_FECHAVEL";
+  descricao: string;
+}
+
 export interface Analise {
   analise_id: string;
   geometria: Geometria;
   jurisdicao: Jurisdicao;
+  origem_geometria: OrigemGeometria;
   avisos: string[];
+}
+
+// Recusa diagnóstica da ingestão (Fase 1.5): arquivo de topografia/CAD, etc.
+export interface DiagnosticoIngestao {
+  n_poligonos: number;
+  n_linhas: number;
+  motivo: string;
+  detalhe: string;
+  n_pontos?: number;
+}
+
+export class IngestaoRecusada extends Error {
+  rota: string;
+  diagnostico: DiagnosticoIngestao;
+  orientacao: string;
+  constructor(rota: string, diagnostico: DiagnosticoIngestao, orientacao: string) {
+    super(diagnostico?.detalhe ?? "Geometria não ingerível.");
+    this.name = "IngestaoRecusada";
+    this.rota = rota;
+    this.diagnostico = diagnostico;
+    this.orientacao = orientacao;
+  }
 }
 
 export interface Modalidade {
@@ -75,7 +103,27 @@ export async function criarAnalise(kmz: File): Promise<Analise> {
     method: "POST",
     body: form,
   });
-  return jsonOrThrow(res);
+  if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      /* corpo não-JSON */
+    }
+    const b = body as Record<string, unknown> | null;
+    // Recusa diagnóstica da ingestão (corpo estruturado, não {detail}).
+    if (b && b.erro === "geometria_nao_ingerivel") {
+      throw new IngestaoRecusada(
+        String(b.rota),
+        b.diagnostico as DiagnosticoIngestao,
+        String(b.orientacao ?? "")
+      );
+    }
+    throw new Error(
+      (b?.detail as string) ?? `${res.status} ${res.statusText}`
+    );
+  }
+  return res.json();
 }
 
 export async function calcularAproveitamento(

@@ -87,6 +87,29 @@ O relatório estampa o nível e diz explicitamente o que não foi considerado.
 
 ---
 
+## 4-A. Camada de ingestão de geometria (classificar por conteúdo)
+
+Decisão central: ~99% dos arquivos reais chegam como export de topografia/CAD
+(linhas, não polígonos). A ingestão é, portanto, **gargalo de viabilidade do produto**
+e precede as dimensões de análise.
+
+O que decide o tratamento é **o conteúdo do arquivo**, não a origem (Google Earth,
+AutoCAD, software de topografia). Três rotas:
+
+| Rota | Condição | Ação |
+|---|---|---|
+| `POLYGON_DIRETO` | ≥1 `<Polygon>` | usa direto (vários → maior + `aviso`) |
+| `LINHA_FECHAVEL` | exatamente 1 `<LineString>` simples, fechada ou com gap ≤ tolerância | fecha e converte |
+| `TOPOGRAFIA_CAD` | demais casos sem polígono (multi-linha, aberta além da tolerância, auto-intersectada) | recusa com diagnóstico → Fase 1.6 |
+
+Regras invioláveis da ingestão: nunca fechar linha em silêncio (sempre declarar o
+gap); nunca adivinhar qual linha é o perímetro quando há várias (isso exige
+confirmação humana, Fase 1.6); recusa sempre diagnóstica (conta o que viu e orienta).
+O motor de geometria permanece **puro** (`Polygon` entra → área sai); a ingestão é um
+adaptador a montante.
+
+---
+
 ## 5. Parâmetros legais verificados (piso nacional)
 
 Fontes cruzadas com legislação. Valores federais são **constantes**; o resto é
@@ -158,17 +181,25 @@ a saída do motor. Por isso a ordem de construção respeita essa cascata.
 
 ## 8. Ordem de construção (fases)
 
-A casca compartilhada vem antes de qualquer dimensão; depois, por valor × automatização,
-respeitando a cascata de dados.
+A casca compartilhada vem antes de qualquer dimensão. A **ingestão fura a fila** logo
+após a casca, porque ~99% dos arquivos reais precisam dela e nenhuma dimensão agrega
+valor sobre uma gleba que o sistema não conseguiu ler. Depois, as dimensões por valor ×
+automatização, respeitando a cascata de dados.
 
-1. **Fase 1 — Casca + Aproveitamento** (mapa, upload KMZ, resolvedor de jurisdição,
+1. **Fase 1 — Casca + Aproveitamento** ✅ (mapa, upload KMZ, resolvedor de jurisdição,
    moldura de relatório, motor de aproveitamento geométrico).
-2. Fase 2 — Ambiental (overlays geoespaciais nacionais).
-3. Fase 3 — Jurídica (perfil municipal/estadual; liga aproveitamento aos limites legais).
-4. Fase 4 — Financeira (consome lotes do motor).
-5. Fase 5 — Econômica (consome fluxo da financeira).
-6. Fase 6 — Localização (enriquecimento IBGE).
-7. Fase 7+ — Técnica / Operacional / Mercadológica / Política (guiadas).
+2. **Fase 1.5 — Ingestão determinística** (classificador por conteúdo; `Polygon` direto +
+   1 linha simples fechável → polígono; CAD multi-linha roteado para 1.6 com diagnóstico).
+   `docs/fase-1.5-ingestao.md`.
+3. **Fase 1.6 — Adaptador de topografia/CAD** (isola perímetro entre várias linhas, fecha
+   gaps grandes, resolve auto-interseções, com confirmação visual no mapa). **Pendente
+   de 3–5 arquivos reais** antes de especificar — caso difícil, não determinístico sozinho.
+4. Fase 2 — Ambiental (overlays geoespaciais nacionais).
+5. Fase 3 — Jurídica (perfil municipal/estadual; liga aproveitamento aos limites legais).
+6. Fase 4 — Financeira (consome lotes do motor).
+7. Fase 5 — Econômica (consome fluxo da financeira).
+8. Fase 6 — Localização (enriquecimento IBGE).
+9. Fase 7+ — Técnica / Operacional / Mercadológica / Política (guiadas).
 
 Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma sem tocar nas outras.
 
@@ -193,6 +224,9 @@ Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma s
 |---|---|---|
 | 2026-06-01 | **Fase 1 concluída e testada** (casca + motor de aproveitamento). Demo ponta a ponta: upload KMZ → mapa Leaflet → área/perímetro geodésicos → jurisdição → aproveitamento. 15 testes `pytest` verdes, cobrindo os 7 critérios de aceite. | 1 |
 | 2026-06-01 | **Resolvedor de jurisdição = stub injetável.** O de-para centróide→município/UF/IBGE é uma interface injetável; em produção retorna "não resolvido" (`municipio=null`, `cobertura=BASE_FEDERAL`), nos testes injeta-se São Roque/SP/3550605. Resolução geográfica real (malha IBGE ou API) fica para fase futura. Mantém determinismo e testes 100% offline. | 1 |
-| 2026-06-01 | **Parser de KMZ aceita apenas `<Polygon>` na Fase 1.** Múltiplos polígonos → usa o de maior área + registra em `avisos`. Geometria inválida → 422. Sem inventar contorno. | 1 |
+| 2026-06-01 | **Parser de KMZ aceita apenas `<Polygon>` na Fase 1.** Múltiplos polígonos → usa o de maior área + registra em `avisos`. Geometria inválida → 422. Sem inventar contorno. (Generalizado pela camada de ingestão na Fase 1.5.) | 1 |
 | 2026-06-01 | **Docker/Compose sem `apt`:** os wheels manylinux de `shapely`/`pyproj`/`lxml` já embarcam GEOS/PROJ/libxml2 — dispensa libs de sistema. Build mais magro e portátil (validado com Podman no macOS ARM). | 1 |
-| 2026-06-01 | **Pendência registrada (não implementada):** KMZ exportado de topografia/CAD traz só `LineString` (sem `Polygon`) — ex.: memorial descritivo/georreferenciamento. Recusado corretamente na Fase 1. Reconstruir polígono a partir das linhas de perímetro deve virar feature especificada numa fase futura (não é hack). | (futura) |
+| 2026-06-01 | **Ingestão fura a fila (antes das dimensões).** ~99% dos arquivos reais chegam como topografia/CAD (linhas, não polígonos); sem ler a entrada nenhuma dimensão agrega valor. Camada de ingestão classifica **por conteúdo** (não por origem), em 3 rotas: `POLYGON_DIRETO`, `LINHA_FECHAVEL`, `TOPOGRAFIA_CAD`. Ver seção 4-A. | 1.5/1.6 |
+| 2026-06-01 | **Ingestão quebrada em 1.5 (determinística) + 1.6 (CAD sujo).** 1.5 resolve casos sem ambiguidade (polígono direto; 1 linha simples fechável) e roteia o resto com diagnóstico — especificada (`docs/fase-1.5-ingestao.md`). 1.6 (isolar perímetro, fechar gaps grandes, auto-interseção, confirmação visual) fica **pendente de 3–5 arquivos reais** para especificação. | 1.5/1.6 |
+| 2026-06-01 | **Fase 1.5 concluída e testada** — camada de ingestão substituiu o parser cru; rotas `POLYGON_DIRETO`/`LINHA_FECHAVEL`/`TOPOGRAFIA_CAD`; `origem_geometria` na resposta; recusa diagnóstica 422; tolerância de fechamento 1,0 m. 10 critérios de aceite verdes, sem regressão na Fase 1. | 1.5 |
+| 2026-06-01 | **Pendência registrada (não implementada):** KMZ exportado de topografia/CAD traz só `LineString` (sem `Polygon`) — ex.: memorial descritivo/georreferenciamento. Recusado corretamente com diagnóstico na Fase 1.5; reconstrução assistida (isolar perímetro entre várias linhas) é a Fase 1.6. | 1.6 |
