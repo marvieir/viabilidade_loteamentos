@@ -202,8 +202,9 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
               onChange={setFmp}
             />
             <p className="col-span-2 self-end text-xs text-slate-500">
-              Piso de parcelamento rural (módulo fiscal/FMP, INCRA). 20.000 m² = 2
-              ha. Puxado da tabela do município quando disponível; editável aqui.
+              Fração Mínima de Parcelamento (FMP por município, INCRA — distinta do
+              módulo fiscal). 20.000 m² = 2 ha. Puxada da tabela quando disponível;
+              na ausência aplica-se o piso de 2 ha (confirmar no CCIR); editável aqui.
             </p>
           </div>
         )}
@@ -240,6 +241,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
                 <TH>Regime rural</TH>
                 <TH>Área</TH>
                 <TH>FMP</TH>
+                <TH>Origem da FMP</TH>
                 <TH>Parcelas</TH>
                 <TH>Proveniência</TH>
               </TR>
@@ -253,6 +255,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
                 <TD>
                   {m2(rural.fmp_m2)} ({ha(rural.fmp_m2)})
                 </TD>
+                <TD className="text-xs text-slate-500">{rural.fmp_origem}</TD>
                 <TD className="font-semibold">{rural.n_parcelas}</TD>
                 <TD className="text-xs text-slate-500">{rural.proveniencia}</TD>
               </TR>

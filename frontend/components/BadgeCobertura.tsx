@@ -37,7 +37,7 @@ export function BadgeCobertura({
     uf,
     origem,
     cruza_divisa,
-    municipios_candidatos,
+    candidatos,
   } = jurisdicao;
 
   const [editando, setEditando] = useState(false);
@@ -101,10 +101,17 @@ export function BadgeCobertura({
           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
             origem === "informado"
               ? "bg-sky-100 text-sky-800"
-              : "bg-slate-100 text-slate-600"
+              : origem === "aproximado"
+                ? "bg-amber-100 text-amber-800"
+                : "bg-slate-100 text-slate-600"
           }`}
+          title={
+            origem === "aproximado"
+              ? "Detecção aproximada (borda/gap) — confirme o município."
+              : undefined
+          }
         >
-          {origem === "informado" ? "informado" : "detectado"}
+          {origem}
         </span>
         <button
           type="button"
@@ -115,14 +122,14 @@ export function BadgeCobertura({
         </button>
       </div>
 
-      {cruza_divisa && municipios_candidatos.length > 0 && (
+      {cruza_divisa && candidatos.length > 0 && (
         <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
           <p className="mb-1 font-medium">
-            A gleba cruza a divisa de {municipios_candidatos.length} municípios.
-            Confirme qual rege a análise:
+            A gleba cruza a divisa de {candidatos.length} municípios. Confirme qual
+            rege a análise (o de maior área vem pré-selecionado):
           </p>
           <div className="flex flex-wrap gap-2">
-            {municipios_candidatos.map((m) => (
+            {candidatos.map((m) => (
               <button
                 key={m.cod_ibge}
                 type="button"
@@ -130,7 +137,8 @@ export function BadgeCobertura({
                 onClick={() => aplicar(m.cod_ibge)}
                 className="rounded-md border border-amber-300 bg-white px-2 py-1 font-medium hover:bg-amber-100 disabled:opacity-50"
               >
-                {m.municipio} / {m.uf}
+                {m.municipio} / {m.uf}{" "}
+                <span className="text-amber-600">({m.pct_area}%)</span>
               </button>
             ))}
           </div>

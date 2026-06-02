@@ -34,21 +34,32 @@ class Municipio:
     uf: str
 
 
+@dataclass(frozen=True)
+class Candidato:
+    """Município candidato na divisa, com a fração da gleba que cai nele (%)."""
+
+    cod_ibge: str
+    municipio: str
+    uf: str
+    pct_area: float  # 0–100, 1 casa decimal
+
+
 @runtime_checkable
 class FonteMalha(Protocol):
-    """Acesso à malha municipal. Implementação real em ``malha_ibge.py``."""
+    """Acesso à malha GEOMÉTRICA municipal (só DETECTAR). Real em ``malha_ibge.py``.
+
+    A busca/correção por NOME usa a lista leve (``lista_municipios.py``), desacoplada —
+    por isso o override sobrevive mesmo sem a malha (decisão #2 da 1.7).
+    """
 
     def municipio_no_ponto(self, lon: float, lat: float) -> Optional[Municipio]:
         """Município que contém o ponto (centróide), ou None se fora da malha."""
 
-    def municipios_que_intersectam(self, poly) -> list[Municipio]:
-        """Todos os municípios que o polígono intersecta (para alerta de divisa)."""
+    def intersecoes(self, poly) -> list[tuple[Municipio, object]]:
+        """``(Municipio, geometria_da_interseção)`` para cada município que toca o polígono.
 
-    def por_codigo(self, cod_ibge: str) -> Optional[Municipio]:
-        """Município pelo código IBGE (para override/seleção manual)."""
-
-    def buscar_por_nome(self, termo: str, limite: int = 10) -> list[Municipio]:
-        """Busca por nome (tolerante a acento/caixa), para o autocomplete do override."""
+        A geometria da interseção alimenta o cálculo do % de área por município na divisa.
+        """
 
 
 # O que o nível BASE_FEDERAL explicitamente NÃO considerou (critério de aceite).
@@ -65,17 +76,17 @@ class Jurisdicao:
     uf: Optional[str]
     cod_ibge: Optional[str]
     cobertura: str  # BASE_FEDERAL | PARCIAL_UF | COMPLETA
-    origem: str = "detectado"  # detectado | informado
+    origem: str = "detectado"  # detectado | aproximado | informado
     cruza_divisa: bool = False
-    municipios_candidatos: list[Municipio] = field(default_factory=list)
+    candidatos: list[Candidato] = field(default_factory=list)
     nao_considerado: list[str] = field(default_factory=list)
 
 
 def _base_federal(
     municipio: Optional[Municipio],
     origem: str,
-    cruza_divisa: bool,
-    candidatos: list[Municipio],
+    cruza_divisa: bool = False,
+    candidatos: Optional[list[Candidato]] = None,
 ) -> Jurisdicao:
     return Jurisdicao(
         municipio=municipio.municipio if municipio else None,
@@ -84,48 +95,72 @@ def _base_federal(
         cobertura="BASE_FEDERAL",
         origem=origem,
         cruza_divisa=cruza_divisa,
-        municipios_candidatos=candidatos,
+        candidatos=candidatos or [],
         nao_considerado=list(NAO_CONSIDERADO_FEDERAL),
     )
+
+
+def _candidatos_por_area(intersecoes, area_poly: float) -> list[Candidato]:
+    """Converte ``(Municipio, geom_interseção)`` em candidatos com % de área, desc.
+
+    O % é a fração da gleba (área geodésica) que cai em cada município. Empate de %
+    desempata por código IBGE → saída determinística.
+    """
+    from app.core.geometria import area_geodesica
+
+    out: list[Candidato] = []
+    for mun, geom_int in intersecoes:
+        pct = round(100.0 * area_geodesica(geom_int) / area_poly, 1) if area_poly > 0 else 0.0
+        out.append(Candidato(mun.cod_ibge, mun.municipio, mun.uf, pct))
+    out.sort(key=lambda c: (-c.pct_area, c.cod_ibge))
+    return out
 
 
 def resolver_jurisdicao(
     poly,
     fonte: Optional[FonteMalha] = None,
 ) -> Jurisdicao:
-    """Resolve a jurisdição a partir do polígono da gleba.
+    """Resolve a jurisdição a partir do polígono da gleba (apenas DETECÇÃO).
 
-    Sem ``fonte`` (default de produção sem malha configurada) → ``BASE_FEDERAL`` com
-    município nulo. Com fonte: detecta por centróide e verifica cruzamento de divisa
-    sobre o polígono inteiro.
+    Sem ``fonte`` (produção sem malha) → ``BASE_FEDERAL`` município nulo. Com fonte:
+    - >1 município → **divisa**: candidatos com % de área, ordenados desc, default no maior;
+      exige confirmação humana (decisão #4). Origem ``detectado``.
+    - 1 município: se o centróide cai dentro dele → ``detectado``; se cai num gap de
+      generalização na borda → fallback **nearest** (o único que a gleba toca), ``aproximado``
+      (decisão #5) — nunca "não resolvido" quando a gleba claramente toca um município.
+    - 0 município (gleba fora de tudo) → município nulo, sem inventar.
     """
     if fonte is None:
-        return _base_federal(None, "detectado", False, [])
+        return _base_federal(None, "detectado")
 
-    centro = poly.centroid
-    intersectados = list(fonte.municipios_que_intersectam(poly))
+    intersecoes = list(fonte.intersecoes(poly))
+    if not intersecoes:
+        return _base_federal(None, "detectado")
 
-    if len(intersectados) > 1:
-        # Divisa: ordena por código para saída determinística; principal = o do centróide
-        # quando entre os candidatos, senão o primeiro candidato.
-        candidatos = sorted(intersectados, key=lambda m: m.cod_ibge)
-        no_centro = fonte.municipio_no_ponto(centro.x, centro.y)
-        principal = no_centro if no_centro in candidatos else candidatos[0]
+    if len(intersecoes) > 1:
+        from app.core.geometria import area_geodesica
+
+        candidatos = _candidatos_por_area(intersecoes, area_geodesica(poly))
+        maior = candidatos[0]
+        principal = Municipio(maior.cod_ibge, maior.municipio, maior.uf)
         return _base_federal(principal, "detectado", True, candidatos)
 
-    no_centro = fonte.municipio_no_ponto(centro.x, centro.y)
-    return _base_federal(no_centro, "detectado", False, [])
+    (mun, _geom), = intersecoes
+    no_centro = fonte.municipio_no_ponto(poly.centroid.x, poly.centroid.y)
+    contido = no_centro is not None and no_centro.cod_ibge == mun.cod_ibge
+    return _base_federal(mun, "detectado" if contido else "aproximado")
 
 
-def atualizar_municipio(cod_ibge: str, fonte: Optional[FonteMalha]) -> Jurisdicao:
-    """Seleção/correção manual: resolve o município pelo código e marca ``informado``.
+def atualizar_municipio(cod_ibge: str, fonte) -> Jurisdicao:
+    """Seleção/correção manual: resolve o município pelo código (na LISTA LEVE) e marca
+    ``informado``. Levanta ``ValueError`` se o código não existe (router → 422).
 
-    Levanta ``ValueError`` se o código não existe na malha (router → 404/422).
+    Usa a lista leve (não a malha) → o override funciona mesmo sem a malha geométrica.
     """
     municipio = fonte.por_codigo(cod_ibge) if fonte else None
     if municipio is None:
-        raise ValueError(f"Código IBGE não encontrado na malha: {cod_ibge!r}")
-    return _base_federal(municipio, "informado", False, [])
+        raise ValueError(f"Código IBGE não encontrado: {cod_ibge!r}")
+    return _base_federal(municipio, "informado")
 
 
 def get_fonte_malha() -> Optional[FonteMalha]:

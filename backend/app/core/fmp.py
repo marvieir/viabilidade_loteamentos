@@ -1,22 +1,30 @@
 """Fração Mínima de Parcelamento (FMP) por município — piso do parcelamento RURAL.
 
 Base legal: Lei 5.868/72 art. 8º; Estatuto da Terra (Lei 4.504/64) art. 65. A FMP é o
-piso de fracionamento de imóvel rural (não a Lei 6.766, que é urbana). Varia por
-município; o piso clássico/conservador é **2 ha = 20.000 m²**.
+piso de fracionamento de imóvel rural (não a Lei 6.766, que é urbana). **Não confundir
+com módulo fiscal** (que serve a ITR/enquadramento, não a parcelamento — decisão #1 da
+1.7). Varia por município; o piso legal/clássico é **2 ha = 20.000 m²**.
 
-Fonte (pipeline, não agente): tabela do módulo fiscal/FMP por município (INCRA,
-publicada pela EMBRAPA). Aqui consumimos uma tabela cacheada (JSON), injetável nos
-testes. PRODUÇÃO: ``get_fonte_fmp`` carrega ``perfis/fmp_municipios.json`` se presente;
-ausente → None (degradação: o usuário informa a FMP no pedido). Valores do seed são
-**PENDENTES de confirmação INCRA/EMBRAPA** (ver ARCHITECTURE.md, histórico da 1.7).
-"""
+Fonte (pipeline, não agente): tabela FMP por município (INCRA, IE 5/2022 Anexo IV; valor
+oficial também no CCIR do imóvel). Aqui consumimos uma tabela cacheada (JSON), injetável
+nos testes. PRODUÇÃO: ``get_fonte_fmp`` carrega ``perfis/fmp_municipios.json`` se presente;
+ausente para o município → o motor aplica o piso de 2 ha e rotula ``fmp_origem`` para
+confirmação no CCIR (nunca bloqueia). Valores do seed são **PENDENTES de confirmação
+INCRA** (ver ARCHITECTURE.md, histórico da 1.7)."""
 
 import json
 import os
 from pathlib import Path
 from typing import Optional, Protocol, runtime_checkable
 
-PROV_FMP = "FMP/módulo fiscal do município (INCRA; Lei 5.868/72 art. 8º)"
+# Piso legal de parcelamento rural quando o município não está na tabela (decisão #1):
+# não bloqueia — aplica o piso clássico de 2 ha e rotula a origem para confirmação.
+FMP_DEFAULT_M2 = 20_000.0
+
+# Rótulos de proveniência da FMP usada (campo ``fmp_origem`` da saída rural).
+FMP_ORIGEM_TABELA = "tabela INCRA"
+FMP_ORIGEM_INFORMADO = "informado pelo usuário"
+FMP_ORIGEM_DEFAULT = "default 2 ha (confirmar no CCIR)"
 
 _SEED = Path(__file__).resolve().parent.parent / "perfis" / "fmp_municipios.json"
 

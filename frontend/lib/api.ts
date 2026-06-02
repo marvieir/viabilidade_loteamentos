@@ -19,14 +19,19 @@ export interface MunicipioRef {
   uf: string;
 }
 
+// Candidato na divisa: município + fração da gleba que cai nele (% de área, 0–100).
+export interface CandidatoRef extends MunicipioRef {
+  pct_area: number;
+}
+
 export interface Jurisdicao {
   municipio: string | null;
   uf: string | null;
   cod_ibge: string | null;
   cobertura: Cobertura;
-  origem: "detectado" | "informado";
+  origem: "detectado" | "aproximado" | "informado";
   cruza_divisa: boolean;
-  municipios_candidatos: MunicipioRef[];
+  candidatos: CandidatoRef[];
   nao_considerado: string[];
 }
 
@@ -89,6 +94,7 @@ export interface RuralResult {
   fmp_m2: number;
   n_parcelas: number;
   area_m2: number;
+  fmp_origem: string; // "tabela INCRA" | "informado pelo usuário" | "default 2 ha (confirmar no CCIR)"
   flag_conversao: string;
   proveniencia: string;
 }

@@ -51,9 +51,17 @@ def _get_json(url: str, tentativas: int = 4) -> object:
     raise RuntimeError("inalcançável")
 
 
-def baixar(saida: str) -> None:
+def baixar(saida: str, saida_lista: str | None = None) -> None:
     print("→ localidades (nomes/UF)…", file=sys.stderr)
     localidades = _get_json(f"{BASE}/api/v1/localidades/municipios")
+
+    # Lista leve (cod+nome+UF, sem geometria) — dataset embarcável que destrava a busca/
+    # override por nome mesmo sem a malha (decisão #2). Sai das mesmas localidades.
+    if saida_lista:
+        lista = malha_ibge.montar_lista(localidades)
+        with open(saida_lista, "w", encoding="utf-8") as fh:
+            json.dump(lista, fh, ensure_ascii=False)
+        print(f"✓ {len(lista)} municípios na lista leve → {saida_lista}", file=sys.stderr)
 
     features: list[dict] = []
     for uf in UFS:
@@ -77,7 +85,13 @@ def baixar(saida: str) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Baixa a malha municipal IBGE → GeoJSON.")
     ap.add_argument("--saida", default="app/perfis/malha_ibge.geojson")
-    baixar(ap.parse_args().saida)
+    ap.add_argument(
+        "--lista",
+        default="app/perfis/lista_municipios.json",
+        help="Saída da lista leve (cod+nome+UF). Use '' para pular.",
+    )
+    args = ap.parse_args()
+    baixar(args.saida, args.lista or None)
 
 
 if __name__ == "__main__":

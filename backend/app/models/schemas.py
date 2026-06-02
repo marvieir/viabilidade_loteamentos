@@ -20,14 +20,20 @@ class MunicipioOut(BaseModel):
     uf: str
 
 
+class CandidatoOut(MunicipioOut):
+    """Candidato na divisa, com a fração da gleba que cai nele (% de área, 0–100)."""
+
+    pct_area: float
+
+
 class JurisdicaoOut(BaseModel):
     municipio: Optional[str]
     uf: Optional[str]
     cod_ibge: Optional[str]
     cobertura: Literal["BASE_FEDERAL", "PARCIAL_UF", "COMPLETA"]
-    origem: Literal["detectado", "informado"] = "detectado"
+    origem: Literal["detectado", "aproximado", "informado"] = "detectado"
     cruza_divisa: bool = False
-    municipios_candidatos: list[MunicipioOut] = []
+    candidatos: list[CandidatoOut] = []
     nao_considerado: list[str] = []
 
 
@@ -103,6 +109,7 @@ class RuralOut(BaseModel):
     fmp_m2: float
     n_parcelas: int
     area_m2: float
+    fmp_origem: str  # "tabela INCRA" | "informado pelo usuário" | "default 2 ha (confirmar no CCIR)"
     flag_conversao: str
     proveniencia: str
 

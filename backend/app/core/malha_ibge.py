@@ -65,13 +65,14 @@ class FonteMalhaArquivo:
                 return self._muns[idx]
         return None
 
-    def municipios_que_intersectam(self, poly) -> list[Municipio]:
+    def intersecoes(self, poly) -> list[tuple[Municipio, object]]:
         if self._tree is None:
             return []
-        achados: list[Municipio] = []
+        achados: list[tuple[Municipio, object]] = []
         for idx in self._tree.query(poly):
-            if self._geoms[idx].intersects(poly):
-                achados.append(self._muns[idx])
+            geom = self._geoms[idx]
+            if geom.intersects(poly):
+                achados.append((self._muns[idx], geom.intersection(poly)))
         return achados
 
     def por_codigo(self, cod_ibge: str) -> Optional[Municipio]:
@@ -150,6 +151,24 @@ def montar_geojson(localidades: list[dict], features: list[dict]) -> dict:
             }
         )
     return {"type": "FeatureCollection", "features": saida}
+
+
+def montar_lista(localidades: list[dict]) -> list[dict]:
+    """Extrai a **lista leve** (``cod_ibge + nome + UF``) das localidades do IBGE.
+
+    Função PURA, sem geometria — é o dataset embarcado no repo que alimenta a busca/
+    correção por nome (``lista_municipios.py``), desacoplado da malha pesada (decisão #2).
+    """
+    saida = []
+    for loc in localidades:
+        cod = loc.get("id")
+        nome = loc.get("nome")
+        uf = _uf_de_localidade(loc)
+        if cod is None or not (nome and uf):
+            continue
+        saida.append({"cod_ibge": str(cod), "municipio": nome, "uf": uf})
+    saida.sort(key=lambda r: (r["municipio"], r["uf"]))
+    return saida
 
 
 def from_env() -> Optional[FonteMalhaArquivo]:

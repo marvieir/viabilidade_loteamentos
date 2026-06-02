@@ -17,7 +17,7 @@ PROV_DESMEMBRAMENTO = (
 PROV_LOTEAMENTO = (
     "Lei 9.785/99 (doação municipal); base declarada no perfil"
 )
-PROV_RURAL = "FMP/módulo fiscal do município (INCRA; Lei 5.868/72 art. 8º)"
+PROV_RURAL = "FMP por município — Lei 5.868/72 art. 8º; Estatuto da Terra art. 65"
 FLAG_CONVERSAO_RURAL = (
     "loteamento urbano exige conversão rural→urbano (gleba dentro do perímetro urbano)"
 )

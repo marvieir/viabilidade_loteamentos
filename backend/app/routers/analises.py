@@ -17,7 +17,14 @@ from app.core import aproveitamento as motor
 from app.core import geometria
 from app.core import ingestao as ingestao_mod
 from app.core import kmz as kmz_parser
-from app.core.fmp import FonteFMP, get_fonte_fmp
+from app.core.fmp import (
+    FMP_DEFAULT_M2,
+    FMP_ORIGEM_DEFAULT,
+    FMP_ORIGEM_INFORMADO,
+    FMP_ORIGEM_TABELA,
+    FonteFMP,
+    get_fonte_fmp,
+)
 from app.core.jurisdicao import (
     FonteMalha,
     Jurisdicao,
@@ -25,6 +32,7 @@ from app.core.jurisdicao import (
     get_fonte_malha,
     resolver_jurisdicao,
 )
+from app.core.lista_municipios import FonteLista, get_fonte_lista
 from app.core.store import STORE
 from app.models import schemas
 
@@ -58,11 +66,14 @@ def _jurisdicao_to_schema(jur: Jurisdicao) -> schemas.JurisdicaoOut:
         cobertura=jur.cobertura,
         origem=jur.origem,
         cruza_divisa=jur.cruza_divisa,
-        municipios_candidatos=[
-            schemas.MunicipioOut(
-                cod_ibge=m.cod_ibge, municipio=m.municipio, uf=m.uf
+        candidatos=[
+            schemas.CandidatoOut(
+                cod_ibge=c.cod_ibge,
+                municipio=c.municipio,
+                uf=c.uf,
+                pct_area=c.pct_area,
             )
-            for m in jur.municipios_candidatos
+            for c in jur.candidatos
         ],
         nao_considerado=jur.nao_considerado,
     )
@@ -150,15 +161,15 @@ async def criar_analise(
 @router.get("/municipios", response_model=list[schemas.MunicipioOut])
 def buscar_municipios(
     q: str = Query(min_length=1, description="Trecho do nome (tolerante a acento/caixa)"),
-    fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
+    fonte_lista: FonteLista | None = Depends(get_fonte_lista),
 ):
-    """Autocomplete por NOME sobre a malha local (offline). Sem malha → lista vazia.
-
-    O usuário busca pelo nome; o código IBGE é resolvido internamente (nunca exibido).
+    """Autocomplete por NOME sobre a **lista leve** (embarcada, offline) — independente da
+    malha geométrica, então funciona mesmo sem ela (decisão #2). O usuário busca pelo nome;
+    o código IBGE é resolvido internamente (nunca exibido).
     """
-    if fonte_malha is None:
+    if fonte_lista is None:
         return []
-    achados = fonte_malha.buscar_por_nome(q)
+    achados = fonte_lista.buscar_por_nome(q)
     return [
         schemas.MunicipioOut(
             cod_ibge=m.cod_ibge, municipio=m.municipio, uf=m.uf
@@ -173,14 +184,15 @@ def buscar_municipios(
 def corrigir_municipio(
     analise_id: str,
     body: schemas.MunicipioIn,
-    fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
+    fonte_lista: FonteLista | None = Depends(get_fonte_lista),
 ):
-    """Override: fixa o município pelo código IBGE e marca a origem como ``informado``."""
+    """Override: fixa o município pelo código IBGE (resolvido na **lista leve**) e marca a
+    origem como ``informado``. Usa a lista, não a malha → sobrevive sem a malha geométrica."""
     registro = STORE.get(analise_id)
     if registro is None:
         raise HTTPException(404, "Análise não encontrada.")
     try:
-        jur = atualizar_municipio(body.cod_ibge, fonte_malha)
+        jur = atualizar_municipio(body.cod_ibge, fonte_lista)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     registro["jurisdicao"] = jur
@@ -217,25 +229,23 @@ def calcular_aproveitamento(
 
     if body.regime == "RURAL":
         jur: Jurisdicao = registro["jurisdicao"]
-        fmp = body.fmp_m2
-        if fmp is None and fonte_fmp is not None and jur.cod_ibge:
-            fmp = fonte_fmp.fmp_m2(jur.cod_ibge)
-        if fmp is None:
-            return JSONResponse(
-                status_code=422,
-                content={
-                    "erro": "fmp_indisponivel",
-                    "detalhe": (
-                        "FMP do município não está na tabela e não foi informada. "
-                        "Envie 'fmp_m2' (ex.: 20000 = 2 ha) ou selecione o município."
-                    ),
-                },
-            )
+        # Origem da FMP (decisão #1): corpo (editável) > tabela INCRA por município >
+        # piso legal de 2 ha (rotulado para confirmação no CCIR — nunca bloqueia).
+        if body.fmp_m2 is not None:
+            fmp, fmp_origem = body.fmp_m2, FMP_ORIGEM_INFORMADO
+        elif (
+            fonte_fmp is not None
+            and jur.cod_ibge
+            and (da_tabela := fonte_fmp.fmp_m2(jur.cod_ibge)) is not None
+        ):
+            fmp, fmp_origem = da_tabela, FMP_ORIGEM_TABELA
+        else:
+            fmp, fmp_origem = FMP_DEFAULT_M2, FMP_ORIGEM_DEFAULT
         rural = motor.aproveitamento_rural(area=area, fmp_m2=fmp)
         return schemas.AproveitamentoOut(
             regime="RURAL",
             premissa=PREMISSA_RURAL,
-            rural=schemas.RuralOut(**rural),
+            rural=schemas.RuralOut(**rural, fmp_origem=fmp_origem),
         )
 
     # URBANO — exige modalidade, lote declarado e parâmetros de loteamento.

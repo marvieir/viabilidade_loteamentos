@@ -10,6 +10,7 @@ from shapely.geometry import LineString, Point, Polygon
 from app.core.camadas import Camadas, get_fonte_camadas
 from app.core.fmp import FonteFMPArquivo, get_fonte_fmp
 from app.core.jurisdicao import Municipio, get_fonte_malha
+from app.core.lista_municipios import FonteListaArquivo, get_fonte_lista
 from app.core.store import STORE
 from app.main import app
 
@@ -99,7 +100,7 @@ LINHA_GAP_GRANDE = [_BL, _BR, _TR, _TL, (LON0, LAT0 + _DLAT_GAP_GRANDE)]
 LINHA_AUTOINTERSEC = [_BL, _TR, _BR, _TL]
 
 
-# ----- Malha municipal de TESTE (injetável) — nunca usada em produção -----
+# ----- Malha GEOMÉTRICA de TESTE (só DETECTAR; injetável) — nunca usada em produção -----
 class StubMalha:
     """Malha-stub: lista de (Municipio, Polygon). Sem rede, determinística."""
 
@@ -113,25 +114,12 @@ class StubMalha:
                 return mun
         return None
 
-    def municipios_que_intersectam(self, poly):
-        return [mun for mun, geom in self._m if geom.intersects(poly)]
-
-    def por_codigo(self, cod_ibge):
-        for mun, _ in self._m:
-            if mun.cod_ibge == cod_ibge:
-                return mun
-        return None
-
-    def buscar_por_nome(self, termo, limite=10):
-        from app.core.jurisdicao import normalizar_nome
-
-        alvo = normalizar_nome(termo)
-        if not alvo:
-            return []
-        achados = [
-            mun for mun, _ in self._m if alvo in normalizar_nome(mun.municipio)
+    def intersecoes(self, poly):
+        return [
+            (mun, geom.intersection(poly))
+            for mun, geom in self._m
+            if geom.intersects(poly)
         ]
-        return sorted(achados, key=lambda m: (m.municipio, m.uf))[:limite]
 
 
 # São Roque/SP cobrindo a região dos retângulos de teste (Fases 1/2, não-regressão).
@@ -140,6 +128,12 @@ SAO_ROQUE_POLY = Polygon(
     [(-47.20, -23.60), (-47.00, -23.60), (-47.00, -23.50), (-47.20, -23.50)]
 )
 MALHA_SAO_ROQUE = [(SAO_ROQUE, SAO_ROQUE_POLY)]
+
+# Lista leve padrão dos testes (desacoplada da malha): cobre São Roque e Bocaina.
+LISTA_PADRAO = [
+    {"cod_ibge": "3550605", "municipio": "São Roque", "uf": "SP"},
+    {"cod_ibge": "3506607", "municipio": "Bocaina", "uf": "SP"},
+]
 
 
 # ----- Fixtures de CAMADAS ambientais (Fase 2) — stubs offline e determinísticos -----
@@ -210,8 +204,23 @@ def fmp():
 
 
 @pytest.fixture
+def lista():
+    """Injeta uma lista leve-stub. Uso: ``lista([{cod_ibge, municipio, uf}, ...])``."""
+
+    def _set(registros):
+        app.dependency_overrides[get_fonte_lista] = lambda: FonteListaArquivo(registros)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_lista, None)
+
+
+@pytest.fixture
 def client_producao():
-    """Cliente com o comportamento REAL: sem malha municipal configurada."""
+    """Cliente com o comportamento REAL: SEM malha geométrica configurada.
+
+    A lista leve permanece no default (seed embarcado) → busca/override por nome ainda
+    funcionam sem a malha (decisão #2). Para determinismo, os testes podem injetar ``lista``.
+    """
     app.dependency_overrides.pop(get_fonte_malha, None)
     with TestClient(app) as c:
         yield c
@@ -219,8 +228,10 @@ def client_producao():
 
 @pytest.fixture
 def client():
-    """Cliente de teste com malha municipal injetada (São Roque/SP)."""
+    """Cliente de teste com malha (São Roque/SP) e lista leve padrão injetadas."""
     app.dependency_overrides[get_fonte_malha] = lambda: StubMalha(MALHA_SAO_ROQUE)
+    app.dependency_overrides[get_fonte_lista] = lambda: FonteListaArquivo(LISTA_PADRAO)
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.pop(get_fonte_malha, None)
+    app.dependency_overrides.pop(get_fonte_lista, None)
