@@ -22,7 +22,7 @@ from typing import Optional
 from shapely.geometry import shape
 from shapely.strtree import STRtree
 
-from app.core.jurisdicao import Municipio
+from app.core.jurisdicao import Municipio, normalizar_nome
 
 _COD = ("cod_ibge", "CD_MUN", "GEOCODIGO", "geocodigo")
 _NOME = ("municipio", "NM_MUN", "nome")
@@ -79,6 +79,77 @@ class FonteMalhaArquivo:
             if mun.cod_ibge == cod_ibge:
                 return mun
         return None
+
+    def buscar_por_nome(self, termo: str, limite: int = 10) -> list[Municipio]:
+        alvo = normalizar_nome(termo)
+        if not alvo:
+            return []
+        # prefixo primeiro, depois substring — ambos sobre o nome normalizado.
+        prefixo = [m for m in self._muns if normalizar_nome(m.municipio).startswith(alvo)]
+        contem = [
+            m
+            for m in self._muns
+            if alvo in normalizar_nome(m.municipio) and m not in prefixo
+        ]
+        ordenados = sorted(prefixo, key=lambda m: (m.municipio, m.uf)) + sorted(
+            contem, key=lambda m: (m.municipio, m.uf)
+        )
+        return ordenados[:limite]
+
+
+def _uf_de_localidade(loc: dict) -> Optional[str]:
+    """Extrai a sigla da UF de um item do IBGE /localidades/municipios (esquema aninhado)."""
+    try:
+        return loc["microrregiao"]["mesorregiao"]["UF"]["sigla"]
+    except (KeyError, TypeError):
+        pass
+    # esquemas alternativos (regiao-imediata) e campos planos
+    for caminho in (
+        ("regiao-imediata", "regiao-intermediaria", "UF", "sigla"),
+    ):
+        node = loc
+        ok = True
+        for chave in caminho:
+            if isinstance(node, dict) and chave in node:
+                node = node[chave]
+            else:
+                ok = False
+                break
+        if ok and isinstance(node, str):
+            return node
+    return loc.get("UF") or loc.get("uf") or loc.get("sigla_uf")
+
+
+def montar_geojson(localidades: list[dict], features: list[dict]) -> dict:
+    """Junta a lista de municípios (id→nome,UF) à malha (features por ``codarea``).
+
+    Função PURA (sem rede), para o pipeline de download e para teste offline. Produz
+    o ``FeatureCollection`` no formato que ``FonteMalhaArquivo`` consome
+    (``properties = {cod_ibge, municipio, uf}``).
+    """
+    por_cod = {
+        str(loc["id"]): (loc.get("nome"), _uf_de_localidade(loc))
+        for loc in localidades
+        if loc.get("id") is not None
+    }
+    saida = []
+    for feat in features:
+        props = feat.get("properties", {}) or {}
+        cod = props.get("codarea") or props.get("cod_ibge") or props.get("CD_MUN")
+        if cod is None or feat.get("geometry") is None:
+            continue
+        cod = str(cod)
+        nome, uf = por_cod.get(cod, (props.get("NM_MUN"), props.get("SIGLA_UF")))
+        if not (nome and uf):
+            continue
+        saida.append(
+            {
+                "type": "Feature",
+                "properties": {"cod_ibge": cod, "municipio": nome, "uf": uf},
+                "geometry": feat["geometry"],
+            }
+        )
+    return {"type": "FeatureCollection", "features": saida}
 
 
 def from_env() -> Optional[FonteMalhaArquivo]:

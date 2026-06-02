@@ -156,6 +156,17 @@ export async function criarAnalise(kmz: File): Promise<Analise> {
   return res.json();
 }
 
+// Autocomplete por NOME sobre a malha local (offline). O código IBGE volta no
+// payload para resolver internamente — o usuário nunca digita nem vê o código.
+export async function buscarMunicipios(q: string): Promise<MunicipioRef[]> {
+  const termo = q.trim();
+  if (termo.length === 0) return [];
+  const res = await fetch(
+    `${API_BASE}/api/municipios?q=${encodeURIComponent(termo)}`
+  );
+  return jsonOrThrow(res);
+}
+
 // Correção/seleção manual do município (override). Origem vira "informado".
 export async function corrigirMunicipio(
   analiseId: string,
@@ -260,11 +271,12 @@ export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {
 // Conveniência: busca as três bases (cada uma é um cálculo do backend).
 export async function calcularTodasBases(
   analiseId: string,
-  p: AproveitamentoParams
+  p: AproveitamentoParams,
+  modalidade: ModalidadeUrbana = "loteamento_aberto"
 ): Promise<{ desmembramento: Modalidade; bases: LoteamentoResult[] }> {
   const ordem: BaseDoacao[] = ["total", "liquida", "combinada"];
   const resultados = await Promise.all(
-    ordem.map((b) => calcularAproveitamento(analiseId, b, p))
+    ordem.map((b) => calcularAproveitamento(analiseId, b, p, modalidade))
   );
   return {
     // URBANO sempre traz ambos; o backend é a fonte de verdade.

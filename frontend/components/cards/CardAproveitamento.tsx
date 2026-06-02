@@ -15,9 +15,18 @@ import {
   calcularTodasBases,
   type LoteamentoResult,
   type Modalidade,
+  type ModalidadeUrbana,
   type Regime,
   type RuralResult,
 } from "@/lib/api";
+
+const MODALIDADES: { valor: ModalidadeUrbana; rotulo: string }[] = [
+  { valor: "loteamento_aberto", rotulo: "Loteamento aberto" },
+  { valor: "loteamento_fechado", rotulo: "Loteamento fechado" },
+  { valor: "condominio_lotes", rotulo: "Condomínio de lotes" },
+  { valor: "condominio_edilicio", rotulo: "Condomínio edilício" },
+  { valor: "desmembramento", rotulo: "Desmembramento" },
+];
 
 const rotuloBase: Record<string, string> = {
   total: "Loteamento — base sobre área total",
@@ -37,6 +46,8 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
   const [regime, setRegime] = useState<Regime>("URBANO");
 
   // URBANO
+  const [modalidade, setModalidade] =
+    useState<ModalidadeUrbana>("loteamento_aberto");
   const [loteMin, setLoteMin] = useState(200);
   const [vias, setVias] = useState(11500);
   const [doacao, setDoacao] = useState(0.2);
@@ -71,13 +82,17 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
         setRural(r.rural ?? null);
         setPremissa(r.premissa);
       } else {
-        const r = await calcularTodasBases(analiseId, {
-          lote_min_m2: loteMin,
-          vias_m2: vias,
-          doacao_pct: doacao,
-          combinado_pct: combinado,
-          fator_aprov: fator,
-        });
+        const r = await calcularTodasBases(
+          analiseId,
+          {
+            lote_min_m2: loteMin,
+            vias_m2: vias,
+            doacao_pct: doacao,
+            combinado_pct: combinado,
+            fator_aprov: fator,
+          },
+          modalidade
+        );
         limpar();
         setDesmembramento(r.desmembramento);
         setBases(r.bases);
@@ -127,22 +142,56 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
         </div>
 
         {regime === "URBANO" ? (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <Campo label="Lote mín. (m²)" value={loteMin} onChange={setLoteMin} />
-            <Campo label="Vias (m²)" value={vias} onChange={setVias} />
-            <Campo label="Doação" value={doacao} step={0.01} onChange={setDoacao} />
-            <Campo
-              label="Combinado"
-              value={combinado}
-              step={0.01}
-              onChange={setCombinado}
-            />
-            <Campo
-              label="Fator desmemb."
-              value={fator}
-              step={0.01}
-              onChange={setFator}
-            />
+          <div className="space-y-3">
+            <label className="flex flex-col gap-1 text-xs text-slate-600">
+              Modalidade (obrigatória)
+              <select
+                value={modalidade}
+                onChange={(e) =>
+                  setModalidade(e.target.value as ModalidadeUrbana)
+                }
+                className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
+              >
+                {MODALIDADES.map((m) => (
+                  <option key={m.valor} value={m.valor}>
+                    {m.rotulo}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <Campo
+                label="Lote mín. (m²)"
+                value={loteMin}
+                onChange={setLoteMin}
+              />
+              <Campo label="Vias (m²)" value={vias} onChange={setVias} />
+              <Campo
+                label="Doação"
+                value={doacao}
+                step={0.01}
+                onChange={setDoacao}
+              />
+              <Campo
+                label="Combinado"
+                value={combinado}
+                step={0.01}
+                onChange={setCombinado}
+              />
+              <Campo
+                label="Fator desmemb."
+                value={fator}
+                step={0.01}
+                onChange={setFator}
+              />
+            </div>
+            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+              <span className="font-medium">Lote mínimo provisório.</span> O valor
+              acima é <span className="font-medium">declarado por você</span>{" "}
+              (proveniência: &quot;declarado pelo usuário — pendente extração da
+              LUOS, Fase 1.8&quot;). A leitura automática das diretrizes municipais
+              (lote/vias/doação por modalidade) entra na próxima fase.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

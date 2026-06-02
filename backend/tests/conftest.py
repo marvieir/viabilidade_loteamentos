@@ -122,6 +122,17 @@ class StubMalha:
                 return mun
         return None
 
+    def buscar_por_nome(self, termo, limite=10):
+        from app.core.jurisdicao import normalizar_nome
+
+        alvo = normalizar_nome(termo)
+        if not alvo:
+            return []
+        achados = [
+            mun for mun, _ in self._m if alvo in normalizar_nome(mun.municipio)
+        ]
+        return sorted(achados, key=lambda m: (m.municipio, m.uf))[:limite]
+
 
 # São Roque/SP cobrindo a região dos retângulos de teste (Fases 1/2, não-regressão).
 SAO_ROQUE = Municipio(cod_ibge="3550605", municipio="São Roque", uf="SP")

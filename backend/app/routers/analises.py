@@ -9,7 +9,7 @@ Endpoints:
 import hashlib
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from shapely.geometry import mapping
 
@@ -33,6 +33,13 @@ router = APIRouter()
 # UUID determinístico: mesmo KMZ → mesmo analise_id (critério de determinismo).
 _NS_ANALISE = uuid.uuid5(uuid.NAMESPACE_URL, "viabilidade-loteamentos/analise")
 
+_ROTULO_MODALIDADE = {
+    "desmembramento": "desmembramento",
+    "loteamento_aberto": "loteamento aberto",
+    "loteamento_fechado": "loteamento fechado",
+    "condominio_lotes": "condomínio de lotes",
+    "condominio_edilicio": "condomínio edilício",
+}
 PREMISSA_URBANA = "parcelamento URBANO (Lei 6.766/79)"
 PREMISSA_RURAL = (
     "parcelamento RURAL (FMP/INCRA — Lei 5.868/72); não se aplica lote de 125 m² "
@@ -140,6 +147,26 @@ async def criar_analise(
     )
 
 
+@router.get("/municipios", response_model=list[schemas.MunicipioOut])
+def buscar_municipios(
+    q: str = Query(min_length=1, description="Trecho do nome (tolerante a acento/caixa)"),
+    fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
+):
+    """Autocomplete por NOME sobre a malha local (offline). Sem malha → lista vazia.
+
+    O usuário busca pelo nome; o código IBGE é resolvido internamente (nunca exibido).
+    """
+    if fonte_malha is None:
+        return []
+    achados = fonte_malha.buscar_por_nome(q)
+    return [
+        schemas.MunicipioOut(
+            cod_ibge=m.cod_ibge, municipio=m.municipio, uf=m.uf
+        )
+        for m in achados
+    ]
+
+
 @router.post(
     "/analises/{analise_id}/municipio", response_model=schemas.JurisdicaoOut
 )
@@ -211,13 +238,15 @@ def calcular_aproveitamento(
             rural=schemas.RuralOut(**rural),
         )
 
-    # URBANO — exige lote declarado e parâmetros de loteamento.
-    if body.lote_min_m2 is None or body.loteamento is None:
+    # URBANO — exige modalidade, lote declarado e parâmetros de loteamento.
+    if body.modalidade is None or body.lote_min_m2 is None or body.loteamento is None:
         return JSONResponse(
             status_code=422,
             content={
                 "erro": "parametros_urbano_incompletos",
-                "detalhe": "Regime URBANO exige 'lote_min_m2' e 'loteamento'.",
+                "detalhe": (
+                    "Regime URBANO exige 'modalidade', 'lote_min_m2' e 'loteamento'."
+                ),
             },
         )
 
@@ -235,9 +264,10 @@ def calcular_aproveitamento(
         lote_min=body.lote_min_m2,
     )
 
+    rotulo = _ROTULO_MODALIDADE.get(body.modalidade, body.modalidade)
     return schemas.AproveitamentoOut(
         regime="URBANO",
-        premissa=PREMISSA_URBANA,
+        premissa=f"{PREMISSA_URBANA} — modalidade: {rotulo}",
         origem_lote=ORIGEM_LOTE_DECLARADO,
         desmembramento=schemas.ModalidadeOut(**desmembramento),
         loteamento=schemas.LoteamentoOut(**loteamento),

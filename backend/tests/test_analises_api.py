@@ -78,6 +78,7 @@ def test_aproveitamento_endpoint_e_determinismo(client):
     analise_id = r.json()["analise_id"]
     body = {
         "regime": "URBANO",
+        "modalidade": "loteamento_aberto",
         "lote_min_m2": 200.0,
         "loteamento": {
             "vias_m2": 11500.0,

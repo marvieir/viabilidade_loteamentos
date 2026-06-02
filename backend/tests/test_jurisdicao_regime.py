@@ -205,6 +205,45 @@ def test_proveniencia_completa(client, malha, fmp):
     assert "premissa" in r.json() and r.json()["regime"] == "RURAL"
 
 
+# ---------- Busca por nome (autocomplete do override, tolerante a acento/caixa) ----------
+def test_busca_municipio_por_nome(client, malha):
+    malha([*MALHA_BOCAINA, (VIZINHA, VIZINHA_POLY)])
+    # "sao roque" não está nesta malha; busca "bocaina" sem acento/caixa qualquer:
+    r = client.get("/api/municipios", params={"q": "BoCaInA"})
+    assert r.status_code == 200, r.text
+    nomes = [m["municipio"] for m in r.json()]
+    assert "Bocaina" in nomes
+    # o código é resolvido internamente, mas vem no payload para o override
+    assert any(m["cod_ibge"] == "3506607" for m in r.json())
+
+
+def test_busca_municipio_sem_malha_vazia(client_producao):
+    # sem malha carregada (produção) → lista vazia, honesto
+    r = client_producao.get("/api/municipios", params={"q": "sao"})
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+# ---------- Modalidade obrigatória no urbano ----------
+def test_urbano_sem_modalidade_422(client, malha):
+    malha(MALHA_BOCAINA)
+    aid = _post(client, [RET_BOCAINA]).json()["analise_id"]
+    r = client.post(
+        f"/api/analises/{aid}/aproveitamento",
+        json={
+            "regime": "URBANO",
+            "lote_min_m2": 200,
+            "loteamento": {
+                "vias_m2": 11500,
+                "doacao_pct": 0.20,
+                "base_doacao": "combinada",
+            },
+        },
+    )
+    assert r.status_code == 422
+    assert r.json()["erro"] == "parametros_urbano_incompletos"
+
+
 # ---------- Critério 9: determinismo ----------
 def test_determinismo_rural(client, malha, fmp):
     malha(MALHA_BOCAINA)

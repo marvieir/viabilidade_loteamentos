@@ -1,9 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { corrigirMunicipio, type Jurisdicao } from "@/lib/api";
+import {
+  buscarMunicipios,
+  corrigirMunicipio,
+  type Jurisdicao,
+  type MunicipioRef,
+} from "@/lib/api";
 
 const rotulo: Record<string, string> = {
   BASE_FEDERAL: "Cobertura: Base Federal",
@@ -37,9 +41,36 @@ export function BadgeCobertura({
   } = jurisdicao;
 
   const [editando, setEditando] = useState(false);
-  const [cod, setCod] = useState("");
+  const [busca, setBusca] = useState("");
+  const [resultados, setResultados] = useState<MunicipioRef[]>([]);
+  const [buscando, setBuscando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+
+  // Autocomplete por nome (debounce 250 ms). A busca é offline, na malha local.
+  useEffect(() => {
+    const termo = busca.trim();
+    if (!editando || termo.length < 2) {
+      setResultados([]);
+      return;
+    }
+    let vivo = true;
+    setBuscando(true);
+    const t = setTimeout(async () => {
+      try {
+        const r = await buscarMunicipios(termo);
+        if (vivo) setResultados(r);
+      } catch {
+        if (vivo) setResultados([]);
+      } finally {
+        if (vivo) setBuscando(false);
+      }
+    }, 250);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [busca, editando]);
 
   async function aplicar(codIbge: string) {
     setCarregando(true);
@@ -48,7 +79,8 @@ export function BadgeCobertura({
       const j = await corrigirMunicipio(analiseId, codIbge);
       onJurisdicao(j);
       setEditando(false);
-      setCod("");
+      setBusca("");
+      setResultados([]);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao corrigir município.");
     } finally {
@@ -106,23 +138,41 @@ export function BadgeCobertura({
       )}
 
       {editando && (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg bg-slate-50 p-3">
+        <div className="space-y-1 rounded-lg bg-slate-50 p-3">
           <label className="flex flex-col gap-1 text-xs text-slate-600">
-            Código IBGE do município
+            Buscar município por nome
             <input
-              value={cod}
-              onChange={(e) => setCod(e.target.value)}
-              placeholder="ex.: 3506607"
+              autoFocus
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="ex.: São Roque"
               className="rounded-lg border border-slate-300 px-2 py-1 text-sm text-slate-900"
             />
           </label>
-          <Button
-            onClick={() => aplicar(cod.trim())}
-            disabled={carregando || cod.trim().length === 0}
-            className="px-3 py-1"
-          >
-            {carregando ? "Aplicando…" : "Aplicar"}
-          </Button>
+          {busca.trim().length >= 2 && (
+            <div className="max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white">
+              {buscando && (
+                <p className="px-3 py-2 text-xs text-slate-400">Buscando…</p>
+              )}
+              {!buscando && resultados.length === 0 && (
+                <p className="px-3 py-2 text-xs text-slate-400">
+                  Nenhum município encontrado (a malha municipal pode não estar
+                  carregada).
+                </p>
+              )}
+              {resultados.map((m) => (
+                <button
+                  key={m.cod_ibge}
+                  type="button"
+                  disabled={carregando}
+                  onClick={() => aplicar(m.cod_ibge)}
+                  className="block w-full px-3 py-1.5 text-left text-sm text-slate-800 hover:bg-sky-50 disabled:opacity-50"
+                >
+                  {m.municipio} <span className="text-slate-400">/ {m.uf}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

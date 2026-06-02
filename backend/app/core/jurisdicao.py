@@ -17,6 +17,14 @@ consumido ainda; a LUOS entra na Fase 1.8).
 
 from dataclasses import dataclass, field
 from typing import Optional, Protocol, runtime_checkable
+import unicodedata
+
+
+def normalizar_nome(s: str) -> str:
+    """Normaliza para busca tolerante a acento/caixa: 'São Roque' == 'sao roque'."""
+    s = unicodedata.normalize("NFKD", s or "")
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return s.casefold().strip()
 
 
 @dataclass(frozen=True)
@@ -38,6 +46,9 @@ class FonteMalha(Protocol):
 
     def por_codigo(self, cod_ibge: str) -> Optional[Municipio]:
         """Município pelo código IBGE (para override/seleção manual)."""
+
+    def buscar_por_nome(self, termo: str, limite: int = 10) -> list[Municipio]:
+        """Busca por nome (tolerante a acento/caixa), para o autocomplete do override."""
 
 
 # O que o nível BASE_FEDERAL explicitamente NÃO considerou (critério de aceite).
