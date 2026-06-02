@@ -69,13 +69,21 @@ pré-carregado. Roda em qualquer KMZ desde o dia 1; o que varia é a profundidad
 | Estadual (órgão licenciador, lote mín. estadual, APA/manancial) | 27 UFs | leve | por UF, sob demanda |
 | Municipal (zoneamento/LUOS por zona) | ~5.570 | pesado — sem base nacional | por cidade, sob demanda |
 
-**Resolvedor:** centróide do polígono → point-in-polygon na malha IBGE → município,
-UF, código IBGE. **Detecção com override** (Fase 1.7): o município detectado é
-mostrado e o usuário pode corrigir por busca/autocomplete sobre a lista IBGE local;
-a proveniência registra `detectado` vs `informado`. Se o **polígono inteiro** cruza
-mais de um município (comum em gleba rural grande, na divisa), sinaliza
-`cruza_divisa` e pede confirmação — nunca crava em silêncio. Centróide fora de
-qualquer município → exige seleção manual, sem inventar.
+**Resolvedor (duas peças desacopladas):**
+- **Detectar** (precisa de geometria): centróide → point-in-polygon na **malha geométrica
+  IBGE** → `cod_ibge`. Se o ponto cai num gap de generalização perto da divisa, fallback
+  para o município mais próximo (nearest) marcado como "aproximado — confirmar", em vez
+  de "não resolvido".
+- **Corrigir** (só precisa da lista): busca/autocomplete por **nome** sobre a **lista leve
+  IBGE** (`cod_ibge + nome + UF`, ~150 KB, embarcada no repo). O usuário digita "São Roque",
+  nunca o código. Funciona mesmo se a malha geométrica não carregou (plano B sobrevive).
+
+A proveniência registra `detectado` vs `informado` vs `aproximado`. **Divisa:** se o
+polígono inteiro intersecta >1 município, mostra os candidatos **com % de área em cada
+um** ("82% em São Roque, 18% em Mairinque"), sugere o de maior área como default e
+**exige confirmação humana** — não aplica "mais restritivo" automático (a regra do mais
+restritivo vale para empilhar camadas da mesma jurisdição, não para escolher entre
+municípios). Centróide fora de tudo → seleção manual por nome, sem inventar.
 
 Sem perfil municipal, **não bloqueia e não inventa** — degrada para o nível federal
 e rotula a cobertura:
@@ -87,11 +95,18 @@ e rotula a cobertura:
 O relatório estampa o nível e diz explicitamente o que não foi considerado.
 
 ### Backbone de dados nacional (carrega uma vez, pipeline de download — não agente)
-- **Malha municipal IBGE** — polígonos dos ~5.570 municípios; usada para resolver
-  município/UF por point-in-polygon do centróide (resolvedor real, Fase 1.7).
-- **Módulo fiscal / FMP por município** — tabela INCRA (publicada pela EMBRAPA),
-  uma linha por município (ha); piso do parcelamento RURAL. Varia por município
-  (tipicamente 2–5 ha; piso clássico 2 ha / 20.000 m²). Usada no regime rural (Fase 1.7).
+- **Malha geométrica IBGE** — polígonos dos ~5.570 municípios, **nível intermediário**
+  (cheia é lenta no point-in-polygon; muito simplificada erra na divisa). Usada só para
+  **detectar** o município. **Não vai no git**: hospedada em volume do Lightsail, baixada
+  por pipeline (build/bootstrap). Fallback nearest na borda.
+- **Lista leve IBGE** — `cod_ibge + nome + UF` (~150 KB), **embarcada no repo**. Usada para
+  **corrigir/buscar por nome** e para rotular o resultado da detecção. Desacoplada da malha
+  pesada → o override funciona mesmo sem a malha.
+- **FMP — Fração Mínima de Parcelamento por município** — tabela INCRA (Instrução Especial
+  nº 5/2022, Anexo IV; valor oficial também no CCIR do imóvel). É o **piso do parcelamento
+  RURAL** (Lei 5.868/72 art. 8º; Estatuto da Terra art. 65) — **não confundir com módulo
+  fiscal** (que serve a ITR/enquadramento, não a parcelamento). Varia por município; piso
+  legal de 2 ha. Ausente na tabela → default 2 ha + aviso "confirmar no CCIR".
 - Hidrografia — base ANA/IBGE (para buffers de APP).
 - Unidades de conservação — ICMBio/CNUC (federal/estadual/municipal/RPPN), WMS/WFS.
 - **Linhas de transmissão — ANEEL/SIGEL** (para faixa de servidão por tensão).
@@ -139,7 +154,7 @@ Fontes cruzadas com legislação. Valores federais são **constantes**; o resto 
 | Servidão LT | 20/40/70 m conforme 69/230/500 kV | **input por tensão** | NBR 5422 |
 | Aproveitamento desmembramento | ~74% (regra de mercado, NÃO lei) | **default editável** | aulas de modalidade |
 | Aproveitamento loteamento | 57–65% conforme base de doação | derivado | Aula 09 + Lei 9.785 |
-| **Regime RURAL — FMP** | piso de parcelamento = FMP/módulo fiscal do município (não 125 m²) | **input/tabela por município** | Lei 5.868/72 art. 8º; Estatuto da Terra art. 65 |
+| **Regime RURAL — FMP** | piso de parcelamento = **FMP do município** (≠ módulo fiscal; ≠ 125 m²); piso legal 2 ha | **tabela INCRA por município** | Lei 5.868/72 art. 8º; Estatuto da Terra art. 65; IE INCRA 5/2022 |
 | **Rural → urbano** | lote urbano só se gleba dentro do perímetro urbano (exige conversão) | flag | Lei 5.868/72; exceção FMP |
 
 **Variação por estado é real** (competência concorrente, art. 24 CF): normas
@@ -208,9 +223,9 @@ automatização, respeitando a cascata de dados.
 3. **Fase 1.6 — Adaptador de topografia/CAD** (isola perímetro entre várias linhas, fecha
    gaps grandes, resolve auto-interseções, com confirmação visual no mapa). **Pendente
    de 3–5 arquivos reais** antes de especificar — caso difícil, não determinístico sozinho.
-4. **Fase 1.7 — Jurisdição real + Regime (urbano/rural) + Rural (FMP)** ✅ (corretiva). Promove
+4. **Fase 1.7 — Jurisdição real + Regime (urbano/rural) + Rural (FMP)** (corretiva). Promove
    o resolvedor de stub para real (malha IBGE, detecção+override+divisa); pergunta de regime
-   no início do aproveitamento; rural usa FMP/módulo fiscal por município; urbano usa lote
+   no início do aproveitamento; rural usa **FMP por município** (tabela INCRA); urbano usa lote
    mínimo **declarado** no interino. Corrige a premissa urbana silenciosa do aproveitamento.
    `docs/fase-1.7-jurisdicao-regime.md`.
 5. **Fase 1.8 — Extração assistida da LUOS (urbano)** (LLM lê o PDF da diretriz municipal →
@@ -269,3 +284,4 @@ Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma s
 | 2026-06-02 | **Fonte de FMP usada na 1.7 — PENDENTE de confirmação oficial.** Tabela `backend/app/perfis/fmp_municipios.json` (`{cod_ibge: fmp_m2}`), carregada por `core/fmp.py` (`get_fonte_fmp`, injetável; produção lê o seed se presente, senão None → usuário informa `fmp_m2`). Seed atual: **Bocaina/SP (3506607) = 20.000 m² (2 ha)** — valor-ouro da spec, **não confirmado** na base INCRA/EMBRAPA (egress bloqueado neste ambiente). Proveniência exibida: "FMP/módulo fiscal do município (INCRA; Lei 5.868/72 art. 8º)". **Ação ao operar:** confirmar a FMP/módulo fiscal real por município na fonte INCRA/EMBRAPA e popular a tabela (mesmo tratamento dado às URLs da ambiental). | 1.7 |
 | 2026-06-02 | **Detecção automática de município: código pronto, DADO ausente (bloqueio aberto).** Em teste real o município veio "não resolvido": confirmado que `get_fonte_malha()` retorna `None` em produção (sem arquivo de malha) e que o egress ao IBGE está **bloqueado (HTTP 403)** — não foi possível baixar a malha aqui. O caminho de produção foi **provado end-to-end** com um GeoJSON no formato real do IBGE (`from_env`→point-in-polygon detecta Bocaina, `origem: detectado`, sem fixture). Adicionado o pipeline `scripts/baixar_malha_ibge.py` (localidades + malhas v3 por UF → GeoJSON; junção `montar_geojson` coberta por teste offline, HTTP não validado ao vivo). **Pendência para fechar o plano A:** popular `MALHA_IBGE_PATH` (rodar o script com rede liberada ou fornecer o arquivo). Até lá, a detecção degrada honesta e o override (plano B) cobre. | 1.7 |
 | 2026-06-02 | **Override por NOME (não por código) + modalidade obrigatória no urbano.** Busca de município por nome via `GET /api/municipios?q=` sobre a malha local, tolerante a acento/caixa (`normalizar_nome`); o código IBGE é resolvido internamente e nunca exibido (autocomplete no `BadgeCobertura`). Aproveitamento URBANO passou a exigir `modalidade` (desmembramento / loteamento aberto / fechado / condomínio de lotes / edilício) — 422 `parametros_urbano_incompletos` sem ela; UI deixa explícito que o lote mínimo é **declarado e provisório** ("pendente extração da LUOS — Fase 1.8"). Suíte total **54 testes** verdes. | 1.7 |
+| 2026-06-02 | **Refino de contrato da 1.7 (dúvidas resolvidas):** (1) piso rural é a **FMP por município** (Lei 5.868/72 art. 8º), **não** o módulo fiscal — Bocaina = 54 parcelas só se a FMP dela for 2 ha; ausente → default 2 ha + aviso. (2) **Lista leve IBGE** (cod+nome+UF, ~150 KB) embarcada no repo, desacoplada da malha geométrica → busca/override por **nome** funciona sem a malha. (3) Modalidade urbana é **só rótulo** na 1.7; regra por modalidade é da 1.8 (depende da LUOS). (4) **Divisa = escolha humana** com % de área por município + default no maior; **não** "mais restritivo" automático. (5) Malha **intermediária** em volume Lightsail (pipeline), fallback nearest na borda. | 1.7 |
