@@ -91,7 +91,15 @@ export default function Home() {
                   {analise.origem_geometria.descricao}
                 </span>
               </div>
-              <BadgeCobertura jurisdicao={analise.jurisdicao} />
+              <BadgeCobertura
+                jurisdicao={analise.jurisdicao}
+                analiseId={analise.analise_id}
+                onJurisdicao={(j) =>
+                  setAnalise((prev) =>
+                    prev ? { ...prev, jurisdicao: j } : prev
+                  )
+                }
+              />
               {analise.avisos.length > 0 && (
                 <div className="rounded-lg bg-sky-50 p-3 text-xs text-sky-900">
                   {analise.avisos.map((a) => (

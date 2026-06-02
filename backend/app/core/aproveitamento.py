@@ -17,6 +17,27 @@ PROV_DESMEMBRAMENTO = (
 PROV_LOTEAMENTO = (
     "Lei 9.785/99 (doação municipal); base declarada no perfil"
 )
+PROV_RURAL = "FMP/módulo fiscal do município (INCRA; Lei 5.868/72 art. 8º)"
+FLAG_CONVERSAO_RURAL = (
+    "loteamento urbano exige conversão rural→urbano (gleba dentro do perímetro urbano)"
+)
+
+
+def aproveitamento_rural(area: float, fmp_m2: float) -> dict:
+    """Parcelamento RURAL: nº de parcelas = floor(área / FMP do município).
+
+    Não aplica lote de 125 m² nem doação (regras urbanas da Lei 6.766). Sinaliza que o
+    uso urbano dependeria de conversão (perímetro urbano). Determinístico.
+    """
+    if fmp_m2 <= 0:
+        raise ValueError("FMP deve ser > 0.")
+    return {
+        "fmp_m2": round(fmp_m2, 2),
+        "n_parcelas": int(area // fmp_m2),
+        "area_m2": round(area, 2),
+        "flag_conversao": FLAG_CONVERSAO_RURAL,
+        "proveniencia": PROV_RURAL,
+    }
 
 
 def aproveitamento_loteamento(

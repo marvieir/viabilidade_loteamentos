@@ -13,11 +13,20 @@ export interface Geometria {
   geojson: GeoJSON.Polygon;
 }
 
+export interface MunicipioRef {
+  cod_ibge: string;
+  municipio: string;
+  uf: string;
+}
+
 export interface Jurisdicao {
   municipio: string | null;
   uf: string | null;
   cod_ibge: string | null;
   cobertura: Cobertura;
+  origem: "detectado" | "informado";
+  cruza_divisa: boolean;
+  municipios_candidatos: MunicipioRef[];
   nao_considerado: string[];
 }
 
@@ -67,9 +76,30 @@ export interface LoteamentoResult extends Modalidade {
   base_doacao: string;
 }
 
+export type Regime = "URBANO" | "RURAL";
+
+export type ModalidadeUrbana =
+  | "loteamento_aberto"
+  | "loteamento_fechado"
+  | "condominio_lotes"
+  | "condominio_edilicio"
+  | "desmembramento";
+
+export interface RuralResult {
+  fmp_m2: number;
+  n_parcelas: number;
+  area_m2: number;
+  flag_conversao: string;
+  proveniencia: string;
+}
+
 export interface Aproveitamento {
-  desmembramento: Modalidade;
-  loteamento: LoteamentoResult;
+  regime: Regime;
+  premissa: string;
+  origem_lote?: string | null;
+  desmembramento?: Modalidade | null;
+  loteamento?: LoteamentoResult | null;
+  rural?: RuralResult | null;
 }
 
 export type BaseDoacao = "total" | "liquida" | "combinada";
@@ -126,10 +156,27 @@ export async function criarAnalise(kmz: File): Promise<Analise> {
   return res.json();
 }
 
+// Correção/seleção manual do município (override). Origem vira "informado".
+export async function corrigirMunicipio(
+  analiseId: string,
+  codIbge: string
+): Promise<Jurisdicao> {
+  const res = await fetch(
+    `${API_BASE}/api/analises/${analiseId}/municipio`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cod_ibge: codIbge }),
+    }
+  );
+  return jsonOrThrow(res);
+}
+
 export async function calcularAproveitamento(
   analiseId: string,
   base: BaseDoacao,
-  p: AproveitamentoParams
+  p: AproveitamentoParams,
+  modalidade: ModalidadeUrbana = "loteamento_aberto"
 ): Promise<Aproveitamento> {
   const res = await fetch(
     `${API_BASE}/api/analises/${analiseId}/aproveitamento`,
@@ -137,6 +184,8 @@ export async function calcularAproveitamento(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        regime: "URBANO",
+        modalidade,
         lote_min_m2: p.lote_min_m2,
         loteamento: {
           vias_m2: p.vias_m2,
@@ -145,6 +194,25 @@ export async function calcularAproveitamento(
           combinado_pct: p.combinado_pct,
         },
         desmembramento: { fator_aprov: p.fator_aprov },
+      }),
+    }
+  );
+  return jsonOrThrow(res);
+}
+
+// Parcelamento RURAL: nº de parcelas pela FMP do município (ou fmp_m2 informada).
+export async function calcularRural(
+  analiseId: string,
+  fmpM2?: number
+): Promise<Aproveitamento> {
+  const res = await fetch(
+    `${API_BASE}/api/analises/${analiseId}/aproveitamento`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        regime: "RURAL",
+        ...(fmpM2 != null ? { fmp_m2: fmpM2 } : {}),
       }),
     }
   );
@@ -199,7 +267,8 @@ export async function calcularTodasBases(
     ordem.map((b) => calcularAproveitamento(analiseId, b, p))
   );
   return {
-    desmembramento: resultados[0].desmembramento,
-    bases: resultados.map((r) => r.loteamento),
+    // URBANO sempre traz ambos; o backend é a fonte de verdade.
+    desmembramento: resultados[0].desmembramento as Modalidade,
+    bases: resultados.map((r) => r.loteamento as LoteamentoResult),
   };
 }

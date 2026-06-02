@@ -14,12 +14,27 @@ class GeometriaOut(BaseModel):
     geojson: dict  # Polygon WGS84, para o mapa
 
 
+class MunicipioOut(BaseModel):
+    cod_ibge: str
+    municipio: str
+    uf: str
+
+
 class JurisdicaoOut(BaseModel):
     municipio: Optional[str]
     uf: Optional[str]
     cod_ibge: Optional[str]
     cobertura: Literal["BASE_FEDERAL", "PARCIAL_UF", "COMPLETA"]
+    origem: Literal["detectado", "informado"] = "detectado"
+    cruza_divisa: bool = False
+    municipios_candidatos: list[MunicipioOut] = []
     nao_considerado: list[str] = []
+
+
+class MunicipioIn(BaseModel):
+    """Correção/seleção manual do município (override)."""
+
+    cod_ibge: str
 
 
 class OrigemGeometriaOut(BaseModel):
@@ -50,9 +65,26 @@ class DesmembramentoIn(BaseModel):
     fator_aprov: float = Field(default=0.74, gt=0, le=1)
 
 
+ModalidadeUrbana = Literal[
+    "desmembramento",
+    "loteamento_aberto",
+    "loteamento_fechado",
+    "condominio_lotes",
+    "condominio_edilicio",
+]
+
+
 class AproveitamentoIn(BaseModel):
-    lote_min_m2: float = Field(gt=0)
-    loteamento: LoteamentoIn
+    """Pedido de aproveitamento. ``regime`` é obrigatório (validado no router →
+    422 ``regime_obrigatorio``); os demais campos dependem do regime escolhido."""
+
+    regime: Optional[Literal["URBANO", "RURAL"]] = None
+    # RURAL — FMP do município (puxada da tabela; editável se município não resolvido)
+    fmp_m2: Optional[float] = Field(default=None, gt=0)
+    # URBANO — lote declarado (pendente extração da LUOS, Fase 1.8)
+    modalidade: Optional[ModalidadeUrbana] = None
+    lote_min_m2: Optional[float] = Field(default=None, gt=0)
+    loteamento: Optional[LoteamentoIn] = None
     desmembramento: DesmembramentoIn = Field(default_factory=DesmembramentoIn)
 
 
@@ -67,9 +99,23 @@ class LoteamentoOut(ModalidadeOut):
     base_doacao: str
 
 
+class RuralOut(BaseModel):
+    fmp_m2: float
+    n_parcelas: int
+    area_m2: float
+    flag_conversao: str
+    proveniencia: str
+
+
 class AproveitamentoOut(BaseModel):
-    desmembramento: ModalidadeOut
-    loteamento: LoteamentoOut
+    regime: Literal["URBANO", "RURAL"]
+    premissa: str
+    # URBANO
+    origem_lote: Optional[str] = None
+    desmembramento: Optional[ModalidadeOut] = None
+    loteamento: Optional[LoteamentoOut] = None
+    # RURAL
+    rural: Optional[RuralOut] = None
 
 
 # ----- GET /api/analises/{id}/ambiental (Fase 2) -----

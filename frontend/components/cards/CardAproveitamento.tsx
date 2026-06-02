@@ -11,9 +11,12 @@ import {
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
+  calcularRural,
   calcularTodasBases,
   type LoteamentoResult,
   type Modalidade,
+  type Regime,
+  type RuralResult,
 } from "@/lib/api";
 
 const rotuloBase: Record<string, string> = {
@@ -25,34 +28,64 @@ const rotuloBase: Record<string, string> = {
 // Formatação de exibição (não é cálculo): os números vêm prontos do backend.
 const m2 = (v: number) =>
   v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " m²";
+const ha = (v: number) =>
+  (v / 10_000).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " ha";
 const pct = (v: number) =>
   (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + "%";
 
 export function CardAproveitamento({ analiseId }: { analiseId: string }) {
+  const [regime, setRegime] = useState<Regime>("URBANO");
+
+  // URBANO
   const [loteMin, setLoteMin] = useState(200);
   const [vias, setVias] = useState(11500);
   const [doacao, setDoacao] = useState(0.2);
   const [combinado, setCombinado] = useState(0.35);
   const [fator, setFator] = useState(0.74);
+  // RURAL
+  const [fmp, setFmp] = useState(20000);
 
   const [desmembramento, setDesmembramento] = useState<Modalidade | null>(null);
   const [bases, setBases] = useState<LoteamentoResult[] | null>(null);
+  const [rural, setRural] = useState<RuralResult | null>(null);
+  const [premissa, setPremissa] = useState<string | null>(null);
+  const [origemLote, setOrigemLote] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+
+  function limpar() {
+    setDesmembramento(null);
+    setBases(null);
+    setRural(null);
+    setPremissa(null);
+    setOrigemLote(null);
+  }
 
   async function calcular() {
     setCarregando(true);
     setErro(null);
     try {
-      const r = await calcularTodasBases(analiseId, {
-        lote_min_m2: loteMin,
-        vias_m2: vias,
-        doacao_pct: doacao,
-        combinado_pct: combinado,
-        fator_aprov: fator,
-      });
-      setDesmembramento(r.desmembramento);
-      setBases(r.bases);
+      if (regime === "RURAL") {
+        const r = await calcularRural(analiseId, fmp);
+        limpar();
+        setRural(r.rural ?? null);
+        setPremissa(r.premissa);
+      } else {
+        const r = await calcularTodasBases(analiseId, {
+          lote_min_m2: loteMin,
+          vias_m2: vias,
+          doacao_pct: doacao,
+          combinado_pct: combinado,
+          fator_aprov: fator,
+        });
+        limpar();
+        setDesmembramento(r.desmembramento);
+        setBases(r.bases);
+        setPremissa("parcelamento URBANO (Lei 6.766/79)");
+        setOrigemLote(
+          "declarado pelo usuário (pendente extração da LUOS — Fase 1.8)"
+        );
+      }
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao calcular.");
     } finally {
@@ -65,44 +98,125 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
       <CardHeader>
         <CardTitle>Aproveitamento</CardTitle>
         <CardDescription>
-          Desmembramento e loteamento (3 bases de doação). Cálculo no backend; aqui
-          só renderizamos o JSON com a proveniência de cada número.
+          Primeiro o regime do parcelamento: URBANO (Lei 6.766) ou RURAL (FMP do
+          INCRA). Cálculo no backend; aqui só renderizamos o JSON com a
+          proveniência.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Campo label="Lote mín. (m²)" value={loteMin} onChange={setLoteMin} />
-          <Campo label="Vias (m²)" value={vias} onChange={setVias} />
-          <Campo
-            label="Doação"
-            value={doacao}
-            step={0.01}
-            onChange={setDoacao}
-          />
-          <Campo
-            label="Combinado"
-            value={combinado}
-            step={0.01}
-            onChange={setCombinado}
-          />
-          <Campo
-            label="Fator desmemb."
-            value={fator}
-            step={0.01}
-            onChange={setFator}
-          />
+        {/* Seletor de regime */}
+        <div className="flex flex-wrap gap-2">
+          {(["URBANO", "RURAL"] as Regime[]).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => {
+                setRegime(r);
+                limpar();
+                setErro(null);
+              }}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+                regime === r
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              {r === "URBANO" ? "Urbano (Lei 6.766)" : "Rural (FMP / INCRA)"}
+            </button>
+          ))}
         </div>
 
+        {regime === "URBANO" ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <Campo label="Lote mín. (m²)" value={loteMin} onChange={setLoteMin} />
+            <Campo label="Vias (m²)" value={vias} onChange={setVias} />
+            <Campo label="Doação" value={doacao} step={0.01} onChange={setDoacao} />
+            <Campo
+              label="Combinado"
+              value={combinado}
+              step={0.01}
+              onChange={setCombinado}
+            />
+            <Campo
+              label="Fator desmemb."
+              value={fator}
+              step={0.01}
+              onChange={setFator}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <Campo
+              label="FMP do município (m²)"
+              value={fmp}
+              step={1000}
+              onChange={setFmp}
+            />
+            <p className="col-span-2 self-end text-xs text-slate-500">
+              Piso de parcelamento rural (módulo fiscal/FMP, INCRA). 20.000 m² = 2
+              ha. Puxado da tabela do município quando disponível; editável aqui.
+            </p>
+          </div>
+        )}
+
         <Button onClick={calcular} disabled={carregando}>
-          {carregando ? "Calculando…" : "Calcular aproveitamento"}
+          {carregando
+            ? "Calculando…"
+            : regime === "RURAL"
+              ? "Calcular parcelas rurais"
+              : "Calcular aproveitamento"}
         </Button>
 
-        {erro && (
-          <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">
-            {erro}
+        {premissa && (
+          <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+            <span className="font-medium">Premissa:</span> {premissa}
+            {origemLote ? (
+              <>
+                <br />
+                <span className="font-medium">Origem do lote:</span> {origemLote}
+              </>
+            ) : null}
           </p>
         )}
 
+        {erro && (
+          <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
+        )}
+
+        {/* RURAL */}
+        {rural && (
+          <Table>
+            <THead>
+              <TR>
+                <TH>Regime rural</TH>
+                <TH>Área</TH>
+                <TH>FMP</TH>
+                <TH>Parcelas</TH>
+                <TH>Proveniência</TH>
+              </TR>
+            </THead>
+            <TBody>
+              <TR>
+                <TD className="font-medium">Parcelamento rural</TD>
+                <TD>
+                  {m2(rural.area_m2)} ({ha(rural.area_m2)})
+                </TD>
+                <TD>
+                  {m2(rural.fmp_m2)} ({ha(rural.fmp_m2)})
+                </TD>
+                <TD className="font-semibold">{rural.n_parcelas}</TD>
+                <TD className="text-xs text-slate-500">{rural.proveniencia}</TD>
+              </TR>
+            </TBody>
+          </Table>
+        )}
+        {rural && (
+          <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+            {rural.flag_conversao}
+          </p>
+        )}
+
+        {/* URBANO */}
         {desmembramento && bases && (
           <Table>
             <THead>

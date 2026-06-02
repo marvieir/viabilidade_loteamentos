@@ -1,8 +1,9 @@
-"""Router da dimensão Casca + Aproveitamento (Fase 1).
+"""Router da dimensão Casca + Aproveitamento (Fases 1 e 1.7).
 
-Dois endpoints:
-  POST /api/analises                     → parse KMZ + geometria + jurisdição
-  POST /api/analises/{id}/aproveitamento → motor de aproveitamento por modalidade
+Endpoints:
+  POST /api/analises                     → parse KMZ + geometria + jurisdição (real)
+  POST /api/analises/{id}/municipio      → correção/seleção manual do município (override)
+  POST /api/analises/{id}/aproveitamento → motor por regime (URBANO bases / RURAL FMP)
 """
 
 import hashlib
@@ -16,9 +17,12 @@ from app.core import aproveitamento as motor
 from app.core import geometria
 from app.core import ingestao as ingestao_mod
 from app.core import kmz as kmz_parser
+from app.core.fmp import FonteFMP, get_fonte_fmp
 from app.core.jurisdicao import (
-    ResolvedorMunicipio,
-    get_resolvedor_municipio,
+    FonteMalha,
+    Jurisdicao,
+    atualizar_municipio,
+    get_fonte_malha,
     resolver_jurisdicao,
 )
 from app.core.store import STORE
@@ -29,13 +33,30 @@ router = APIRouter()
 # UUID determinístico: mesmo KMZ → mesmo analise_id (critério de determinismo).
 _NS_ANALISE = uuid.uuid5(uuid.NAMESPACE_URL, "viabilidade-loteamentos/analise")
 
+PREMISSA_URBANA = "parcelamento URBANO (Lei 6.766/79)"
+PREMISSA_RURAL = (
+    "parcelamento RURAL (FMP/INCRA — Lei 5.868/72); não se aplica lote de 125 m² "
+    "nem doação. Uso urbano dependeria de conversão (perímetro urbano)."
+)
+ORIGEM_LOTE_DECLARADO = (
+    "declarado pelo usuário (pendente extração da LUOS — Fase 1.8)"
+)
 
-def _jurisdicao_to_schema(jur) -> schemas.JurisdicaoOut:
+
+def _jurisdicao_to_schema(jur: Jurisdicao) -> schemas.JurisdicaoOut:
     return schemas.JurisdicaoOut(
         municipio=jur.municipio,
         uf=jur.uf,
         cod_ibge=jur.cod_ibge,
         cobertura=jur.cobertura,
+        origem=jur.origem,
+        cruza_divisa=jur.cruza_divisa,
+        municipios_candidatos=[
+            schemas.MunicipioOut(
+                cod_ibge=m.cod_ibge, municipio=m.municipio, uf=m.uf
+            )
+            for m in jur.municipios_candidatos
+        ],
         nao_considerado=jur.nao_considerado,
     )
 
@@ -44,7 +65,7 @@ def _jurisdicao_to_schema(jur) -> schemas.JurisdicaoOut:
 async def criar_analise(
     kmz: UploadFile | None = File(None),
     kml: UploadFile | None = File(None),
-    resolvedor: ResolvedorMunicipio | None = Depends(get_resolvedor_municipio),
+    fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
 ):
     upload = kmz or kml
     if upload is None:
@@ -91,7 +112,7 @@ async def criar_analise(
         )
 
     poly, area, perimetro = medidos[0]
-    jur = resolver_jurisdicao(poly.centroid, resolvedor)
+    jur = resolver_jurisdicao(poly, fonte_malha)
 
     analise_id = str(
         uuid.uuid5(_NS_ANALISE, hashlib.sha256(conteudo).hexdigest())
@@ -120,15 +141,85 @@ async def criar_analise(
 
 
 @router.post(
+    "/analises/{analise_id}/municipio", response_model=schemas.JurisdicaoOut
+)
+def corrigir_municipio(
+    analise_id: str,
+    body: schemas.MunicipioIn,
+    fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
+):
+    """Override: fixa o município pelo código IBGE e marca a origem como ``informado``."""
+    registro = STORE.get(analise_id)
+    if registro is None:
+        raise HTTPException(404, "Análise não encontrada.")
+    try:
+        jur = atualizar_municipio(body.cod_ibge, fonte_malha)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    registro["jurisdicao"] = jur
+    return _jurisdicao_to_schema(jur)
+
+
+@router.post(
     "/analises/{analise_id}/aproveitamento",
     response_model=schemas.AproveitamentoOut,
 )
-def calcular_aproveitamento(analise_id: str, body: schemas.AproveitamentoIn):
+def calcular_aproveitamento(
+    analise_id: str,
+    body: schemas.AproveitamentoIn,
+    fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
+):
     registro = STORE.get(analise_id)
     if registro is None:
         raise HTTPException(404, "Análise não encontrada.")
 
+    # Regime é obrigatório: nunca assumir parcelamento urbano em silêncio (falha da Fase 2).
+    if body.regime is None:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "erro": "regime_obrigatorio",
+                "detalhe": (
+                    "Informe o regime ('URBANO' ou 'RURAL'). Terra rural rege-se pela "
+                    "FMP do INCRA, não pela Lei 6.766; o número seria ilustrativo sem isso."
+                ),
+            },
+        )
+
     area = registro["area_m2"]
+
+    if body.regime == "RURAL":
+        jur: Jurisdicao = registro["jurisdicao"]
+        fmp = body.fmp_m2
+        if fmp is None and fonte_fmp is not None and jur.cod_ibge:
+            fmp = fonte_fmp.fmp_m2(jur.cod_ibge)
+        if fmp is None:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "erro": "fmp_indisponivel",
+                    "detalhe": (
+                        "FMP do município não está na tabela e não foi informada. "
+                        "Envie 'fmp_m2' (ex.: 20000 = 2 ha) ou selecione o município."
+                    ),
+                },
+            )
+        rural = motor.aproveitamento_rural(area=area, fmp_m2=fmp)
+        return schemas.AproveitamentoOut(
+            regime="RURAL",
+            premissa=PREMISSA_RURAL,
+            rural=schemas.RuralOut(**rural),
+        )
+
+    # URBANO — exige lote declarado e parâmetros de loteamento.
+    if body.lote_min_m2 is None or body.loteamento is None:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "erro": "parametros_urbano_incompletos",
+                "detalhe": "Regime URBANO exige 'lote_min_m2' e 'loteamento'.",
+            },
+        )
 
     loteamento = motor.aproveitamento_loteamento(
         area=area,
@@ -145,6 +236,9 @@ def calcular_aproveitamento(analise_id: str, body: schemas.AproveitamentoIn):
     )
 
     return schemas.AproveitamentoOut(
+        regime="URBANO",
+        premissa=PREMISSA_URBANA,
+        origem_lote=ORIGEM_LOTE_DECLARADO,
         desmembramento=schemas.ModalidadeOut(**desmembramento),
         loteamento=schemas.LoteamentoOut(**loteamento),
     )

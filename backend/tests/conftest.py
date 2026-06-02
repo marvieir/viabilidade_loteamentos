@@ -5,10 +5,11 @@ import zipfile
 
 import pytest
 from fastapi.testclient import TestClient
-from shapely.geometry import LineString, Polygon
+from shapely.geometry import LineString, Point, Polygon
 
 from app.core.camadas import Camadas, get_fonte_camadas
-from app.core.jurisdicao import get_resolvedor_municipio
+from app.core.fmp import FonteFMPArquivo, get_fonte_fmp
+from app.core.jurisdicao import Municipio, get_fonte_malha
 from app.core.store import STORE
 from app.main import app
 
@@ -98,9 +99,36 @@ LINHA_GAP_GRANDE = [_BL, _BR, _TR, _TL, (LON0, LAT0 + _DLAT_GAP_GRANDE)]
 LINHA_AUTOINTERSEC = [_BL, _TR, _BR, _TL]
 
 
-def resolver_sao_roque(lon, lat):
-    """De-para de TESTE — nunca usado em produção."""
-    return ("São Roque", "SP", "3550605")
+# ----- Malha municipal de TESTE (injetável) — nunca usada em produção -----
+class StubMalha:
+    """Malha-stub: lista de (Municipio, Polygon). Sem rede, determinística."""
+
+    def __init__(self, municipios: list[tuple[Municipio, Polygon]]):
+        self._m = municipios
+
+    def municipio_no_ponto(self, lon, lat):
+        p = Point(lon, lat)
+        for mun, geom in self._m:
+            if geom.contains(p):
+                return mun
+        return None
+
+    def municipios_que_intersectam(self, poly):
+        return [mun for mun, geom in self._m if geom.intersects(poly)]
+
+    def por_codigo(self, cod_ibge):
+        for mun, _ in self._m:
+            if mun.cod_ibge == cod_ibge:
+                return mun
+        return None
+
+
+# São Roque/SP cobrindo a região dos retângulos de teste (Fases 1/2, não-regressão).
+SAO_ROQUE = Municipio(cod_ibge="3550605", municipio="São Roque", uf="SP")
+SAO_ROQUE_POLY = Polygon(
+    [(-47.20, -23.60), (-47.00, -23.60), (-47.00, -23.50), (-47.20, -23.50)]
+)
+MALHA_SAO_ROQUE = [(SAO_ROQUE, SAO_ROQUE_POLY)]
 
 
 # ----- Fixtures de CAMADAS ambientais (Fase 2) — stubs offline e determinísticos -----
@@ -149,17 +177,39 @@ def _limpa_store():
 
 
 @pytest.fixture
+def malha():
+    """Injeta uma malha-stub. Uso: ``malha([(Municipio, Polygon), ...])`` no teste."""
+
+    def _set(municipios):
+        app.dependency_overrides[get_fonte_malha] = lambda: StubMalha(municipios)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_malha, None)
+
+
+@pytest.fixture
+def fmp():
+    """Injeta uma tabela FMP-stub. Uso: ``fmp({cod_ibge: m2})`` no teste."""
+
+    def _set(tabela):
+        app.dependency_overrides[get_fonte_fmp] = lambda: FonteFMPArquivo(tabela)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_fmp, None)
+
+
+@pytest.fixture
 def client_producao():
-    """Cliente com o comportamento REAL: sem de-para municipal configurado."""
-    app.dependency_overrides.pop(get_resolvedor_municipio, None)
+    """Cliente com o comportamento REAL: sem malha municipal configurada."""
+    app.dependency_overrides.pop(get_fonte_malha, None)
     with TestClient(app) as c:
         yield c
 
 
 @pytest.fixture
 def client():
-    """Cliente de teste com de-para municipal injetado (São Roque/SP)."""
-    app.dependency_overrides[get_resolvedor_municipio] = lambda: resolver_sao_roque
+    """Cliente de teste com malha municipal injetada (São Roque/SP)."""
+    app.dependency_overrides[get_fonte_malha] = lambda: StubMalha(MALHA_SAO_ROQUE)
     with TestClient(app) as c:
         yield c
-    app.dependency_overrides.pop(get_resolvedor_municipio, None)
+    app.dependency_overrides.pop(get_fonte_malha, None)

@@ -69,9 +69,16 @@ pré-carregado. Roda em qualquer KMZ desde o dia 1; o que varia é a profundidad
 | Estadual (órgão licenciador, lote mín. estadual, APA/manancial) | 27 UFs | leve | por UF, sob demanda |
 | Municipal (zoneamento/LUOS por zona) | ~5.570 | pesado — sem base nacional | por cidade, sob demanda |
 
-**Resolvedor:** centróide do polígono → código IBGE do município → UF → carrega os
-perfis disponíveis. Sem perfil, **não bloqueia e não inventa** — degrada para o nível
-federal e rotula a cobertura:
+**Resolvedor:** centróide do polígono → point-in-polygon na malha IBGE → município,
+UF, código IBGE. **Detecção com override** (Fase 1.7): o município detectado é
+mostrado e o usuário pode corrigir por busca/autocomplete sobre a lista IBGE local;
+a proveniência registra `detectado` vs `informado`. Se o **polígono inteiro** cruza
+mais de um município (comum em gleba rural grande, na divisa), sinaliza
+`cruza_divisa` e pede confirmação — nunca crava em silêncio. Centróide fora de
+qualquer município → exige seleção manual, sem inventar.
+
+Sem perfil municipal, **não bloqueia e não inventa** — degrada para o nível federal
+e rotula a cobertura:
 
 - `BASE_FEDERAL` — só piso nacional + geoespacial.
 - `PARCIAL_UF` — federal + estadual; falta zoneamento municipal.
@@ -79,10 +86,15 @@ federal e rotula a cobertura:
 
 O relatório estampa o nível e diz explicitamente o que não foi considerado.
 
-### Backbone de dados nacional (carrega uma vez, via geoserviços INDE)
-- Limites municipais — IBGE.
+### Backbone de dados nacional (carrega uma vez, pipeline de download — não agente)
+- **Malha municipal IBGE** — polígonos dos ~5.570 municípios; usada para resolver
+  município/UF por point-in-polygon do centróide (resolvedor real, Fase 1.7).
+- **Módulo fiscal / FMP por município** — tabela INCRA (publicada pela EMBRAPA),
+  uma linha por município (ha); piso do parcelamento RURAL. Varia por município
+  (tipicamente 2–5 ha; piso clássico 2 ha / 20.000 m²). Usada no regime rural (Fase 1.7).
 - Hidrografia — base ANA/IBGE (para buffers de APP).
 - Unidades de conservação — ICMBio/CNUC (federal/estadual/municipal/RPPN), WMS/WFS.
+- **Linhas de transmissão — ANEEL/SIGEL** (para faixa de servidão por tensão).
 - DEM — SRTM (MVP) ou Copernicus GLO-30 (evolução); fonte trocável por config.
 
 ---
@@ -127,6 +139,8 @@ Fontes cruzadas com legislação. Valores federais são **constantes**; o resto 
 | Servidão LT | 20/40/70 m conforme 69/230/500 kV | **input por tensão** | NBR 5422 |
 | Aproveitamento desmembramento | ~74% (regra de mercado, NÃO lei) | **default editável** | aulas de modalidade |
 | Aproveitamento loteamento | 57–65% conforme base de doação | derivado | Aula 09 + Lei 9.785 |
+| **Regime RURAL — FMP** | piso de parcelamento = FMP/módulo fiscal do município (não 125 m²) | **input/tabela por município** | Lei 5.868/72 art. 8º; Estatuto da Terra art. 65 |
+| **Rural → urbano** | lote urbano só se gleba dentro do perímetro urbano (exige conversão) | flag | Lei 5.868/72; exceção FMP |
 
 **Variação por estado é real** (competência concorrente, art. 24 CF): normas
 estaduais podem ser **mais restritivas**, e o licenciamento de loteamento costuma
@@ -194,15 +208,24 @@ automatização, respeitando a cascata de dados.
 3. **Fase 1.6 — Adaptador de topografia/CAD** (isola perímetro entre várias linhas, fecha
    gaps grandes, resolve auto-interseções, com confirmação visual no mapa). **Pendente
    de 3–5 arquivos reais** antes de especificar — caso difícil, não determinístico sozinho.
-4. **Fase 2 — Ambiental** ✅ (overlays vetoriais: hidrografia→APP + faixa não-edificável,
-   unidades de conservação, mineração; interseção espacial determinística; fonte de camadas
-   injetável). Declividade≥30% via DEM fica na **Fase 2.5** (exige chave OpenTopography).
-   `docs/fase-2-ambiental.md`.
-5. Fase 3 — Jurídica (perfil municipal/estadual; liga aproveitamento aos limites legais).
-6. Fase 4 — Financeira (consome lotes do motor).
-7. Fase 5 — Econômica (consome fluxo da financeira).
-8. Fase 6 — Localização (enriquecimento IBGE).
-9. Fase 7+ — Técnica / Operacional / Mercadológica / Política (guiadas).
+4. **Fase 1.7 — Jurisdição real + Regime (urbano/rural) + Rural (FMP)** ✅ (corretiva). Promove
+   o resolvedor de stub para real (malha IBGE, detecção+override+divisa); pergunta de regime
+   no início do aproveitamento; rural usa FMP/módulo fiscal por município; urbano usa lote
+   mínimo **declarado** no interino. Corrige a premissa urbana silenciosa do aproveitamento.
+   `docs/fase-1.7-jurisdicao-regime.md`.
+5. **Fase 1.8 — Extração assistida da LUOS (urbano)** (LLM lê o PDF da diretriz municipal →
+   propõe lote mínimo por modalidade → **validação humana** → vira perfil). Substitui o lote
+   declarado da 1.7. **A especificar após a 1.7** (contrato depende dela).
+6. **Fase 2 — Ambiental (overlays vetoriais)** ✅ encanada (`docs/fase-2-ambiental.md`).
+7. **Fase 2.1 — Ambiental com dados reais + ANEEL** (corretiva). Liga as camadas oficiais
+   reais (SIGMINE, ANA, ICMBio, **+ linhas ANEEL** p/ faixa de servidão) com smoke test ao
+   vivo. Resolve o "fonte não configurada". `docs/fase-2.1-ambiental-dados-reais.md`.
+8. Fase 2.5 — Declividade via DEM (exige chave OpenTopography).
+9. Fase 3 — Jurídica (perfil municipal/estadual; consome o que a 1.8 extraiu).
+10. Fase 4 — Financeira (consome lotes do motor).
+11. Fase 5 — Econômica (consome fluxo da financeira).
+12. Fase 6 — Localização (enriquecimento IBGE).
+13. Fase 7+ — Técnica / Operacional / Mercadológica / Política (guiadas).
 
 Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma sem tocar nas outras.
 
@@ -218,6 +241,11 @@ Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma s
 - **Aproveitamento ~74% / ~60% não tem âncora legal** — é regra de mercado; default editável com aviso.
 - **APP urbana**: divergência 15 m (Lei 6.766) × 30 m (Cód. Florestal), modulada pela
   Lei 14.285/2021. Aplicar o maior buffer como triagem e marcar "verificar legislação municipal".
+- **Aproveitamento NÃO pode assumir regime urbano em silêncio** (falha detectada na Fase 2):
+  a Lei 6.766 (lote 125 m², doação) é **urbana**; terra **rural** rege-se pelo INCRA e não
+  pode ser fracionada abaixo da **FMP** do município (~2 ha), salvo se dentro do perímetro
+  urbano. O motor exige `regime` explícito e declara a premissa; sem isso, número é ilustrativo.
+  (Corrigido na Fase 1.7.)
 
 ---
 
@@ -233,8 +261,9 @@ Cada dimensão = **um endpoint no FastAPI + um card no Next.js**. Adiciona uma s
 | 2026-06-01 | **Ingestão quebrada em 1.5 (determinística) + 1.6 (CAD sujo).** 1.5 resolve casos sem ambiguidade (polígono direto; 1 linha simples fechável) e roteia o resto com diagnóstico — especificada (`docs/fase-1.5-ingestao.md`). 1.6 (isolar perímetro, fechar gaps grandes, auto-interseção, confirmação visual) fica **pendente de 3–5 arquivos reais** para especificação. | 1.5/1.6 |
 | 2026-06-01 | **Fase 1.5 concluída e testada** — camada de ingestão substituiu o parser cru; 10 critérios de aceite verdes (26 testes no total: 15 da Fase 1 sem regressão + 11 da 1.5). **Tolerância de fechamento:** `1,0 m` (constante `TOLERANCIA_FECHAMENTO_M`), **configurável por chamada** via parâmetro `tolerancia_m` de `ingerir(...)`; gap medido geodesicamente (`pyproj.Geod`) entre 1º e último ponto. **Formato final de `origem_geometria`:** objeto `{rota, descricao}` em toda resposta de sucesso — `rota ∈ {POLYGON_DIRETO, LINHA_FECHAVEL}` (apenas rotas de sucesso entram no schema) e `descricao` em prosa auditável (`"polígono direto do arquivo"`; `"linha já fechada do arquivo (anel)"`; `"linha fechada automaticamente (gap = X,XX m ≤ 1,0 m)"`). Linha fechada nunca em silêncio: o gap fechado também vai em `avisos`. **Ajustes de contrato vs. spec:** (a) além das 3 rotas, recusa **`SEM_GEOMETRIA`** (motivo `sem_geometria`) para arquivo sem polígono e sem linha — ex.: só `<Point>`; (b) `diagnostico.n_pontos` incluído quando há pontos; (c) linha simples porém degenerada (área 0 / inválida) é recusada como `TOPOGRAFIA_CAD` motivo `auto_intersecao`. `<Polygon>` direto preserva byte-a-byte a saída da Fase 1 (não-regressão). | 1.5 |
 | 2026-06-01 | **Pendência registrada (não implementada):** KMZ exportado de topografia/CAD traz só `LineString` (sem `Polygon`) — ex.: memorial descritivo/georreferenciamento. Recusado corretamente com diagnóstico na Fase 1.5; reconstrução assistida (isolar perímetro entre várias linhas) é a Fase 1.6. | 1.6 |
-| 2026-06-01 | **Fase 2 (Ambiental) concluída e testada** — endpoint aditivo `GET /api/analises/{id}/ambiental`; 3 overlays vetoriais por interseção determinística: hidrografia→APP (Cód. Florestal art. 4º I, faixas 30/50/100/200/500 m) + faixa não-edificável (Lei 6.766 art. 4º III, 15 m), unidades de conservação (ICMBio) e mineração (SIGMINE/ANM). **10 critérios de aceite verdes; suíte total 36 testes (sem regressão das Fases 1/1.5).** Card Ambiental no front com overlays/legenda/toggle no mapa. | 2 |
-| 2026-06-01 | **Buffers/áreas ambientais em CRS métrico local (AEQD no centróide), nunca em graus** — projeta gleba e camadas para azimutal equidistante (pyproj), faz buffer/interseção em metros e reprojeta o overlay para WGS84. Coerente com "geodésico, não área em graus". | 2 |
-| 2026-06-01 | **Aquisição = pipeline (não agente), fonte de camadas INJETÁVEL com default de produção `None`** — mesmo padrão do resolvedor de jurisdição (Fase 1): sem fonte configurada, o endpoint degrada honestamente ("camadas não consultadas"), nunca inventa. Downloader real `FonteCamadasINDE` implementado (stdlib `urllib` + GeoJSON + `shapely.geometry.shape`, **zero dependência nova**; cada camada degrada isoladamente em falha). Testes 100% offline com camadas-stub. | 2 |
-| 2026-06-01 | **APP com largura desconhecida → mínimo conservador de 30 m + `largura_confirmada: false` + aviso** (regra honesta da spec). Alerta de hidrografia usa o maior buffer (APP ≥ faixa não-edificável). Toda saída traz proveniência (camada + data + ressalva "caráter informativo — triagem, não veredito"). | 2 |
-| 2026-06-01 | **URLs oficiais das camadas (proveniência):** Mineração (ANM/SIGMINE) `https://geo.anm.gov.br/arcgis/rest/services/SIGMINE/dados_anm/MapServer/0/query` (ArcGIS REST `f=geojson`) — endpoint da spec. Hidrografia (ANA) `https://www.snirh.gov.br/arcgis/rest/services/HIDRO/Hidrografia/MapServer/0/query` e UC (ICMBio) `https://geoservicos.inde.gov.br/geoserver/ICMBio/ows` (WFS, typeName `ICMBio:lim_unidade_conservacao_a`). **⚠️ ANA e ICMBio DECLARADOS por documentação, NÃO validados ao vivo** — a política de rede deste ambiente bloqueia o egress (HTTP 403). Confirmar URL/typeName/atributos contra o serviço real ao habilitar a aquisição; os testes não dependem deles. | 2 |
+| 2026-06-01 | **Falha detectada em teste real (gleba rural Bocaina, 109 ha):** o aproveitamento assumia parcelamento URBANO em silêncio e a jurisdição não era resolvida (stub) — gerou "4048 lotes de 200 m²" em área rural de serra. Terra rural rege-se pela FMP do INCRA (~2 ha), não pela Lei 6.766. **Correção → Fase 1.7**: resolvedor IBGE real (detecção+override+divisa), pergunta de regime urbano/rural, FMP por município no rural, lote declarado no urbano (extração da LUOS = Fase 1.8). | 1.7 |
+| 2026-06-01 | **Falha detectada em teste real (Ambiental "não configurada"):** a Fase 2 passou nos 10 critérios porque eram todos offline com stubs; a integração com dados reais ficou fora dos critérios → no app real a camada não consultava nada. **Correção → Fase 2.1**: ligar SIGMINE/ANA/ICMBio/ANEEL reais + smoke test ao vivo; adicionar linhas de transmissão (ANEEL) para faixa de servidão. | 2.1 |
+| 2026-06-01 | **Decisão: detecção de município com override.** Detecta por point-in-polygon do centróide; mostra o resultado; usuário corrige por busca local (lista IBGE); alerta de divisa quando o polígono cruza >1 município; proveniência `detectado`/`informado`. Offline, sem agente. | 1.7 |
+| 2026-06-01 | **Decisão: aquisição de dado oficial é pipeline, não agente.** Malha IBGE, módulo fiscal INCRA, SIGMINE, ANA, ICMBio, ANEEL têm endpoint/arquivo fixo → download+cache. Agente/LLM só onde o alvo é não-estruturado: extração da LUOS (Fase 1.8, com validação humana) e busca de mercado (Mercadológica). Descartada detecção ambiental por visão sobre satélite (sem proveniência, propensa a erro). | geral |
+| 2026-06-02 | **Fase 1.7 concluída e testada** (jurisdição real + regime + rural FMP). 10 critérios de aceite verdes; suíte total **49 testes** (36 das Fases 1/1.5/2 sem regressão + 13 novos). **Valor-ouro confirmado:** Bocaina rural = `floor(1.094.111 / 20.000) = 54 parcelas` (vs. os "4048 lotes" urbanos sem sentido). Resolvedor de jurisdição promovido de stub→`FonteMalha` **injetável** (`jurisdicao.py`); loader de produção `malha_ibge.py` lê GeoJSON de `MALHA_IBGE_PATH` por point-in-polygon/interseção (stdlib `json` + `shapely.STRtree`, **sem dep nova**; egress bloqueado → não validado ao vivo, default degrada para município nulo). Regime obrigatório no aproveitamento (`regime_obrigatorio` 422); rural via `aproveitamento_rural`; novo `POST /analises/{id}/municipio` (override → origem `informado`); alerta `cruza_divisa` + candidatos. Frontend: seletor de regime no card de aproveitamento, correção/divisa no `BadgeCobertura`. | 1.7 |
+| 2026-06-02 | **Fonte de FMP usada na 1.7 — PENDENTE de confirmação oficial.** Tabela `backend/app/perfis/fmp_municipios.json` (`{cod_ibge: fmp_m2}`), carregada por `core/fmp.py` (`get_fonte_fmp`, injetável; produção lê o seed se presente, senão None → usuário informa `fmp_m2`). Seed atual: **Bocaina/SP (3506607) = 20.000 m² (2 ha)** — valor-ouro da spec, **não confirmado** na base INCRA/EMBRAPA (egress bloqueado neste ambiente). Proveniência exibida: "FMP/módulo fiscal do município (INCRA; Lei 5.868/72 art. 8º)". **Ação ao operar:** confirmar a FMP/módulo fiscal real por município na fonte INCRA/EMBRAPA e popular a tabela (mesmo tratamento dado às URLs da ambiental). | 1.7 |

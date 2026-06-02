@@ -77,6 +77,7 @@ def test_aproveitamento_endpoint_e_determinismo(client):
     r = _post_analise(client, [RET_RETANGULO])
     analise_id = r.json()["analise_id"]
     body = {
+        "regime": "URBANO",
         "lote_min_m2": 200.0,
         "loteamento": {
             "vias_m2": 11500.0,
