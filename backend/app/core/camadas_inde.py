@@ -15,15 +15,17 @@ PROVENIÊNCIA DOS ENDPOINTS (estado em 2026-06-01):
 - Hidrografia (ANA — Base Hidrográfica Ottocodificada): WFS oficial via INDE/ANA.
 - Unidades de conservação (ICMBio/CNUC): WFS oficial via INDE/ICMBio.
 
-  STATUS AO VIVO (2026-06-04, testado em máquina com rede):
-  - ✅ SIGMINE (mineração) e ✅ ANEEL (linhas de transmissão) → HTTP 200, consultadas.
-  - ❌ ANA (hidrografia) → HTTP 404 (URL migrou); ❌ ICMBio (UC) → HTTP 400 (workspace/
-    typeName a confirmar). A degradação por camada isola essas duas sem derrubar as demais.
+  STATUS DOS ENDPOINTS (2026-06-04):
+  - ✅ SIGMINE (mineração) e ✅ ANEEL (linhas de transmissão) → confirmados HTTP 200.
+  - Hidrografia e UC: o catálogo da ANA não expõe WFS usável (só metadados/download), mas o
+    servidor ArcGIS da ANA (`/arcgis/rest/services/DADOSABERTOS`) serve ambos como REST —
+    `Curso_dÁgua` (cursos d'água) e `Unidade_de_Conservação` (UC). Agora são os defaults
+    (ArcGIS, mesmo formato do SIGMINE). **Pendente confirmar ao vivo** o índice da camada
+    (`/0`) e os nomes de atributos.
 
   Todos os endpoints são SOBRESCREVÍVEIS por env (AMB_URL_MINERACAO, AMB_URL_HIDROGRAFIA,
-  AMB_URL_UC, AMB_UC_TYPENAME, AMB_URL_LT) → quando a URL correta da ANA/ICMBio for
-  confirmada no geoportal, basta exportá-la, sem deploy de código. Os testes não dependem
-  destes endpoints (smoke ao vivo é gated por RUN_LIVE_SMOKE).
+  AMB_URL_UC, AMB_URL_LT) → se um caminho mudar, basta exportar a URL certa, sem deploy.
+  Os testes não dependem destes endpoints (smoke ao vivo gated por RUN_LIVE_SMOKE).
 """
 
 from __future__ import annotations
@@ -55,15 +57,18 @@ URL_MINERACAO = os.getenv(
     "AMB_URL_MINERACAO",
     "https://geo.anm.gov.br/arcgis/rest/services/SIGMINE/dados_anm/MapServer/0/query",
 )
-URL_HIDROGRAFIA = os.getenv(  # ANA — 404 no default antigo; aponte para o serviço atual.
+# Hidrografia (ANA) — rede de cursos d'água do servidor ArcGIS da ANA (DADOSABERTOS).
+# Nome do serviço acentuado → caminho percent-encoded (Curso_dÁgua → Curso_d%C3%81gua).
+URL_HIDROGRAFIA = os.getenv(
     "AMB_URL_HIDROGRAFIA",
-    "https://www.snirh.gov.br/arcgis/rest/services/HIDRO/Hidrografia/MapServer/0/query",
+    "https://www.snirh.gov.br/arcgis/rest/services/DADOSABERTOS/Curso_d%C3%81gua/MapServer/0/query",
 )
-URL_UC = os.getenv(  # ICMBio — 400 no default antigo; confirmar workspace/typeName.
+# Unidades de conservação — também servido pela ANA (ArcGIS), o que dispensa o ICMBio WFS.
+# Unidade_de_Conservação → Unidade_de_Conserva%C3%A7%C3%A3o.
+URL_UC = os.getenv(
     "AMB_URL_UC",
-    "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows",
+    "https://www.snirh.gov.br/arcgis/rest/services/DADOSABERTOS/Unidade_de_Conserva%C3%A7%C3%A3o/MapServer/0/query",
 )
-UC_TYPENAME = os.getenv("AMB_UC_TYPENAME", "ICMBio:lim_unidade_conservacao_a")
 # Linhas de transmissão (ANEEL/SIGEL) — ArcGIS REST (confirmado HTTP 200).
 URL_LT = os.getenv(
     "AMB_URL_LT",
@@ -126,20 +131,6 @@ def _arcgis_envelope(bbox: BBox) -> dict:
     }
 
 
-def _wfs_bbox(typename: str, bbox: BBox) -> dict:
-    min_lon, min_lat, max_lon, max_lat = bbox
-    return {
-        "service": "WFS",
-        "version": "2.0.0",
-        "request": "GetFeature",
-        "typeNames": typename,
-        "outputFormat": "application/json",
-        "srsName": "EPSG:4326",
-        # WFS 2.0 com EPSG:4326 espera ordem lat,lon no bbox.
-        "bbox": f"{min_lat},{min_lon},{max_lat},{max_lon},EPSG:4326",
-    }
-
-
 class FonteCamadasINDE:
     """Pipeline real de aquisição. Cada camada degrada isoladamente em caso de falha."""
 
@@ -187,18 +178,18 @@ class FonteCamadasINDE:
             c.indisponiveis.append(COD_HIDRO)
             c.avisos.append(f"Camada de hidrografia (ANA) indisponível — {_detalhe_erro(exc)}")
 
-        # Unidades de conservação (ICMBio/CNUC)
+        # Unidades de conservação (ArcGIS — servido pela ANA; dispensa o ICMBio WFS)
         try:
-            fc = _get_json(URL_UC, _wfs_bbox(UC_TYPENAME, bbox))
+            fc = _get_json(URL_UC, _arcgis_envelope(bbox))
             for ft in _features(fc):
                 geom = shape(ft["geometry"])
                 props = ft.get("properties", {}) or {}
                 c.unidades_conservacao.append(
                     FeicaoUC(
                         geometria=geom,
-                        nome=_first(props, "nome_uc", "NOME_UC", "nome")
+                        nome=_first(props, "nome_uc", "nome", "nm_uc", "nome_da_uc")
                         or "UC não identificada",
-                        grupo=_first(props, "grupo", "categoria"),
+                        grupo=_first(props, "grupo", "categoria", "tipo", "esfera"),
                     )
                 )
             c.data_uc = hoje
