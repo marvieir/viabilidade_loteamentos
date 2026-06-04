@@ -20,6 +20,7 @@ ATENÇÃO: o egress de rede deste ambiente está bloqueado (HTTP 403), então es
 """
 
 import argparse
+import gzip
 import json
 import sys
 import time
@@ -39,9 +40,21 @@ def _get_json(url: str, tentativas: int = 4) -> object:
     espera = 2
     for i in range(tentativas):
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "viab-malha/1.7"})
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "viab-malha/1.7",
+                    "Accept": "application/json",
+                    "Accept-Encoding": "gzip, identity",
+                },
+            )
             with urllib.request.urlopen(req, timeout=60) as r:
-                return json.loads(r.read().decode("utf-8"))
+                raw = r.read()
+            # O IBGE costuma devolver gzip (assinatura 1f 8b) mesmo sem negociação —
+            # descomprime se preciso antes de decodificar (corrige o UnicodeDecodeError).
+            if r.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
+                raw = gzip.decompress(raw)
+            return json.loads(raw.decode("utf-8"))
         except Exception as exc:  # noqa: BLE001 — pipeline de linha de comando
             if i == tentativas - 1:
                 raise
