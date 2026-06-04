@@ -97,7 +97,13 @@ def _get_json(url: str, params: dict) -> dict:
     # decodificar (mesmo bug que travava o IBGE; ler cru como UTF-8 quebrava).
     if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
         raw = gzip.decompress(raw)
-    return json.loads(raw.decode("utf-8"))
+    data = json.loads(raw.decode("utf-8"))
+    # ArcGIS devolve erro como HTTP 200 com corpo {"error": {...}} — NÃO é "0 feições",
+    # é falha. Levantar para a camada cair honestamente em ``indisponiveis`` com o motivo,
+    # em vez de mascarar como consultada-vazia.
+    if isinstance(data, dict) and "error" in data:
+        raise RuntimeError(f"erro do serviço ArcGIS: {data['error']}")
+    return data
 
 
 def _detalhe_erro(exc: Exception) -> str:
