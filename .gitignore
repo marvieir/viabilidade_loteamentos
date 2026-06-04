@@ -26,3 +26,8 @@ next-env.d.ts
 *.swp
 .idea/
 .vscode/
+
+# Dados pesados gerados por pipeline (NÃO vão no git — ficam em volume; ARCHITECTURE §4).
+# A malha geométrica do IBGE é grande (~dezenas de MB). A LISTA LEVE
+# (lista_municipios.json, ~150 KB) É versionada — por isso não entra aqui.
+backend/app/perfis/malha_ibge.geojson
