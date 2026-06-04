@@ -23,6 +23,7 @@ PROVENIÊNCIA DOS ENDPOINTS (estado em 2026-06-01):
 
 from __future__ import annotations
 
+import gzip
 import json
 import urllib.parse
 import urllib.request
@@ -60,9 +61,26 @@ _TIMEOUT = 30
 
 def _get_json(url: str, params: dict) -> dict:
     query = urllib.parse.urlencode(params)
-    req = urllib.request.Request(f"{url}?{query}", headers={"User-Agent": "viabilidade-loteamentos/0.2"})
+    req = urllib.request.Request(
+        f"{url}?{query}",
+        headers={
+            "User-Agent": "viabilidade-loteamentos/0.2",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, identity",
+        },
+    )
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (URL fixa de config)
-        return json.loads(resp.read().decode("utf-8"))
+        raw = resp.read()
+    # Alguns serviços oficiais devolvem gzip (assinatura 1f 8b) — descomprime antes de
+    # decodificar (mesmo bug que travava o IBGE; ler cru como UTF-8 quebrava).
+    if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    return json.loads(raw.decode("utf-8"))
+
+
+def _detalhe_erro(exc: Exception) -> str:
+    """Mensagem curta e auditável do porquê a camada falhou (HTTP, parse, timeout…)."""
+    return f"{type(exc).__name__}: {exc}"[:180]
 
 
 def _features(fc: dict) -> list[dict]:
@@ -128,9 +146,9 @@ class FonteCamadasINDE:
                 )
             c.data_mineracao = hoje
             c.consultadas.append(COD_MINERACAO)
-        except Exception:  # noqa: BLE001 — degradar a camada, não derrubar o endpoint
+        except Exception as exc:  # noqa: BLE001 — degradar a camada, não derrubar o endpoint
             c.indisponiveis.append(COD_MINERACAO)
-            c.avisos.append("Camada de mineração (SIGMINE/ANM) indisponível — não consultada.")
+            c.avisos.append(f"Camada de mineração (SIGMINE/ANM) indisponível — {_detalhe_erro(exc)}")
 
         # Hidrografia (ANA)
         try:
@@ -148,9 +166,9 @@ class FonteCamadasINDE:
                 )
             c.data_hidrografia = hoje
             c.consultadas.append(COD_HIDRO)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             c.indisponiveis.append(COD_HIDRO)
-            c.avisos.append("Camada de hidrografia (ANA) indisponível — não consultada.")
+            c.avisos.append(f"Camada de hidrografia (ANA) indisponível — {_detalhe_erro(exc)}")
 
         # Unidades de conservação (ICMBio/CNUC)
         try:
@@ -168,9 +186,9 @@ class FonteCamadasINDE:
                 )
             c.data_uc = hoje
             c.consultadas.append(COD_UC)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             c.indisponiveis.append(COD_UC)
-            c.avisos.append("Camada de unidades de conservação (ICMBio) indisponível — não consultada.")
+            c.avisos.append(f"Camada de unidades de conservação (ICMBio) indisponível — {_detalhe_erro(exc)}")
 
         # Linhas de transmissão (ANEEL/SIGEL) → faixa de servidão
         try:
@@ -188,8 +206,8 @@ class FonteCamadasINDE:
                 )
             c.data_lt = hoje
             c.consultadas.append(COD_LT)
-        except Exception:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001
             c.indisponiveis.append(COD_LT)
-            c.avisos.append("Camada de linhas de transmissão (ANEEL) indisponível — não consultada.")
+            c.avisos.append(f"Camada de linhas de transmissão (ANEEL) indisponível — {_detalhe_erro(exc)}")
 
         return c
