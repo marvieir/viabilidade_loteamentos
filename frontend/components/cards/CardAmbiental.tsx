@@ -20,6 +20,7 @@ import {
 export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   app: "#3b82f6",
   faixa_nao_edificavel: "#06b6d4",
+  app_massa_dagua: "#0ea5e9",
   uc: "#16a34a",
   mineracao: "#d97706",
   linhas_transmissao: "#a855f7",
@@ -28,6 +29,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
 const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   app: "APP (hidrografia)",
   faixa_nao_edificavel: "Faixa não-edificável (15 m)",
+  app_massa_dagua: "APP de massa d'água (lago/represa)",
   uc: "Unidade de conservação",
   mineracao: "Mineração (ANM)",
   linhas_transmissao: "Faixa de servidão (LT/ANEEL)",

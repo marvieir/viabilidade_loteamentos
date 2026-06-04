@@ -153,6 +153,10 @@ MINA_SOBREPOE = Polygon(
 )
 # Linha de transmissão que CRUZA a gleba (horizontal, lat média) — faixa de servidão.
 LT_CRUZA = LineString([(-47.145, -23.524), (-47.115, -23.524)])
+# Massa d'água (lago/represa) que sobrepõe parte da gleba — polígono.
+LAGO_SOBREPOE = Polygon(
+    [(-47.138, -23.529), (-47.130, -23.529), (-47.130, -23.523), (-47.138, -23.523)]
+)
 
 
 class StubFonte:

@@ -242,6 +242,7 @@ export type TipoAlerta =
   | "MINERACAO"
   | "UNIDADE_CONSERVACAO"
   | "APP_HIDROGRAFIA"
+  | "APP_MASSA_DAGUA"
   | "FAIXA_NAO_EDIFICAVEL"
   | "FAIXA_SERVIDAO_LT";
 
@@ -264,6 +265,7 @@ export interface AlertaAmbiental {
 export type ChaveOverlay =
   | "app"
   | "faixa_nao_edificavel"
+  | "app_massa_dagua"
   | "uc"
   | "mineracao"
   | "linhas_transmissao";

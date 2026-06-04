@@ -30,6 +30,10 @@ _FAIXAS_APP: list[tuple[float, float]] = [
 APP_MINIMA_M = 30.0            # mínimo legal e default conservador (largura desconhecida)
 APP_MAXIMA_M = 500.0           # acima de 600 m de largura
 FAIXA_NAO_EDIFICAVEL_M = 15.0  # Lei 6.766/79, art. 4º, III (cada lado de águas)
+# Faixa marginal de APP de massa d'água (lago/lagoa/reservatório), Cód. Florestal art. 4º,
+# II/III. Mínimo conservador de 30 m; lago natural rural pode chegar a 100 m (>20 ha) e
+# reservatório artificial à faixa da licença — sinalizado no detalhe do alerta.
+APP_MASSA_DAGUA_M = 30.0
 
 # Faixa de servidão de linha de transmissão (Fase 2.1) — semi-faixa: buffer de CADA LADO
 # da LT, por tensão. NBR 5422 / ARCHITECTURE.md §5 (20/40/70 m para 69/230/500 kV).
@@ -51,6 +55,7 @@ CAMADA_HIDRO = "ANA/IBGE — hidrografia"
 CAMADA_UC = "ICMBio/CNUC — unidades de conservação"
 CAMADA_MINERACAO = "SIGMINE/ANM — processos minerários"
 CAMADA_LT = "ANEEL/SIGEL — linhas de transmissão"
+CAMADA_MASSA_DAGUA = "ANA — massas d'água (lagos/reservatórios)"
 
 
 def app_por_largura(largura_m: Optional[float]) -> float:
@@ -173,6 +178,33 @@ def analisar(gleba, camadas: Camadas) -> ResultadoAmbiental:
                     camada=CAMADA_HIDRO,
                     data_referencia=camadas.data_hidrografia,
                     area_afetada_m2=round(inter_faixa.area, 2),
+                )
+            )
+
+    # --- Massas d'água (lagos/lagoas/reservatórios) → APP marginal ---
+    md_bands = []
+    for f in camadas.massas_dagua:
+        geom_l = transform(to_local, f.geometria)
+        md_bands.append(geom_l.buffer(APP_MASSA_DAGUA_M))
+    if md_bands:
+        md_union = unary_union(md_bands)
+        overlays["app_massa_dagua"] = mapping(transform(to_wgs, md_union))
+        inter_md = md_union.intersection(gleba_l)
+        if not inter_md.is_empty and inter_md.area > 0:
+            alertas.append(
+                Alerta(
+                    tipo="APP_MASSA_DAGUA",
+                    severidade="ALERTA",
+                    intersecta=True,
+                    detalhe=(
+                        "Massa d'água (lago/lagoa/reservatório) com faixa marginal de APP "
+                        "incide sobre a gleba (Cód. Florestal art. 4º, II/III). Faixa mínima "
+                        "de 30 m aplicada; lago natural rural >20 ha exige até 100 m e "
+                        "reservatório artificial, a faixa da licença — confirmar tipo e área."
+                    ),
+                    camada=CAMADA_MASSA_DAGUA,
+                    data_referencia=camadas.data_massa_dagua,
+                    area_afetada_m2=round(inter_md.area, 2),
                 )
             )
 

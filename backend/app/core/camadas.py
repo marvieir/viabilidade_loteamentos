@@ -62,6 +62,16 @@ class FeicaoLinhaTransmissao:
     nome: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class FeicaoMassaDagua:
+    """Massa d'água: lago, lagoa ou reservatório (ANA Massa_dágua). Polígono → APP marginal
+    (Cód. Florestal art. 4º, II/III). Distinta do curso d'água (linha)."""
+
+    geometria: BaseGeometry  # Polygon/MultiPolygon (WGS84)
+    nome: Optional[str] = None
+    tipo: Optional[str] = None  # natural/artificial, se a fonte informar
+
+
 @dataclass
 class Camadas:
     """Feições recortadas para o bbox da gleba + proveniência (data) por camada.
@@ -74,10 +84,12 @@ class Camadas:
     unidades_conservacao: list[FeicaoUC] = field(default_factory=list)
     mineracao: list[FeicaoMineracao] = field(default_factory=list)
     linhas_transmissao: list[FeicaoLinhaTransmissao] = field(default_factory=list)
+    massas_dagua: list[FeicaoMassaDagua] = field(default_factory=list)
     data_hidrografia: Optional[str] = None
     data_uc: Optional[str] = None
     data_mineracao: Optional[str] = None
     data_lt: Optional[str] = None
+    data_massa_dagua: Optional[str] = None
     # Degradação por camada (Fase 2.1): quais camadas foram efetivamente consultadas e
     # quais falharam — códigos curtos (SIGMINE/ANA/ICMBio/ANEEL). Uma fonte fora do ar
     # entra em ``indisponiveis`` sem derrubar as demais.

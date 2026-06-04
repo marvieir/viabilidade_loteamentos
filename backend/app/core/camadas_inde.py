@@ -45,6 +45,7 @@ from app.core.camadas import (
     Camadas,
     FeicaoHidrografia,
     FeicaoLinhaTransmissao,
+    FeicaoMassaDagua,
     FeicaoMineracao,
     FeicaoUC,
 )
@@ -74,9 +75,17 @@ URL_LT = os.getenv(
     "AMB_URL_LT",
     "https://sigel.aneel.gov.br/arcgis/rest/services/PORTAL/WFS/MapServer/0/query",
 )
+# Massas d'água (lagos/lagoas/reservatórios) — ANA. Curso d'água (linha) NÃO cobre represas;
+# por isso consultamos as duas camadas de polígono (a "Grande" pega grandes reservatórios).
+_BASE_ANA = "https://www.snirh.gov.br/arcgis/rest/services/DADOSABERTOS"
+URL_MASSA_DAGUA = os.getenv("AMB_URL_MASSA_DAGUA", f"{_BASE_ANA}/Massa_d%C3%A1gua/MapServer/0/query")
+URL_MASSA_DAGUA_GRANDE = os.getenv(
+    "AMB_URL_MASSA_DAGUA_GRANDE", f"{_BASE_ANA}/Massa_d%C3%81gua_Grande/MapServer/0/query"
+)
 
 # Códigos curtos de camada (para camadas_consultadas / camadas_indisponiveis — Fase 2.1).
 COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
+COD_MASSA = "Massa d'água"
 
 _TIMEOUT = 30
 
@@ -223,5 +232,30 @@ class FonteCamadasINDE:
         except Exception as exc:  # noqa: BLE001
             c.indisponiveis.append(COD_LT)
             c.avisos.append(f"Camada de linhas de transmissão (ANEEL) indisponível — {_detalhe_erro(exc)}")
+
+        # Massas d'água (lagos/lagoas/reservatórios) — duas camadas; consultada se UMA responder
+        md_ok, md_err = False, []
+        for url in (URL_MASSA_DAGUA, URL_MASSA_DAGUA_GRANDE):
+            try:
+                fc = _get_json(url, _arcgis_envelope(bbox))
+                for ft in _features(fc):
+                    geom = shape(ft["geometry"])
+                    props = ft.get("properties", {}) or {}
+                    c.massas_dagua.append(
+                        FeicaoMassaDagua(
+                            geometria=geom,
+                            nome=_first(props, "nome", "NOME", "nome_corpo", "norep"),
+                            tipo=_first(props, "tipo", "TIPO", "classe"),
+                        )
+                    )
+                md_ok = True
+            except Exception as exc:  # noqa: BLE001
+                md_err.append(_detalhe_erro(exc))
+        if md_ok:
+            c.data_massa_dagua = hoje
+            c.consultadas.append(COD_MASSA)
+        else:
+            c.indisponiveis.append(COD_MASSA)
+            c.avisos.append("Camada de massas d'água (ANA) indisponível — " + "; ".join(md_err))
 
         return c

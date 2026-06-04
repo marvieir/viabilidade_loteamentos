@@ -138,6 +138,7 @@ class AlertaAmbientalOut(BaseModel):
         "MINERACAO",
         "UNIDADE_CONSERVACAO",
         "APP_HIDROGRAFIA",
+        "APP_MASSA_DAGUA",
         "FAIXA_NAO_EDIFICAVEL",
         "FAIXA_SERVIDAO_LT",
     ]
@@ -151,7 +152,7 @@ class AlertaAmbientalOut(BaseModel):
 
 class AmbientalOut(BaseModel):
     alertas: list[AlertaAmbientalOut] = []
-    geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, uc, mineracao, linhas_transmissao}
+    geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, app_massa_dagua, uc, mineracao, linhas_transmissao}
     avisos: list[str] = []
     sem_alertas: bool
     # Degradação por camada (Fase 2.1): quais fontes responderam e quais falharam.

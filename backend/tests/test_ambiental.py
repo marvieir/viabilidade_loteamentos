@@ -5,11 +5,13 @@ from app.core.camadas import (
     Camadas,
     FeicaoHidrografia,
     FeicaoLinhaTransmissao,
+    FeicaoMassaDagua,
     FeicaoMineracao,
     FeicaoUC,
 )
 from tests.conftest import (
     DATA_REF,
+    LAGO_SOBREPOE,
     LT_CRUZA,
     MINA_SOBREPOE,
     RET_RETANGULO,
@@ -258,6 +260,27 @@ def test_lt_tensao_desconhecida_aplica_maxima(client, fonte):
     a_none = _do_tipo(sem_t, "FAIXA_SERVIDAO_LT")[0]["area_afetada_m2"]
     assert a_none > a230  # 70 m cobre mais que 40 m
     assert any("tensão" in a.lower() for a in sem_t["avisos"]), sem_t["avisos"]
+
+
+# 2.1-b2) Massa d'água (lago/represa) → APP marginal (gap do Curso_dÁgua só-linha) ---
+def test_massa_dagua_app_intersecta(client, fonte):
+    data = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            massas_dagua=[
+                FeicaoMassaDagua(LAGO_SOBREPOE, nome="Represa Teste", tipo="artificial")
+            ],
+            data_massa_dagua=DATA_REF,
+            consultadas=["Massa d'água"],
+        ),
+    )
+    al = _do_tipo(data, "APP_MASSA_DAGUA")
+    assert al, data
+    assert al[0]["intersecta"] is True
+    assert al[0]["area_afetada_m2"] > 0
+    assert "massa" in al[0]["proveniencia"]["camada"].lower()
+    assert "app_massa_dagua" in data["geojson_overlays"]
 
 
 # 2.1-c) Critério nº4: degradação por camada (consultadas vs indisponíveis) --
