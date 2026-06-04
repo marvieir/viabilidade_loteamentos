@@ -31,3 +31,6 @@ next-env.d.ts
 # A malha geométrica do IBGE é grande (~dezenas de MB). A LISTA LEVE
 # (lista_municipios.json, ~150 KB) É versionada — por isso não entra aqui.
 backend/app/perfis/malha_ibge.geojson
+# Rasters de vegetação (Fase 2.2) — recortes baixados por pipeline, ficam em volume.
+backend/app/perfis/*.tif
+backend/app/perfis/verde.tif

@@ -55,9 +55,14 @@ A `area_liquida_m2` (após desconto do verde) entra como **base** do cálculo de
 quando a vegetação foi consultada — com proveniência explícita do desconto. Sem fonte, o
 aproveitamento segue como hoje (sem desconto), rotulando que o verde não foi considerado.
 
-## Valores-ouro (a fixar quando o raster real estiver disponível)
-- Gleba-teste com X% de cobertura conhecida → `area_verde_m2` dentro de tolerância de ±Y%
-  (raster de 30 m tem granularidade; a tolerância reconhece isso).
+## Valores-ouro (validados ao vivo — ESA WorldCover 2021)
+**Terreno_Cachoeira (tile S24W048), validado pelo operador em 2026-06-04:**
+- Área total: **24,08 ha**. Composição WorldCover: árvores 57,9% (~13,95 ha),
+  pastagem/campo 41,3% (~9,95 ha), água 0,7%, construído 0,1%.
+- Classes verde = `{10,20,90,95}` → **área verde 13,77 ha (57,2%)**, área líquida 10,31 ha.
+- **Decisão de produto (operador):** pastagem/campo (classe 30) **NÃO** conta como verde —
+  é área aberta/aproveitável; a mata (classe 10) é a parte com restrição ambiental
+  potencial. Confirma a regra conservadora "verde = mata, não pasto".
 
 ## Não-escopo (explícito)
 - Classificar bioma/espécie/passível de supressão. - Emitir parecer de supressão/compensação.
