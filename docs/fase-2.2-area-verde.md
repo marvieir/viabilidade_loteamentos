@@ -1,0 +1,58 @@
+# Fase 2.2 — Área verde (cobertura vegetal) → desconto da área aproveitável
+
+> Spec da fase. Fonte de verdade junto com `CLAUDE.md` e `ARCHITECTURE.md`.
+
+## Objetivo (escopo de TRIAGEM, não de laudo)
+Identificar a **área verde / cobertura vegetal** dentro da gleba e **descontá-la da área
+aproveitável**. A plataforma **não classifica** se é Mata Atlântica, mata nativa, capoeira
+ou vegetação removível — isso é trabalho do **engenheiro ambiental** numa análise detalhada,
+fora do escopo. Aqui: detectar o verde, medir, e tirar do total aproveitável.
+
+**Princípio conservador:** verde = **fora** do aproveitável até que um especialista prove o
+contrário. Melhor subestimar o aproveitável do que vender área que não se pode lotear.
+
+## Regras inegociáveis herdadas
+1. Cálculo numérico **só no backend** (rasterio/shapely), nunca no front, nunca via LLM.
+2. **Determinismo:** mesma gleba + mesmo raster de referência → mesma área verde.
+3. **Proveniência obrigatória:** fonte (ex.: "MapBiomas Coleção N, ano AAAA"), data, classe.
+4. **Degradação honesta:** sem fonte de vegetação configurada → não inventa; reporta
+   "cobertura vegetal não consultada" e não desconta nada (não zera nem chuta).
+
+## Contrato de saída (endpoint próprio — um card por dimensão)
+`GET /api/analises/{id}/vegetacao`
+```jsonc
+{
+  "area_total_m2": 240842.15,        // área da gleba (geodésica, já medida na geometria)
+  "area_verde_m2": 131000.00,        // cobertura vegetal detectada dentro da gleba
+  "area_liquida_m2": 109842.15,      // area_total - area_verde (base após desconto do verde)
+  "percentual_verde": 54.4,
+  "geojson_verde": { /* polígono(s) da área verde, p/ overlay no mapa */ },
+  "proveniencia": { "fonte": "MapBiomas Coleção 9 (2023)", "data_referencia": "2026-06-04",
+                    "classes": ["Formação Florestal", "Formação Savânica"] },
+  "avisos": [],
+  "consultada": true                 // false = sem fonte → area_verde_m2 = null, sem desconto
+}
+```
+
+## Fonte de dados (injetável, padrão da malha)
+- Interface `FonteVegetacao.cobertura_verde(gleba) -> (geometria_verde, proveniencia)`.
+- Produção: `FonteVegetacaoRaster` lê um **raster de uso/cobertura** local
+  (`MAPBIOMAS_RASTER_PATH`, montado como volume — igual à malha do IBGE), recorta pela
+  gleba com `rasterio.mask`, seleciona as **classes de vegetação** (floresta/savana/etc.)
+  e poligoniza a máscara para o overlay e a área.
+- `get_fonte_vegetacao()` → `None` por padrão (degradação); raster presente → liga.
+- Testes: **offline**, com fonte-stub determinística (polígono de verde sintético) e, para o
+  caminho raster, um GeoTIFF sintético em memória.
+
+## Integração com Aproveitamento
+A `area_liquida_m2` (após desconto do verde) entra como **base** do cálculo de aproveitamento
+quando a vegetação foi consultada — com proveniência explícita do desconto. Sem fonte, o
+aproveitamento segue como hoje (sem desconto), rotulando que o verde não foi considerado.
+
+## Valores-ouro (a fixar quando o raster real estiver disponível)
+- Gleba-teste com X% de cobertura conhecida → `area_verde_m2` dentro de tolerância de ±Y%
+  (raster de 30 m tem granularidade; a tolerância reconhece isso).
+
+## Não-escopo (explícito)
+- Classificar bioma/espécie/passível de supressão. - Emitir parecer de supressão/compensação.
+- Substituir o laudo do engenheiro ambiental. A saída é **triagem** e diz isso na proveniência.
