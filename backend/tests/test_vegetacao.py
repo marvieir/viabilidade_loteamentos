@@ -81,3 +81,37 @@ def test_determinismo(client, fonte_vegetacao):
 
 def test_vegetacao_analise_inexistente_404(client):
     assert client.get("/api/analises/nao-existe/vegetacao").status_code == 404
+
+
+# 5 — integração: verde desconta a base do APROVEITAMENTO (Fase 2.2) ------------
+_BODY_URBANO = {
+    "regime": "URBANO",
+    "modalidade": "loteamento_aberto",
+    "lote_min_m2": 200.0,
+    "loteamento": {
+        "vias_m2": 0.0,
+        "doacao_pct": 0.0,
+        "base_doacao": "total",
+        "combinado_pct": 0.35,
+    },
+    "desmembramento": {"fator_aprov": 1.0},
+}
+
+
+def test_aproveitamento_desconta_verde(client, fonte_vegetacao):
+    aid = _criar_analise(client)
+    sem = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
+    assert sem["desconto_verde"] is None  # sem fonte → sem desconto
+
+    # liga a fonte: metade da gleba é verde
+    fonte_vegetacao(CoberturaVerde(geometria=VERDE_METADE, fonte="MapBiomas (teste)"))
+    com = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
+    dv = com["desconto_verde"]
+    assert dv is not None
+    assert dv["area_verde_m2"] > 0
+    assert abs(dv["area_base_m2"] - (dv["area_total_m2"] - dv["area_verde_m2"])) < 0.5
+    # base menor → área aproveitável menor (fator 1.0, sem vias/doação → ~metade)
+    assert com["desmembramento"]["area_aproveitavel_m2"] < sem["desmembramento"][
+        "area_aproveitavel_m2"
+    ]
+    assert "ambiental" in dv["proveniencia"].lower()

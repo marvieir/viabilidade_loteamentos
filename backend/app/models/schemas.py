@@ -114,9 +114,21 @@ class RuralOut(BaseModel):
     proveniencia: str
 
 
+class DescontoVerdeOut(BaseModel):
+    """Quanto de área verde foi removido do total antes do cálculo (triagem, Fase 2.2)."""
+
+    area_total_m2: float
+    area_verde_m2: float
+    area_base_m2: float  # total − verde: a base efetivamente usada no aproveitamento
+    percentual_verde: float
+    proveniencia: str
+
+
 class AproveitamentoOut(BaseModel):
     regime: Literal["URBANO", "RURAL"]
     premissa: str
+    # Desconto de área verde (Fase 2.2): presente só quando a vegetação foi consultada.
+    desconto_verde: Optional[DescontoVerdeOut] = None
     # URBANO
     origem_lote: Optional[str] = None
     desmembramento: Optional[ModalidadeOut] = None

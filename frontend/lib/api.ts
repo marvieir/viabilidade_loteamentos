@@ -99,9 +99,18 @@ export interface RuralResult {
   proveniencia: string;
 }
 
+export interface DescontoVerde {
+  area_total_m2: number;
+  area_verde_m2: number;
+  area_base_m2: number;
+  percentual_verde: number;
+  proveniencia: string;
+}
+
 export interface Aproveitamento {
   regime: Regime;
   premissa: string;
+  desconto_verde?: DescontoVerde | null;
   origem_lote?: string | null;
   desmembramento?: Modalidade | null;
   loteamento?: LoteamentoResult | null;
@@ -313,7 +322,11 @@ export async function calcularTodasBases(
   analiseId: string,
   p: AproveitamentoParams,
   modalidade: ModalidadeUrbana = "loteamento_aberto"
-): Promise<{ desmembramento: Modalidade; bases: LoteamentoResult[] }> {
+): Promise<{
+  desmembramento: Modalidade;
+  bases: LoteamentoResult[];
+  desconto_verde: DescontoVerde | null;
+}> {
   const ordem: BaseDoacao[] = ["total", "liquida", "combinada"];
   const resultados = await Promise.all(
     ordem.map((b) => calcularAproveitamento(analiseId, b, p, modalidade))
@@ -322,5 +335,7 @@ export async function calcularTodasBases(
     // URBANO sempre traz ambos; o backend é a fonte de verdade.
     desmembramento: resultados[0].desmembramento as Modalidade,
     bases: resultados.map((r) => r.loteamento as LoteamentoResult),
+    // O desconto de verde é o mesmo nas três bases (mesma gleba/fonte).
+    desconto_verde: resultados[0].desconto_verde ?? null,
   };
 }

@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   calcularRural,
   calcularTodasBases,
+  type DescontoVerde,
   type LoteamentoResult,
   type Modalidade,
   type ModalidadeUrbana,
@@ -61,6 +62,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
   const [rural, setRural] = useState<RuralResult | null>(null);
   const [premissa, setPremissa] = useState<string | null>(null);
   const [origemLote, setOrigemLote] = useState<string | null>(null);
+  const [descontoVerde, setDescontoVerde] = useState<DescontoVerde | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
@@ -70,6 +72,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
     setRural(null);
     setPremissa(null);
     setOrigemLote(null);
+    setDescontoVerde(null);
   }
 
   async function calcular() {
@@ -81,6 +84,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
         limpar();
         setRural(r.rural ?? null);
         setPremissa(r.premissa);
+        setDescontoVerde(r.desconto_verde ?? null);
       } else {
         const r = await calcularTodasBases(
           analiseId,
@@ -96,6 +100,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
         limpar();
         setDesmembramento(r.desmembramento);
         setBases(r.bases);
+        setDescontoVerde(r.desconto_verde);
         setPremissa("parcelamento URBANO (Lei 6.766/79)");
         setOrigemLote(
           "declarado pelo usuário (pendente extração da LUOS — Fase 1.8)"
@@ -227,6 +232,30 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
               </>
             ) : null}
           </p>
+        )}
+
+        {descontoVerde && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900">
+            <p className="font-medium">
+              Área verde descontada da base:{" "}
+              {(descontoVerde.area_verde_m2 / 10000).toLocaleString("pt-BR", {
+                maximumFractionDigits: 2,
+              })}{" "}
+              ha ({descontoVerde.percentual_verde.toLocaleString("pt-BR")}%)
+            </p>
+            <p className="mt-1">
+              Base usada:{" "}
+              {(descontoVerde.area_base_m2 / 10000).toLocaleString("pt-BR", {
+                maximumFractionDigits: 2,
+              })}{" "}
+              ha de{" "}
+              {(descontoVerde.area_total_m2 / 10000).toLocaleString("pt-BR", {
+                maximumFractionDigits: 2,
+              })}{" "}
+              ha.
+            </p>
+            <p className="mt-1 text-emerald-700">{descontoVerde.proveniencia}</p>
+          </div>
         )}
 
         {erro && (

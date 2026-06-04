@@ -34,6 +34,11 @@ from app.core.jurisdicao import (
 )
 from app.core.lista_municipios import FonteLista, get_fonte_lista
 from app.core.store import STORE
+from app.core.vegetacao import (
+    FonteVegetacao,
+    analisar_vegetacao,
+    get_fonte_vegetacao,
+)
 from app.models import schemas
 
 router = APIRouter()
@@ -207,6 +212,7 @@ def calcular_aproveitamento(
     analise_id: str,
     body: schemas.AproveitamentoIn,
     fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
+    fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -227,6 +233,27 @@ def calcular_aproveitamento(
 
     area = registro["area_m2"]
 
+    # Desconto de área verde (Fase 2.2): se a vegetação foi consultada, a base do
+    # aproveitamento passa a ser o total menos a cobertura vegetal (triagem
+    # conservadora — verde fora do aproveitável até laudo ambiental). Vale p/ os 2 regimes.
+    desconto_verde = None
+    if fonte_veg is not None:
+        veg = analisar_vegetacao(registro["poly"], fonte_veg.cobertura_verde(registro["poly"]))
+        if veg.consultada and veg.area_verde_m2:
+            area_base = max(round(area - veg.area_verde_m2, 2), 0.0)
+            fonte_nome = (veg.proveniencia or {}).get("fonte") or "fonte de cobertura"
+            desconto_verde = schemas.DescontoVerdeOut(
+                area_total_m2=round(area, 2),
+                area_verde_m2=veg.area_verde_m2,
+                area_base_m2=area_base,
+                percentual_verde=veg.percentual_verde or 0.0,
+                proveniencia=(
+                    f"base = área total − área verde ({fonte_nome}); verde removido na "
+                    "triagem (Fase 2.2) — classificação/supressão dependem de laudo ambiental"
+                ),
+            )
+            area = area_base
+
     if body.regime == "RURAL":
         jur: Jurisdicao = registro["jurisdicao"]
         # Origem da FMP (decisão #1): corpo (editável) > tabela INCRA por município >
@@ -245,6 +272,7 @@ def calcular_aproveitamento(
         return schemas.AproveitamentoOut(
             regime="RURAL",
             premissa=PREMISSA_RURAL,
+            desconto_verde=desconto_verde,
             rural=schemas.RuralOut(**rural, fmp_origem=fmp_origem),
         )
 
@@ -278,6 +306,7 @@ def calcular_aproveitamento(
     return schemas.AproveitamentoOut(
         regime="URBANO",
         premissa=f"{PREMISSA_URBANA} — modalidade: {rotulo}",
+        desconto_verde=desconto_verde,
         origem_lote=ORIGEM_LOTE_DECLARADO,
         desmembramento=schemas.ModalidadeOut(**desmembramento),
         loteamento=schemas.LoteamentoOut(**loteamento),
