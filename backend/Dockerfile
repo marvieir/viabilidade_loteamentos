@@ -1,7 +1,15 @@
 # Backend FastAPI — Pré-Viabilidade de Loteamento
-# Os wheels manylinux de shapely/pyproj/lxml já trazem GEOS, PROJ e libxml2
-# embutidos — não é preciso instalar libs de sistema via apt.
+# shapely/pyproj/lxml vêm por wheel manylinux (GEOS/PROJ/libxml2 embutidos).
+# rasterio (Fase 2.2 — área verde) NÃO tem wheel para linux-arm64 → compila do fonte e
+# precisa do GDAL + toolchain de build. Instalamos via apt antes do pip.
 FROM python:3.11-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        gdal-bin \
+        libgdal-dev \
+        build-essential \
+    && rm -rf /var/lib/apt/lists/*
+ENV GDAL_CONFIG=/usr/bin/gdal-config
 
 WORKDIR /app
 

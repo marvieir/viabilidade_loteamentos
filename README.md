@@ -42,8 +42,9 @@ docker compose up --build
 cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8700
-pytest            # 15 testes — valores-ouro da Fase 1
+cp .env.example .env          # variáveis (malha, ambiental, área verde) — edite se quiser
+uvicorn app.main:app --reload --port 8700 --env-file .env
+pytest            # valores-ouro das fases
 ```
 
 ### Frontend

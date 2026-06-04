@@ -34,3 +34,6 @@ backend/app/perfis/malha_ibge.geojson
 # Rasters de vegetação (Fase 2.2) — recortes baixados por pipeline, ficam em volume.
 backend/app/perfis/*.tif
 backend/app/perfis/verde.tif
+
+# .env do backend (segredos/caminhos da máquina) — versionamos só o .env.example.
+backend/.env

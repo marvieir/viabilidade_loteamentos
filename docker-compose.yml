@@ -12,16 +12,17 @@ services:
       MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
       # Liga a aquisição ambiental real (Fase 2.1 — SIGMINE/ANA/ICMBio/ANEEL).
       AMBIENTAL_FONTE_REAL: "1"
-      # Fase 2.2 — área verde: aponte para o raster montado abaixo. Recomendado: ESA
-      # WorldCover (sem login) via scripts/baixar_worldcover.py. Sem isso, a vegetação
-      # degrada honesta (não desconta).
-      # VEGETACAO_RASTER_PATH: "/data/verde.tif"
+      # Fase 2.2 — área verde (ESA WorldCover, sem login). Recorte gerado por
+      # scripts/baixar_worldcover.py e montado no volume abaixo. Comente esta linha e o
+      # volume se ainda não tiver o arquivo (a vegetação degrada honesta, sem descontar).
+      VEGETACAO_RASTER_PATH: "/data/verde.tif"
     volumes:
       # Monta a malha gerada no host (python -m scripts.baixar_malha_ibge) no container.
       # O arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
       - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
-      # Fase 2.2 — raster de vegetação (recorte). Descomente quando tiver o arquivo:
-      # - ./backend/app/perfis/verde.tif:/data/verde.tif:ro
+      # Fase 2.2 — raster de vegetação (recorte WorldCover). O arquivo PRECISA existir
+      # antes do `up` (gere com scripts/baixar_worldcover.py), senão o bind cria dir vazio.
+      - ./backend/app/perfis/verde.tif:/data/verde.tif:ro
     restart: unless-stopped
 
   web:
