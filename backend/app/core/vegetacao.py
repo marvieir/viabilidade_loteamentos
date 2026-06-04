@@ -25,9 +25,15 @@ RESSALVA_VEG = (
     "supressão dependem de laudo de engenheiro ambiental (fora do escopo da plataforma)"
 )
 
-# Classes do MapBiomas tratadas como "área verde" (formações naturais). Ajustar à legenda
-# da coleção real ao validar com o raster. Sobrescrevível por env (MAPBIOMAS_CLASSES_VERDE).
+# Legenda ESA WorldCover (fonte PADRÃO — pública, 10 m, sem login): classes tratadas como
+# "área verde". 10=árvores, 20=arbustiva, 90=área úmida herbácea, 95=mangue. NÃO incluímos
+# 30=pastagem/campo por padrão (costuma ser aproveitável); adicione via env se quiser.
+# Sobrescrevível por env VEGETACAO_CLASSES_VERDE (ex.: "10,20,30,90,95").
+CLASSES_VERDE_WORLDCOVER = {10, 20, 90, 95}
+# Referência, caso use MapBiomas (legenda diferente!): formações naturais.
 CLASSES_VERDE_MAPBIOMAS = {3, 4, 5, 6, 49, 11, 12, 13, 32, 29, 50}
+# Default da plataforma = WorldCover (sem autenticação).
+CLASSES_VERDE_PADRAO = CLASSES_VERDE_WORLDCOVER
 
 
 @dataclass
@@ -102,18 +108,23 @@ def analisar_vegetacao(
 
 
 class FonteVegetacaoRaster:
-    """Produção: lê um raster de uso/cobertura (MapBiomas) e devolve a cobertura verde.
+    """Produção: lê um raster de uso/cobertura e devolve a cobertura verde da gleba.
 
-    ``rasterio.mask`` recorta pela gleba; as classes de vegetação viram polígono via
-    ``rasterio.features.shapes``. Import de rasterio é tardio (dependência só de produção;
-    os testes usam fonte-stub). Degrada honestamente se o raster falhar.
-
-    PENDENTE de validação ao vivo com o raster real (legenda/CRS/classes da coleção).
+    Fonte PADRÃO = ESA WorldCover (pública, 10 m, SEM login); funciona com qualquer raster
+    de classes (MapBiomas etc.) passando ``classes``. ``rasterio.mask`` recorta pela gleba;
+    as classes de vegetação viram polígono via ``rasterio.features.shapes``. Import de
+    rasterio é tardio (só produção; testes usam stub). Degrada honesto se o raster falhar.
     """
 
-    def __init__(self, caminho: str, classes: Optional[set[int]] = None):
+    def __init__(
+        self,
+        caminho: str,
+        classes: Optional[set[int]] = None,
+        fonte: Optional[str] = None,
+    ):
         self.caminho = caminho
-        self.classes = classes or _classes_env() or CLASSES_VERDE_MAPBIOMAS
+        self.classes = classes or _classes_env() or CLASSES_VERDE_PADRAO
+        self.fonte = fonte or os.getenv("VEGETACAO_FONTE_NOME") or "ESA WorldCover 10m (2021)"
 
     def cobertura_verde(self, gleba: BaseGeometry) -> CoberturaVerde:
         from datetime import date
@@ -140,14 +151,14 @@ class FonteVegetacaoRaster:
                 ]
                 if not polys:
                     return CoberturaVerde(
-                        fonte="MapBiomas (uso/cobertura)",
+                        fonte=self.fonte,
                         data_referencia=date.today().isoformat(),
                         avisos=["Nenhuma cobertura vegetal detectada na gleba (raster)."],
                     )
                 to_wgs = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True).transform
                 return CoberturaVerde(
                     geometria=shp_transform(to_wgs, unary_union(polys)),
-                    fonte="MapBiomas (uso/cobertura)",
+                    fonte=self.fonte,
                     data_referencia=date.today().isoformat(),
                     classes=[str(c) for c in sorted(self.classes)],
                 )
@@ -158,15 +169,20 @@ class FonteVegetacaoRaster:
 
 
 def _classes_env() -> Optional[set[int]]:
-    bruto = os.getenv("MAPBIOMAS_CLASSES_VERDE")
+    # VEGETACAO_CLASSES_VERDE (preferido) ou MAPBIOMAS_CLASSES_VERDE (compat).
+    bruto = os.getenv("VEGETACAO_CLASSES_VERDE") or os.getenv("MAPBIOMAS_CLASSES_VERDE")
     if not bruto:
         return None
     return {int(x) for x in bruto.replace(";", ",").split(",") if x.strip()}
 
 
 def get_fonte_vegetacao() -> Optional[FonteVegetacao]:
-    """Liga a fonte real se ``MAPBIOMAS_RASTER_PATH`` apontar para um raster (volume)."""
-    caminho = os.getenv("MAPBIOMAS_RASTER_PATH")
+    """Liga a fonte real se um raster estiver apontado por env (arquivo local OU /vsicurl/).
+
+    ``VEGETACAO_RASTER_PATH`` (preferido) ou ``MAPBIOMAS_RASTER_PATH`` (compat). Sem env →
+    None (degrada honesto: não desconta). O padrão recomendado é ESA WorldCover (sem login).
+    """
+    caminho = os.getenv("VEGETACAO_RASTER_PATH") or os.getenv("MAPBIOMAS_RASTER_PATH")
     if caminho:
         return FonteVegetacaoRaster(caminho)
     return None

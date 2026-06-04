@@ -36,13 +36,19 @@ contrário. Melhor subestimar o aproveitável do que vender área que não se po
 
 ## Fonte de dados (injetável, padrão da malha)
 - Interface `FonteVegetacao.cobertura_verde(gleba) -> (geometria_verde, proveniencia)`.
-- Produção: `FonteVegetacaoRaster` lê um **raster de uso/cobertura** local
-  (`MAPBIOMAS_RASTER_PATH`, montado como volume — igual à malha do IBGE), recorta pela
-  gleba com `rasterio.mask`, seleciona as **classes de vegetação** (floresta/savana/etc.)
-  e poligoniza a máscara para o overlay e a área.
-- `get_fonte_vegetacao()` → `None` por padrão (degradação); raster presente → liga.
-- Testes: **offline**, com fonte-stub determinística (polígono de verde sintético) e, para o
-  caminho raster, um GeoTIFF sintético em memória.
+- Produção: `FonteVegetacaoRaster` lê um **raster de uso/cobertura**, recorta pela gleba com
+  `rasterio.mask`, seleciona as **classes de vegetação** e poligoniza a máscara.
+- **Fonte recomendada: ESA WorldCover (10 m, 2021) — PÚBLICA, SEM LOGIN.** COG na AWS Open
+  Data; `scripts/baixar_worldcover.py` lê só a janela da gleba por HTTP (sem autenticar) e
+  salva um recorte local → `VEGETACAO_RASTER_PATH`. Classes verde padrão:
+  `{10 árvores, 20 arbustiva, 90 área úmida, 95 mangue}` (30 pastagem fica de fora;
+  ajustável por env `VEGETACAO_CLASSES_VERDE`).
+- Alternativa: **MapBiomas** (`scripts/baixar_mapbiomas.py`, via Earth Engine — exige conta
+  Google/projeto Cloud; pode esbarrar em bloqueio de login). Mesma `FonteVegetacaoRaster`,
+  só muda a legenda de classes.
+- `get_fonte_vegetacao()` → `None` por padrão (degradação); raster apontado → liga.
+- Testes: **offline**, com fonte-stub determinística; o caminho raster tem teste com GeoTIFF
+  sintético (gated por `rasterio`).
 
 ## Integração com Aproveitamento
 A `area_liquida_m2` (após desconto do verde) entra como **base** do cálculo de aproveitamento
