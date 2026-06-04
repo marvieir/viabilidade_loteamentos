@@ -15,16 +15,22 @@ PROVENIÊNCIA DOS ENDPOINTS (estado em 2026-06-01):
 - Hidrografia (ANA — Base Hidrográfica Ottocodificada): WFS oficial via INDE/ANA.
 - Unidades de conservação (ICMBio/CNUC): WFS oficial via INDE/ICMBio.
 
-  ⚠️ Os endpoints de ANA e ICMBio abaixo são os OFICIAIS conhecidos por documentação,
-  mas NÃO foram validados ao vivo neste ambiente (a política de rede bloqueia o egress —
-  HTTP 403). Confirmar/ajustar `URL`, `typeName`/layer e nomes de atributos contra o
-  serviço real ao habilitar a aquisição. Os testes da fase não dependem deles.
+  STATUS AO VIVO (2026-06-04, testado em máquina com rede):
+  - ✅ SIGMINE (mineração) e ✅ ANEEL (linhas de transmissão) → HTTP 200, consultadas.
+  - ❌ ANA (hidrografia) → HTTP 404 (URL migrou); ❌ ICMBio (UC) → HTTP 400 (workspace/
+    typeName a confirmar). A degradação por camada isola essas duas sem derrubar as demais.
+
+  Todos os endpoints são SOBRESCREVÍVEIS por env (AMB_URL_MINERACAO, AMB_URL_HIDROGRAFIA,
+  AMB_URL_UC, AMB_UC_TYPENAME, AMB_URL_LT) → quando a URL correta da ANA/ICMBio for
+  confirmada no geoportal, basta exportá-la, sem deploy de código. Os testes não dependem
+  destes endpoints (smoke ao vivo é gated por RUN_LIVE_SMOKE).
 """
 
 from __future__ import annotations
 
 import gzip
 import json
+import os
 import urllib.parse
 import urllib.request
 from datetime import date
@@ -41,17 +47,28 @@ from app.core.camadas import (
     FeicaoUC,
 )
 
-# --- Endpoints oficiais (ver proveniência no docstring do módulo) ---
-URL_MINERACAO = (
-    "https://geo.anm.gov.br/arcgis/rest/services/SIGMINE/dados_anm/MapServer/0/query"
+# --- Endpoints oficiais — SOBRESCREVÍVEIS por ambiente (sem mexer em código) ---
+# Confirmados ao vivo (HTTP 200): SIGMINE e ANEEL. ANA e ICMBio são endpoints que
+# MIGRAM com frequência — quando a URL correta for confirmada no geoportal, basta exportar
+# a env var (AMB_URL_HIDROGRAFIA / AMB_URL_UC / AMB_UC_TYPENAME) — zero deploy de código.
+URL_MINERACAO = os.getenv(
+    "AMB_URL_MINERACAO",
+    "https://geo.anm.gov.br/arcgis/rest/services/SIGMINE/dados_anm/MapServer/0/query",
 )
-# DECLARADOS — validar em rede ao habilitar:
-URL_HIDROGRAFIA = "https://www.snirh.gov.br/arcgis/rest/services/HIDRO/Hidrografia/MapServer/0/query"
-URL_UC = "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows"
-UC_TYPENAME = "ICMBio:lim_unidade_conservacao_a"
-# Linhas de transmissão (ANEEL/SIGEL) — ArcGIS REST. DECLARADO: confirmar o índice da
-# camada "Linhas de Transmissão - Base Existente" e o campo de tensão no serviço real.
-URL_LT = "https://sigel.aneel.gov.br/arcgis/rest/services/PORTAL/WFS/MapServer/0/query"
+URL_HIDROGRAFIA = os.getenv(  # ANA — 404 no default antigo; aponte para o serviço atual.
+    "AMB_URL_HIDROGRAFIA",
+    "https://www.snirh.gov.br/arcgis/rest/services/HIDRO/Hidrografia/MapServer/0/query",
+)
+URL_UC = os.getenv(  # ICMBio — 400 no default antigo; confirmar workspace/typeName.
+    "AMB_URL_UC",
+    "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows",
+)
+UC_TYPENAME = os.getenv("AMB_UC_TYPENAME", "ICMBio:lim_unidade_conservacao_a")
+# Linhas de transmissão (ANEEL/SIGEL) — ArcGIS REST (confirmado HTTP 200).
+URL_LT = os.getenv(
+    "AMB_URL_LT",
+    "https://sigel.aneel.gov.br/arcgis/rest/services/PORTAL/WFS/MapServer/0/query",
+)
 
 # Códigos curtos de camada (para camadas_consultadas / camadas_indisponiveis — Fase 2.1).
 COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
