@@ -7,6 +7,15 @@ services:
       - "8700:8700"
     environment:
       CORS_ORIGINS: "http://localhost:3700"
+      # Liga a detecção de município por malha real (Fase 1.7). O arquivo entra por volume
+      # (abaixo) — é grande e gitignored, não vai na imagem.
+      MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
+      # Liga a aquisição ambiental real (Fase 2.1 — SIGMINE/ANA/ICMBio/ANEEL).
+      AMBIENTAL_FONTE_REAL: "1"
+    volumes:
+      # Monta a malha gerada no host (python -m scripts.baixar_malha_ibge) no container.
+      # O arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
+      - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
     restart: unless-stopped
 
   web:
