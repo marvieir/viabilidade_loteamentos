@@ -151,6 +151,8 @@ UC_COBRE = Polygon(
 MINA_SOBREPOE = Polygon(
     [(-47.135, -23.528), (-47.125, -23.528), (-47.125, -23.522), (-47.135, -23.522)]
 )
+# Linha de transmissão que CRUZA a gleba (horizontal, lat média) — faixa de servidão.
+LT_CRUZA = LineString([(-47.145, -23.524), (-47.115, -23.524)])
 
 
 class StubFonte:

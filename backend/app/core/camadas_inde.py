@@ -35,6 +35,7 @@ from app.core.camadas import (
     BBox,
     Camadas,
     FeicaoHidrografia,
+    FeicaoLinhaTransmissao,
     FeicaoMineracao,
     FeicaoUC,
 )
@@ -47,6 +48,12 @@ URL_MINERACAO = (
 URL_HIDROGRAFIA = "https://www.snirh.gov.br/arcgis/rest/services/HIDRO/Hidrografia/MapServer/0/query"
 URL_UC = "https://geoservicos.inde.gov.br/geoserver/ICMBio/ows"
 UC_TYPENAME = "ICMBio:lim_unidade_conservacao_a"
+# Linhas de transmissão (ANEEL/SIGEL) — ArcGIS REST. DECLARADO: confirmar o índice da
+# camada "Linhas de Transmissão - Base Existente" e o campo de tensão no serviço real.
+URL_LT = "https://sigel.aneel.gov.br/arcgis/rest/services/PORTAL/WFS/MapServer/0/query"
+
+# Códigos curtos de camada (para camadas_consultadas / camadas_indisponiveis — Fase 2.1).
+COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
 
 _TIMEOUT = 30
 
@@ -120,7 +127,9 @@ class FonteCamadasINDE:
                     )
                 )
             c.data_mineracao = hoje
+            c.consultadas.append(COD_MINERACAO)
         except Exception:  # noqa: BLE001 — degradar a camada, não derrubar o endpoint
+            c.indisponiveis.append(COD_MINERACAO)
             c.avisos.append("Camada de mineração (SIGMINE/ANM) indisponível — não consultada.")
 
         # Hidrografia (ANA)
@@ -138,7 +147,9 @@ class FonteCamadasINDE:
                     )
                 )
             c.data_hidrografia = hoje
+            c.consultadas.append(COD_HIDRO)
         except Exception:  # noqa: BLE001
+            c.indisponiveis.append(COD_HIDRO)
             c.avisos.append("Camada de hidrografia (ANA) indisponível — não consultada.")
 
         # Unidades de conservação (ICMBio/CNUC)
@@ -156,7 +167,29 @@ class FonteCamadasINDE:
                     )
                 )
             c.data_uc = hoje
+            c.consultadas.append(COD_UC)
         except Exception:  # noqa: BLE001
+            c.indisponiveis.append(COD_UC)
             c.avisos.append("Camada de unidades de conservação (ICMBio) indisponível — não consultada.")
+
+        # Linhas de transmissão (ANEEL/SIGEL) → faixa de servidão
+        try:
+            fc = _get_json(URL_LT, _arcgis_envelope(bbox))
+            for ft in _features(fc):
+                geom = shape(ft["geometry"])
+                props = ft.get("properties", {}) or {}
+                tensao = _first(props, "TENSAO", "tensao", "tensao_kv", "kv")
+                c.linhas_transmissao.append(
+                    FeicaoLinhaTransmissao(
+                        geometria=geom,
+                        tensao_kv=float(tensao) if tensao else None,
+                        nome=_first(props, "NOME", "nome", "denominacao"),
+                    )
+                )
+            c.data_lt = hoje
+            c.consultadas.append(COD_LT)
+        except Exception:  # noqa: BLE001
+            c.indisponiveis.append(COD_LT)
+            c.avisos.append("Camada de linhas de transmissão (ANEEL) indisponível — não consultada.")
 
         return c

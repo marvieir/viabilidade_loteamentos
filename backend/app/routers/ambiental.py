@@ -64,4 +64,6 @@ def analisar_ambiental(
         geojson_overlays=res.geojson_overlays,
         avisos=res.avisos,
         sem_alertas=res.sem_alertas,
+        camadas_consultadas=res.camadas_consultadas,
+        camadas_indisponiveis=res.camadas_indisponiveis,
     )

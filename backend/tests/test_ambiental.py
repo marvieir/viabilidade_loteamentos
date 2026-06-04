@@ -1,13 +1,16 @@
-"""Critérios de aceite da Fase 2 — Ambiental (10), offline com camadas-stub."""
+"""Critérios de aceite das Fases 2 e 2.1 — Ambiental, offline com camadas-stub."""
 
+from app.core.ambiental import faixa_servidao
 from app.core.camadas import (
     Camadas,
     FeicaoHidrografia,
+    FeicaoLinhaTransmissao,
     FeicaoMineracao,
     FeicaoUC,
 )
 from tests.conftest import (
     DATA_REF,
+    LT_CRUZA,
     MINA_SOBREPOE,
     RET_RETANGULO,
     RIO_CRUZA,
@@ -201,6 +204,88 @@ def test_ambiental_analise_inexistente_404(client):
     assert r.status_code == 404
 
 
-# 10 ------------------------------------------------------------------------
-# Não-regressão (Fases 1 e 1.5): verificada rodando a suíte completa
-# (test_analises_api.py, test_aproveitamento.py, test_geometria.py, test_ingestao.py).
+# ======================= Fase 2.1 — dados reais + ANEEL =======================
+
+
+# 2.1-a) Faixa de servidão por tensão (NBR 5422 / ARCHITECTURE §5) -----------
+def test_faixa_servidao_por_tensao():
+    assert faixa_servidao(69) == 20.0     # ≤ 69 kV
+    assert faixa_servidao(138) == 40.0    # 69–230 kV
+    assert faixa_servidao(500) == 70.0    # > 230 kV
+    assert faixa_servidao(None) == 70.0   # desconhecida → máxima (conservadora)
+
+
+# 2.1-b) Critério nº2: LT cruza a gleba → FAIXA_SERVIDAO_LT + overlay --------
+def test_lt_servidao_intersecta(client, fonte):
+    data = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            linhas_transmissao=[
+                FeicaoLinhaTransmissao(LT_CRUZA, tensao_kv=230, nome="LT Teste")
+            ],
+            data_lt=DATA_REF,
+            consultadas=["ANEEL"],
+        ),
+    )
+    al = _do_tipo(data, "FAIXA_SERVIDAO_LT")
+    assert al, data
+    assert al[0]["intersecta"] is True
+    assert al[0]["area_afetada_m2"] > 0
+    assert "ANEEL" in al[0]["proveniencia"]["camada"]
+    assert "linhas_transmissao" in data["geojson_overlays"]
+    assert "ANEEL" in data["camadas_consultadas"]
+
+
+def test_lt_tensao_desconhecida_aplica_maxima(client, fonte):
+    base = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            linhas_transmissao=[FeicaoLinhaTransmissao(LT_CRUZA, tensao_kv=230)],
+            data_lt=DATA_REF,
+        ),
+    )
+    sem_t = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            linhas_transmissao=[FeicaoLinhaTransmissao(LT_CRUZA, tensao_kv=None)],
+            data_lt=DATA_REF,
+        ),
+    )
+    a230 = _do_tipo(base, "FAIXA_SERVIDAO_LT")[0]["area_afetada_m2"]
+    a_none = _do_tipo(sem_t, "FAIXA_SERVIDAO_LT")[0]["area_afetada_m2"]
+    assert a_none > a230  # 70 m cobre mais que 40 m
+    assert any("tensão" in a.lower() for a in sem_t["avisos"]), sem_t["avisos"]
+
+
+# 2.1-c) Critério nº4: degradação por camada (consultadas vs indisponíveis) --
+def test_degradacao_por_camada(client, fonte):
+    data = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            mineracao=[FeicaoMineracao(MINA_SOBREPOE, processo="1/2020")],
+            data_mineracao=DATA_REF,
+            consultadas=["SIGMINE"],
+            indisponiveis=["ICMBio"],
+        ),
+    )
+    assert "SIGMINE" in data["camadas_consultadas"]
+    assert "ICMBio" in data["camadas_indisponiveis"]
+    # com fonte configurada, NÃO se diz "fonte não configurada"
+    assert not any("não configurada" in a.lower() for a in data["avisos"]), data["avisos"]
+    # a camada consultada segue produzindo alerta
+    assert _do_tipo(data, "MINERACAO"), data
+
+
+# 2.1-d) "não configurada" só aparece quando NÃO há fonte (não com degradação) -
+def test_nao_configurada_apenas_sem_fonte(client):
+    aid = _criar_analise(client)
+    data = client.get(f"/api/analises/{aid}/ambiental").json()
+    assert data["camadas_consultadas"] == []
+    assert any("não configurada" in a.lower() for a in data["avisos"]), data["avisos"]
+
+
+# Não-regressão (Fases 1, 1.5, 1.7): verificada rodando a suíte completa.

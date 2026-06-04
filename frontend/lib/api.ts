@@ -242,7 +242,8 @@ export type TipoAlerta =
   | "MINERACAO"
   | "UNIDADE_CONSERVACAO"
   | "APP_HIDROGRAFIA"
-  | "FAIXA_NAO_EDIFICAVEL";
+  | "FAIXA_NAO_EDIFICAVEL"
+  | "FAIXA_SERVIDAO_LT";
 
 export interface ProvenienciaAmbiental {
   camada: string;
@@ -260,13 +261,20 @@ export interface AlertaAmbiental {
   proveniencia: ProvenienciaAmbiental;
 }
 
-export type ChaveOverlay = "app" | "faixa_nao_edificavel" | "uc" | "mineracao";
+export type ChaveOverlay =
+  | "app"
+  | "faixa_nao_edificavel"
+  | "uc"
+  | "mineracao"
+  | "linhas_transmissao";
 
 export interface Ambiental {
   alertas: AlertaAmbiental[];
   geojson_overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
   avisos: string[];
   sem_alertas: boolean;
+  camadas_consultadas: string[];
+  camadas_indisponiveis: string[];
 }
 
 export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {

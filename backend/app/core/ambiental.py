@@ -31,6 +31,16 @@ APP_MINIMA_M = 30.0            # mínimo legal e default conservador (largura de
 APP_MAXIMA_M = 500.0           # acima de 600 m de largura
 FAIXA_NAO_EDIFICAVEL_M = 15.0  # Lei 6.766/79, art. 4º, III (cada lado de águas)
 
+# Faixa de servidão de linha de transmissão (Fase 2.1) — semi-faixa: buffer de CADA LADO
+# da LT, por tensão. NBR 5422 / ARCHITECTURE.md §5 (20/40/70 m para 69/230/500 kV).
+# (limite_superior_tensao_kV, semifaixa_m).
+_FAIXAS_SERVIDAO: list[tuple[float, float]] = [
+    (69.0, 20.0),    # até 69 kV → 20 m
+    (230.0, 40.0),   # 69 a 230 kV → 40 m
+]
+SERVIDAO_MAXIMA_M = 70.0   # acima de 230 kV (ex.: 500 kV)
+SERVIDAO_DEFAULT_M = 70.0  # tensão não confirmada → faixa máxima (triagem conservadora)
+
 # Cada alerta é triagem, não veredito (restrição inegociável da Fase 2).
 RESSALVA = (
     "caráter informativo — triagem conservadora, não veredito; "
@@ -40,6 +50,7 @@ RESSALVA = (
 CAMADA_HIDRO = "ANA/IBGE — hidrografia"
 CAMADA_UC = "ICMBio/CNUC — unidades de conservação"
 CAMADA_MINERACAO = "SIGMINE/ANM — processos minerários"
+CAMADA_LT = "ANEEL/SIGEL — linhas de transmissão"
 
 
 def app_por_largura(largura_m: Optional[float]) -> float:
@@ -50,6 +61,17 @@ def app_por_largura(largura_m: Optional[float]) -> float:
         if largura_m <= limite:
             return buffer
     return APP_MAXIMA_M
+
+
+def faixa_servidao(tensao_kv: Optional[float]) -> float:
+    """Semi-faixa de servidão (m, de cada lado da LT) pela tensão. ``None`` → faixa máxima
+    (70 m), como triagem conservadora — ``mais restritivo aplicável`` do ARCHITECTURE.md."""
+    if tensao_kv is None:
+        return SERVIDAO_DEFAULT_M
+    for limite, faixa in _FAIXAS_SERVIDAO:
+        if tensao_kv <= limite:
+            return faixa
+    return SERVIDAO_MAXIMA_M
 
 
 def _crs_local(lon: float, lat: float) -> CRS:
@@ -78,6 +100,8 @@ class ResultadoAmbiental:
     geojson_overlays: dict = field(default_factory=dict)
     avisos: list[str] = field(default_factory=list)
     sem_alertas: bool = True
+    camadas_consultadas: list[str] = field(default_factory=list)
+    camadas_indisponiveis: list[str] = field(default_factory=list)
 
 
 def analisar(gleba, camadas: Camadas) -> ResultadoAmbiental:
@@ -198,9 +222,46 @@ def analisar(gleba, camadas: Camadas) -> ResultadoAmbiental:
     if minas:
         overlays["mineracao"] = mapping(transform(to_wgs, unary_union(minas)))
 
+    # --- Linhas de transmissão (ANEEL) → faixa de servidão por tensão ---
+    lt_bands = []
+    tensao_desconhecida = False
+    for f in camadas.linhas_transmissao:
+        geom_l = transform(to_local, f.geometria)
+        lt_bands.append(geom_l.buffer(faixa_servidao(f.tensao_kv)))
+        if f.tensao_kv is None:
+            tensao_desconhecida = True
+    if lt_bands:
+        lt_union = unary_union(lt_bands)
+        overlays["linhas_transmissao"] = mapping(transform(to_wgs, lt_union))
+        inter_lt = lt_union.intersection(gleba_l)
+        if not inter_lt.is_empty and inter_lt.area > 0:
+            detalhe = (
+                "Faixa de servidão de linha de transmissão incide sobre a gleba "
+                "(NBR 5422; largura por tensão)."
+            )
+            if tensao_desconhecida:
+                detalhe += " Tensão não confirmada — aplicada a faixa máxima de 70 m."
+                avisos.append(
+                    "tensão da LT não confirmada — faixa de servidão aplicada no "
+                    "máximo (70 m)"
+                )
+            alertas.append(
+                Alerta(
+                    tipo="FAIXA_SERVIDAO_LT",
+                    severidade="ALERTA",
+                    intersecta=True,
+                    detalhe=detalhe,
+                    camada=CAMADA_LT,
+                    data_referencia=camadas.data_lt,
+                    area_afetada_m2=round(inter_lt.area, 2),
+                )
+            )
+
     return ResultadoAmbiental(
         alertas=alertas,
         geojson_overlays=overlays,
         avisos=avisos,
         sem_alertas=len(alertas) == 0,
+        camadas_consultadas=list(camadas.consultadas),
+        camadas_indisponiveis=list(camadas.indisponiveis),
     )

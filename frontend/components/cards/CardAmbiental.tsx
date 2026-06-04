@@ -22,6 +22,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   faixa_nao_edificavel: "#06b6d4",
   uc: "#16a34a",
   mineracao: "#d97706",
+  linhas_transmissao: "#a855f7",
 };
 
 const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -29,6 +30,7 @@ const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   faixa_nao_edificavel: "Faixa não-edificável (15 m)",
   uc: "Unidade de conservação",
   mineracao: "Mineração (ANM)",
+  linhas_transmissao: "Faixa de servidão (LT/ANEEL)",
 };
 
 const m2 = (v: number) =>
@@ -139,6 +141,20 @@ export function CardAmbiental({
                   <AlertaItem key={`${a.tipo}-${i}`} a={a} />
                 ))}
               </ul>
+            )}
+
+            {(data.camadas_consultadas.length > 0 ||
+              data.camadas_indisponiveis.length > 0) && (
+              <p className="text-xs text-slate-500">
+                {data.camadas_consultadas.length > 0 && (
+                  <>Camadas consultadas: {data.camadas_consultadas.join(", ")}. </>
+                )}
+                {data.camadas_indisponiveis.length > 0 && (
+                  <span className="text-amber-700">
+                    Indisponíveis: {data.camadas_indisponiveis.join(", ")}.
+                  </span>
+                )}
+              </p>
             )}
 
             {data.avisos.length > 0 && (

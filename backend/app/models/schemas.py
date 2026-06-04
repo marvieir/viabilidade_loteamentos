@@ -135,7 +135,11 @@ class ProvenienciaAmbientalOut(BaseModel):
 
 class AlertaAmbientalOut(BaseModel):
     tipo: Literal[
-        "MINERACAO", "UNIDADE_CONSERVACAO", "APP_HIDROGRAFIA", "FAIXA_NAO_EDIFICAVEL"
+        "MINERACAO",
+        "UNIDADE_CONSERVACAO",
+        "APP_HIDROGRAFIA",
+        "FAIXA_NAO_EDIFICAVEL",
+        "FAIXA_SERVIDAO_LT",
     ]
     severidade: Literal["ALERTA", "INFORMATIVO"]
     intersecta: bool
@@ -147,6 +151,9 @@ class AlertaAmbientalOut(BaseModel):
 
 class AmbientalOut(BaseModel):
     alertas: list[AlertaAmbientalOut] = []
-    geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, uc, mineracao}
+    geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, uc, mineracao, linhas_transmissao}
     avisos: list[str] = []
     sem_alertas: bool
+    # Degradação por camada (Fase 2.1): quais fontes responderam e quais falharam.
+    camadas_consultadas: list[str] = []
+    camadas_indisponiveis: list[str] = []

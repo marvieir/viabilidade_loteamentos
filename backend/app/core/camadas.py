@@ -53,6 +53,15 @@ class FeicaoMineracao:
     fase: Optional[str] = None  # "concessão de lavra", "requerimento de pesquisa", ...
 
 
+@dataclass(frozen=True)
+class FeicaoLinhaTransmissao:
+    """Linha de transmissão (ANEEL/SIGEL) → faixa de servidão por tensão (NBR 5422)."""
+
+    geometria: BaseGeometry  # LineString/MultiLineString (WGS84)
+    tensao_kv: Optional[float] = None  # None = tensão não informada pela camada
+    nome: Optional[str] = None
+
+
 @dataclass
 class Camadas:
     """Feições recortadas para o bbox da gleba + proveniência (data) por camada.
@@ -64,9 +73,16 @@ class Camadas:
     hidrografia: list[FeicaoHidrografia] = field(default_factory=list)
     unidades_conservacao: list[FeicaoUC] = field(default_factory=list)
     mineracao: list[FeicaoMineracao] = field(default_factory=list)
+    linhas_transmissao: list[FeicaoLinhaTransmissao] = field(default_factory=list)
     data_hidrografia: Optional[str] = None
     data_uc: Optional[str] = None
     data_mineracao: Optional[str] = None
+    data_lt: Optional[str] = None
+    # Degradação por camada (Fase 2.1): quais camadas foram efetivamente consultadas e
+    # quais falharam — códigos curtos (SIGMINE/ANA/ICMBio/ANEEL). Uma fonte fora do ar
+    # entra em ``indisponiveis`` sem derrubar as demais.
+    consultadas: list[str] = field(default_factory=list)
+    indisponiveis: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
 
 
@@ -80,7 +96,16 @@ class FonteCamadas(Protocol):
 def get_fonte_camadas() -> Optional[FonteCamadas]:
     """Dependência FastAPI da fonte de camadas.
 
-    PRODUÇÃO: ``None`` (nenhuma fonte configurada) → degradação graciosa.
+    PRODUÇÃO: ``None`` por padrão (degradação graciosa). Para LIGAR a aquisição real
+    (Fase 2.1), defina ``AMBIENTAL_FONTE_REAL=1`` → devolve ``FonteCamadasINDE`` (pipeline
+    SIGMINE/ANA/ICMBio/ANEEL). Análogo ao ``MALHA_IBGE_PATH`` da jurisdição: o código fica
+    pronto e desligável; ligar é um passo de operação, não de build.
     TESTES: sobrescrito via ``app.dependency_overrides`` por um stub offline.
     """
+    import os
+
+    if os.getenv("AMBIENTAL_FONTE_REAL"):
+        from app.core.camadas_inde import FonteCamadasINDE
+
+        return FonteCamadasINDE()
     return None
