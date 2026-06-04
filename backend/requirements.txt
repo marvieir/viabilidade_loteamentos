@@ -6,6 +6,7 @@ python-multipart==0.0.20
 shapely==2.0.6
 pyproj==3.7.0
 lxml==5.3.0
+rasterio==1.4.3  # Fase 2.2 — amostragem do raster MapBiomas (área verde)
 
 # dev / testes
 pytest==8.3.4

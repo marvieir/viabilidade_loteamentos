@@ -284,6 +284,30 @@ export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {
   return jsonOrThrow(res);
 }
 
+// ----- Fase 2.2 — Área verde (cobertura vegetal) -----
+export interface ProvenienciaVegetacao {
+  fonte: string | null;
+  data_referencia: string | null;
+  classes: string[];
+  ressalva: string | null;
+}
+
+export interface Vegetacao {
+  area_total_m2: number;
+  area_verde_m2: number | null;
+  area_liquida_m2: number | null;
+  percentual_verde: number | null;
+  geojson_verde: GeoJSON.Geometry | Record<string, never>;
+  proveniencia: ProvenienciaVegetacao | null;
+  avisos: string[];
+  consultada: boolean;
+}
+
+export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/vegetacao`);
+  return jsonOrThrow(res);
+}
+
 // Conveniência: busca as três bases (cada uma é um cálculo do backend).
 export async function calcularTodasBases(
   analiseId: string,

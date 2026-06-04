@@ -6,6 +6,7 @@ import { UploadKmz } from "@/components/UploadKmz";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
+import { CardVegetacao } from "@/components/cards/CardVegetacao";
 import {
   Card,
   CardContent,
@@ -116,6 +117,8 @@ export default function Home() {
             analiseId={analise.analise_id}
             onOverlays={setOverlays}
           />
+
+          <CardVegetacao analiseId={analise.analise_id} />
         </>
       )}
     </main>

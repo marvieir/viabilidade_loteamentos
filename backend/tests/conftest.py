@@ -12,6 +12,7 @@ from app.core.fmp import FonteFMPArquivo, get_fonte_fmp
 from app.core.jurisdicao import Municipio, get_fonte_malha
 from app.core.lista_municipios import FonteListaArquivo, get_fonte_lista
 from app.core.store import STORE
+from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
 from app.main import app
 
 _KML = """<?xml version="1.0" encoding="UTF-8"?>
@@ -185,6 +186,27 @@ def _limpa_store():
     STORE.clear()
     yield
     STORE.clear()
+
+
+class StubFonteVegetacao:
+    """Fonte de vegetação de TESTE — devolve uma CoberturaVerde fixa, sem raster/rede."""
+
+    def __init__(self, cobertura: CoberturaVerde):
+        self._cobertura = cobertura
+
+    def cobertura_verde(self, gleba):  # assinatura de FonteVegetacao
+        return self._cobertura
+
+
+@pytest.fixture
+def fonte_vegetacao():
+    """Injeta uma fonte de vegetação-stub. Uso: ``fonte_vegetacao(CoberturaVerde(...))``."""
+
+    def _set(cobertura: CoberturaVerde):
+        app.dependency_overrides[get_fonte_vegetacao] = lambda: StubFonteVegetacao(cobertura)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_vegetacao, None)
 
 
 @pytest.fixture

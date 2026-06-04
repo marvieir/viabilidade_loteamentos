@@ -158,3 +158,22 @@ class AmbientalOut(BaseModel):
     # Degradação por camada (Fase 2.1): quais fontes responderam e quais falharam.
     camadas_consultadas: list[str] = []
     camadas_indisponiveis: list[str] = []
+
+
+# ----- Fase 2.2 — Área verde (cobertura vegetal) -----
+class ProvenienciaVegetacaoOut(BaseModel):
+    fonte: Optional[str] = None
+    data_referencia: Optional[str] = None
+    classes: list[str] = []
+    ressalva: Optional[str] = None
+
+
+class VegetacaoOut(BaseModel):
+    area_total_m2: float
+    area_verde_m2: Optional[float] = None      # None = não consultada (sem desconto)
+    area_liquida_m2: Optional[float] = None    # area_total - area_verde
+    percentual_verde: Optional[float] = None
+    geojson_verde: dict = {}
+    proveniencia: Optional[ProvenienciaVegetacaoOut] = None
+    avisos: list[str] = []
+    consultada: bool
