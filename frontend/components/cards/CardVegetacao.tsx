@@ -16,7 +16,13 @@ const m2 = (v: number) =>
 const ha = (v: number) =>
   (v / 10000).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " ha";
 
-export function CardVegetacao({ analiseId }: { analiseId: string }) {
+export function CardVegetacao({
+  analiseId,
+  onOverlayVerde,
+}: {
+  analiseId: string;
+  onOverlayVerde?: (g: GeoJSON.Geometry | null) => void;
+}) {
   const [data, setData] = useState<Vegetacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -25,7 +31,11 @@ export function CardVegetacao({ analiseId }: { analiseId: string }) {
     setCarregando(true);
     setErro(null);
     try {
-      setData(await buscarVegetacao(analiseId));
+      const r = await buscarVegetacao(analiseId);
+      setData(r);
+      // Empurra a mancha verde pro mapa (só renderiza; a geometria veio do backend).
+      const g = r.geojson_verde;
+      onOverlayVerde?.(g && "type" in g ? (g as GeoJSON.Geometry) : null);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");
     } finally {

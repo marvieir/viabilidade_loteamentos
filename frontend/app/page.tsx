@@ -30,13 +30,21 @@ const m2 = (v: number) =>
 
 export default function Home() {
   const [analise, setAnalise] = useState<Analise | null>(null);
-  const [overlays, setOverlays] = useState<
+  const [overlaysAmb, setOverlaysAmb] = useState<
     Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
   >({});
+  const [overlayVerde, setOverlayVerde] = useState<GeoJSON.Geometry | null>(null);
+
+  // O mapa recebe os overlays ambientais + a mancha verde (cada card alimenta o seu).
+  const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {
+    ...overlaysAmb,
+    ...(overlayVerde ? { verde: overlayVerde } : {}),
+  };
 
   function onAnalise(a: Analise | null) {
     setAnalise(a);
-    setOverlays({}); // nova gleba → limpa overlays ambientais do mapa
+    setOverlaysAmb({}); // nova gleba → limpa overlays do mapa
+    setOverlayVerde(null);
   }
 
   return (
@@ -115,10 +123,13 @@ export default function Home() {
 
           <CardAmbiental
             analiseId={analise.analise_id}
-            onOverlays={setOverlays}
+            onOverlays={setOverlaysAmb}
           />
 
-          <CardVegetacao analiseId={analise.analise_id} />
+          <CardVegetacao
+            analiseId={analise.analise_id}
+            onOverlayVerde={setOverlayVerde}
+          />
         </>
       )}
     </main>

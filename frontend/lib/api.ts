@@ -264,7 +264,8 @@ export type ChaveOverlay =
   | "app_massa_dagua"
   | "uc"
   | "mineracao"
-  | "linhas_transmissao";
+  | "linhas_transmissao"
+  | "verde";
 
 export interface Ambiental {
   alertas: AlertaAmbiental[];
