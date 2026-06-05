@@ -1,33 +1,36 @@
 """Motor de aproveitamento — puramente determinístico e geométrico.
 
-Estas funções não tocam em rede, raster ou estado. Recebem a área (m²) já medida
-pelo módulo de geometria e devolvem área aproveitável, percentual, nº de lotes e a
-proveniência de cada número (regra inegociável: todo número carrega proveniência).
+Estas funções não tocam em rede, raster ou estado. Recebem a área APROVEITÁVEL (m²) — já
+descontadas as restrições físicas/legais (mata ∪ APP ∪ faixas; ver core/aproveitavel.py) —
+e devolvem o nº de lotes/parcelas e a proveniência de cada número.
 
-Valores-ouro (Aula 09 — ARCHITECTURE.md §5), área=50000, vias=11500, doação=0.20,
-lote=200:
-    total     → 28500 m² → 57.0% → 142 lotes
-    liquida   → 30800 m² → 61.6% → 154 lotes
-    combinada → 32500 m² → 65.0% → 162 lotes
+TRIAGEM (Fase 2.2): vias e doação NÃO entram. As vias só se conhecem no projeto
+urbanístico; o % de doação depende da diretriz de cada prefeitura (a plataforma ainda não
+carrega isso). Por isso o nº de lotes urbano é um TETO (limite superior), não um projeto.
 """
 
-PROV_DESMEMBRAMENTO = (
-    "fator de mercado (aulas de modalidade) — não é exigência legal"
-)
-PROV_LOTEAMENTO = (
-    "Lei 9.785/99 (doação municipal); base declarada no perfil"
-)
 PROV_RURAL = "FMP por município — Lei 5.868/72 art. 8º; Estatuto da Terra art. 65"
 FLAG_CONVERSAO_RURAL = (
     "loteamento urbano exige conversão rural→urbano (gleba dentro do perímetro urbano)"
 )
+RESSALVA_URBANO = (
+    "teto de lotes = área aproveitável ÷ lote mínimo. Vias e doação NÃO descontadas — "
+    "dependem do projeto urbanístico e da diretriz municipal (fora do escopo atual)."
+)
+
+
+def lotes_teto(area_aproveitavel: float, lote_min: float) -> int:
+    """Teto de lotes urbano = floor(área aproveitável / lote mínimo). Sem vias/doação."""
+    if lote_min <= 0:
+        raise ValueError("lote mínimo deve ser > 0.")
+    return int(area_aproveitavel // lote_min)
 
 
 def aproveitamento_rural(area: float, fmp_m2: float) -> dict:
-    """Parcelamento RURAL: nº de parcelas = floor(área / FMP do município).
+    """Parcelamento RURAL: nº de parcelas = floor(área aproveitável / FMP do município).
 
-    Não aplica lote de 125 m² nem doação (regras urbanas da Lei 6.766). Sinaliza que o
-    uso urbano dependeria de conversão (perímetro urbano). Determinístico.
+    Não aplica lote de 125 m² (regra urbana da Lei 6.766). Sinaliza que o uso urbano
+    dependeria de conversão (perímetro urbano). Determinístico.
     """
     if fmp_m2 <= 0:
         raise ValueError("FMP deve ser > 0.")
@@ -37,47 +40,4 @@ def aproveitamento_rural(area: float, fmp_m2: float) -> dict:
         "area_m2": round(area, 2),
         "flag_conversao": FLAG_CONVERSAO_RURAL,
         "proveniencia": PROV_RURAL,
-    }
-
-
-def aproveitamento_loteamento(
-    area: float,
-    vias: float,
-    doacao_pct: float,
-    base: str,
-    combinado_pct: float,
-    lote_min: float,
-) -> dict:
-    """Aproveitamento de loteamento nas três bases de doação (A/B/C)."""
-    if base == "total":
-        aprov = area - vias - doacao_pct * area
-    elif base == "liquida":
-        bruto = area - vias
-        aprov = bruto - doacao_pct * bruto
-    elif base == "combinada":
-        aprov = area * (1 - combinado_pct)
-    else:
-        raise ValueError(f"base_doacao inválida: {base!r}")
-
-    return {
-        "area_aproveitavel_m2": round(aprov, 2),
-        "pct_aproveitamento": round(aprov / area, 4),
-        "n_lotes": int(aprov // lote_min),
-        "base_doacao": base,
-        "proveniencia": PROV_LOTEAMENTO,
-    }
-
-
-def aproveitamento_desmembramento(
-    area: float,
-    fator: float,
-    lote_min: float,
-) -> dict:
-    """Aproveitamento de desmembramento por fator de mercado (default 0.74)."""
-    aprov = area * fator
-    return {
-        "area_aproveitavel_m2": round(aprov, 2),
-        "pct_aproveitamento": round(fator, 4),
-        "n_lotes": int(aprov // lote_min),
-        "proveniencia": PROV_DESMEMBRAMENTO,
     }

@@ -76,39 +76,21 @@ def test_determinismo_mesma_entrada(client):
 def test_aproveitamento_endpoint_e_determinismo(client):
     r = _post_analise(client, [RET_RETANGULO])
     analise_id = r.json()["analise_id"]
-    body = {
-        "regime": "URBANO",
-        "modalidade": "loteamento_aberto",
-        "lote_min_m2": 200.0,
-        "loteamento": {
-            "vias_m2": 11500.0,
-            "doacao_pct": 0.20,
-            "base_doacao": "combinada",
-            "combinado_pct": 0.35,
-        },
-        "desmembramento": {"fator_aprov": 0.74},
-    }
+    body = {"regime": "URBANO", "modalidade": "loteamento_aberto", "lote_min_m2": 200.0}
     a1 = client.post(f"/api/analises/{analise_id}/aproveitamento", json=body)
     a2 = client.post(f"/api/analises/{analise_id}/aproveitamento", json=body)
     assert a1.status_code == 200, a1.text
     assert a1.json() == a2.json()  # determinismo
-    lot = a1.json()["loteamento"]
-    assert lot["base_doacao"] == "combinada"
-    assert lot["pct_aproveitamento"] == 0.65
-    assert "proveniencia" in lot
-    assert "proveniencia" in a1.json()["desmembramento"]
+    out = a1.json()
+    # Sem fonte de restrição, aproveitável = total e teto = aproveitável / lote.
+    assert out["area_aproveitavel_m2"] > 0
+    assert out["n_lotes_teto"] == int(out["area_aproveitavel_m2"] // 200)
+    assert out["descontos"] is None  # nada descontado sem fonte
 
 
 def test_aproveitamento_analise_inexistente_404(client):
     r = client.post(
         "/api/analises/nao-existe/aproveitamento",
-        json={
-            "lote_min_m2": 200.0,
-            "loteamento": {
-                "vias_m2": 0,
-                "doacao_pct": 0.2,
-                "base_doacao": "total",
-            },
-        },
+        json={"regime": "URBANO", "lote_min_m2": 200.0},
     )
     assert r.status_code == 404

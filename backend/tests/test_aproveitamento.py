@@ -1,51 +1,35 @@
-"""Critério de aceite #2 e #3 — valores-ouro do motor de aproveitamento (Aula 09)."""
+"""Motor de aproveitamento (TRIAGEM, Fase 2.2): teto de lotes urbano + parcelas rurais.
+
+Vias e doação saíram do cálculo (dependem do projeto urbanístico e da diretriz municipal).
+O nº de lotes urbano é um TETO = área aproveitável ÷ lote mínimo.
+"""
 
 import pytest
 
 from app.core import aproveitamento as m
 
-# Aula 09: área 50.000 m², vias 11.500 m², doação 20%, lote 200 m².
-AREA = 50_000.0
-VIAS = 11_500.0
-DOACAO = 0.20
-LOTE = 200.0
+
+def test_lotes_teto():
+    # 30.000 m² aproveitáveis / lote 200 m² = 150 lotes (teto).
+    assert m.lotes_teto(30_000.0, 200.0) == 150
 
 
-def test_base_total():
-    r = m.aproveitamento_loteamento(AREA, VIAS, DOACAO, "total", 0.35, LOTE)
-    assert r["area_aproveitavel_m2"] == 28_500.0
-    assert r["pct_aproveitamento"] == 0.57
-    assert r["n_lotes"] == 142
-    assert r["base_doacao"] == "total"
+def test_lotes_teto_arredonda_para_baixo():
+    assert m.lotes_teto(30_150.0, 200.0) == 150  # floor, nunca vende lote a mais
 
 
-def test_base_liquida():
-    r = m.aproveitamento_loteamento(AREA, VIAS, DOACAO, "liquida", 0.35, LOTE)
-    assert r["area_aproveitavel_m2"] == 30_800.0
-    assert r["pct_aproveitamento"] == 0.616
-    assert r["n_lotes"] == 154
-
-
-def test_base_combinada():
-    r = m.aproveitamento_loteamento(AREA, VIAS, DOACAO, "combinada", 0.35, LOTE)
-    assert r["area_aproveitavel_m2"] == 32_500.0
-    assert r["pct_aproveitamento"] == 0.65
-    assert r["n_lotes"] == 162
-
-
-def test_base_invalida():
+def test_lotes_teto_lote_invalido():
     with pytest.raises(ValueError):
-        m.aproveitamento_loteamento(AREA, VIAS, DOACAO, "xpto", 0.35, LOTE)
+        m.lotes_teto(30_000.0, 0.0)
 
 
-def test_desmembramento_default():
-    r = m.aproveitamento_desmembramento(AREA, 0.74, LOTE)
-    assert r["pct_aproveitamento"] == 0.74
-    assert r["area_aproveitavel_m2"] == 37_000.0
-    assert r["n_lotes"] == 185
-    assert "não é exigência legal" in r["proveniencia"]
+def test_rural_parcelas_por_fmp():
+    r = m.aproveitamento_rural(area=100_000.0, fmp_m2=20_000.0)
+    assert r["n_parcelas"] == 5
+    assert r["area_m2"] == 100_000.0
+    assert "FMP" in r["proveniencia"]
 
 
-def test_proveniencia_loteamento():
-    r = m.aproveitamento_loteamento(AREA, VIAS, DOACAO, "total", 0.35, LOTE)
-    assert "9.785" in r["proveniencia"]
+def test_rural_fmp_invalida():
+    with pytest.raises(ValueError):
+        m.aproveitamento_rural(area=100_000.0, fmp_m2=0.0)

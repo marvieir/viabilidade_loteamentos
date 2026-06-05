@@ -83,35 +83,25 @@ def test_vegetacao_analise_inexistente_404(client):
     assert client.get("/api/analises/nao-existe/vegetacao").status_code == 404
 
 
-# 5 — integração: verde desconta a base do APROVEITAMENTO (Fase 2.2) ------------
-_BODY_URBANO = {
-    "regime": "URBANO",
-    "modalidade": "loteamento_aberto",
-    "lote_min_m2": 200.0,
-    "loteamento": {
-        "vias_m2": 0.0,
-        "doacao_pct": 0.0,
-        "base_doacao": "total",
-        "combinado_pct": 0.35,
-    },
-    "desmembramento": {"fator_aprov": 1.0},
-}
+# 5 — integração: verde desconta a área aproveitável do APROVEITAMENTO (Fase 2.2) ----
+_BODY_URBANO = {"regime": "URBANO", "modalidade": "loteamento_aberto", "lote_min_m2": 200.0}
 
 
 def test_aproveitamento_desconta_verde(client, fonte_vegetacao):
     aid = _criar_analise(client)
     sem = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
-    assert sem["desconto_verde"] is None  # sem fonte → sem desconto
+    assert sem["descontos"] is None  # sem fonte → sem desconto
+    aprov_sem = sem["area_aproveitavel_m2"]
 
     # liga a fonte: metade da gleba é verde
     fonte_vegetacao(CoberturaVerde(geometria=VERDE_METADE, fonte="MapBiomas (teste)"))
     com = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
-    dv = com["desconto_verde"]
-    assert dv is not None
-    assert dv["area_verde_m2"] > 0
-    assert abs(dv["area_base_m2"] - (dv["area_total_m2"] - dv["area_verde_m2"])) < 0.5
-    # base menor → área aproveitável menor (fator 1.0, sem vias/doação → ~metade)
-    assert com["desmembramento"]["area_aproveitavel_m2"] < sem["desmembramento"][
-        "area_aproveitavel_m2"
-    ]
-    assert "ambiental" in dv["proveniencia"].lower()
+    d = com["descontos"]
+    assert d is not None
+    assert d["area_restritiva_m2"] > 0
+    assert abs(d["area_base_m2"] - (d["area_total_m2"] - d["area_restritiva_m2"])) < 0.5
+    assert any(i["tipo"] == "verde" for i in d["itens"])
+    # metade verde → aproveitável cai ~50% e o teto de lotes acompanha
+    assert com["area_aproveitavel_m2"] < aprov_sem
+    assert com["n_lotes_teto"] < sem["n_lotes_teto"]
+    assert com["pct_sobre_total"] < 1.0

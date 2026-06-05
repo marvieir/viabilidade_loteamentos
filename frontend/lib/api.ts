@@ -70,17 +70,6 @@ export class IngestaoRecusada extends Error {
   }
 }
 
-export interface Modalidade {
-  area_aproveitavel_m2: number;
-  pct_aproveitamento: number;
-  n_lotes: number;
-  proveniencia: string;
-}
-
-export interface LoteamentoResult extends Modalidade {
-  base_doacao: string;
-}
-
 export type Regime = "URBANO" | "RURAL";
 
 export type ModalidadeUrbana =
@@ -99,32 +88,36 @@ export interface RuralResult {
   proveniencia: string;
 }
 
-export interface DescontoVerde {
+// Fase 2.2 — restrições físicas/legais descontadas (mata ∪ APP ∪ faixas), sem dupla contagem.
+export interface ItemRestricao {
+  tipo: string;
+  rotulo: string;
+  area_m2: number;
+}
+
+export interface Descontos {
   area_total_m2: number;
-  area_verde_m2: number;
-  area_base_m2: number;
-  percentual_verde: number;
+  area_restritiva_m2: number; // união
+  area_base_m2: number; // total − restritiva
+  percentual_restritivo: number;
+  sobreposicao_m2: number;
+  itens: ItemRestricao[];
   proveniencia: string;
 }
 
 export interface Aproveitamento {
   regime: Regime;
   premissa: string;
-  desconto_verde?: DescontoVerde | null;
+  descontos?: Descontos | null;
+  area_aproveitavel_m2?: number | null;
+  pct_sobre_total?: number | null;
+  // URBANO
   origem_lote?: string | null;
-  desmembramento?: Modalidade | null;
-  loteamento?: LoteamentoResult | null;
+  lote_min_m2?: number | null;
+  n_lotes_teto?: number | null;
+  ressalva_urbano?: string | null;
+  // RURAL
   rural?: RuralResult | null;
-}
-
-export type BaseDoacao = "total" | "liquida" | "combinada";
-
-export interface AproveitamentoParams {
-  lote_min_m2: number;
-  vias_m2: number;
-  doacao_pct: number;
-  combinado_pct: number;
-  fator_aprov: number;
 }
 
 async function jsonOrThrow(res: Response) {
@@ -198,10 +191,11 @@ export async function corrigirMunicipio(
   return jsonOrThrow(res);
 }
 
-export async function calcularAproveitamento(
+// URBANO (triagem): área aproveitável = total − restrições; teto de lotes = aproveitável /
+// lote mínimo. Vias e doação NÃO entram (projeto urbanístico + diretriz municipal).
+export async function calcularUrbano(
   analiseId: string,
-  base: BaseDoacao,
-  p: AproveitamentoParams,
+  loteMinM2: number,
   modalidade: ModalidadeUrbana = "loteamento_aberto"
 ): Promise<Aproveitamento> {
   const res = await fetch(
@@ -212,14 +206,7 @@ export async function calcularAproveitamento(
       body: JSON.stringify({
         regime: "URBANO",
         modalidade,
-        lote_min_m2: p.lote_min_m2,
-        loteamento: {
-          vias_m2: p.vias_m2,
-          doacao_pct: p.doacao_pct,
-          base_doacao: base,
-          combinado_pct: p.combinado_pct,
-        },
-        desmembramento: { fator_aprov: p.fator_aprov },
+        lote_min_m2: loteMinM2,
       }),
     }
   );
@@ -315,27 +302,4 @@ export interface Vegetacao {
 export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {
   const res = await fetch(`${API_BASE}/api/analises/${analiseId}/vegetacao`);
   return jsonOrThrow(res);
-}
-
-// Conveniência: busca as três bases (cada uma é um cálculo do backend).
-export async function calcularTodasBases(
-  analiseId: string,
-  p: AproveitamentoParams,
-  modalidade: ModalidadeUrbana = "loteamento_aberto"
-): Promise<{
-  desmembramento: Modalidade;
-  bases: LoteamentoResult[];
-  desconto_verde: DescontoVerde | null;
-}> {
-  const ordem: BaseDoacao[] = ["total", "liquida", "combinada"];
-  const resultados = await Promise.all(
-    ordem.map((b) => calcularAproveitamento(analiseId, b, p, modalidade))
-  );
-  return {
-    // URBANO sempre traz ambos; o backend é a fonte de verdade.
-    desmembramento: resultados[0].desmembramento as Modalidade,
-    bases: resultados.map((r) => r.loteamento as LoteamentoResult),
-    // O desconto de verde é o mesmo nas três bases (mesma gleba/fonte).
-    desconto_verde: resultados[0].desconto_verde ?? null,
-  };
 }

@@ -195,32 +195,24 @@ def test_rural_fmp_ausente_default(client, malha, fmp):
     assert "CCIR" in rural["fmp_origem"]
 
 
-# ---------- Critério 6: URBANO mantém números + premissa/origem ----------
+# ---------- Critério 6: URBANO — área aproveitável + teto de lotes + premissa/origem ----------
 def test_urbano_premissa_e_origem(client, malha):
     malha(MALHA_BOCAINA)
     aid = _post(client, [RET_BOCAINA]).json()["analise_id"]
     r = client.post(
         f"/api/analises/{aid}/aproveitamento",
-        json={
-            "regime": "URBANO",
-            "modalidade": "loteamento_aberto",
-            "lote_min_m2": 200,
-            "loteamento": {
-                "vias_m2": 11500,
-                "doacao_pct": 0.20,
-                "base_doacao": "combinada",
-                "combinado_pct": 0.35,
-            },
-        },
+        json={"regime": "URBANO", "modalidade": "loteamento_aberto", "lote_min_m2": 200},
     )
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["regime"] == "URBANO"
     assert "URBANO" in body["premissa"]
     assert "LUOS" in body["origem_lote"]
-    # base combinada → 65% independente da área (não-regressão do motor)
-    assert body["loteamento"]["pct_aproveitamento"] == 0.65
-    assert body["desmembramento"] is not None
+    # Sem fonte de restrição, aproveitável = total → teto = total / lote_min.
+    assert body["area_aproveitavel_m2"] > 0
+    assert body["n_lotes_teto"] == int(body["area_aproveitavel_m2"] // 200)
+    assert body["pct_sobre_total"] == 1.0  # nada descontado sem fonte
+    assert "vias e doação" in body["ressalva_urbano"].lower()
 
 
 # ---------- Critério 7: regime obrigatório ----------
@@ -267,23 +259,28 @@ def test_busca_por_nome_sem_malha(client_producao, lista):
 
 
 # ---------- Modalidade obrigatória no urbano ----------
-def test_urbano_sem_modalidade_422(client, malha):
+def test_urbano_sem_lote_min_422(client, malha):
+    # Modalidade virou rótulo opcional; o que URBANO exige agora é o lote mínimo.
     malha(MALHA_BOCAINA)
     aid = _post(client, [RET_BOCAINA]).json()["analise_id"]
     r = client.post(
         f"/api/analises/{aid}/aproveitamento",
-        json={
-            "regime": "URBANO",
-            "lote_min_m2": 200,
-            "loteamento": {
-                "vias_m2": 11500,
-                "doacao_pct": 0.20,
-                "base_doacao": "combinada",
-            },
-        },
+        json={"regime": "URBANO", "modalidade": "loteamento_aberto"},
     )
     assert r.status_code == 422
     assert r.json()["erro"] == "parametros_urbano_incompletos"
+
+
+def test_urbano_sem_modalidade_ok(client, malha):
+    # Sem modalidade, mas com lote mínimo → 200 (modalidade é só rótulo na premissa).
+    malha(MALHA_BOCAINA)
+    aid = _post(client, [RET_BOCAINA]).json()["analise_id"]
+    r = client.post(
+        f"/api/analises/{aid}/aproveitamento",
+        json={"regime": "URBANO", "lote_min_m2": 200},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["n_lotes_teto"] > 0
 
 
 # ---------- Critério 9: determinismo ----------

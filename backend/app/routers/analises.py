@@ -11,9 +11,11 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
-from shapely.geometry import mapping
+from shapely.geometry import mapping, shape
 
+from app.core import ambiental as ambiental_motor
 from app.core import aproveitamento as motor
+from app.core import aproveitavel
 from app.core import geometria
 from app.core import ingestao as ingestao_mod
 from app.core import kmz as kmz_parser
@@ -32,14 +34,60 @@ from app.core.jurisdicao import (
     get_fonte_malha,
     resolver_jurisdicao,
 )
+from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.lista_municipios import FonteLista, get_fonte_lista
 from app.core.store import STORE
-from app.core.vegetacao import (
-    FonteVegetacao,
-    analisar_vegetacao,
-    get_fonte_vegetacao,
-)
+from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
+
+# Faixas não-edificáveis do ambiental que reduzem o aproveitável (Fase 2.2).
+_CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")
+
+
+def _consolidar_descontos(registro, fonte_veg, fonte_camadas):
+    """Une mata + faixas não-edificáveis dentro da gleba (sem dupla contagem).
+
+    Devolve ``(DescontosOut | None, area_restritiva_m2)``. Degrada honesto: sem fonte ou
+    sem restrição → ``(None, 0.0)`` (não desconta nada).
+    """
+    gleba = registro["poly"]
+    geoms: dict = {}
+    if fonte_veg is not None:
+        cob = fonte_veg.cobertura_verde(gleba)
+        if cob.geometria is not None:
+            geoms["verde"] = cob.geometria
+    if fonte_camadas is not None:
+        camadas = fonte_camadas.coletar(gleba.bounds, registro["jurisdicao"].uf)
+        overlays = ambiental_motor.analisar(gleba, camadas).geojson_overlays
+        for chave in _CHAVES_RESTRITIVAS:
+            if overlays.get(chave):
+                geoms[chave] = shape(overlays[chave])
+
+    if not geoms:
+        return None, 0.0
+    cons = aproveitavel.consolidar(gleba, geoms)
+    if cons.area_restritiva_m2 <= 0:
+        return None, 0.0
+
+    total = registro["area_m2"]
+    base = max(round(total - cons.area_restritiva_m2, 2), 0.0)
+    descontos = schemas.DescontosOut(
+        area_total_m2=round(total, 2),
+        area_restritiva_m2=cons.area_restritiva_m2,
+        area_base_m2=base,
+        percentual_restritivo=round(cons.area_restritiva_m2 / total * 100, 2) if total else 0.0,
+        sobreposicao_m2=cons.sobreposicao_m2,
+        itens=[
+            schemas.ItemRestricaoOut(tipo=i.tipo, rotulo=i.rotulo, area_m2=i.area_m2)
+            for i in cons.itens
+        ],
+        proveniencia=(
+            "base = área total − união("
+            + ", ".join(i.rotulo for i in cons.itens)
+            + "); vias e doação NÃO descontadas — projeto urbanístico + diretriz municipal"
+        ),
+    )
+    return descontos, cons.area_restritiva_m2
 
 router = APIRouter()
 
@@ -213,6 +261,7 @@ def calcular_aproveitamento(
     body: schemas.AproveitamentoIn,
     fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
     fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
+    fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -231,28 +280,12 @@ def calcular_aproveitamento(
             },
         )
 
-    area = registro["area_m2"]
-
-    # Desconto de área verde (Fase 2.2): se a vegetação foi consultada, a base do
-    # aproveitamento passa a ser o total menos a cobertura vegetal (triagem
-    # conservadora — verde fora do aproveitável até laudo ambiental). Vale p/ os 2 regimes.
-    desconto_verde = None
-    if fonte_veg is not None:
-        veg = analisar_vegetacao(registro["poly"], fonte_veg.cobertura_verde(registro["poly"]))
-        if veg.consultada and veg.area_verde_m2:
-            area_base = max(round(area - veg.area_verde_m2, 2), 0.0)
-            fonte_nome = (veg.proveniencia or {}).get("fonte") or "fonte de cobertura"
-            desconto_verde = schemas.DescontoVerdeOut(
-                area_total_m2=round(area, 2),
-                area_verde_m2=veg.area_verde_m2,
-                area_base_m2=area_base,
-                percentual_verde=veg.percentual_verde or 0.0,
-                proveniencia=(
-                    f"base = área total − área verde ({fonte_nome}); verde removido na "
-                    "triagem (Fase 2.2) — classificação/supressão dependem de laudo ambiental"
-                ),
-            )
-            area = area_base
+    # Área aproveitável (TRIAGEM) = total − união(mata, APP, faixas não-edificáveis).
+    # Vias e doação NÃO entram (projeto urbanístico + diretriz municipal). Vale p/ os 2 regimes.
+    total = registro["area_m2"]
+    descontos, area_restritiva = _consolidar_descontos(registro, fonte_veg, fonte_camadas)
+    area_aproveitavel = max(round(total - area_restritiva, 2), 0.0)
+    pct_total = round(area_aproveitavel / total, 4) if total else None
 
     if body.regime == "RURAL":
         jur: Jurisdicao = registro["jurisdicao"]
@@ -268,46 +301,35 @@ def calcular_aproveitamento(
             fmp, fmp_origem = da_tabela, FMP_ORIGEM_TABELA
         else:
             fmp, fmp_origem = FMP_DEFAULT_M2, FMP_ORIGEM_DEFAULT
-        rural = motor.aproveitamento_rural(area=area, fmp_m2=fmp)
+        rural = motor.aproveitamento_rural(area=area_aproveitavel, fmp_m2=fmp)
         return schemas.AproveitamentoOut(
             regime="RURAL",
             premissa=PREMISSA_RURAL,
-            desconto_verde=desconto_verde,
+            descontos=descontos,
+            area_aproveitavel_m2=area_aproveitavel,
+            pct_sobre_total=pct_total,
             rural=schemas.RuralOut(**rural, fmp_origem=fmp_origem),
         )
 
-    # URBANO — exige modalidade, lote declarado e parâmetros de loteamento.
-    if body.modalidade is None or body.lote_min_m2 is None or body.loteamento is None:
+    # URBANO — exige apenas o lote mínimo declarado (vias/doação saíram do cálculo).
+    if body.lote_min_m2 is None:
         return JSONResponse(
             status_code=422,
             content={
                 "erro": "parametros_urbano_incompletos",
-                "detalhe": (
-                    "Regime URBANO exige 'modalidade', 'lote_min_m2' e 'loteamento'."
-                ),
+                "detalhe": "Regime URBANO exige 'lote_min_m2' (lote mínimo declarado).",
             },
         )
 
-    loteamento = motor.aproveitamento_loteamento(
-        area=area,
-        vias=body.loteamento.vias_m2,
-        doacao_pct=body.loteamento.doacao_pct,
-        base=body.loteamento.base_doacao,
-        combinado_pct=body.loteamento.combinado_pct,
-        lote_min=body.lote_min_m2,
-    )
-    desmembramento = motor.aproveitamento_desmembramento(
-        area=area,
-        fator=body.desmembramento.fator_aprov,
-        lote_min=body.lote_min_m2,
-    )
-
-    rotulo = _ROTULO_MODALIDADE.get(body.modalidade, body.modalidade)
+    rotulo = _ROTULO_MODALIDADE.get(body.modalidade) if body.modalidade else None
     return schemas.AproveitamentoOut(
         regime="URBANO",
-        premissa=f"{PREMISSA_URBANA} — modalidade: {rotulo}",
-        desconto_verde=desconto_verde,
+        premissa=PREMISSA_URBANA + (f" — modalidade: {rotulo}" if rotulo else ""),
+        descontos=descontos,
+        area_aproveitavel_m2=area_aproveitavel,
+        pct_sobre_total=pct_total,
         origem_lote=ORIGEM_LOTE_DECLARADO,
-        desmembramento=schemas.ModalidadeOut(**desmembramento),
-        loteamento=schemas.LoteamentoOut(**loteamento),
+        lote_min_m2=body.lote_min_m2,
+        n_lotes_teto=motor.lotes_teto(area_aproveitavel, body.lote_min_m2),
+        ressalva_urbano=motor.RESSALVA_URBANO,
     )

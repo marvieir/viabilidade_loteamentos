@@ -60,17 +60,6 @@ class AnaliseOut(BaseModel):
 
 # ----- POST /api/analises/{id}/aproveitamento -----
 
-class LoteamentoIn(BaseModel):
-    vias_m2: float = Field(ge=0)
-    doacao_pct: float = Field(ge=0, le=1)
-    base_doacao: Literal["total", "liquida", "combinada"]
-    combinado_pct: float = Field(default=0.35, ge=0, le=1)
-
-
-class DesmembramentoIn(BaseModel):
-    fator_aprov: float = Field(default=0.74, gt=0, le=1)
-
-
 ModalidadeUrbana = Literal[
     "desmembramento",
     "loteamento_aberto",
@@ -81,58 +70,62 @@ ModalidadeUrbana = Literal[
 
 
 class AproveitamentoIn(BaseModel):
-    """Pedido de aproveitamento. ``regime`` é obrigatório (validado no router →
-    422 ``regime_obrigatorio``); os demais campos dependem do regime escolhido."""
+    """Pedido de aproveitamento (TRIAGEM). ``regime`` é obrigatório (validado no router →
+    422 ``regime_obrigatorio``). Vias e doação NÃO entram: dependem do projeto urbanístico
+    e da diretriz municipal (ainda não carregável na plataforma) — Fase 2.2."""
 
     regime: Optional[Literal["URBANO", "RURAL"]] = None
     # RURAL — FMP do município (puxada da tabela; editável se município não resolvido)
     fmp_m2: Optional[float] = Field(default=None, gt=0)
-    # URBANO — lote declarado (pendente extração da LUOS, Fase 1.8)
+    # URBANO — lote declarado (pendente extração da LUOS, Fase 1.8); modalidade é rótulo
     modalidade: Optional[ModalidadeUrbana] = None
     lote_min_m2: Optional[float] = Field(default=None, gt=0)
-    loteamento: Optional[LoteamentoIn] = None
-    desmembramento: DesmembramentoIn = Field(default_factory=DesmembramentoIn)
-
-
-class ModalidadeOut(BaseModel):
-    area_aproveitavel_m2: float
-    pct_aproveitamento: float
-    n_lotes: int
-    proveniencia: str
-
-
-class LoteamentoOut(ModalidadeOut):
-    base_doacao: str
 
 
 class RuralOut(BaseModel):
     fmp_m2: float
     n_parcelas: int
-    area_m2: float
+    area_m2: float  # área aproveitável (após restrições) usada na divisão por FMP
     fmp_origem: str  # "tabela INCRA" | "informado pelo usuário" | "default 2 ha (confirmar no CCIR)"
     flag_conversao: str
     proveniencia: str
 
 
-class DescontoVerdeOut(BaseModel):
-    """Quanto de área verde foi removido do total antes do cálculo (triagem, Fase 2.2)."""
+class ItemRestricaoOut(BaseModel):
+    tipo: str  # verde | app | app_massa_dagua | faixa_nao_edificavel | linhas_transmissao
+    rotulo: str
+    area_m2: float
+
+
+class DescontosOut(BaseModel):
+    """Restrições removidas do total antes do cálculo (triagem, Fase 2.2).
+
+    ``area_restritiva_m2`` é a UNIÃO (sem dupla contagem) — a soma dos ``itens`` pode ser
+    maior, pela sobreposição (ex.: mata ribeirinha que é APP e verde ao mesmo tempo)."""
 
     area_total_m2: float
-    area_verde_m2: float
-    area_base_m2: float  # total − verde: a base efetivamente usada no aproveitamento
-    percentual_verde: float
+    area_restritiva_m2: float
+    area_base_m2: float  # total − restritiva: a base usada no aproveitamento
+    percentual_restritivo: float
+    sobreposicao_m2: float
+    itens: list[ItemRestricaoOut] = []
     proveniencia: str
 
 
 class AproveitamentoOut(BaseModel):
     regime: Literal["URBANO", "RURAL"]
     premissa: str
-    # Desconto de área verde (Fase 2.2): presente só quando a vegetação foi consultada.
-    desconto_verde: Optional[DescontoVerdeOut] = None
+    # Descontos de área não-aproveitável (Fase 2.2): presente quando há fonte consultada.
+    descontos: Optional[DescontosOut] = None
+    # Área que sobra após as restrições físicas/legais (mata ∪ APP ∪ faixas). Vale p/ os 2
+    # regimes. Vias e doação NÃO descontadas (entram no projeto/diretriz municipal).
+    area_aproveitavel_m2: Optional[float] = None
+    pct_sobre_total: Optional[float] = None
     # URBANO
     origem_lote: Optional[str] = None
-    desmembramento: Optional[ModalidadeOut] = None
-    loteamento: Optional[LoteamentoOut] = None
+    lote_min_m2: Optional[float] = None
+    n_lotes_teto: Optional[int] = None  # teto: aproveitável ÷ lote mínimo (sem vias/doação)
+    ressalva_urbano: Optional[str] = None
     # RURAL
     rural: Optional[RuralOut] = None
 
