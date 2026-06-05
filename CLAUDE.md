@@ -68,3 +68,15 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
 
 ## Deploy
 - Docker Compose com dois serviços: `api` (FastAPI) e `web` (Next.js). Alvo: Lightsail.
+
+## Comunicação com o operador (INEGOCIÁVEL)
+- **Sempre passe instruções COMPLETAS e prontas para colar.** Nada de comando pela metade.
+  Para qualquer passo no Mac do operador, inclua: **de qual diretório** rodar (`cd …` com o
+  caminho absoluto), o comando exato, e o que esperar de saída.
+- Ao mexer no que roda em **container**: diga explicitamente se precisa **`git pull`**,
+  se precisa **rebuildar** (`podman-compose up --build -d`) ou só reiniciar, e como ver logs.
+- Ao mexer no que roda **local (dev)**: diga se precisa reiniciar o `uvicorn`/`npm run dev`,
+  e quais **variáveis de ambiente** ligar (preferir `backend/.env`, não `export` solto).
+- Placeholders (ex.: `SUA_GLEBA.kmz`) devem vir marcados como "troque pelo caminho real".
+- Se uma ação depende de algo que o operador precisa ter (arquivo, dado, rede), **diga antes**
+  e ofereça o plano B. Prefira errar por excesso de detalhe a deixar o operador adivinhando.
