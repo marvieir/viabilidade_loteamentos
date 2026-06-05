@@ -112,11 +112,26 @@ class DescontosOut(BaseModel):
     proveniencia: str
 
 
+class CenarioOtimistaOut(BaseModel):
+    """Cenário HIPOTÉTICO (Fase 2.3): aproveitável se o verde 'a verificar' for liberado.
+
+    NÃO é o headline de triagem — é o teto se a supressão do verde a verificar (fora de
+    zonas não-edificáveis) for autorizada por laudo + licença."""
+
+    premissa: str
+    area_aproveitavel_m2: float
+    pct_sobre_total: float
+    n_lotes_teto: Optional[int] = None  # urbano
+    ressalva: str
+
+
 class AproveitamentoOut(BaseModel):
     regime: Literal["URBANO", "RURAL"]
     premissa: str
     # Descontos de área não-aproveitável (Fase 2.2): presente quando há fonte consultada.
     descontos: Optional[DescontosOut] = None
+    # Cenário otimista (Fase 2.3): null se severidade indisponível. INFORMATIVO.
+    cenario_otimista: Optional[CenarioOtimistaOut] = None
     # Área que sobra após as restrições físicas/legais (mata ∪ APP ∪ faixas). Vale p/ os 2
     # regimes. Vias e doação NÃO descontadas (entram no projeto/diretriz municipal).
     area_aproveitavel_m2: Optional[float] = None
@@ -182,3 +197,25 @@ class VegetacaoOut(BaseModel):
     proveniencia: Optional[ProvenienciaVegetacaoOut] = None
     avisos: list[str] = []
     consultada: bool
+    # Fase 2.3 — severidade: null se vegetação OU camadas ambientais não consultadas.
+    severidade: Optional["SeveridadeVerdeOut"] = None
+
+
+# ----- Fase 2.3 — Severidade do verde (restrição dura × a verificar) -----
+class BucketVerdeOut(BaseModel):
+    area_m2: float
+    pct_do_verde: float
+    geojson: dict = {}
+
+
+class RestricaoDuraOut(BucketVerdeOut):
+    fontes: list[str] = []  # quais camadas incidiram (app/app_massa_dagua/uc)
+
+
+class SeveridadeVerdeOut(BaseModel):
+    verde_total_m2: float
+    restricao_dura: RestricaoDuraOut
+    a_verificar: BucketVerdeOut
+    potencial_desbloqueavel_m2: float  # a_verificar − (faixa ∪ servidão); clamp >= 0
+    proveniencia: str
+    ressalva: str

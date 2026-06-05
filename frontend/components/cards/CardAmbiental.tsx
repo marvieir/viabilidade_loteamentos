@@ -25,6 +25,8 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   mineracao: "#d97706",
   linhas_transmissao: "#a855f7",
   verde: "#65a30d", // cobertura vegetal (Fase 2.2) — empurrado pelo card Área verde
+  verde_dura: "#dc2626", // verde em APP/UC = restrição dura (Fase 2.3)
+  verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
 };
 
 const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -35,6 +37,8 @@ const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   mineracao: "Mineração (ANM)",
   linhas_transmissao: "Faixa de servidão (LT/ANEEL)",
   verde: "Cobertura vegetal",
+  verde_dura: "Verde em APP/UC (restrição dura)",
+  verde_verificar: "Verde a verificar (fora de APP/UC)",
 };
 
 const m2 = (v: number) =>

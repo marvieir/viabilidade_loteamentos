@@ -105,10 +105,19 @@ export interface Descontos {
   proveniencia: string;
 }
 
+export interface CenarioOtimista {
+  premissa: string;
+  area_aproveitavel_m2: number;
+  pct_sobre_total: number;
+  n_lotes_teto?: number | null;
+  ressalva: string;
+}
+
 export interface Aproveitamento {
   regime: Regime;
   premissa: string;
   descontos?: Descontos | null;
+  cenario_otimista?: CenarioOtimista | null;
   area_aproveitavel_m2?: number | null;
   pct_sobre_total?: number | null;
   // URBANO
@@ -265,7 +274,9 @@ export type ChaveOverlay =
   | "uc"
   | "mineracao"
   | "linhas_transmissao"
-  | "verde";
+  | "verde"
+  | "verde_dura"
+  | "verde_verificar";
 
 export interface Ambiental {
   alertas: AlertaAmbiental[];
@@ -298,6 +309,23 @@ export interface Vegetacao {
   proveniencia: ProvenienciaVegetacao | null;
   avisos: string[];
   consultada: boolean;
+  severidade?: SeveridadeVerde | null;
+}
+
+// Fase 2.3 — severidade do verde (restrição dura × a verificar)
+export interface BucketVerde {
+  area_m2: number;
+  pct_do_verde: number;
+  geojson: GeoJSON.Geometry | Record<string, never>;
+}
+
+export interface SeveridadeVerde {
+  verde_total_m2: number;
+  restricao_dura: BucketVerde & { fontes: string[] };
+  a_verificar: BucketVerde;
+  potencial_desbloqueavel_m2: number;
+  proveniencia: string;
+  ressalva: string;
 }
 
 export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {

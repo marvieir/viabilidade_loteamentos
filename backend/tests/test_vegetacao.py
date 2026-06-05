@@ -2,8 +2,9 @@
 
 from shapely.geometry import Polygon
 
+from app.core.camadas import Camadas, FeicaoMassaDagua
 from app.core.vegetacao import CoberturaVerde
-from tests.conftest import DATA_REF, RET_RETANGULO, make_kmz
+from tests.conftest import DATA_REF, LAGO_SOBREPOE, RET_RETANGULO, make_kmz
 
 
 def _criar_analise(client) -> str:
@@ -105,3 +106,55 @@ def test_aproveitamento_desconta_verde(client, fonte_vegetacao):
     assert com["area_aproveitavel_m2"] < aprov_sem
     assert com["n_lotes_teto"] < sem["n_lotes_teto"]
     assert com["pct_sobre_total"] < 1.0
+
+
+# 6 — Fase 2.3: severidade do verde no endpoint /vegetacao -----------------------
+def _camadas_com_massa():
+    return Camadas(
+        massas_dagua=[FeicaoMassaDagua(LAGO_SOBREPOE, nome="Represa Teste", tipo="artificial")],
+        consultadas=["ANA"],
+    )
+
+
+def test_severidade_no_endpoint(client, fonte_vegetacao, fonte):
+    fonte_vegetacao(CoberturaVerde(geometria=VERDE_METADE, fonte="WorldCover (teste)"))
+    fonte(_camadas_com_massa())
+    aid = _criar_analise(client)
+    sev = client.get(f"/api/analises/{aid}/vegetacao").json()["severidade"]
+    assert sev is not None
+    # conservação: dura + a_verificar = verde_total
+    soma = sev["restricao_dura"]["area_m2"] + sev["a_verificar"]["area_m2"]
+    assert abs(soma - sev["verde_total_m2"]) / sev["verde_total_m2"] < 0.005
+    assert sev["restricao_dura"]["area_m2"] > 0  # verde encosta na APP da represa
+    assert "app_massa_dagua" in sev["restricao_dura"]["fontes"]
+    assert "laudo" in sev["ressalva"].lower()
+
+
+def test_severidade_null_sem_camadas(client, fonte_vegetacao):
+    # Só vegetação, sem ambiental → severidade null + aviso honesto.
+    fonte_vegetacao(CoberturaVerde(geometria=VERDE_METADE, fonte="WorldCover (teste)"))
+    aid = _criar_analise(client)
+    data = client.get(f"/api/analises/{aid}/vegetacao").json()
+    assert data["severidade"] is None
+    assert any("severidade" in a.lower() for a in data["avisos"])
+
+
+# 7 — Fase 2.3: cenário otimista no aproveitamento ------------------------------
+def test_cenario_otimista(client, fonte_vegetacao, fonte):
+    fonte_vegetacao(CoberturaVerde(geometria=VERDE_METADE, fonte="WorldCover (teste)"))
+    fonte(_camadas_com_massa())
+    aid = _criar_analise(client)
+    out = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
+    co = out["cenario_otimista"]
+    assert co is not None
+    # otimista = conservador + potencial desbloqueável ≥ headline
+    assert co["area_aproveitavel_m2"] >= out["area_aproveitavel_m2"]
+    assert co["n_lotes_teto"] >= out["n_lotes_teto"]
+    assert "hipot" in co["ressalva"].lower()
+
+
+def test_cenario_otimista_null_sem_camadas(client, fonte_vegetacao):
+    fonte_vegetacao(CoberturaVerde(geometria=VERDE_METADE, fonte="WorldCover (teste)"))
+    aid = _criar_analise(client)
+    out = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
+    assert out["cenario_otimista"] is None  # severidade indisponível sem ambiental

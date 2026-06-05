@@ -252,6 +252,26 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
             </p>
           </>
         )}
+
+        {/* Cenário otimista (Fase 2.3) — hipotético, claramente separado do headline */}
+        {res?.cenario_otimista && (
+          <div className="rounded-lg border border-dashed border-yellow-300 bg-yellow-50 p-3">
+            <p className="text-sm font-medium text-yellow-900">
+              Cenário otimista (hipotético) ·{" "}
+              {ha(res.cenario_otimista.area_aproveitavel_m2)} (
+              {pct(res.cenario_otimista.pct_sobre_total)} da gleba)
+              {res.cenario_otimista.n_lotes_teto != null
+                ? ` · até ${res.cenario_otimista.n_lotes_teto} lotes`
+                : ""}
+            </p>
+            <p className="mt-1 text-xs text-yellow-800">
+              {res.cenario_otimista.premissa}.
+            </p>
+            <p className="mt-1 text-xs text-yellow-700">
+              {res.cenario_otimista.ressalva}
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

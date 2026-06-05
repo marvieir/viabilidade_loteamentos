@@ -37,31 +37,43 @@ from app.core.jurisdicao import (
 from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.lista_municipios import FonteLista, get_fonte_lista
 from app.core.store import STORE
+from app.core.severidade_verde import classificar_severidade_verde
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
+
+_RESSALVA_OTIMISTA = (
+    "Cenário HIPOTÉTICO. Depende de laudo + licença ambiental. NÃO é o número de triagem "
+    "(headline) — é o teto se a vegetação a verificar for liberada."
+)
 
 # Faixas não-edificáveis do ambiental que reduzem o aproveitável (Fase 2.2).
 _CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")
 
 
-def _consolidar_descontos(registro, fonte_veg, fonte_camadas):
-    """Une mata + faixas não-edificáveis dentro da gleba (sem dupla contagem).
-
-    Devolve ``(DescontosOut | None, area_restritiva_m2)``. Degrada honesto: sem fonte ou
-    sem restrição → ``(None, 0.0)`` (não desconta nada).
-    """
+def _coletar_geoms(registro, fonte_veg, fonte_camadas):
+    """Busca, uma vez, a geometria do verde (WGS84) e as camadas ambientais (dict WGS84)."""
     gleba = registro["poly"]
-    geoms: dict = {}
-    if fonte_veg is not None:
-        cob = fonte_veg.cobertura_verde(gleba)
-        if cob.geometria is not None:
-            geoms["verde"] = cob.geometria
+    verde_geom = fonte_veg.cobertura_verde(gleba).geometria if fonte_veg is not None else None
+    overlays: dict = {}
     if fonte_camadas is not None:
         camadas = fonte_camadas.coletar(gleba.bounds, registro["jurisdicao"].uf)
-        overlays = ambiental_motor.analisar(gleba, camadas).geojson_overlays
-        for chave in _CHAVES_RESTRITIVAS:
-            if overlays.get(chave):
-                geoms[chave] = shape(overlays[chave])
+        raw = ambiental_motor.analisar(gleba, camadas).geojson_overlays
+        overlays = {k: shape(v) for k, v in raw.items() if v}
+    return verde_geom, overlays
+
+
+def _consolidar_descontos(gleba, total, verde_geom, overlays):
+    """Une mata + faixas não-edificáveis dentro da gleba (sem dupla contagem).
+
+    Devolve ``(DescontosOut | None, area_restritiva_m2)``. Degrada honesto: sem geometria
+    ou sem restrição → ``(None, 0.0)`` (não desconta nada).
+    """
+    geoms: dict = {}
+    if verde_geom is not None:
+        geoms["verde"] = verde_geom
+    for chave in _CHAVES_RESTRITIVAS:
+        if overlays.get(chave) is not None:
+            geoms[chave] = overlays[chave]
 
     if not geoms:
         return None, 0.0
@@ -69,7 +81,6 @@ def _consolidar_descontos(registro, fonte_veg, fonte_camadas):
     if cons.area_restritiva_m2 <= 0:
         return None, 0.0
 
-    total = registro["area_m2"]
     base = max(round(total - cons.area_restritiva_m2, 2), 0.0)
     descontos = schemas.DescontosOut(
         area_total_m2=round(total, 2),
@@ -282,10 +293,33 @@ def calcular_aproveitamento(
 
     # Área aproveitável (TRIAGEM) = total − união(mata, APP, faixas não-edificáveis).
     # Vias e doação NÃO entram (projeto urbanístico + diretriz municipal). Vale p/ os 2 regimes.
+    gleba = registro["poly"]
     total = registro["area_m2"]
-    descontos, area_restritiva = _consolidar_descontos(registro, fonte_veg, fonte_camadas)
+    verde_geom, overlays = _coletar_geoms(registro, fonte_veg, fonte_camadas)
+    descontos, area_restritiva = _consolidar_descontos(gleba, total, verde_geom, overlays)
     area_aproveitavel = max(round(total - area_restritiva, 2), 0.0)
     pct_total = round(area_aproveitavel / total, 4) if total else None
+
+    # Cenário otimista (Fase 2.3): aproveitável + potencial desbloqueável (verde a verificar
+    # fora de zona não-edificável). Só quando verde E camadas foram consultados.
+    potencial = 0.0
+    severidade_ok = verde_geom is not None and bool(overlays)
+    if severidade_ok:
+        potencial = classificar_severidade_verde(
+            gleba, verde_geom, overlays
+        ).potencial_desbloqueavel_m2
+
+    def _cenario(n_lotes_teto: int | None) -> schemas.CenarioOtimistaOut | None:
+        if not severidade_ok:
+            return None
+        aprov = round(area_aproveitavel + potencial, 2)
+        return schemas.CenarioOtimistaOut(
+            premissa="supressão autorizada do verde a verificar fora de zonas não-edificáveis",
+            area_aproveitavel_m2=aprov,
+            pct_sobre_total=round(aprov / total, 4) if total else 0.0,
+            n_lotes_teto=n_lotes_teto,
+            ressalva=_RESSALVA_OTIMISTA,
+        )
 
     if body.regime == "RURAL":
         jur: Jurisdicao = registro["jurisdicao"]
@@ -306,6 +340,7 @@ def calcular_aproveitamento(
             regime="RURAL",
             premissa=PREMISSA_RURAL,
             descontos=descontos,
+            cenario_otimista=_cenario(n_lotes_teto=None),  # rural conta parcelas, não lotes
             area_aproveitavel_m2=area_aproveitavel,
             pct_sobre_total=pct_total,
             rural=schemas.RuralOut(**rural, fmp_origem=fmp_origem),
@@ -322,10 +357,14 @@ def calcular_aproveitamento(
         )
 
     rotulo = _ROTULO_MODALIDADE.get(body.modalidade) if body.modalidade else None
+    aprov_otim = round(area_aproveitavel + potencial, 2)
     return schemas.AproveitamentoOut(
         regime="URBANO",
         premissa=PREMISSA_URBANA + (f" — modalidade: {rotulo}" if rotulo else ""),
         descontos=descontos,
+        cenario_otimista=_cenario(
+            n_lotes_teto=motor.lotes_teto(aprov_otim, body.lote_min_m2)
+        ),
         area_aproveitavel_m2=area_aproveitavel,
         pct_sobre_total=pct_total,
         origem_lote=ORIGEM_LOTE_DECLARADO,

@@ -9,19 +9,29 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { buscarVegetacao, type Vegetacao } from "@/lib/api";
+import {
+  buscarVegetacao,
+  type ChaveOverlay,
+  type Vegetacao,
+} from "@/lib/api";
 
 const m2 = (v: number) =>
   v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " m²";
 const ha = (v: number) =>
   (v / 10000).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " ha";
+const pctBR = (v: number) =>
+  (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
+
+type OverlaysVerde = Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
+const ehGeom = (g: unknown): g is GeoJSON.Geometry =>
+  !!g && typeof g === "object" && "type" in (g as object);
 
 export function CardVegetacao({
   analiseId,
-  onOverlayVerde,
+  onOverlaysVerde,
 }: {
   analiseId: string;
-  onOverlayVerde?: (g: GeoJSON.Geometry | null) => void;
+  onOverlaysVerde?: (o: OverlaysVerde) => void;
 }) {
   const [data, setData] = useState<Vegetacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -33,9 +43,18 @@ export function CardVegetacao({
     try {
       const r = await buscarVegetacao(analiseId);
       setData(r);
-      // Empurra a mancha verde pro mapa (só renderiza; a geometria veio do backend).
-      const g = r.geojson_verde;
-      onOverlayVerde?.(g && "type" in g ? (g as GeoJSON.Geometry) : null);
+      // Empurra a(s) mancha(s) pro mapa. Com severidade: dois baldes (dura/a verificar);
+      // sem severidade: o verde total. Só renderiza — a geometria veio do backend.
+      const ov: OverlaysVerde = {};
+      if (r.severidade) {
+        if (ehGeom(r.severidade.restricao_dura.geojson))
+          ov.verde_dura = r.severidade.restricao_dura.geojson;
+        if (ehGeom(r.severidade.a_verificar.geojson))
+          ov.verde_verificar = r.severidade.a_verificar.geojson;
+      } else if (ehGeom(r.geojson_verde)) {
+        ov.verde = r.geojson_verde;
+      }
+      onOverlaysVerde?.(ov);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");
     } finally {
@@ -94,6 +113,45 @@ export function CardVegetacao({
                 {data.area_verde_m2 != null ? m2(data.area_verde_m2) : "—"} removidos do
                 aproveitável.
               </p>
+            )}
+
+            {/* Fase 2.3 — severidade do verde */}
+            {data.severidade && (
+              <div className="space-y-2 rounded-lg border border-slate-200 p-3">
+                <p className="text-sm font-medium text-slate-800">
+                  Severidade do verde
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 p-2">
+                    <p className="text-xs text-rose-700">
+                      🔴 Restrição dura (APP/UC)
+                    </p>
+                    <p className="text-sm font-semibold text-rose-900">
+                      {ha(data.severidade.restricao_dura.area_m2)} (
+                      {pctBR(data.severidade.restricao_dura.pct_do_verde)})
+                    </p>
+                    {data.severidade.restricao_dura.fontes.length > 0 && (
+                      <p className="text-xs text-rose-600">
+                        {data.severidade.restricao_dura.fontes.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-2">
+                    <p className="text-xs text-yellow-700">🟡 A verificar</p>
+                    <p className="text-sm font-semibold text-yellow-900">
+                      {ha(data.severidade.a_verificar.area_m2)} (
+                      {pctBR(data.severidade.a_verificar.pct_do_verde)})
+                    </p>
+                    <p className="text-xs text-yellow-700">
+                      potencial desbloqueável:{" "}
+                      {ha(data.severidade.potencial_desbloqueavel_m2)}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-slate-500">
+                  {data.severidade.ressalva}
+                </p>
+              </div>
             )}
 
             {data.proveniencia && (
