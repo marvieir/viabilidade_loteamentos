@@ -64,30 +64,43 @@ _INSTRUCAO_ANTIALUCINACAO = (
     "cálculo. Não conclua nada sobre a viabilidade da gleba."
 )
 
-# Esquema do que o LLM devolve (structured outputs). Frações como number; sem constraints
-# numéricos (não suportados em json_schema estrito).
-_ESQUEMA_EXTRACAO = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "zonas": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "codigo": {"type": "string"},
-                    "descricao": {"type": ["string", "null"]},
-                    "params": {"type": "object"},
-                    "modalidades": {"type": "object"},
-                },
-                "required": ["codigo"],
-            },
-        },
-        "avisos": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["zonas"],
-}
+# Formato pedido ao LLM (JSON-only, parse tolerante no nosso lado). Cada ParamProv =
+# {valor, artigo, pagina, trecho}; doacao_pct ganha `base`. Valor ausente → omita o param.
+_INSTRUCAO_FORMATO = (
+    "Extraia os índices da LUOS e responda APENAS com um objeto JSON (sem markdown, sem "
+    "texto antes/depois) no formato:\n"
+    '{"zonas": [{"codigo": "ZR1", "descricao": "...", '
+    '"params": {'
+    '"lote_min_m2": {"valor": 250, "artigo": "Art. 12, I", "pagina": 8, "trecho": "..."}, '
+    '"frente_min_m": {"valor": 10, "artigo": "...", "pagina": 8, "trecho": "..."}, '
+    '"doacao_pct": {"valor": 0.35, "base": "total", "artigo": "Art. 20", "pagina": 14, '
+    '"trecho": "..."}}, '
+    '"modalidades": {"desmembramento": {"doacao_pct": {"valor": 0.0, "artigo": "Art. 22", '
+    '"pagina": 15, "trecho": "..."}}}}], '
+    '"avisos": ["..."]}\n'
+    "Omita qualquer parâmetro cujo valor você não encontrou no texto (NÃO invente). Se não "
+    "conseguir ler o documento, devolva {\"zonas\": [], \"avisos\": [\"motivo\"]}."
+)
+
+
+def _json_tolerante(texto: str):
+    """Parse tolerante: tenta JSON direto; se falhar, recorta do 1º '{' ao último '}'
+    (cobre cercas markdown / texto solto). ``None`` se não houver JSON utilizável."""
+    import json
+
+    if not texto:
+        return None
+    try:
+        return json.loads(texto)
+    except ValueError:
+        pass
+    ini, fim = texto.find("{"), texto.rfind("}")
+    if ini >= 0 and fim > ini:
+        try:
+            return json.loads(texto[ini : fim + 1])
+        except ValueError:
+            return None
+    return None
 
 
 class ExtratorLUOSClaude:
@@ -137,35 +150,23 @@ class ExtratorLUOSClaude:
                                     "data": b64,
                                 },
                             },
-                            {
-                                "type": "text",
-                                "text": (
-                                    "Extraia os índices da LUOS por zona, com citação por "
-                                    "valor. Se não conseguir ler o documento, devolve "
-                                    "zonas vazias e um aviso explicando."
-                                ),
-                            },
+                            {"type": "text", "text": _INSTRUCAO_FORMATO},
                         ],
                     }
                 ],
-                output_config={
-                    "format": {"type": "json_schema", "schema": _ESQUEMA_EXTRACAO}
-                },
             )
         except Exception as exc:  # noqa: BLE001 — falha de leitura/serviço → honesta
             raise PdfIlegivel(
-                f"Não foi possível extrair a LUOS — {type(exc).__name__}. Revise manualmente."
+                f"Não foi possível extrair a LUOS — {type(exc).__name__}: {exc}. "
+                "Revise manualmente."
             ) from exc
 
-        import json
-
-        texto = next((b.text for b in resp.content if b.type == "text"), "")
-        try:
-            bruto = json.loads(texto)
-        except ValueError as exc:
+        texto = next((b.text for b in resp.content if getattr(b, "type", None) == "text"), "")
+        bruto = _json_tolerante(texto)
+        if bruto is None:
             raise PdfIlegivel(
-                "Extração não retornou JSON válido — revise manualmente."
-            ) from exc
+                "A extração não retornou JSON válido — revise manualmente."
+            )
 
         perfil = PerfilMunicipal.model_validate(
             {

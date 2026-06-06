@@ -5,9 +5,16 @@ dimensão Casca + Aproveitamento (routers/analises.py).
 """
 
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+# Carrega backend/.env (ANTHROPIC_API_KEY etc.) já na importação — robusto mesmo se o
+# uvicorn for iniciado sem `--env-file`. Não sobrescreve vars já presentes no ambiente
+# (ex.: as do docker-compose), então container e dev convivem.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from app.routers import ambiental, analises, perfil, vegetacao
 

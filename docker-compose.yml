@@ -5,6 +5,10 @@ services:
     build: ./backend
     ports:
       - "8700:8700"
+    # Segredos/credenciais da máquina (ex.: ANTHROPIC_API_KEY da Fase 1.8) entram por aqui —
+    # o arquivo é gitignored e NÃO vai na imagem. Sem isto, a extração da LUOS responde 503.
+    env_file:
+      - ./backend/.env
     environment:
       CORS_ORIGINS: "http://localhost:3700"
       # Liga a detecção de município por malha real (Fase 1.7). O arquivo entra por volume
@@ -16,6 +20,8 @@ services:
       # scripts/baixar_worldcover.py e montado no volume abaixo. Comente esta linha e o
       # volume se ainda não tiver o arquivo (a vegetação degrada honesta, sem descontar).
       VEGETACAO_RASTER_PATH: "/data/verde.tif"
+      # Fase 1.8 — onde os perfis municipais CONFIRMADOS da LUOS persistem (volume abaixo).
+      PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
     volumes:
       # Monta a malha gerada no host (python -m scripts.baixar_malha_ibge) no container.
       # O arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
@@ -23,6 +29,9 @@ services:
       # Fase 2.2 — raster de vegetação (recorte WorldCover). O arquivo PRECISA existir
       # antes do `up` (gere com scripts/baixar_worldcover.py), senão o bind cria dir vazio.
       - ./backend/app/perfis/verde.tif:/data/verde.tif:ro
+      # Fase 1.8 — perfis confirmados da LUOS (dado do operador). Bind no host → sobrevivem
+      # a rebuilds e ficam inspecionáveis em backend/app/perfis/municipais/.
+      - ./backend/app/perfis/municipais:/data/perfis-municipais
     restart: unless-stopped
 
   web:
