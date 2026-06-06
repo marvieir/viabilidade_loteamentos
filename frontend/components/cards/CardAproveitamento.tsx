@@ -35,6 +35,27 @@ const ha = (v: number) =>
 const pct = (v: number) =>
   (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
 
+const LOTE_MIN_DEFAULT = 200;
+
+// Lote mínimo LEGAL efetivo de (zona, modalidade) num perfil CONFIRMADO. Espelha o
+// backend (core/aproveitamento._param_zona): override da modalidade quando houver, senão
+// o da zona. Não é cálculo — só seleciona qual número confirmado o backend usaria, para
+// pré-preencher o formulário. `null` = zona sem lote legal confirmado (não chuta).
+function loteMinLegalDaZona(
+  perfil: PerfilMunicipal | null | undefined,
+  zonaCodigo: string,
+  modalidade: ModalidadeUrbana,
+): number | null {
+  if (!perfil || perfil.status !== "confirmado" || !zonaCodigo) return null;
+  const zona = perfil.zonas.find((z) => z.codigo === zonaCodigo);
+  if (!zona) return null;
+  const ov = zona.modalidades?.[modalidade]?.lote_min_m2;
+  if (ov?.valor != null && ov.valor > 0) return ov.valor;
+  const p = zona.params?.lote_min_m2;
+  if (p?.valor != null && p.valor > 0) return p.valor;
+  return null;
+}
+
 export function CardAproveitamento({
   analiseId,
   perfil,
@@ -45,12 +66,27 @@ export function CardAproveitamento({
   const [regime, setRegime] = useState<Regime>("URBANO");
   const [modalidade, setModalidade] =
     useState<ModalidadeUrbana>("loteamento_aberto");
-  const [loteMin, setLoteMin] = useState(200);
+  const [loteMin, setLoteMin] = useState(LOTE_MIN_DEFAULT);
+  // true quando `loteMin` veio da LUOS confirmada (zona selecionada), não digitado à mão.
+  const [loteMinDaLuos, setLoteMinDaLuos] = useState(false);
   const [fmp, setFmp] = useState(20000);
   // Zona declarada (Fase 1.8) — dropdown das zonas do perfil CONFIRMADO. "" = sem cenário.
   const [zona, setZona] = useState("");
   const zonasConfirmadas =
     perfil?.status === "confirmado" ? perfil.zonas : [];
+
+  // Sincroniza o lote mínimo do formulário com a zona/modalidade confirmada da LUOS, para
+  // o teto físico do headline usar o lote LEGAL (não o default). O backend continua sendo
+  // quem calcula — aqui só escolhemos o número de entrada. Edição manual desliga o vínculo.
+  function aplicarLoteDaZona(zonaCodigo: string, mod: ModalidadeUrbana) {
+    const legal = loteMinLegalDaZona(perfil, zonaCodigo, mod);
+    if (legal != null) {
+      setLoteMin(legal);
+      setLoteMinDaLuos(true);
+    } else {
+      setLoteMinDaLuos(false);
+    }
+  }
 
   const [res, setRes] = useState<Aproveitamento | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -114,9 +150,11 @@ export function CardAproveitamento({
                 Modalidade (rótulo)
                 <select
                   value={modalidade}
-                  onChange={(e) =>
-                    setModalidade(e.target.value as ModalidadeUrbana)
-                  }
+                  onChange={(e) => {
+                    const m = e.target.value as ModalidadeUrbana;
+                    setModalidade(m);
+                    if (zona) aplicarLoteDaZona(zona, m);
+                  }}
                   className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
                 >
                   {MODALIDADES.map((m) => (
@@ -126,14 +164,26 @@ export function CardAproveitamento({
                   ))}
                 </select>
               </label>
-              <Campo label="Lote mín. (m²)" value={loteMin} onChange={setLoteMin} />
+              <Campo
+                label="Lote mín. (m²)"
+                value={loteMin}
+                onChange={(v) => {
+                  setLoteMin(v);
+                  setLoteMinDaLuos(false); // edição manual rompe o vínculo com a LUOS
+                }}
+              />
             </div>
             {zonasConfirmadas.length > 0 && (
               <label className="flex flex-col gap-1 text-xs text-slate-600">
                 Zona (LUOS confirmada) — liga o cenário com diretriz
                 <select
                   value={zona}
-                  onChange={(e) => setZona(e.target.value)}
+                  onChange={(e) => {
+                    const z = e.target.value;
+                    setZona(z);
+                    if (z) aplicarLoteDaZona(z, modalidade);
+                    else setLoteMinDaLuos(false);
+                  }}
                   className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
                 >
                   <option value="">— sem diretriz (só teto físico) —</option>
@@ -146,12 +196,24 @@ export function CardAproveitamento({
                 </select>
               </label>
             )}
-            <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-              <span className="font-medium">Lote mínimo provisório.</span> Declarado
-              por você (pendente extração da LUOS, Fase 1.8). O nº de lotes é um{" "}
-              <span className="font-medium">teto</span> — vias e doação reduzem isso
-              no projeto urbanístico e dependem da diretriz municipal.
-            </p>
+            {loteMinDaLuos ? (
+              <p className="rounded-lg bg-emerald-50 p-3 text-xs text-emerald-900">
+                <span className="font-medium">Lote mínimo legal.</span> Puxado da LUOS
+                confirmada para a zona <span className="font-medium">{zona}</span>{" "}
+                (Fase 1.8) — você pode sobrescrever. O nº de lotes é um{" "}
+                <span className="font-medium">teto</span>; a doação entra no{" "}
+                <span className="font-medium">cenário com diretriz</span> abaixo, não
+                neste teto físico.
+              </p>
+            ) : (
+              <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+                <span className="font-medium">Lote mínimo provisório.</span> Declarado
+                por você (selecione a zona da LUOS confirmada para puxar o lote legal). O
+                nº de lotes é um <span className="font-medium">teto</span> — vias e
+                doação reduzem isso no projeto urbanístico e dependem da diretriz
+                municipal.
+              </p>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -219,34 +281,83 @@ export function CardAproveitamento({
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
         )}
 
-        {/* Resultado URBANO */}
-        {res?.regime === "URBANO" && res.area_aproveitavel_m2 != null && (
-          <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Metrica
-                titulo="Área aproveitável"
-                valor={ha(res.area_aproveitavel_m2)}
-                sub={
-                  res.pct_sobre_total != null
-                    ? `${pct(res.pct_sobre_total)} da gleba`
-                    : undefined
-                }
-                destaque
-              />
-              <Metrica titulo="Lote mínimo" valor={m2(res.lote_min_m2 ?? 0)} />
-              <Metrica
-                titulo="Lotes (teto)"
-                valor={String(res.n_lotes_teto ?? 0)}
-                sub="máximo, antes de vias/doação"
-              />
-            </div>
-            {res.ressalva_urbano && (
+        {/* Resultado URBANO — com zona LUOS confirmada o HEADLINE é o cenário com diretriz
+            (lote legal + doação já aplicados); o teto físico cai para linha secundária.
+            Sem zona, o headline segue sendo o teto físico. Veto da spec 1.8 (decisão A). */}
+        {res?.regime === "URBANO" &&
+          res.area_aproveitavel_m2 != null &&
+          (res.cenario_diretriz ? (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Metrica
+                  titulo="Área aproveitável (com diretriz)"
+                  valor={ha(res.cenario_diretriz.area_aproveitavel_m2)}
+                  sub={
+                    res.cenario_diretriz.pct_sobre_total != null
+                      ? `${pct(res.cenario_diretriz.pct_sobre_total)} da gleba · doação descontada`
+                      : "doação descontada"
+                  }
+                  destaque
+                />
+                <Metrica
+                  titulo="Lote mínimo legal"
+                  valor={m2(res.cenario_diretriz.lote_min_m2_legal)}
+                  sub={`zona ${res.cenario_diretriz.zona}`}
+                />
+                <Metrica
+                  titulo="Lotes"
+                  valor={String(res.cenario_diretriz.n_lotes)}
+                  sub="lote legal + doação aplicados"
+                />
+              </div>
+              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                <p className="text-xs text-indigo-800">
+                  Lote legal {m2(res.cenario_diretriz.lote_min_m2_legal)} · doação{" "}
+                  {pct(res.cenario_diretriz.doacao_pct)} (base{" "}
+                  {res.cenario_diretriz.doacao_base}) ={" "}
+                  {ha(res.cenario_diretriz.doacao_m2)} descontados.
+                </p>
+                <p className="mt-1 text-xs text-indigo-700">
+                  {res.cenario_diretriz.proveniencia}
+                </p>
+                <p className="mt-1 text-xs text-indigo-600">
+                  {res.cenario_diretriz.ressalva}
+                </p>
+              </div>
+              {/* Teto físico — agora secundário (sem doação, lote declarado) */}
               <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
-                {res.ressalva_urbano}
+                <span className="font-medium">Teto físico (sem doação):</span>{" "}
+                {res.n_lotes_teto ?? 0} lotes em {ha(res.area_aproveitavel_m2)} com lote{" "}
+                {m2(res.lote_min_m2 ?? 0)}. {res.ressalva_urbano}
               </p>
-            )}
-          </>
-        )}
+            </>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <Metrica
+                  titulo="Área aproveitável"
+                  valor={ha(res.area_aproveitavel_m2)}
+                  sub={
+                    res.pct_sobre_total != null
+                      ? `${pct(res.pct_sobre_total)} da gleba`
+                      : undefined
+                  }
+                  destaque
+                />
+                <Metrica titulo="Lote mínimo" valor={m2(res.lote_min_m2 ?? 0)} />
+                <Metrica
+                  titulo="Lotes (teto)"
+                  valor={String(res.n_lotes_teto ?? 0)}
+                  sub="máximo, antes de vias/doação"
+                />
+              </div>
+              {res.ressalva_urbano && (
+                <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+                  {res.ressalva_urbano}
+                </p>
+              )}
+            </>
+          ))}
 
         {/* Resultado RURAL */}
         {res?.regime === "RURAL" && res.rural && (
@@ -282,30 +393,8 @@ export function CardAproveitamento({
           </>
         )}
 
-        {/* Cenário diretriz (Fase 1.8) — físico − doação + lote legal da zona declarada */}
-        {res?.cenario_diretriz && (
-          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-            <p className="text-sm font-medium text-indigo-900">
-              Cenário com diretriz · zona {res.cenario_diretriz.zona} ·{" "}
-              {ha(res.cenario_diretriz.area_aproveitavel_m2)}
-              {res.cenario_diretriz.pct_sobre_total != null
-                ? ` (${pct(res.cenario_diretriz.pct_sobre_total)} da gleba)`
-                : ""}{" "}
-              · {res.cenario_diretriz.n_lotes} lotes
-            </p>
-            <p className="mt-1 text-xs text-indigo-800">
-              Lote legal {m2(res.cenario_diretriz.lote_min_m2_legal)} · doação{" "}
-              {pct(res.cenario_diretriz.doacao_pct)} (base {res.cenario_diretriz.doacao_base}
-              ) = {ha(res.cenario_diretriz.doacao_m2)} descontados.
-            </p>
-            <p className="mt-1 text-xs text-indigo-700">
-              {res.cenario_diretriz.proveniencia}
-            </p>
-            <p className="mt-1 text-xs text-indigo-600">
-              {res.cenario_diretriz.ressalva}
-            </p>
-          </div>
-        )}
+        {/* Cenário diretriz (Fase 1.8): com zona confirmada ele vira o HEADLINE acima.
+            Aqui fica só o aviso quando NÃO deu para computá-lo (zona sem lote legal etc.). */}
         {res?.aviso_diretriz && !res.cenario_diretriz && (
           <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
             {res.aviso_diretriz}

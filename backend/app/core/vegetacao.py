@@ -163,9 +163,18 @@ class FonteVegetacaoRaster:
                     classes=[str(c) for c in sorted(self.classes)],
                 )
         except Exception as exc:  # noqa: BLE001 — degradar, não derrubar
-            return CoberturaVerde(
-                avisos=[f"Cobertura vegetal indisponível — {type(exc).__name__}: {exc}"[:180]]
-            )
+            # Causa típica em produção: o recorte `verde.tif` foi gerado para OUTRA gleba,
+            # então não cobre a atual (rasterio: "Input shapes do not overlap raster").
+            # Traduz para uma instrução acionável em vez de vazar o erro cru.
+            if "do not overlap" in str(exc):
+                aviso = (
+                    "Cobertura vegetal indisponível — o recorte de vegetação não cobre "
+                    "esta gleba (foi gerado para outra área). Gere o recorte deste KMZ "
+                    "(scripts/baixar_worldcover.py) e reinicie a API."
+                )
+            else:
+                aviso = f"Cobertura vegetal indisponível — {type(exc).__name__}: {exc}"
+            return CoberturaVerde(avisos=[aviso[:200]])
 
 
 def _classes_env() -> Optional[set[int]]:
