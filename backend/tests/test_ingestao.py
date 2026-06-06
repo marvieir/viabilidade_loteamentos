@@ -136,7 +136,7 @@ def test_c9_proveniencia_presente(client):
     for conteudo in (make_kmz([RET_RETANGULO]), make_kmz_linhas([LINHA_FECHADA])):
         data = _post(client, conteudo).json()
         og = data["origem_geometria"]
-        assert og["rota"] in ("POLYGON_DIRETO", "LINHA_FECHAVEL")
+        assert og["rota"] in ("POLYGON_DIRETO", "LINHA_FECHAVEL", "POLYGON_REPARADO")
         assert og["descricao"]
 
 

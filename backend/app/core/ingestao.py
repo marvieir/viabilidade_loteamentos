@@ -144,6 +144,43 @@ def _linha_unica(
     )
 
 
+def _reparar_poligonos(poligonos: list[Polygon]) -> tuple[list[Polygon], bool, list[str]]:
+    """Repara <Polygon> auto-interseccionados via ``buffer(0)`` — determinístico e (no caso
+    típico de export de CAD) preservando a área. Decisão do operador (Fase 1.8): reparar com
+    AVISO em vez de recusar. Polígono já válido passa intacto; reparo que não produz polígono
+    válido é mantido como veio → o motor recusa adiante (422 honesto). Multipolígono resultante
+    (auto-interseção ambígua) → maior parte, com aviso explícito.
+
+    Devolve ``(poligonos, reparou, avisos)``.
+    """
+    out: list[Polygon] = []
+    reparados = 0
+    avisos: list[str] = []
+    for p in poligonos:
+        if not p.is_empty and p.is_valid:
+            out.append(p)
+            continue
+        rep = p.buffer(0)  # buffer 0 = limpeza topológica (distância 0; vale em graus)
+        if rep.is_empty or not rep.is_valid:
+            out.append(p)  # não deu para reparar → segue inválido (recusa diagnóstica adiante)
+            continue
+        if rep.geom_type == "MultiPolygon":
+            rep = max(rep.geoms, key=lambda g: g.area)
+            avisos.append(
+                "Auto-interseção dividiu o polígono na correção; usada a MAIOR parte — "
+                "confira o traçado no mapa."
+            )
+        out.append(rep)
+        reparados += 1
+    if reparados:
+        avisos.insert(
+            0,
+            f"{reparados} polígono(s) com auto-interseção corrigido(s) automaticamente "
+            "(buffer 0). Confira o traçado no mapa antes de confiar nos números.",
+        )
+    return out, reparados > 0, avisos
+
+
 def ingerir(
     conteudo: bytes, tolerancia_m: float = TOLERANCIA_FECHAMENTO_M
 ) -> Ingestao:
@@ -158,11 +195,17 @@ def ingerir(
     n_pts = conteudo_kml.n_pontos
 
     if n_poly >= 1:
+        poligonos, reparou, avisos = _reparar_poligonos(conteudo_kml.poligonos)
         return Ingestao(
             ok=True,
-            rota="POLYGON_DIRETO",
-            descricao="polígono direto do arquivo",
-            poligonos=conteudo_kml.poligonos,
+            rota="POLYGON_REPARADO" if reparou else "POLYGON_DIRETO",
+            descricao=(
+                "polígono corrigido (auto-interseção) do arquivo"
+                if reparou
+                else "polígono direto do arquivo"
+            ),
+            poligonos=poligonos,
+            avisos=avisos,
         )
 
     if n_lin == 1:

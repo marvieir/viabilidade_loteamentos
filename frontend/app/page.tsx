@@ -97,10 +97,18 @@ export default function Home() {
                 />
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-800">
+                <span
+                  className={`rounded-full px-2 py-0.5 font-medium ${
+                    analise.origem_geometria.rota === "POLYGON_REPARADO"
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-emerald-100 text-emerald-800"
+                  }`}
+                >
                   {analise.origem_geometria.rota === "POLYGON_DIRETO"
                     ? "polígono do arquivo"
-                    : "linha fechada automaticamente"}
+                    : analise.origem_geometria.rota === "POLYGON_REPARADO"
+                      ? "polígono corrigido (auto-interseção)"
+                      : "linha fechada automaticamente"}
                 </span>
                 <span className="text-slate-500">
                   {analise.origem_geometria.descricao}

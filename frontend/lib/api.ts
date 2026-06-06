@@ -36,7 +36,7 @@ export interface Jurisdicao {
 }
 
 export interface OrigemGeometria {
-  rota: "POLYGON_DIRETO" | "LINHA_FECHAVEL";
+  rota: "POLYGON_DIRETO" | "LINHA_FECHAVEL" | "POLYGON_REPARADO";
   descricao: string;
 }
 

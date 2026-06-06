@@ -44,10 +44,24 @@ def test_multipoligono_usa_maior_e_avisa(client):
     assert data["geometria"]["area_m2"] == r_so_maior.json()["geometria"]["area_m2"]
 
 
-def test_geometria_invalida_422(client):
+def test_polygon_auto_interseccionado_reparado(client):
+    """Fase 1.8 (decisão do operador): <Polygon> auto-interseccionado é REPARADO por
+    buffer(0) com AVISO, em vez de recusado. Rota vira POLYGON_REPARADO."""
     r = _post_analise(client, [RET_INVALIDO])
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["origem_geometria"]["rota"] == "POLYGON_REPARADO"
+    assert data["geometria"]["area_m2"] > 0
+    assert any("auto-interse" in a.lower() or "corrigi" in a.lower() for a in data["avisos"])
+
+
+def test_geometria_irreparavel_422(client):
+    """Degenerado (agulha de área 0) → buffer(0) vazio → segue inválido → 422 honesto.
+    O auto-reparo só desbloqueia o que vira polígono de área; o resto continua recusado."""
+    agulha = [(-47.14, -23.53), (-47.13, -23.52), (-47.14, -23.53), (-47.13, -23.52)]
+    r = _post_analise(client, [agulha])
     assert r.status_code == 422
-    assert "inválid" in r.text.lower()
+    assert "inválid" in r.text.lower() or "vazio" in r.text.lower()
 
 
 def test_degradacao_sem_perfil(client_producao):

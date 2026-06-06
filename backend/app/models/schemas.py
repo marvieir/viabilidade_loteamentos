@@ -44,9 +44,9 @@ class MunicipioIn(BaseModel):
 
 
 class OrigemGeometriaOut(BaseModel):
-    """Proveniência da rota de ingestão (Fase 1.5)."""
+    """Proveniência da rota de ingestão (Fase 1.5; POLYGON_REPARADO desde a 1.8)."""
 
-    rota: Literal["POLYGON_DIRETO", "LINHA_FECHAVEL"]
+    rota: Literal["POLYGON_DIRETO", "LINHA_FECHAVEL", "POLYGON_REPARADO"]
     descricao: str
 
 
