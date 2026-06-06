@@ -131,7 +131,7 @@ class ExtratorLUOSClaude:
                 "Pacote 'anthropic' ausente — instale para a extração assistida."
             ) from exc
 
-        client = anthropic.Anthropic(api_key=self.api_key)
+        client = anthropic.Anthropic(api_key=self.api_key, **_opcoes_tls())
         b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
         try:
             resp = client.messages.create(
@@ -196,6 +196,30 @@ def _marcar_origem_llm(perfil: PerfilMunicipal) -> None:
                 p = getattr(ov, nome, None)
                 if p is not None:
                     p.origem = "proposto_llm"
+
+
+def _opcoes_tls() -> dict:
+    """Opera atrás de inspeção TLS corporativa SEM tocar no código, por env:
+
+    - ``LUOS_CA_BUNDLE`` (ou ``SSL_CERT_FILE``/``REQUESTS_CA_BUNDLE``): caminho de um bundle
+      PEM que inclui a CA raiz da empresa → caminho SEGURO (verificação continua ligada).
+    - ``LUOS_TLS_INSECURE=1``: desliga a verificação TLS. **INSEGURO** — só para desbloquear
+      numa máquina controlada sob inspeção corporativa; prefira o CA bundle.
+
+    Sem env → ``{}`` (verificação padrão via certifi). Mantém os timeouts do SDK ao usar o
+    cliente httpx só para ajustar ``verify``.
+    """
+    insecure = os.getenv("LUOS_TLS_INSECURE")
+    ca = (
+        os.getenv("LUOS_CA_BUNDLE")
+        or os.getenv("SSL_CERT_FILE")
+        or os.getenv("REQUESTS_CA_BUNDLE")
+    )
+    if not insecure and not ca:
+        return {}
+    import httpx  # dependência do anthropic; só produção
+
+    return {"http_client": httpx.Client(verify=False if insecure else ca)}
 
 
 def get_extrator_luos() -> Optional[ExtratorLUOS]:
