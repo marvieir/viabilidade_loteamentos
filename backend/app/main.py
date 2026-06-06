@@ -9,7 +9,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import ambiental, analises, vegetacao
+from app.routers import ambiental, analises, perfil, vegetacao
 
 app = FastAPI(
     title="Pré-Viabilidade de Loteamento — API",
@@ -30,6 +30,7 @@ app.add_middleware(
 app.include_router(analises.router, prefix="/api")
 app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")
+app.include_router(perfil.router, prefix="/api")
 
 
 @app.get("/health")

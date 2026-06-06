@@ -8,12 +8,15 @@ from fastapi.testclient import TestClient
 from shapely.geometry import LineString, Point, Polygon
 
 from app.core.camadas import Camadas, get_fonte_camadas
+from app.core.extrator_luos import get_extrator_luos
 from app.core.fmp import FonteFMPArquivo, get_fonte_fmp
 from app.core.jurisdicao import Municipio, get_fonte_malha
 from app.core.lista_municipios import FonteListaArquivo, get_fonte_lista
+from app.core.perfil_municipal import get_fonte_perfil
 from app.core.store import STORE
 from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
 from app.main import app
+from app.models.schemas import PerfilMunicipal
 
 _KML = """<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document>{placemarks}</Document></kml>"""
@@ -240,6 +243,62 @@ def lista():
 
     yield _set
     app.dependency_overrides.pop(get_fonte_lista, None)
+
+
+# ----- Fase 1.8 — perfil municipal (LUOS) + extrator: stubs offline, sem rede, sem chave -----
+class StubExtratorLUOS:
+    """Extrator de TESTE: devolve um PerfilMunicipal fixo (proposto), sem PDF/rede/chave."""
+
+    def __init__(self, perfil: PerfilMunicipal):
+        self._perfil = perfil
+
+    def extrair(self, pdf_bytes, cod_ibge, municipio, uf, nome_arquivo=None):
+        return self._perfil.model_copy(deep=True)
+
+
+class FontePerfilMemoria:
+    """Fonte de perfil em memória (injetável nos testes) — sem volume/arquivo."""
+
+    def __init__(self):
+        self._m: dict[str, PerfilMunicipal] = {}
+
+    def carregar(self, cod_ibge):
+        return self._m.get(str(cod_ibge))
+
+    def salvar(self, perfil: PerfilMunicipal):
+        self._m[str(perfil.cod_ibge)] = perfil.model_copy(deep=True)
+
+    def semear(self, perfil: PerfilMunicipal):
+        """Atalho de teste: planta um perfil direto (ex.: já confirmado)."""
+        self.salvar(perfil)
+
+
+@pytest.fixture
+def extrator_luos():
+    """Injeta um extrator-stub. Uso: ``extrator_luos(PerfilMunicipal(...))``."""
+
+    def _set(perfil: PerfilMunicipal):
+        app.dependency_overrides[get_extrator_luos] = lambda: StubExtratorLUOS(perfil)
+
+    yield _set
+    app.dependency_overrides.pop(get_extrator_luos, None)
+
+
+@pytest.fixture
+def extrator_indisponivel():
+    """Força o extrator a None (sem credencial) — simula produção sem chave de LLM."""
+    app.dependency_overrides[get_extrator_luos] = lambda: None
+    yield
+    app.dependency_overrides.pop(get_extrator_luos, None)
+
+
+@pytest.fixture
+def fonte_perfil():
+    """Injeta uma fonte de perfil em memória e devolve a instância (p/ semear/checar)."""
+    fonte = FontePerfilMemoria()
+    app.dependency_overrides[get_fonte_perfil] = lambda: fonte
+    yield fonte
+    app.dependency_overrides.pop(get_fonte_perfil, None)
 
 
 @pytest.fixture

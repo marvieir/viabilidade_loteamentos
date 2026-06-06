@@ -15,6 +15,7 @@ import {
   calcularUrbano,
   type Aproveitamento,
   type ModalidadeUrbana,
+  type PerfilMunicipal,
   type Regime,
 } from "@/lib/api";
 
@@ -34,12 +35,22 @@ const ha = (v: number) =>
 const pct = (v: number) =>
   (v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + "%";
 
-export function CardAproveitamento({ analiseId }: { analiseId: string }) {
+export function CardAproveitamento({
+  analiseId,
+  perfil,
+}: {
+  analiseId: string;
+  perfil?: PerfilMunicipal | null;
+}) {
   const [regime, setRegime] = useState<Regime>("URBANO");
   const [modalidade, setModalidade] =
     useState<ModalidadeUrbana>("loteamento_aberto");
   const [loteMin, setLoteMin] = useState(200);
   const [fmp, setFmp] = useState(20000);
+  // Zona declarada (Fase 1.8) — dropdown das zonas do perfil CONFIRMADO. "" = sem cenário.
+  const [zona, setZona] = useState("");
+  const zonasConfirmadas =
+    perfil?.status === "confirmado" ? perfil.zonas : [];
 
   const [res, setRes] = useState<Aproveitamento | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -52,7 +63,7 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
       const r =
         regime === "RURAL"
           ? await calcularRural(analiseId, fmp)
-          : await calcularUrbano(analiseId, loteMin, modalidade);
+          : await calcularUrbano(analiseId, loteMin, modalidade, zona || null);
       setRes(r);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao calcular.");
@@ -117,6 +128,24 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
               </label>
               <Campo label="Lote mín. (m²)" value={loteMin} onChange={setLoteMin} />
             </div>
+            {zonasConfirmadas.length > 0 && (
+              <label className="flex flex-col gap-1 text-xs text-slate-600">
+                Zona (LUOS confirmada) — liga o cenário com diretriz
+                <select
+                  value={zona}
+                  onChange={(e) => setZona(e.target.value)}
+                  className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
+                >
+                  <option value="">— sem diretriz (só teto físico) —</option>
+                  {zonasConfirmadas.map((z) => (
+                    <option key={z.codigo} value={z.codigo}>
+                      {z.codigo}
+                      {z.descricao ? ` · ${z.descricao}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
               <span className="font-medium">Lote mínimo provisório.</span> Declarado
               por você (pendente extração da LUOS, Fase 1.8). O nº de lotes é um{" "}
@@ -251,6 +280,36 @@ export function CardAproveitamento({ analiseId }: { analiseId: string }) {
               {res.rural.flag_conversao}
             </p>
           </>
+        )}
+
+        {/* Cenário diretriz (Fase 1.8) — físico − doação + lote legal da zona declarada */}
+        {res?.cenario_diretriz && (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+            <p className="text-sm font-medium text-indigo-900">
+              Cenário com diretriz · zona {res.cenario_diretriz.zona} ·{" "}
+              {ha(res.cenario_diretriz.area_aproveitavel_m2)}
+              {res.cenario_diretriz.pct_sobre_total != null
+                ? ` (${pct(res.cenario_diretriz.pct_sobre_total)} da gleba)`
+                : ""}{" "}
+              · {res.cenario_diretriz.n_lotes} lotes
+            </p>
+            <p className="mt-1 text-xs text-indigo-800">
+              Lote legal {m2(res.cenario_diretriz.lote_min_m2_legal)} · doação{" "}
+              {pct(res.cenario_diretriz.doacao_pct)} (base {res.cenario_diretriz.doacao_base}
+              ) = {ha(res.cenario_diretriz.doacao_m2)} descontados.
+            </p>
+            <p className="mt-1 text-xs text-indigo-700">
+              {res.cenario_diretriz.proveniencia}
+            </p>
+            <p className="mt-1 text-xs text-indigo-600">
+              {res.cenario_diretriz.ressalva}
+            </p>
+          </div>
+        )}
+        {res?.aviso_diretriz && !res.cenario_diretriz && (
+          <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+            {res.aviso_diretriz}
+          </p>
         )}
 
         {/* Cenário otimista (Fase 2.3) — hipotético, claramente separado do headline */}

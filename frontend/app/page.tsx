@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { UploadKmz } from "@/components/UploadKmz";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
+import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
 import {
@@ -13,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Analise, ChaveOverlay } from "@/lib/api";
+import type { Analise, ChaveOverlay, PerfilMunicipal } from "@/lib/api";
 
 // Leaflet só roda no cliente.
 const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
@@ -36,6 +37,8 @@ export default function Home() {
   const [overlaysVerde, setOverlaysVerde] = useState<
     Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
   >({});
+  // Perfil municipal (LUOS, Fase 1.8): confirmado → alimenta o cenário diretriz.
+  const [perfil, setPerfil] = useState<PerfilMunicipal | null>(null);
 
   // O mapa recebe os overlays ambientais + os do verde (cada card alimenta o seu).
   const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {
@@ -47,6 +50,7 @@ export default function Home() {
     setAnalise(a);
     setOverlaysAmb({}); // nova gleba → limpa overlays do mapa
     setOverlaysVerde({});
+    setPerfil(null); // nova gleba → o card da LUOS recarrega pelo município
   }
 
   return (
@@ -121,7 +125,14 @@ export default function Home() {
             </CardContent>
           </Card>
 
-          <CardAproveitamento analiseId={analise.analise_id} />
+          <CardPerfilLuos
+            codIbge={analise.jurisdicao.cod_ibge}
+            municipio={analise.jurisdicao.municipio}
+            uf={analise.jurisdicao.uf}
+            onConfirmado={setPerfil}
+          />
+
+          <CardAproveitamento analiseId={analise.analise_id} perfil={perfil} />
 
           <CardAmbiental
             analiseId={analise.analise_id}

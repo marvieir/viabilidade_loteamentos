@@ -36,6 +36,7 @@ from app.core.jurisdicao import (
 )
 from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.lista_municipios import FonteLista, get_fonte_lista
+from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
 from app.core.severidade_verde import classificar_severidade_verde
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
@@ -273,6 +274,7 @@ def calcular_aproveitamento(
     fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
     fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
+    fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -358,6 +360,24 @@ def calcular_aproveitamento(
 
     rotulo = _ROTULO_MODALIDADE.get(body.modalidade) if body.modalidade else None
     aprov_otim = round(area_aproveitavel + potencial, 2)
+
+    # Cenário diretriz (Fase 1.8): só com perfil municipal CONFIRMADO para a zona declarada.
+    # ADITIVO — não toca o headline físico-ambiental. Determinístico (perfil + zona fixos).
+    cenario_diretriz = None
+    aviso_diretriz = None
+    if body.zona:
+        jur: Jurisdicao = registro["jurisdicao"]
+        perfil = (
+            fonte_perfil.carregar(jur.cod_ibge)
+            if fonte_perfil is not None and jur.cod_ibge
+            else None
+        )
+        dados, aviso_diretriz = motor.cenario_diretriz(
+            perfil, body.zona, body.modalidade, area_aproveitavel, total
+        )
+        if dados is not None:
+            cenario_diretriz = schemas.CenarioDiretrizOut(**dados)
+
     return schemas.AproveitamentoOut(
         regime="URBANO",
         premissa=PREMISSA_URBANA + (f" — modalidade: {rotulo}" if rotulo else ""),
@@ -365,6 +385,8 @@ def calcular_aproveitamento(
         cenario_otimista=_cenario(
             n_lotes_teto=motor.lotes_teto(aprov_otim, body.lote_min_m2)
         ),
+        cenario_diretriz=cenario_diretriz,
+        aviso_diretriz=aviso_diretriz,
         area_aproveitavel_m2=area_aproveitavel,
         pct_sobre_total=pct_total,
         origem_lote=ORIGEM_LOTE_DECLARADO,

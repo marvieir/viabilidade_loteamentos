@@ -113,11 +113,29 @@ export interface CenarioOtimista {
   ressalva: string;
 }
 
+// Fase 1.8 — cenário "com diretriz" (físico − doação municipal + lote legal da zona).
+export type BaseDoacao = "total" | "liquida" | "combinada";
+
+export interface CenarioDiretriz {
+  zona: string;
+  lote_min_m2_legal: number;
+  doacao_pct: number;
+  doacao_base: BaseDoacao;
+  doacao_m2: number;
+  area_aproveitavel_m2: number;
+  pct_sobre_total?: number | null;
+  n_lotes: number;
+  proveniencia: string;
+  ressalva: string;
+}
+
 export interface Aproveitamento {
   regime: Regime;
   premissa: string;
   descontos?: Descontos | null;
   cenario_otimista?: CenarioOtimista | null;
+  cenario_diretriz?: CenarioDiretriz | null;
+  aviso_diretriz?: string | null;
   area_aproveitavel_m2?: number | null;
   pct_sobre_total?: number | null;
   // URBANO
@@ -205,7 +223,8 @@ export async function corrigirMunicipio(
 export async function calcularUrbano(
   analiseId: string,
   loteMinM2: number,
-  modalidade: ModalidadeUrbana = "loteamento_aberto"
+  modalidade: ModalidadeUrbana = "loteamento_aberto",
+  zona?: string | null
 ): Promise<Aproveitamento> {
   const res = await fetch(
     `${API_BASE}/api/analises/${analiseId}/aproveitamento`,
@@ -216,6 +235,7 @@ export async function calcularUrbano(
         regime: "URBANO",
         modalidade,
         lote_min_m2: loteMinM2,
+        ...(zona ? { zona } : {}),
       }),
     }
   );
@@ -330,5 +350,102 @@ export interface SeveridadeVerde {
 
 export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {
   const res = await fetch(`${API_BASE}/api/analises/${analiseId}/vegetacao`);
+  return jsonOrThrow(res);
+}
+
+// ----- Fase 1.8 — Perfil municipal (extração assistida da LUOS) -----
+export type OrigemParam = "proposto_llm" | "editado_humano";
+
+export interface ParamProv {
+  valor: number | null;
+  artigo: string | null;
+  pagina: number | null;
+  trecho: string | null;
+  origem: OrigemParam;
+  base?: BaseDoacao | null; // só em doacao_pct
+}
+
+export interface DoacaoSplit {
+  viario: number | null;
+  verde: number | null;
+  institucional: number | null;
+  artigo: string | null;
+  pagina: number | null;
+}
+
+export interface ZonaParams {
+  lote_min_m2: ParamProv | null;
+  frente_min_m: ParamProv | null;
+  doacao_pct: ParamProv | null;
+  doacao_split: DoacaoSplit | null;
+  ca: ParamProv | null;
+  taxa_ocupacao: ParamProv | null;
+}
+
+export interface ModalidadeOverride {
+  doacao_pct: ParamProv | null;
+  lote_min_m2: ParamProv | null;
+}
+
+export interface ZonaPerfil {
+  codigo: string;
+  descricao: string | null;
+  params: ZonaParams;
+  modalidades: Record<string, ModalidadeOverride>;
+}
+
+export interface PerfilMunicipal {
+  cod_ibge: string;
+  municipio: string | null;
+  uf: string | null;
+  status: "proposto" | "confirmado";
+  fonte_documento: string | null;
+  zonas: ZonaPerfil[];
+  avisos: string[];
+  validado_por: string | null;
+  data_referencia: string | null;
+}
+
+// Dispara a extração assistida (LLM lê o PDF). Devolve RASCUNHO (status=proposto).
+// 503 = sem credencial de LLM; 422 = PDF ilegível. NÃO persiste.
+export async function extrairPerfil(
+  codIbge: string,
+  pdf: File,
+  municipio?: string | null,
+  uf?: string | null
+): Promise<PerfilMunicipal> {
+  const form = new FormData();
+  form.append("pdf", pdf);
+  const qs = new URLSearchParams();
+  if (municipio) qs.set("municipio", municipio);
+  if (uf) qs.set("uf", uf);
+  const res = await fetch(
+    `${API_BASE}/api/municipios/${codIbge}/perfil/extrair?${qs.toString()}`,
+    { method: "POST", body: form }
+  );
+  return jsonOrThrow(res);
+}
+
+// Gate humano: confirma o perfil revisado/editado (status=confirmado) e persiste.
+// É o ÚNICO caminho que torna o perfil utilizável no cálculo.
+export async function confirmarPerfil(
+  codIbge: string,
+  perfil: PerfilMunicipal,
+  validadoPor: string
+): Promise<PerfilMunicipal> {
+  const res = await fetch(`${API_BASE}/api/municipios/${codIbge}/perfil`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...perfil, validado_por: validadoPor }),
+  });
+  return jsonOrThrow(res);
+}
+
+// Perfil confirmado do município (404 → null: ainda não cadastrado).
+export async function obterPerfil(
+  codIbge: string
+): Promise<PerfilMunicipal | null> {
+  const res = await fetch(`${API_BASE}/api/municipios/${codIbge}/perfil`);
+  if (res.status === 404) return null;
   return jsonOrThrow(res);
 }

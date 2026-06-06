@@ -8,6 +8,7 @@ pyproj==3.7.0
 lxml==5.3.0
 rasterio==1.4.3  # Fase 2.2 — amostragem do raster de vegetação (área verde)
 python-dotenv==1.0.1  # carrega backend/.env via `uvicorn --env-file .env`
+anthropic==0.69.0  # Fase 1.8 — extrator real da LUOS (import TARDIO, gated por ANTHROPIC_API_KEY; testes não usam)
 
 # dev / testes
 pytest==8.3.4

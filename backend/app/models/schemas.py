@@ -71,15 +71,18 @@ ModalidadeUrbana = Literal[
 
 class AproveitamentoIn(BaseModel):
     """Pedido de aproveitamento (TRIAGEM). ``regime`` é obrigatório (validado no router →
-    422 ``regime_obrigatorio``). Vias e doação NÃO entram: dependem do projeto urbanístico
-    e da diretriz municipal (ainda não carregável na plataforma) — Fase 2.2."""
+    422 ``regime_obrigatorio``). Vias e doação NÃO entram no headline: dependem do projeto
+    urbanístico e da diretriz municipal. ``zona`` (Fase 1.8) liga o ``cenario_diretriz``
+    quando há perfil municipal CONFIRMADO — aditivo, nunca altera o headline."""
 
     regime: Optional[Literal["URBANO", "RURAL"]] = None
     # RURAL — FMP do município (puxada da tabela; editável se município não resolvido)
     fmp_m2: Optional[float] = Field(default=None, gt=0)
-    # URBANO — lote declarado (pendente extração da LUOS, Fase 1.8); modalidade é rótulo
+    # URBANO — lote declarado (interino até a 1.8 confirmar a LUOS); modalidade é rótulo
     modalidade: Optional[ModalidadeUrbana] = None
     lote_min_m2: Optional[float] = Field(default=None, gt=0)
+    # URBANO + perfil municipal confirmado (Fase 1.8): zona declarada da LUOS → cenário diretriz.
+    zona: Optional[str] = None
 
 
 class RuralOut(BaseModel):
@@ -132,6 +135,11 @@ class AproveitamentoOut(BaseModel):
     descontos: Optional[DescontosOut] = None
     # Cenário otimista (Fase 2.3): null se severidade indisponível. INFORMATIVO.
     cenario_otimista: Optional[CenarioOtimistaOut] = None
+    # Cenário diretriz (Fase 1.8): físico − doação municipal + lote legal da ZONA declarada.
+    # null se não houver perfil CONFIRMADO p/ a zona. ADITIVO — não altera o headline.
+    cenario_diretriz: Optional["CenarioDiretrizOut"] = None
+    # Aviso quando a zona foi declarada mas não há perfil/zona p/ computar o cenário diretriz.
+    aviso_diretriz: Optional[str] = None
     # Área que sobra após as restrições físicas/legais (mata ∪ APP ∪ faixas). Vale p/ os 2
     # regimes. Vias e doação NÃO descontadas (entram no projeto/diretriz municipal).
     area_aproveitavel_m2: Optional[float] = None
@@ -217,5 +225,101 @@ class SeveridadeVerdeOut(BaseModel):
     restricao_dura: RestricaoDuraOut
     a_verificar: BucketVerdeOut
     potencial_desbloqueavel_m2: float  # a_verificar − (faixa ∪ servidão); clamp >= 0
+    proveniencia: str
+    ressalva: str
+
+
+# ----- Fase 1.8 — Perfil municipal (extração assistida da LUOS) -----
+# A IA fica na BORDA (lê e PROPÕE com citação); nada entra no cálculo sem status=confirmado
+# e proveniência por artigo (ARCHITECTURE §2). Mesmas formas são persistidas e devolvidas.
+
+OrigemParam = Literal["proposto_llm", "editado_humano"]
+BaseDoacao = Literal["total", "liquida", "combinada"]
+
+
+class ParamProv(BaseModel):
+    """Um índice da LUOS + sua proveniência por artigo. ``valor=None`` = não encontrado
+    (o LLM NUNCA inventa número). Valor sem ``artigo`` não é confirmável (gate da 1.8)."""
+
+    valor: Optional[float] = None
+    artigo: Optional[str] = None  # "Art. 12, I"
+    pagina: Optional[int] = None
+    trecho: Optional[str] = None  # verbatim da LUOS, para o humano conferir
+    origem: OrigemParam = "proposto_llm"
+    base: Optional[BaseDoacao] = None  # só em doacao_pct: sobre o que o % incide
+
+
+class DoacaoSplit(BaseModel):
+    """Repartição da doação (viário/verde/institucional). Dado de perfil — não entra no
+    número (o total é ``doacao_pct``); persiste p/ a dimensão Jurídica (Fase 3)."""
+
+    viario: Optional[float] = None
+    verde: Optional[float] = None
+    institucional: Optional[float] = None
+    artigo: Optional[str] = None
+    pagina: Optional[int] = None
+
+
+class ZonaParams(BaseModel):
+    """Índices por zona. Apenas ``lote_min_m2`` e ``doacao_pct`` entram no número (decisão
+    vetável §6-B); o resto é perfil para a Jurídica (Fase 3)."""
+
+    lote_min_m2: Optional[ParamProv] = None
+    frente_min_m: Optional[ParamProv] = None
+    doacao_pct: Optional[ParamProv] = None
+    doacao_split: Optional[DoacaoSplit] = None
+    ca: Optional[ParamProv] = None
+    taxa_ocupacao: Optional[ParamProv] = None
+
+
+class ModalidadeOverride(BaseModel):
+    """Override por modalidade quando a LUOS diferencia (ex.: desmembramento isento de
+    doação → ``doacao_pct.valor = 0``; 0 é VÁLIDO, distinto de 'não considerado')."""
+
+    doacao_pct: Optional[ParamProv] = None
+    lote_min_m2: Optional[ParamProv] = None
+
+
+class ZonaPerfil(BaseModel):
+    codigo: str  # "ZR1"
+    descricao: Optional[str] = None
+    params: ZonaParams = Field(default_factory=ZonaParams)
+    modalidades: dict[str, ModalidadeOverride] = {}
+
+
+class PerfilMunicipal(BaseModel):
+    """Perfil municipal extraído da LUOS. Nasce ``proposto`` (não alimenta cálculo);
+    só ``confirmado`` (via PUT, com ``validado_por`` + ``data_referencia``) é utilizável."""
+
+    cod_ibge: str
+    municipio: Optional[str] = None
+    uf: Optional[str] = None
+    status: Literal["proposto", "confirmado"] = "proposto"
+    fonte_documento: Optional[str] = None
+    zonas: list[ZonaPerfil] = []
+    avisos: list[str] = []
+    validado_por: Optional[str] = None
+    data_referencia: Optional[str] = None
+
+
+class PerfilConfirmarIn(PerfilMunicipal):
+    """Corpo do PUT: perfil revisado/editado + quem validou. O router força
+    ``status=confirmado`` e carimba ``data_referencia`` (hoje, se ausente)."""
+
+    validado_por: str  # obrigatório no PUT (proveniência de quem confirmou)
+
+
+class CenarioDiretrizOut(BaseModel):
+    """Cenário 'com diretriz' (Fase 1.8): aproveitável físico − doação municipal, com lote
+    mínimo LEGAL da zona. ADITIVO ao headline (§7-A decisão A). Determinístico."""
+
+    zona: str
+    lote_min_m2_legal: float  # substitui o declarado
+    doacao_pct: float  # 0 é válido (modalidade isenta), distinto de "não considerado"
+    doacao_base: BaseDoacao
+    doacao_m2: float
+    area_aproveitavel_m2: float  # físico − doação
+    pct_sobre_total: Optional[float] = None
+    n_lotes: int  # floor(aprov_diretriz / lote_legal)
     proveniencia: str
     ressalva: str
