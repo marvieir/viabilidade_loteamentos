@@ -83,6 +83,56 @@ _INSTRUCAO_FORMATO = (
 )
 
 
+# Ferramenta de saída estruturada: o modelo é FORÇADO a chamá-la (tool_choice), então os
+# índices voltam como dict — sem prosa para parsear (robusto ao raciocínio do Opus). Cada
+# índice = {valor, artigo, pagina, trecho}; doacao_pct leva `base`. params/modalidades ficam
+# como objeto livre (o modelo segue a descrição/_INSTRUCAO_FORMATO); o Pydantic valida aqui.
+_FERRAMENTA = {
+    "name": "registrar_indices_luos",
+    "description": (
+        "Registra os índices urbanísticos extraídos da LUOS, POR ZONA, cada valor com "
+        "citação (artigo, página, trecho verbatim). Índice ausente no texto → omita o "
+        "parâmetro (não invente)."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "zonas": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "codigo": {"type": "string", "description": "Ex.: ZR1, ZM2, ZEIS"},
+                        "descricao": {"type": "string"},
+                        "params": {
+                            "type": "object",
+                            "description": (
+                                "Mapa de índices. Cada um: "
+                                '{"valor": number, "artigo": "Art. X", "pagina": int, '
+                                '"trecho": "verbatim"}. doacao_pct é fração (0.35=35%) e '
+                                'leva "base": "total"|"liquida"|"combinada". Chaves: '
+                                "lote_min_m2, frente_min_m, doacao_pct, ca, taxa_ocupacao."
+                            ),
+                        },
+                        "modalidades": {
+                            "type": "object",
+                            "description": (
+                                "Overrides por modalidade (loteamento/desmembramento/"
+                                "condomínio) quando a LUOS diferencia; mesmo formato de "
+                                "params. Doação 0 é válida (isenção) — registre com citação."
+                            ),
+                        },
+                    },
+                    "required": ["codigo"],
+                },
+            },
+            "avisos": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["zonas"],
+    },
+}
+
+
 def _json_tolerante(texto: str):
     """Parse tolerante: tenta JSON direto; se falhar, recorta do 1º '{' ao último '}'
     (cobre cercas markdown / texto solto). ``None`` se não houver JSON utilizável."""
@@ -138,6 +188,10 @@ class ExtratorLUOSClaude:
                 model=self.modelo,
                 max_tokens=16000,
                 system=_INSTRUCAO_ANTIALUCINACAO,
+                tools=[_FERRAMENTA],
+                # Força a saída estruturada: o modelo PRECISA chamar a ferramenta, então não
+                # há prosa para parsear (robusto ao raciocínio em texto do Opus).
+                tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
                 messages=[
                     {
                         "role": "user",
@@ -161,24 +215,41 @@ class ExtratorLUOSClaude:
                 "Revise manualmente."
             ) from exc
 
-        texto = next((b.text for b in resp.content if getattr(b, "type", None) == "text"), "")
-        bruto = _json_tolerante(texto)
+        # Saída estruturada: pega o bloco tool_use (já é dict). Fallback: JSON em texto.
+        bruto = next(
+            (b.input for b in resp.content if getattr(b, "type", None) == "tool_use"),
+            None,
+        )
         if bruto is None:
+            texto = next(
+                (b.text for b in resp.content if getattr(b, "type", None) == "text"), ""
+            )
+            bruto = _json_tolerante(texto)
+        if not isinstance(bruto, dict):
             raise PdfIlegivel(
-                "A extração não retornou JSON válido — revise manualmente."
+                "A extração não devolveu dados estruturados "
+                f"(stop_reason={getattr(resp, 'stop_reason', '?')}). "
+                "Se for 'max_tokens', o documento é grande — extraia por capítulo/zona. "
+                "Revise manualmente."
             )
 
-        perfil = PerfilMunicipal.model_validate(
-            {
-                "cod_ibge": cod_ibge,
-                "municipio": municipio,
-                "uf": uf,
-                "status": "proposto",
-                "fonte_documento": nome_arquivo,
-                "zonas": bruto.get("zonas", []),
-                "avisos": bruto.get("avisos", []),
-            }
-        )
+        try:
+            perfil = PerfilMunicipal.model_validate(
+                {
+                    "cod_ibge": cod_ibge,
+                    "municipio": municipio,
+                    "uf": uf,
+                    "status": "proposto",
+                    "fonte_documento": nome_arquivo,
+                    "zonas": bruto.get("zonas", []),
+                    "avisos": bruto.get("avisos", []),
+                }
+            )
+        except ValueError as exc:
+            raise PdfIlegivel(
+                f"Índices extraídos em formato inesperado ({type(exc).__name__}). "
+                "Revise manualmente."
+            ) from exc
         # Garante a marca de origem em todo valor proposto pelo LLM (não confiar no modelo).
         _marcar_origem_llm(perfil)
         return perfil
