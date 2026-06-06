@@ -32,6 +32,9 @@ services:
       # Fase 1.8 — perfis confirmados da LUOS (dado do operador). Bind no host → sobrevivem
       # a rebuilds e ficam inspecionáveis em backend/app/perfis/municipais/.
       - ./backend/app/perfis/municipais:/data/perfis-municipais
+      # CA corporativa (ex.: Cisco Secure Access) para religar o TLS sob inspeção: coloque o
+      # PEM em backend/certs/corp-ca.pem e defina LUOS_CA_BUNDLE=/certs/corp-ca.pem no .env.
+      - ./backend/certs:/certs:ro
     restart: unless-stopped
 
   web:

@@ -39,3 +39,6 @@ backend/app/perfis/municipais/
 
 # .env do backend (segredos/caminhos da máquina) — versionamos só o .env.example.
 backend/.env
+
+# CA corporativa para TLS sob inspeção (Fase 1.8) — segredo da máquina, fora do git.
+backend/certs/

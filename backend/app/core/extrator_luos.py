@@ -272,25 +272,41 @@ def _marcar_origem_llm(perfil: PerfilMunicipal) -> None:
 def _opcoes_tls() -> dict:
     """Opera atrás de inspeção TLS corporativa SEM tocar no código, por env:
 
-    - ``LUOS_CA_BUNDLE`` (ou ``SSL_CERT_FILE``/``REQUESTS_CA_BUNDLE``): caminho de um bundle
-      PEM que inclui a CA raiz da empresa → caminho SEGURO (verificação continua ligada).
-    - ``LUOS_TLS_INSECURE=1``: desliga a verificação TLS. **INSEGURO** — só para desbloquear
-      numa máquina controlada sob inspeção corporativa; prefira o CA bundle.
+    - ``LUOS_CA_BUNDLE`` (ou ``SSL_CERT_FILE``/``REQUESTS_CA_BUNDLE``): caminho do PEM da CA
+      corporativa (ex.: Cisco Secure Access). **Caminho SEGURO/recomendado** — a verificação
+      CONTINUA ligada e passa a confiar nessa CA **junto** com as CAs públicas (certifi), então
+      tráfego interceptado e não-interceptado verificam normalmente.
+    - ``LUOS_TLS_INSECURE=1``: desliga a verificação TLS. **INSEGURO** — escape de emergência
+      só para desbloquear numa máquina sob inspeção corporativa; prefira o CA bundle.
 
-    Sem env → ``{}`` (verificação padrão via certifi). Mantém os timeouts do SDK ao usar o
-    cliente httpx só para ajustar ``verify``.
+    Sem env → ``{}`` (verificação padrão via certifi).
     """
-    insecure = os.getenv("LUOS_TLS_INSECURE")
+    if os.getenv("LUOS_TLS_INSECURE"):
+        import httpx  # dependência do anthropic; só produção
+
+        return {"http_client": httpx.Client(verify=False)}
+
     ca = (
         os.getenv("LUOS_CA_BUNDLE")
         or os.getenv("SSL_CERT_FILE")
         or os.getenv("REQUESTS_CA_BUNDLE")
     )
-    if not insecure and not ca:
+    if not ca:
         return {}
-    import httpx  # dependência do anthropic; só produção
 
-    return {"http_client": httpx.Client(verify=False if insecure else ca)}
+    import ssl
+
+    import httpx
+
+    # Contexto = CAs públicas (certifi) + CA corporativa → confia nas duas, verificação ligada.
+    try:
+        import certifi
+
+        ctx = ssl.create_default_context(cafile=certifi.where())
+    except Exception:  # noqa: BLE001 — sem certifi, usa o store do sistema
+        ctx = ssl.create_default_context()
+    ctx.load_verify_locations(cafile=ca)
+    return {"http_client": httpx.Client(verify=ctx)}
 
 
 def get_extrator_luos() -> Optional[ExtratorLUOS]:
