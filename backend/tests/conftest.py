@@ -191,6 +191,14 @@ def _limpa_store():
     STORE.clear()
 
 
+@pytest.fixture(autouse=True)
+def _vegetacao_auto_off(monkeypatch):
+    # Em produção o modo automático (ESA WorldCover via HTTP) é o padrão. Nos testes ele
+    # fica DESLIGADO (sem rede/rasterio no sandbox), preservando o caminho "sem fonte →
+    # degrada honesto". Testes que exercem o modo auto religam via monkeypatch.
+    monkeypatch.setenv("VEGETACAO_WORLDCOVER_AUTO", "0")
+
+
 class StubFonteVegetacao:
     """Fonte de vegetação de TESTE — devolve uma CoberturaVerde fixa, sem raster/rede."""
 

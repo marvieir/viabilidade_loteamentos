@@ -16,19 +16,25 @@ services:
       MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
       # Liga a aquisição ambiental real (Fase 2.1 — SIGMINE/ANA/ICMBio/ANEEL).
       AMBIENTAL_FONTE_REAL: "1"
-      # Fase 2.2 — área verde (ESA WorldCover, sem login). Recorte gerado por
-      # scripts/baixar_worldcover.py e montado no volume abaixo. Comente esta linha e o
-      # volume se ainda não tiver o arquivo (a vegetação degrada honesta, sem descontar).
-      VEGETACAO_RASTER_PATH: "/data/verde.tif"
+      # Fase 2.2 — área verde (ESA WorldCover 10m, sem login). PADRÃO = modo AUTOMÁTICO:
+      # a API lê o COG público por HTTP e escolhe o tile pela posição da gleba, então
+      # funciona para QUALQUER KMZ sem recorte manual. Requer egress ao bucket público
+      # (esa-worldcover.s3.eu-central-1.amazonaws.com). Sem egress, desligue com
+      # VEGETACAO_WORLDCOVER_AUTO: "0" e aponte um recorte local em VEGETACAO_RASTER_PATH
+      # (gere com scripts/baixar_worldcover.py e descomente o volume verde.tif abaixo).
+      VEGETACAO_WORLDCOVER_AUTO: "1"
+      # VEGETACAO_RASTER_PATH: "/data/verde.tif"   # offline/override (recorte por gleba)
       # Fase 1.8 — onde os perfis municipais CONFIRMADOS da LUOS persistem (volume abaixo).
       PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
     volumes:
       # Monta a malha gerada no host (python -m scripts.baixar_malha_ibge) no container.
       # O arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
       - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
-      # Fase 2.2 — raster de vegetação (recorte WorldCover). O arquivo PRECISA existir
-      # antes do `up` (gere com scripts/baixar_worldcover.py), senão o bind cria dir vazio.
-      - ./backend/app/perfis/verde.tif:/data/verde.tif:ro
+      # Fase 2.2 — recorte LOCAL de vegetação (só no modo offline/override). No modo
+      # automático (padrão) este volume NÃO é usado; descomente apenas se você gerar um
+      # verde.tif (scripts/baixar_worldcover.py) e setar VEGETACAO_RASTER_PATH acima — o
+      # arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
+      # - ./backend/app/perfis/verde.tif:/data/verde.tif:ro
       # Fase 1.8 — perfis confirmados da LUOS (dado do operador). Bind no host → sobrevivem
       # a rebuilds e ficam inspecionáveis em backend/app/perfis/municipais/.
       - ./backend/app/perfis/municipais:/data/perfis-municipais

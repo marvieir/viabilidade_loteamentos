@@ -107,13 +107,90 @@ def analisar_vegetacao(
     )
 
 
-class FonteVegetacaoRaster:
-    """Produção: lê um raster de uso/cobertura e devolve a cobertura verde da gleba.
+def _extrair_cobertura(
+    fontes: list[str],
+    gleba: BaseGeometry,
+    classes: set[int],
+    fonte_nome: str,
+) -> CoberturaVerde:
+    """Lê uma ou mais fontes raster (arquivo local OU ``/vsicurl/`` COG remoto) e devolve a
+    cobertura verde da gleba (união, WGS84). ``rasterio.mask`` recorta pela gleba; as classes
+    de vegetação viram polígono via ``rasterio.features.shapes``. Import de rasterio é tardio
+    (só produção; testes usam stub). Degrada honesto se TODA fonte falhar — nunca derruba.
+    """
+    from datetime import date
 
-    Fonte PADRÃO = ESA WorldCover (pública, 10 m, SEM login); funciona com qualquer raster
-    de classes (MapBiomas etc.) passando ``classes``. ``rasterio.mask`` recorta pela gleba;
-    as classes de vegetação viram polígono via ``rasterio.features.shapes``. Import de
-    rasterio é tardio (só produção; testes usam stub). Degrada honesto se o raster falhar.
+    try:
+        import numpy as np
+        import rasterio
+        from rasterio.features import shapes as rio_shapes
+        from rasterio.mask import mask as rio_mask
+        from rasterio.warp import transform_geom
+        from shapely.geometry import shape
+        from shapely.ops import transform as shp_transform
+        from shapely.ops import unary_union
+    except Exception as exc:  # noqa: BLE001 — sem rasterio → degrada
+        return CoberturaVerde(
+            avisos=[f"Cobertura vegetal indisponível — {type(exc).__name__}: {exc}"[:200]]
+        )
+
+    polys_wgs = []
+    erros: list[str] = []
+    for fonte in fontes:
+        try:
+            with rasterio.open(fonte) as src:
+                geom_raster = transform_geom("EPSG:4326", src.crs, mapping(gleba))
+                recorte, transf = rio_mask(src, [geom_raster], crop=True, filled=True)
+                mask_verde = np.isin(recorte[0], list(classes))
+                to_wgs = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True).transform
+                for g, _ in rio_shapes(
+                    mask_verde.astype("uint8"), mask=mask_verde, transform=transf
+                ):
+                    polys_wgs.append(shp_transform(to_wgs, shape(g)))
+        except Exception as exc:  # noqa: BLE001 — tile pode não cobrir/existir; tenta o próximo
+            erros.append(f"{type(exc).__name__}: {exc}")
+            continue
+
+    if polys_wgs:
+        return CoberturaVerde(
+            geometria=unary_union(polys_wgs),
+            fonte=fonte_nome,
+            data_referencia=date.today().isoformat(),
+            classes=[str(c) for c in sorted(classes)],
+        )
+
+    # Sem polígono de verde. Se TODAS as fontes falharam é erro real (não "gleba sem mata").
+    if erros and len(erros) == len(fontes):
+        bruto = erros[0]
+        if "do not overlap" in bruto:
+            aviso = (
+                "Cobertura vegetal indisponível — o recorte de vegetação não cobre esta "
+                "gleba (foi gerado para outra área). Use o modo automático (WorldCover por "
+                "HTTP, sem recorte) ou gere o recorte deste KMZ."
+            )
+        elif any(k in bruto for k in ("curl", "HTTP", "Connection", "timed out", "403", "404")):
+            aviso = (
+                "Cobertura vegetal indisponível — não foi possível ler o ESA WorldCover por "
+                "HTTP (egress bloqueado?). Libere o acesso ao bucket público ou aponte um "
+                "recorte local em VEGETACAO_RASTER_PATH."
+            )
+        else:
+            aviso = f"Cobertura vegetal indisponível — {bruto}"
+        return CoberturaVerde(avisos=[aviso[:200]])
+
+    # Fonte(s) lida(s) com sucesso, mas sem classe verde na gleba — degrada honesto.
+    return CoberturaVerde(
+        fonte=fonte_nome,
+        data_referencia=date.today().isoformat(),
+        avisos=["Nenhuma cobertura vegetal detectada na gleba (raster)."],
+    )
+
+
+class FonteVegetacaoRaster:
+    """Lê um recorte raster LOCAL (arquivo) e devolve a cobertura verde da gleba.
+
+    Modo offline / override: útil quando o egress para o COG público está bloqueado. O
+    recorte é gerado por ``scripts/baixar_worldcover.py`` para uma gleba específica.
     """
 
     def __init__(
@@ -127,54 +204,70 @@ class FonteVegetacaoRaster:
         self.fonte = fonte or os.getenv("VEGETACAO_FONTE_NOME") or "ESA WorldCover 10m (2021)"
 
     def cobertura_verde(self, gleba: BaseGeometry) -> CoberturaVerde:
-        from datetime import date
+        return _extrair_cobertura([self.caminho], gleba, self.classes, self.fonte)
 
-        try:
-            import numpy as np
-            import rasterio
-            from rasterio.features import shapes as rio_shapes
-            from rasterio.mask import mask as rio_mask
-            from rasterio.warp import transform_geom
-            from shapely.geometry import shape
-            from shapely.ops import transform as shp_transform
-            from shapely.ops import unary_union
 
-            with rasterio.open(self.caminho) as src:
-                geom_raster = transform_geom("EPSG:4326", src.crs, mapping(gleba))
-                recorte, transf = rio_mask(src, [geom_raster], crop=True, filled=True)
-                mask_verde = np.isin(recorte[0], list(self.classes))
-                polys = [
-                    shape(g)
-                    for g, _ in rio_shapes(
-                        mask_verde.astype("uint8"), mask=mask_verde, transform=transf
-                    )
-                ]
-                if not polys:
-                    return CoberturaVerde(
-                        fonte=self.fonte,
-                        data_referencia=date.today().isoformat(),
-                        avisos=["Nenhuma cobertura vegetal detectada na gleba (raster)."],
-                    )
-                to_wgs = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True).transform
-                return CoberturaVerde(
-                    geometria=shp_transform(to_wgs, unary_union(polys)),
-                    fonte=self.fonte,
-                    data_referencia=date.today().isoformat(),
-                    classes=[str(c) for c in sorted(self.classes)],
-                )
-        except Exception as exc:  # noqa: BLE001 — degradar, não derrubar
-            # Causa típica em produção: o recorte `verde.tif` foi gerado para OUTRA gleba,
-            # então não cobre a atual (rasterio: "Input shapes do not overlap raster").
-            # Traduz para uma instrução acionável em vez de vazar o erro cru.
-            if "do not overlap" in str(exc):
-                aviso = (
-                    "Cobertura vegetal indisponível — o recorte de vegetação não cobre "
-                    "esta gleba (foi gerado para outra área). Gere o recorte deste KMZ "
-                    "(scripts/baixar_worldcover.py) e reinicie a API."
-                )
-            else:
-                aviso = f"Cobertura vegetal indisponível — {type(exc).__name__}: {exc}"
-            return CoberturaVerde(avisos=[aviso[:200]])
+# COG público do ESA WorldCover (AWS Open Data, anônimo, SEM login).
+WORLDCOVER_COG_URL = (
+    "https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/"
+    "ESA_WorldCover_10m_2021_v200_{tile}_Map.tif"
+)
+
+
+def _tile_worldcover(lon: float, lat: float) -> str:
+    """Tile de 3°×3° pelo canto inferior-esquerdo (ex.: gleba em SP → 'S24W048')."""
+    import math
+
+    lat3 = math.floor(lat / 3) * 3
+    lon3 = math.floor(lon / 3) * 3
+    ns = f"{'N' if lat3 >= 0 else 'S'}{abs(lat3):02d}"
+    ew = f"{'E' if lon3 >= 0 else 'W'}{abs(lon3):03d}"
+    return ns + ew
+
+
+def _tiles_da_gleba(bounds: tuple[float, float, float, float]) -> list[str]:
+    """Tiles WorldCover distintos que cobrem o bbox da gleba (cantos + centróide). Quase
+    sempre 1; >1 só quando a gleba cruza uma linha do grid de 3° (raro)."""
+    minx, miny, maxx, maxy = bounds
+    cantos = [
+        (minx, miny), (maxx, miny), (minx, maxy), (maxx, maxy),
+        ((minx + maxx) / 2, (miny + maxy) / 2),
+    ]
+    tiles: list[str] = []
+    for lon, lat in cantos:
+        t = _tile_worldcover(lon, lat)
+        if t not in tiles:
+            tiles.append(t)
+    return tiles
+
+
+def _gdal_anon_http_env() -> None:
+    """Liga acesso anônimo e leitura por janela (range requests) ao COG público."""
+    os.environ.setdefault("AWS_NO_SIGN_REQUEST", "YES")
+    os.environ.setdefault("GDAL_HTTP_MULTIRANGE", "YES")
+    os.environ.setdefault("GDAL_DISABLE_READDIR_ON_OPEN", "EMPTY_DIR")
+    os.environ.setdefault("CPL_VSIL_CURL_ALLOWED_EXTENSIONS", ".tif")
+
+
+class FonteVegetacaoWorldCoverAuto:
+    """Lê o ESA WorldCover DIRETO do COG público por HTTP, escolhendo o tile pela posição
+    da gleba. Funciona para QUALQUER KMZ **sem recorte manual** — rasterio/GDAL lê só a
+    janela da gleba (range requests). Único requisito: egress ao bucket público no deploy.
+    """
+
+    def __init__(self, classes: Optional[set[int]] = None, fonte: Optional[str] = None):
+        self.classes = classes or _classes_env() or CLASSES_VERDE_PADRAO
+        self.fonte = (
+            fonte or os.getenv("VEGETACAO_FONTE_NOME") or "ESA WorldCover 10m (2021, COG)"
+        )
+
+    def cobertura_verde(self, gleba: BaseGeometry) -> CoberturaVerde:
+        _gdal_anon_http_env()
+        fontes = [
+            f"/vsicurl/{WORLDCOVER_COG_URL.format(tile=t)}"
+            for t in _tiles_da_gleba(gleba.bounds)
+        ]
+        return _extrair_cobertura(fontes, gleba, self.classes, self.fonte)
 
 
 def _classes_env() -> Optional[set[int]]:
@@ -186,12 +279,17 @@ def _classes_env() -> Optional[set[int]]:
 
 
 def get_fonte_vegetacao() -> Optional[FonteVegetacao]:
-    """Liga a fonte real se um raster estiver apontado por env (arquivo local OU /vsicurl/).
+    """Escolhe a fonte de vegetação (degrada honesto se nenhuma servir):
 
-    ``VEGETACAO_RASTER_PATH`` (preferido) ou ``MAPBIOMAS_RASTER_PATH`` (compat). Sem env →
-    None (degrada honesto: não desconta). O padrão recomendado é ESA WorldCover (sem login).
+    1. ``VEGETACAO_RASTER_PATH`` / ``MAPBIOMAS_RASTER_PATH`` → recorte LOCAL (offline/override).
+    2. senão, modo AUTOMÁTICO (WorldCover via COG/HTTP) — funciona para qualquer KMZ sem
+       recorte manual; desligável com ``VEGETACAO_WORLDCOVER_AUTO=0`` (ex.: egress fechado).
+    3. senão → ``None`` (não desconta, não inventa).
     """
     caminho = os.getenv("VEGETACAO_RASTER_PATH") or os.getenv("MAPBIOMAS_RASTER_PATH")
     if caminho:
         return FonteVegetacaoRaster(caminho)
+    auto = os.getenv("VEGETACAO_WORLDCOVER_AUTO", "1").strip().lower()
+    if auto not in ("0", "false", "no", "off"):
+        return FonteVegetacaoWorldCoverAuto()
     return None

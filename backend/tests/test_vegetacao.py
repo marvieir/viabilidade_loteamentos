@@ -158,3 +158,46 @@ def test_cenario_otimista_null_sem_camadas(client, fonte_vegetacao):
     aid = _criar_analise(client)
     out = client.post(f"/api/analises/{aid}/aproveitamento", json=_BODY_URBANO).json()
     assert out["cenario_otimista"] is None  # severidade indisponível sem ambiental
+
+
+# ---- Modo automático WorldCover (escolha do tile pela posição da gleba) ----
+# Pura aritmética de grid (3°×3°), roda sem rasterio. Garante que QUALQUER KMZ acha o
+# COG público certo sem recorte manual.
+from app.core.vegetacao import (  # noqa: E402
+    FonteVegetacaoWorldCoverAuto,
+    _tile_worldcover,
+    _tiles_da_gleba,
+    get_fonte_vegetacao,
+)
+
+
+def test_tile_worldcover_sao_roque():
+    # Gleba de São Roque/SP (≈ -47,0 / -23,5) cai no tile S24W048.
+    assert _tile_worldcover(-47.0, -23.5) == "S24W048"
+
+
+def test_tile_worldcover_hemisferios():
+    assert _tile_worldcover(2.0, 48.0) == "N48E000"  # Paris
+    assert _tile_worldcover(-0.1, -0.1) == "S03W003"  # logo abaixo/oeste do (0,0)
+
+
+def test_tiles_da_gleba_uma_so_quando_pequena():
+    gleba = Polygon(
+        [(-47.14, -23.53), (-47.12, -23.53), (-47.12, -23.52), (-47.14, -23.52)]
+    )
+    assert _tiles_da_gleba(gleba.bounds) == ["S24W048"]
+
+
+def test_get_fonte_auto_por_padrao(monkeypatch):
+    # Sem recorte local apontado, o padrão é o modo automático (qualquer KMZ, sem recorte).
+    monkeypatch.delenv("VEGETACAO_RASTER_PATH", raising=False)
+    monkeypatch.delenv("MAPBIOMAS_RASTER_PATH", raising=False)
+    monkeypatch.delenv("VEGETACAO_WORLDCOVER_AUTO", raising=False)
+    assert isinstance(get_fonte_vegetacao(), FonteVegetacaoWorldCoverAuto)
+
+
+def test_get_fonte_auto_desligavel(monkeypatch):
+    monkeypatch.delenv("VEGETACAO_RASTER_PATH", raising=False)
+    monkeypatch.delenv("MAPBIOMAS_RASTER_PATH", raising=False)
+    monkeypatch.setenv("VEGETACAO_WORLDCOVER_AUTO", "0")
+    assert get_fonte_vegetacao() is None
