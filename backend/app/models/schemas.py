@@ -229,6 +229,35 @@ class SeveridadeVerdeOut(BaseModel):
     ressalva: str
 
 
+# ----- Fase 2.5 — Declividade via DEM (faixas + flag legal ≥30%) -----
+class FaixaDeclividadeOut(BaseModel):
+    classe: Literal["suave", "media", "alta"]
+    limite: str  # ex.: "≤8%", "8–20%", ">20%"
+    area_m2: float
+    pct: float  # fração da área medida dentro da gleba
+
+
+class FlagVedacaoOut(BaseModel):
+    """Área com declividade ≥30% = vedação de parcelamento (Lei 6.766/79). null se área=0."""
+
+    limite_pct: float
+    area_m2: float
+    pct_da_gleba: float
+    geojson: dict = {}  # overlay vermelho + entra na união do aproveitável
+    base_legal: str
+    ressalva: str
+
+
+class DeclividadeOut(BaseModel):
+    consultada: bool
+    fonte: Optional[str] = None
+    declividade_media_pct: Optional[float] = None
+    faixas: list[FaixaDeclividadeOut] = []
+    flag_vedacao: Optional[FlagVedacaoOut] = None  # null se área ≥30% = 0
+    proveniencia: Optional[str] = None
+    avisos: list[str] = []
+
+
 # ----- Fase 1.8 — Perfil municipal (extração assistida da LUOS) -----
 # A IA fica na BORDA (lê e PROPÕE com citação); nada entra no cálculo sem status=confirmado
 # e proveniência por artigo (ARCHITECTURE §2). Mesmas formas são persistidas e devolvidas.

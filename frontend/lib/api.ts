@@ -296,7 +296,8 @@ export type ChaveOverlay =
   | "linhas_transmissao"
   | "verde"
   | "verde_dura"
-  | "verde_verificar";
+  | "verde_verificar"
+  | "declividade_vedada";
 
 export interface Ambiental {
   alertas: AlertaAmbiental[];
@@ -350,6 +351,40 @@ export interface SeveridadeVerde {
 
 export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {
   const res = await fetch(`${API_BASE}/api/analises/${analiseId}/vegetacao`);
+  return jsonOrThrow(res);
+}
+
+// ----- Fase 2.5 — Declividade via DEM (faixas + flag legal ≥30%) -----
+export interface FaixaDeclividade {
+  classe: "suave" | "media" | "alta";
+  limite: string;
+  area_m2: number;
+  pct: number;
+}
+
+export interface FlagVedacao {
+  limite_pct: number;
+  area_m2: number;
+  pct_da_gleba: number;
+  geojson: GeoJSON.Geometry | Record<string, never>;
+  base_legal: string;
+  ressalva: string;
+}
+
+export interface Declividade {
+  consultada: boolean;
+  fonte: string | null;
+  declividade_media_pct: number | null;
+  faixas: FaixaDeclividade[];
+  flag_vedacao: FlagVedacao | null;
+  proveniencia: string | null;
+  avisos: string[];
+}
+
+export async function buscarDeclividade(
+  analiseId: string
+): Promise<Declividade> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/declividade`);
   return jsonOrThrow(res);
 }
 

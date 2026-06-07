@@ -8,6 +8,7 @@ import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
 import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
+import { CardDeclividade } from "@/components/cards/CardDeclividade";
 import {
   Card,
   CardContent,
@@ -37,6 +38,9 @@ export default function Home() {
   const [overlaysVerde, setOverlaysVerde] = useState<
     Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
   >({});
+  const [overlaysDecliv, setOverlaysDecliv] = useState<
+    Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
+  >({});
   // Perfil municipal (LUOS, Fase 1.8): confirmado → alimenta o cenário diretriz.
   const [perfil, setPerfil] = useState<PerfilMunicipal | null>(null);
 
@@ -44,12 +48,14 @@ export default function Home() {
   const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {
     ...overlaysAmb,
     ...overlaysVerde,
+    ...overlaysDecliv,
   };
 
   function onAnalise(a: Analise | null) {
     setAnalise(a);
     setOverlaysAmb({}); // nova gleba → limpa overlays do mapa
     setOverlaysVerde({});
+    setOverlaysDecliv({});
     setPerfil(null); // nova gleba → o card da LUOS recarrega pelo município
   }
 
@@ -150,6 +156,11 @@ export default function Home() {
           <CardVegetacao
             analiseId={analise.analise_id}
             onOverlaysVerde={setOverlaysVerde}
+          />
+
+          <CardDeclividade
+            analiseId={analise.analise_id}
+            onOverlaysDecliv={setOverlaysDecliv}
           />
         </>
       )}

@@ -35,6 +35,8 @@ from app.core.jurisdicao import (
     resolver_jurisdicao,
 )
 from app.core.camadas import FonteCamadas, get_fonte_camadas
+from app.core import declividade as declividade_motor
+from app.core.declividade import FonteDEM, get_fonte_dem
 from app.core.lista_municipios import FonteLista, get_fonte_lista
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
@@ -51,8 +53,9 @@ _RESSALVA_OTIMISTA = (
 _CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")
 
 
-def _coletar_geoms(registro, fonte_veg, fonte_camadas):
-    """Busca, uma vez, a geometria do verde (WGS84) e as camadas ambientais (dict WGS84)."""
+def _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem=None):
+    """Busca, uma vez, a geometria do verde (WGS84), as camadas ambientais (dict WGS84) e a
+    mancha de declividade vedada (≥30%, WGS84, Fase 2.5). Cada um degrada honesto se ausente."""
     gleba = registro["poly"]
     verde_geom = fonte_veg.cobertura_verde(gleba).geometria if fonte_veg is not None else None
     overlays: dict = {}
@@ -60,11 +63,18 @@ def _coletar_geoms(registro, fonte_veg, fonte_camadas):
         camadas = fonte_camadas.coletar(gleba.bounds, registro["jurisdicao"].uf)
         raw = ambiental_motor.analisar(gleba, camadas).geojson_overlays
         overlays = {k: shape(v) for k, v in raw.items() if v}
-    return verde_geom, overlays
+    decliv_geom = None
+    if fonte_dem is not None:
+        dem = fonte_dem.amostrar(gleba)
+        res = declividade_motor.analisar_declividade(gleba, dem)
+        if res.geojson_vedacao:
+            decliv_geom = shape(res.geojson_vedacao)
+    return verde_geom, overlays, decliv_geom
 
 
-def _consolidar_descontos(gleba, total, verde_geom, overlays):
-    """Une mata + faixas não-edificáveis dentro da gleba (sem dupla contagem).
+def _consolidar_descontos(gleba, total, verde_geom, overlays, decliv_geom=None):
+    """Une mata + faixas não-edificáveis + declividade ≥30% dentro da gleba (sem dupla
+    contagem).
 
     Devolve ``(DescontosOut | None, area_restritiva_m2)``. Degrada honesto: sem geometria
     ou sem restrição → ``(None, 0.0)`` (não desconta nada).
@@ -75,6 +85,8 @@ def _consolidar_descontos(gleba, total, verde_geom, overlays):
     for chave in _CHAVES_RESTRITIVAS:
         if overlays.get(chave) is not None:
             geoms[chave] = overlays[chave]
+    if decliv_geom is not None:
+        geoms["declividade_vedada"] = decliv_geom
 
     if not geoms:
         return None, 0.0
@@ -275,6 +287,7 @@ def calcular_aproveitamento(
     fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
+    fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -297,8 +310,12 @@ def calcular_aproveitamento(
     # Vias e doação NÃO entram (projeto urbanístico + diretriz municipal). Vale p/ os 2 regimes.
     gleba = registro["poly"]
     total = registro["area_m2"]
-    verde_geom, overlays = _coletar_geoms(registro, fonte_veg, fonte_camadas)
-    descontos, area_restritiva = _consolidar_descontos(gleba, total, verde_geom, overlays)
+    verde_geom, overlays, decliv_geom = _coletar_geoms(
+        registro, fonte_veg, fonte_camadas, fonte_dem
+    )
+    descontos, area_restritiva = _consolidar_descontos(
+        gleba, total, verde_geom, overlays, decliv_geom
+    )
     area_aproveitavel = max(round(total - area_restritiva, 2), 0.0)
     pct_total = round(area_aproveitavel / total, 4) if total else None
 

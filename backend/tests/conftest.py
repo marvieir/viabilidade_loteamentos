@@ -14,6 +14,7 @@ from app.core.jurisdicao import Municipio, get_fonte_malha
 from app.core.lista_municipios import FonteListaArquivo, get_fonte_lista
 from app.core.perfil_municipal import get_fonte_perfil
 from app.core.store import STORE
+from app.core.declividade import DEMRecorte, get_fonte_dem
 from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
 from app.main import app
 from app.models.schemas import PerfilMunicipal
@@ -197,6 +198,29 @@ def _vegetacao_auto_off(monkeypatch):
     # fica DESLIGADO (sem rede/rasterio no sandbox), preservando o caminho "sem fonte →
     # degrada honesto". Testes que exercem o modo auto religam via monkeypatch.
     monkeypatch.setenv("VEGETACAO_WORLDCOVER_AUTO", "0")
+    # Idem para o DEM da declividade (Copernicus via HTTP é o default em produção).
+    monkeypatch.setenv("DEM_FONTE", "none")
+
+
+class StubFonteDEM:
+    """Fonte de DEM de TESTE — devolve um DEMRecorte fixo (grid métrico), sem raster/rede."""
+
+    def __init__(self, recorte: DEMRecorte):
+        self._recorte = recorte
+
+    def amostrar(self, gleba):  # assinatura de FonteDEM
+        return self._recorte
+
+
+@pytest.fixture
+def fonte_dem():
+    """Injeta uma fonte de DEM-stub. Uso: ``fonte_dem(DEMRecorte(...))``."""
+
+    def _set(recorte: DEMRecorte):
+        app.dependency_overrides[get_fonte_dem] = lambda: StubFonteDEM(recorte)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_dem, None)
 
 
 class StubFonteVegetacao:

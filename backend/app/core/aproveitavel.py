@@ -24,6 +24,7 @@ ROTULOS = {
     "app_massa_dagua": "APP de massa d'água",
     "faixa_nao_edificavel": "faixa não-edificável",
     "linhas_transmissao": "servidão de linha de transmissão",
+    "declividade_vedada": "Declividade ≥30% (Lei 6.766)",
 }
 
 

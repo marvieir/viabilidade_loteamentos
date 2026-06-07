@@ -27,6 +27,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   verde: "#65a30d", // cobertura vegetal (Fase 2.2) — empurrado pelo card Área verde
   verde_dura: "#dc2626", // verde em APP/UC = restrição dura (Fase 2.3)
   verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
+  declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5) — empurrado pelo card
 };
 
 const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -39,6 +40,7 @@ const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   verde: "Cobertura vegetal",
   verde_dura: "Verde em APP/UC (restrição dura)",
   verde_verificar: "Verde a verificar (fora de APP/UC)",
+  declividade_vedada: "Declividade ≥30% (vedada, Lei 6.766)",
 };
 
 const m2 = (v: number) =>

@@ -24,6 +24,12 @@ services:
       # (gere com scripts/baixar_worldcover.py e descomente o volume verde.tif abaixo).
       VEGETACAO_WORLDCOVER_AUTO: "1"
       # VEGETACAO_RASTER_PATH: "/data/verde.tif"   # offline/override (recorte por gleba)
+      # Fase 2.5 — declividade via DEM (Copernicus GLO-30 Public, SEM chave). PADRÃO = COG
+      # público por HTTP, tile escolhido pela posição da gleba — qualquer KMZ, sem recorte.
+      # Requer egress a copernicus-dem-30m.s3.eu-central-1.amazonaws.com. Desligue com
+      # DEM_FONTE: "none"; fallback offline com DEM_RASTER_PATH; OpenTopography (opcional)
+      # com DEM_FONTE: "opentopography" + OPENTOPOGRAPHY_API_KEY.
+      DEM_FONTE: "copernicus_auto"
       # Fase 1.8 — onde os perfis municipais CONFIRMADOS da LUOS persistem (volume abaixo).
       PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
     volumes:
