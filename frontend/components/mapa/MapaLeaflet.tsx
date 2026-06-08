@@ -7,7 +7,7 @@ import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import type { GeoJsonObject } from "geojson";
 import L from "leaflet";
 import type { ChaveOverlay } from "@/lib/api";
-import { CORES_OVERLAY } from "@/components/cards/CardAmbiental";
+import { CORES_OVERLAY } from "@/components/mapa/overlays";
 
 // O front apenas RENDERIZA o GeoJSON que veio do backend. Nenhuma geo-matemática
 // aqui — fitBounds é só enquadramento de tela, não cálculo de viabilidade.

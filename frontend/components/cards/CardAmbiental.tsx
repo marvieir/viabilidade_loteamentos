@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -16,60 +16,25 @@ import {
   type ChaveOverlay,
 } from "@/lib/api";
 
-// Cores das camadas no mapa (também usadas na legenda do card).
-export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
-  app: "#3b82f6",
-  faixa_nao_edificavel: "#06b6d4",
-  app_massa_dagua: "#0ea5e9",
-  uc: "#16a34a",
-  mineracao: "#d97706",
-  linhas_transmissao: "#a855f7",
-  verde: "#65a30d", // cobertura vegetal (Fase 2.2) — empurrado pelo card Área verde
-  verde_dura: "#dc2626", // verde em APP/UC = restrição dura (Fase 2.3)
-  verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
-  declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5) — empurrado pelo card
-};
-
-const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
-  app: "APP (hidrografia)",
-  faixa_nao_edificavel: "Faixa não-edificável (15 m)",
-  app_massa_dagua: "APP de massa d'água (lago/represa)",
-  uc: "Unidade de conservação",
-  mineracao: "Mineração (ANM)",
-  linhas_transmissao: "Faixa de servidão (LT/ANEEL)",
-  verde: "Cobertura vegetal",
-  verde_dura: "Verde em APP/UC (restrição dura)",
-  verde_verificar: "Verde a verificar (fora de APP/UC)",
-  declividade_vedada: "Declividade ≥30% (vedada, Lei 6.766)",
-};
-
 const m2 = (v: number) =>
   v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " m²";
 
 export function CardAmbiental({
   analiseId,
   onOverlays,
+  onData,
+  sinal,
 }: {
   analiseId: string;
   onOverlays?: (
     overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
   ) => void;
+  onData?: (d: Ambiental) => void;
+  sinal?: number; // "Analisar tudo": dispara a análise quando muda
 }) {
   const [data, setData] = useState<Ambiental | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
-  const [visiveis, setVisiveis] = useState<Set<ChaveOverlay>>(new Set());
-
-  function aplicarVisiveis(
-    overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>,
-    sel: Set<ChaveOverlay>
-  ) {
-    const filtrado: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {};
-    (Object.keys(overlays) as ChaveOverlay[]).forEach((k) => {
-      if (sel.has(k)) filtrado[k] = overlays[k];
-    });
-    onOverlays?.(filtrado);
-  }
 
   async function analisar() {
     setCarregando(true);
@@ -77,11 +42,9 @@ export function CardAmbiental({
     try {
       const r = await buscarAmbiental(analiseId);
       setData(r);
-      const todas = new Set(
-        Object.keys(r.geojson_overlays) as ChaveOverlay[]
-      );
-      setVisiveis(todas);
-      aplicarVisiveis(r.geojson_overlays, todas);
+      onData?.(r);
+      // Empurra todos os overlays; a visibilidade é controlada no painel do mapa-herói.
+      onOverlays?.(r.geojson_overlays);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");
     } finally {
@@ -89,17 +52,10 @@ export function CardAmbiental({
     }
   }
 
-  function toggle(k: ChaveOverlay) {
-    if (!data) return;
-    const sel = new Set(visiveis);
-    sel.has(k) ? sel.delete(k) : sel.add(k);
-    setVisiveis(sel);
-    aplicarVisiveis(data.geojson_overlays, sel);
-  }
-
-  const chavesOverlay = data
-    ? (Object.keys(data.geojson_overlays) as ChaveOverlay[])
-    : [];
+  useEffect(() => {
+    if (sinal) analisar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinal]);
 
   return (
     <Card>
@@ -122,25 +78,6 @@ export function CardAmbiental({
 
         {data && (
           <>
-            {chavesOverlay.length > 0 && (
-              <div className="flex flex-wrap gap-3 text-xs">
-                {chavesOverlay.map((k) => (
-                  <label key={k} className="flex items-center gap-1.5 text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={visiveis.has(k)}
-                      onChange={() => toggle(k)}
-                    />
-                    <span
-                      className="inline-block h-3 w-3 rounded-sm"
-                      style={{ backgroundColor: CORES_OVERLAY[k] }}
-                    />
-                    {ROTULO_OVERLAY[k]}
-                  </label>
-                ))}
-              </div>
-            )}
-
             {data.sem_alertas ? (
               <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
                 Nenhuma sobreposição ambiental encontrada nas camadas consultadas.

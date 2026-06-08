@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -59,9 +59,13 @@ function loteMinLegalDaZona(
 export function CardAproveitamento({
   analiseId,
   perfil,
+  onData,
+  sinal,
 }: {
   analiseId: string;
   perfil?: PerfilMunicipal | null;
+  onData?: (d: Aproveitamento) => void;
+  sinal?: number;
 }) {
   const [regime, setRegime] = useState<Regime>("URBANO");
   const [modalidade, setModalidade] =
@@ -101,12 +105,18 @@ export function CardAproveitamento({
           ? await calcularRural(analiseId, fmp)
           : await calcularUrbano(analiseId, loteMin, modalidade, zona || null);
       setRes(r);
+      onData?.(r);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao calcular.");
     } finally {
       setCarregando(false);
     }
   }
+
+  useEffect(() => {
+    if (sinal) calcular();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinal]);
 
   const d = res?.descontos ?? null;
 

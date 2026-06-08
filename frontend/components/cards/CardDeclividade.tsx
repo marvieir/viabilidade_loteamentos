@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -33,9 +33,13 @@ const ROTULO_FAIXA: Record<string, string> = {
 export function CardDeclividade({
   analiseId,
   onOverlaysDecliv,
+  onData,
+  sinal,
 }: {
   analiseId: string;
   onOverlaysDecliv?: (o: OverlaysDecliv) => void;
+  onData?: (d: Declividade) => void;
+  sinal?: number;
 }) {
   const [data, setData] = useState<Declividade | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -47,6 +51,7 @@ export function CardDeclividade({
     try {
       const r = await buscarDeclividade(analiseId);
       setData(r);
+      onData?.(r);
       // Empurra a mancha vedada (≥30%) pro mapa. Só renderiza — geometria veio do backend.
       const ov: OverlaysDecliv = {};
       if (r.flag_vedacao && ehGeom(r.flag_vedacao.geojson))
@@ -58,6 +63,11 @@ export function CardDeclividade({
       setCarregando(false);
     }
   }
+
+  useEffect(() => {
+    if (sinal) analisar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinal]);
 
   return (
     <Card>

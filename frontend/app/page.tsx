@@ -1,178 +1,219 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import { UploadKmz } from "@/components/UploadKmz";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
+import { TopBar } from "@/components/shell/TopBar";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { SECOES, type Secao } from "@/components/shell/secoes";
+import { KpiRow } from "@/components/dashboard/KpiRow";
+import { MapHero } from "@/components/dashboard/MapHero";
+import { VisaoGeral } from "@/components/dashboard/VisaoGeral";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
 import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
 import { CardDeclividade } from "@/components/cards/CardDeclividade";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import type { Analise, ChaveOverlay, PerfilMunicipal } from "@/lib/api";
+import { IconMap } from "@/components/Icons";
+import type {
+  Ambiental,
+  Analise,
+  Aproveitamento,
+  ChaveOverlay,
+  Declividade,
+  PerfilMunicipal,
+  Vegetacao,
+} from "@/lib/api";
 
-// Leaflet só roda no cliente.
-const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex h-full items-center justify-center text-sm text-slate-400">
-      Carregando mapa…
-    </div>
-  ),
-});
-
-const m2 = (v: number) =>
-  v.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " m²";
+type Overlays = Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
 
 export default function Home() {
   const [analise, setAnalise] = useState<Analise | null>(null);
-  const [overlaysAmb, setOverlaysAmb] = useState<
-    Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
-  >({});
-  const [overlaysVerde, setOverlaysVerde] = useState<
-    Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
-  >({});
-  const [overlaysDecliv, setOverlaysDecliv] = useState<
-    Partial<Record<ChaveOverlay, GeoJSON.Geometry>>
-  >({});
-  // Perfil municipal (LUOS, Fase 1.8): confirmado → alimenta o cenário diretriz.
-  const [perfil, setPerfil] = useState<PerfilMunicipal | null>(null);
+  const [secao, setSecao] = useState<Secao>("visao");
 
-  // O mapa recebe os overlays ambientais + os do verde (cada card alimenta o seu).
-  const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {
-    ...overlaysAmb,
-    ...overlaysVerde,
-    ...overlaysDecliv,
-  };
+  // Overlays por origem (cada card alimenta o seu); o mapa-herói mostra a união.
+  const [overlaysAmb, setOverlaysAmb] = useState<Overlays>({});
+  const [overlaysVerde, setOverlaysVerde] = useState<Overlays>({});
+  const [overlaysDecliv, setOverlaysDecliv] = useState<Overlays>({});
+  const [ocultos, setOcultos] = useState<Set<ChaveOverlay>>(new Set());
+
+  // Dados consolidados para KPIs / visão geral (cada card reporta via onData).
+  const [perfil, setPerfil] = useState<PerfilMunicipal | null>(null);
+  const [dadosAmb, setDadosAmb] = useState<Ambiental | null>(null);
+  const [dadosVerde, setDadosVerde] = useState<Vegetacao | null>(null);
+  const [dadosDecliv, setDadosDecliv] = useState<Declividade | null>(null);
+  const [dadosAprov, setDadosAprov] = useState<Aproveitamento | null>(null);
+
+  // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
+  const [sinal, setSinal] = useState(0);
+
+  const overlays: Overlays = { ...overlaysAmb, ...overlaysVerde, ...overlaysDecliv };
 
   function onAnalise(a: Analise | null) {
     setAnalise(a);
-    setOverlaysAmb({}); // nova gleba → limpa overlays do mapa
+    setSecao("visao");
+    setOverlaysAmb({});
     setOverlaysVerde({});
     setOverlaysDecliv({});
-    setPerfil(null); // nova gleba → o card da LUOS recarrega pelo município
+    setOcultos(new Set());
+    setPerfil(null);
+    setDadosAmb(null);
+    setDadosVerde(null);
+    setDadosDecliv(null);
+    setDadosAprov(null);
+    setSinal(0);
   }
 
+  function toggleOculto(k: ChaveOverlay) {
+    setOcultos((prev) => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  }
+
+  const nAlertas =
+    dadosAmb?.alertas.filter((a) => a.severidade === "ALERTA").length ?? 0;
+
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Pré-Viabilidade de Loteamento</h1>
-        <p className="text-sm text-slate-500">
-          Triagem determinística a partir do KMZ da gleba. Todo número vem do
-          backend, com proveniência. Não decide aprovação municipal.
-        </p>
-      </header>
+    <div className="min-h-screen">
+      <TopBar
+        analise={analise}
+        onNova={() => onAnalise(null)}
+        onAnalisarTudo={() => setSinal((s) => s + 1)}
+      />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>1 · KMZ da gleba</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <UploadKmz onAnalise={onAnalise} />
-        </CardContent>
-      </Card>
+      {!analise ? (
+        <UploadHero onAnalise={onAnalise} />
+      ) : (
+        <div className="flex">
+          <Sidebar
+            secao={secao}
+            onSecao={setSecao}
+            alertas={nAlertas}
+            perfilConfirmado={perfil?.status === "confirmado"}
+          />
 
-      {analise && (
-        <>
-          <Card>
-            <CardHeader>
-              <CardTitle>2 · Geometria e jurisdição</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="h-80 overflow-hidden rounded-lg border border-slate-200">
-                <MapaLeaflet
-                  geojson={analise.geometria.geojson}
-                  overlays={overlays}
+          <main className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-5">
+            <KpiRow
+              analise={analise}
+              aprov={dadosAprov}
+              amb={dadosAmb}
+              verde={dadosVerde}
+              decliv={dadosDecliv}
+            />
+
+            <MapHero
+              analise={analise}
+              overlays={overlays}
+              ocultos={ocultos}
+              onToggle={toggleOculto}
+              badge={
+                <BadgeCobertura
+                  jurisdicao={analise.jurisdicao}
+                  analiseId={analise.analise_id}
+                  onJurisdicao={(j) =>
+                    setAnalise((prev) => (prev ? { ...prev, jurisdicao: j } : prev))
+                  }
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Metrica titulo="Área" valor={m2(analise.geometria.area_m2)} />
-                <Metrica
-                  titulo="Área (ha)"
-                  valor={`${analise.geometria.area_ha.toLocaleString("pt-BR")} ha`}
-                />
-                <Metrica
-                  titulo="Perímetro"
-                  valor={`${analise.geometria.perimetro_m.toLocaleString("pt-BR")} m`}
-                />
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <span
-                  className={`rounded-full px-2 py-0.5 font-medium ${
-                    analise.origem_geometria.rota === "POLYGON_REPARADO"
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-emerald-100 text-emerald-800"
+              }
+            />
+
+            {/* Navegação por seção no mobile (a sidebar cobre o desktop) */}
+            <div className="-mx-4 flex gap-1 overflow-x-auto px-4 md:hidden">
+              {SECOES.map(({ id, rotulo }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setSecao(id)}
+                  className={`shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium ${
+                    secao === id
+                      ? "bg-slate-900 text-white"
+                      : "bg-white text-slate-600"
                   }`}
                 >
-                  {analise.origem_geometria.rota === "POLYGON_DIRETO"
-                    ? "polígono do arquivo"
-                    : analise.origem_geometria.rota === "POLYGON_REPARADO"
-                      ? "polígono corrigido (auto-interseção)"
-                      : "linha fechada automaticamente"}
-                </span>
-                <span className="text-slate-500">
-                  {analise.origem_geometria.descricao}
-                </span>
-              </div>
-              <BadgeCobertura
-                jurisdicao={analise.jurisdicao}
-                analiseId={analise.analise_id}
-                onJurisdicao={(j) =>
-                  setAnalise((prev) =>
-                    prev ? { ...prev, jurisdicao: j } : prev
-                  )
-                }
+                  {rotulo}
+                </button>
+              ))}
+            </div>
+
+            {/* Painéis: todos montados (estado preservado); só o ativo é exibido. */}
+            <div className={secao === "visao" ? "" : "hidden"}>
+              <VisaoGeral
+                analise={analise}
+                amb={dadosAmb}
+                verde={dadosVerde}
+                decliv={dadosDecliv}
+                aprov={dadosAprov}
+                onIr={setSecao}
               />
-              {analise.avisos.length > 0 && (
-                <div className="rounded-lg bg-sky-50 p-3 text-xs text-sky-900">
-                  {analise.avisos.map((a) => (
-                    <p key={a}>{a}</p>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <CardPerfilLuos
-            codIbge={analise.jurisdicao.cod_ibge}
-            municipio={analise.jurisdicao.municipio}
-            uf={analise.jurisdicao.uf}
-            onConfirmado={setPerfil}
-          />
-
-          <CardAproveitamento analiseId={analise.analise_id} perfil={perfil} />
-
-          <CardAmbiental
-            analiseId={analise.analise_id}
-            onOverlays={setOverlaysAmb}
-          />
-
-          <CardVegetacao
-            analiseId={analise.analise_id}
-            onOverlaysVerde={setOverlaysVerde}
-          />
-
-          <CardDeclividade
-            analiseId={analise.analise_id}
-            onOverlaysDecliv={setOverlaysDecliv}
-          />
-        </>
+            </div>
+            <div className={secao === "ambiental" ? "" : "hidden"}>
+              <CardAmbiental
+                analiseId={analise.analise_id}
+                onOverlays={setOverlaysAmb}
+                onData={setDadosAmb}
+                sinal={sinal}
+              />
+            </div>
+            <div className={secao === "verde" ? "" : "hidden"}>
+              <CardVegetacao
+                analiseId={analise.analise_id}
+                onOverlaysVerde={setOverlaysVerde}
+                onData={setDadosVerde}
+                sinal={sinal}
+              />
+            </div>
+            <div className={secao === "declividade" ? "" : "hidden"}>
+              <CardDeclividade
+                analiseId={analise.analise_id}
+                onOverlaysDecliv={setOverlaysDecliv}
+                onData={setDadosDecliv}
+                sinal={sinal}
+              />
+            </div>
+            <div className={secao === "aproveitamento" ? "" : "hidden"}>
+              <CardAproveitamento
+                analiseId={analise.analise_id}
+                perfil={perfil}
+                onData={setDadosAprov}
+                sinal={sinal}
+              />
+            </div>
+            <div className={secao === "luos" ? "" : "hidden"}>
+              <CardPerfilLuos
+                codIbge={analise.jurisdicao.cod_ibge}
+                municipio={analise.jurisdicao.municipio}
+                uf={analise.jurisdicao.uf}
+                onConfirmado={setPerfil}
+              />
+            </div>
+          </main>
+        </div>
       )}
-    </main>
+    </div>
   );
 }
 
-function Metrica({ titulo, valor }: { titulo: string; valor: string }) {
+function UploadHero({ onAnalise }: { onAnalise: (a: Analise) => void }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs text-slate-500">{titulo}</p>
-      <p className="text-base font-semibold text-slate-900">{valor}</p>
-    </div>
+    <main className="mx-auto grid max-w-3xl place-items-center px-4 py-16 sm:py-24">
+      <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+          <IconMap width={28} height={28} />
+        </div>
+        <h1 className="mt-5 text-2xl font-bold tracking-tight">
+          Pré-Viabilidade de Loteamento
+        </h1>
+        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
+          Envie o KMZ da gleba para uma triagem determinística: geometria, ambiental,
+          área verde, declividade e aproveitamento — cada número com proveniência. Não
+          decide aprovação municipal.
+        </p>
+        <div className="mt-6 flex justify-center">
+          <UploadKmz onAnalise={onAnalise} />
+        </div>
+      </div>
+    </main>
   );
 }

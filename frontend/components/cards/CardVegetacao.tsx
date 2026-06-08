@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -29,9 +29,13 @@ const ehGeom = (g: unknown): g is GeoJSON.Geometry =>
 export function CardVegetacao({
   analiseId,
   onOverlaysVerde,
+  onData,
+  sinal,
 }: {
   analiseId: string;
   onOverlaysVerde?: (o: OverlaysVerde) => void;
+  onData?: (d: Vegetacao) => void;
+  sinal?: number;
 }) {
   const [data, setData] = useState<Vegetacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -43,6 +47,7 @@ export function CardVegetacao({
     try {
       const r = await buscarVegetacao(analiseId);
       setData(r);
+      onData?.(r);
       // Empurra a(s) mancha(s) pro mapa. Com severidade: dois baldes (dura/a verificar);
       // sem severidade: o verde total. Só renderiza — a geometria veio do backend.
       const ov: OverlaysVerde = {};
@@ -61,6 +66,11 @@ export function CardVegetacao({
       setCarregando(false);
     }
   }
+
+  useEffect(() => {
+    if (sinal) analisar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinal]);
 
   return (
     <Card>
