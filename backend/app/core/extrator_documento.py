@@ -30,6 +30,7 @@ __all__ = [
     "ExtratorDocumento",
     "ExtratorDocumentoClaude",
     "ExtratorIndisponivel",
+    "MEDIA_SUPORTADAS",
     "PdfIlegivel",
     "get_extrator_documento",
 ]
@@ -37,14 +38,44 @@ __all__ = [
 
 @runtime_checkable
 class ExtratorDocumento(Protocol):
-    """Lê o PDF do documento e PROPÕE uma ``FichaJuridica`` (status='proposto', com citações)."""
+    """Lê o(s) arquivo(s) do documento e PROPÕE uma ``FichaJuridica`` (status='proposto').
+
+    ``arquivos`` é uma lista de ``(bytes, media_type)`` — um documento pode vir como 1 PDF ou
+    como N imagens (matrícula escaneada multipágina). media_type ∈ ``MEDIA_SUPORTADAS``.
+    """
 
     def extrair(
         self,
-        pdf_bytes: bytes,
+        arquivos: list[tuple[bytes, str]],
         tipo: str,
         nome_arquivo: Optional[str] = None,
     ) -> FichaJuridica: ...
+
+
+# Formatos aceitos: PDF nativo + imagens (matrícula/certidão digitalizada).
+MEDIA_SUPORTADAS = {
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif",
+}
+
+
+def _bloco_conteudo(data: bytes, media_type: str) -> dict:
+    """Bloco de conteúdo para a API: ``document`` para PDF, ``image`` para imagem."""
+    import base64
+
+    b64 = base64.standard_b64encode(data).decode("utf-8")
+    if media_type == "application/pdf":
+        return {
+            "type": "document",
+            "source": {"type": "base64", "media_type": "application/pdf", "data": b64},
+        }
+    return {
+        "type": "image",
+        "source": {"type": "base64", "media_type": media_type, "data": b64},
+    }
 
 
 # Regra anti-alucinação (mais rígida que a 1.8) — vai no system prompt da extração real.
@@ -173,17 +204,16 @@ class ExtratorDocumentoClaude:
 
     def extrair(
         self,
-        pdf_bytes: bytes,
+        arquivos: list[tuple[bytes, str]],
         tipo: str,
         nome_arquivo: Optional[str] = None,
     ) -> FichaJuridica:
-        if not pdf_bytes:
-            raise PdfIlegivel("PDF vazio — nada para extrair.")
+        arquivos = [(d, m) for d, m in (arquivos or []) if d]
+        if not arquivos:
+            raise PdfIlegivel("Documento vazio — nada para extrair.")
         if tipo not in _PROMPT:
             raise PdfIlegivel(f"Tipo de documento desconhecido: {tipo!r}.")
         try:
-            import base64
-
             import anthropic
         except ImportError as exc:
             raise ExtratorIndisponivel(
@@ -192,7 +222,9 @@ class ExtratorDocumentoClaude:
 
         instrucao, ferramenta = _PROMPT[tipo]
         client = anthropic.Anthropic(api_key=self.api_key, **_opcoes_tls())
-        b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+        # Um bloco por arquivo (PDF→document, imagem→image) + a instrução em texto.
+        conteudo = [_bloco_conteudo(d, m) for d, m in arquivos]
+        conteudo.append({"type": "text", "text": instrucao})
         try:
             resp = client.messages.create(
                 model=self.modelo,
@@ -200,22 +232,7 @@ class ExtratorDocumentoClaude:
                 system=_INSTRUCAO_ANTIALUCINACAO,
                 tools=[ferramenta],
                 tool_choice={"type": "tool", "name": ferramenta["name"]},
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "document",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "application/pdf",
-                                    "data": b64,
-                                },
-                            },
-                            {"type": "text", "text": instrucao},
-                        ],
-                    }
-                ],
+                messages=[{"role": "user", "content": conteudo}],
             )
         except Exception as exc:  # noqa: BLE001 — falha de leitura/serviço → honesta
             raise PdfIlegivel(

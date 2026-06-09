@@ -605,14 +605,15 @@ export interface JuridicoDocumental {
 }
 
 // Dispara a extração assistida (LLM lê o documento). RASCUNHO (status=proposto). NÃO persiste.
-// 503 = sem credencial de LLM; 422 = documento ilegível.
+// Aceita PDF ou imagens (JPEG/PNG/WEBP) e MÚLTIPLOS arquivos (documento multipágina escaneado).
+// 503 = sem credencial de LLM; 422 = documento ilegível/formato não suportado.
 export async function extrairJuridico(
   analiseId: string,
-  documento: File,
+  documentos: File[],
   tipo: TipoDocumento
 ): Promise<FichaJuridica> {
   const form = new FormData();
-  form.append("documento", documento);
+  documentos.forEach((d) => form.append("documentos", d));
   form.append("tipo", tipo);
   const res = await fetch(
     `${API_BASE}/api/analises/${analiseId}/juridico/extrair`,

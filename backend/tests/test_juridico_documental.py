@@ -73,7 +73,7 @@ def _criar_analise(client):
 
 def _upload():
     return (
-        {"documento": ("matricula.pdf", b"%PDF-1.4 fake", "application/pdf")},
+        {"documentos": ("matricula.pdf", b"%PDF-1.4 fake", "application/pdf")},
         {"tipo": "matricula"},
     )
 
@@ -123,6 +123,46 @@ def test_indisponibilidade_false_nao_vira_disponivel(client, fonte_juridica, ale
     # Sem ônus + indisponibilidade=false → baixo, MAS com a ressalva (não "limpo").
     assert g["sintese_risco"]["nivel"] == "baixo"
     assert "não significa imóvel" in g["sintese_risco"]["resumo"].lower()
+
+
+def test_extrair_aceita_jpeg(client, extrator_documento, fonte_juridica, alertas_geo):
+    """Matrícula digitalizada em imagem: JPEG é aceito (não só PDF)."""
+    extrator_documento(_matricula_proposta())
+    aid, _ = _criar_analise(client)
+    r = client.post(
+        f"/api/analises/{aid}/juridico/extrair",
+        files={"documentos": ("matricula.jpg", b"\xff\xd8\xff fake", "image/jpeg")},
+        data={"tipo": "matricula"},
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "proposto"
+
+
+def test_extrair_multiplas_imagens(client, extrator_documento, fonte_juridica, alertas_geo):
+    """Documento multipágina = várias imagens num mesmo POST."""
+    extrator_documento(_matricula_proposta())
+    aid, _ = _criar_analise(client)
+    r = client.post(
+        f"/api/analises/{aid}/juridico/extrair",
+        files=[
+            ("documentos", ("p1.jpg", b"\xff\xd8\xff a", "image/jpeg")),
+            ("documentos", ("p2.png", b"\x89PNG b", "image/png")),
+        ],
+        data={"tipo": "matricula"},
+    )
+    assert r.status_code == 200
+
+
+def test_extrair_formato_nao_suportado_422(client, extrator_documento, fonte_juridica):
+    extrator_documento(_matricula_proposta())
+    aid, _ = _criar_analise(client)
+    r = client.post(
+        f"/api/analises/{aid}/juridico/extrair",
+        files={"documentos": ("doc.txt", b"texto", "text/plain")},
+        data={"tipo": "matricula"},
+    )
+    assert r.status_code == 422
+    assert "não suportado" in r.json()["detail"].lower()
 
 
 # ----- 4. Extração injetável + 503 sem credencial -----

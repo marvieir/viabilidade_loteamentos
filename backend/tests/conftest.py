@@ -344,7 +344,7 @@ class StubExtratorDocumento:
     def __init__(self, ficha: FichaJuridica):
         self._ficha = ficha
 
-    def extrair(self, pdf_bytes, tipo, nome_arquivo=None):
+    def extrair(self, arquivos, tipo, nome_arquivo=None):
         return self._ficha.model_copy(deep=True)
 
 

@@ -75,11 +75,12 @@ export function CardJuridico({
     void analisar();
   }
 
-  async function extrair(file: File) {
+  async function extrair(files: File[]) {
+    if (files.length === 0) return;
     setCarregando(true);
     setErro(null);
     try {
-      const f = await extrairJuridico(analiseId, file, tipo);
+      const f = await extrairJuridico(analiseId, files, tipo);
       setRascunho(f);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha na extração.");
@@ -138,11 +139,12 @@ export function CardJuridico({
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/*"
+            multiple
             className="hidden"
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) extrair(f);
+              const fs = Array.from(e.target.files ?? []);
+              if (fs.length) extrair(fs);
               e.target.value = "";
             }}
           />
@@ -151,9 +153,13 @@ export function CardJuridico({
             onClick={() => inputRef.current?.click()}
             disabled={carregando}
           >
-            Extrair documento (PDF)
+            Extrair documento (PDF/imagens)
           </Button>
         </div>
+        <p className="-mt-2 text-[11px] text-slate-500">
+          PDF ou imagens (JPEG/PNG). Documento de várias páginas? Selecione todos os arquivos
+          de uma vez — eles entram como um só documento.
+        </p>
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
