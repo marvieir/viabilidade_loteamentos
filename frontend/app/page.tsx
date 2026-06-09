@@ -14,6 +14,7 @@ import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
 import { CardDeclividade } from "@/components/cards/CardDeclividade";
+import { CardJuridico } from "@/components/cards/CardJuridico";
 import { IconMap } from "@/components/Icons";
 import type {
   Ambiental,
@@ -21,6 +22,7 @@ import type {
   Aproveitamento,
   ChaveOverlay,
   Declividade,
+  JuridicoDocumental,
   PerfilMunicipal,
   Vegetacao,
 } from "@/lib/api";
@@ -43,6 +45,7 @@ export default function Home() {
   const [dadosVerde, setDadosVerde] = useState<Vegetacao | null>(null);
   const [dadosDecliv, setDadosDecliv] = useState<Declividade | null>(null);
   const [dadosAprov, setDadosAprov] = useState<Aproveitamento | null>(null);
+  const [dadosJuridico, setDadosJuridico] = useState<JuridicoDocumental | null>(null);
 
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
   const [sinal, setSinal] = useState(0);
@@ -61,6 +64,7 @@ export default function Home() {
     setDadosVerde(null);
     setDadosDecliv(null);
     setDadosAprov(null);
+    setDadosJuridico(null);
     setSinal(0);
   }
 
@@ -101,6 +105,7 @@ export default function Home() {
               amb={dadosAmb}
               verde={dadosVerde}
               decliv={dadosDecliv}
+              juridico={dadosJuridico}
             />
 
             <MapHero
@@ -177,6 +182,13 @@ export default function Home() {
                 analiseId={analise.analise_id}
                 perfil={perfil}
                 onData={setDadosAprov}
+                sinal={sinal}
+              />
+            </div>
+            <div className={secao === "juridico" ? "" : "hidden"}>
+              <CardJuridico
+                analiseId={analise.analise_id}
+                onData={setDadosJuridico}
                 sinal={sinal}
               />
             </div>

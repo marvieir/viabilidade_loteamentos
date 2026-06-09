@@ -16,7 +16,14 @@ from fastapi.middleware.cors import CORSMiddleware
 # (ex.: as do docker-compose), então container e dev convivem.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from app.routers import ambiental, analises, declividade, perfil, vegetacao
+from app.routers import (
+    ambiental,
+    analises,
+    declividade,
+    juridico,
+    perfil,
+    vegetacao,
+)
 
 app = FastAPI(
     title="Pré-Viabilidade de Loteamento — API",
@@ -39,6 +46,7 @@ app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")
 app.include_router(declividade.router, prefix="/api")
 app.include_router(perfil.router, prefix="/api")
+app.include_router(juridico.router, prefix="/api")
 
 
 @app.get("/health")

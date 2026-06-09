@@ -5,6 +5,7 @@ import type {
   Analise,
   Aproveitamento,
   Declividade,
+  JuridicoDocumental,
   Vegetacao,
 } from "@/lib/api";
 
@@ -17,12 +18,14 @@ export function KpiRow({
   amb,
   verde,
   decliv,
+  juridico,
 }: {
   analise: Analise;
   aprov: Aproveitamento | null;
   amb: Ambiental | null;
   verde: Vegetacao | null;
   decliv: Declividade | null;
+  juridico: JuridicoDocumental | null;
 }) {
   // Aproveitável: prioriza o cenário com diretriz (headline). Só renderiza JSON do backend.
   const comDiretriz = aprov?.cenario_diretriz ?? null;
@@ -34,12 +37,29 @@ export function KpiRow({
     : aprov?.pct_sobre_total ?? null;
   const lotes = comDiretriz ? comDiretriz.n_lotes : aprov?.n_lotes_teto ?? null;
 
-  // Restrições críticas: alertas ambientais + vedação de declividade + verde em APP/UC.
+  // Restrições críticas. Quando o Jurídico foi rodado, o roll-up (§3.4) é a leitura
+  // autoritativa (já junta domínio + alertas geo). Senão, soma as dimensões geo.
   const nAlertas = amb?.alertas.filter((a) => a.severidade === "ALERTA").length ?? 0;
   const temDecliv = !!decliv?.flag_vedacao;
   const temVerdeDuro = (verde?.severidade?.restricao_dura.area_m2 ?? 0) > 0;
-  const analisado = !!amb || !!decliv || !!verde;
-  const nRestricoes = nAlertas + (temDecliv ? 1 : 0) + (temVerdeDuro ? 1 : 0);
+  const nRestricoesGeo = nAlertas + (temDecliv ? 1 : 0) + (temVerdeDuro ? 1 : 0);
+  const analisado = !!amb || !!decliv || !!verde || !!juridico;
+
+  const nivelJur = juridico?.sintese_risco.nivel;
+  const nRestricoes = juridico
+    ? juridico.sintese_risco.criticos.length
+    : nRestricoesGeo;
+  const tomRestricoes = juridico
+    ? nivelJur === "alto"
+      ? "rose"
+      : nivelJur === "medio"
+        ? "indigo"
+        : "emerald"
+    : nRestricoes > 0
+      ? "rose"
+      : analisado
+        ? "emerald"
+        : "slate";
 
   return (
     <section className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -73,21 +93,24 @@ export function KpiRow({
         }
       />
       <Stat
-        tom={nRestricoes > 0 ? "rose" : analisado ? "emerald" : "slate"}
+        tom={tomRestricoes}
         rotulo="Restrições críticas"
         valor={analisado ? String(nRestricoes) : "—"}
         sub={
-          analisado
-            ? nRestricoes > 0
-              ? [
-                  nAlertas ? `${nAlertas} ambiental` : "",
-                  temDecliv ? "declividade ≥30%" : "",
-                  temVerdeDuro ? "verde APP/UC" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-              : "nenhuma incidente"
-            : "rode Ambiental/Declividade"
+          juridico
+            ? juridico.sintese_risco.criticos.slice(0, 2).join(" · ") ||
+              `risco ${nivelJur} (pré-análise documental)`
+            : analisado
+              ? nRestricoes > 0
+                ? [
+                    nAlertas ? `${nAlertas} ambiental` : "",
+                    temDecliv ? "declividade ≥30%" : "",
+                    temVerdeDuro ? "verde APP/UC" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")
+                : "nenhuma incidente"
+              : "rode Ambiental/Declividade"
         }
       />
     </section>

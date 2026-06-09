@@ -36,6 +36,8 @@ backend/app/perfis/*.tif
 backend/app/perfis/verde.tif
 # Perfis municipais confirmados da LUOS (Fase 1.8) — dado do operador, persistido em volume.
 backend/app/perfis/municipais/
+# Fichas jurídicas confirmadas por análise (Fase 3) — dado do operador, persistido em volume.
+backend/app/perfis/juridico/
 
 # .env do backend (segredos/caminhos da máquina) — versionamos só o .env.example.
 backend/.env

@@ -47,3 +47,6 @@ export const IconMap = (p: P) => (
 export const IconChevron = (p: P) => (
   <svg {...base(p)}><path d="m9 18 6-6-6-6" /></svg>
 );
+export const IconJuridico = (p: P) => (
+  <svg {...base(p)}><path d="M12 3v18" /><path d="M5 7h14" /><path d="m5 7-3 6a3 3 0 0 0 6 0L5 7Z" /><path d="m19 7-3 6a3 3 0 0 0 6 0l-3-6Z" /><path d="M7 21h10" /></svg>
+);

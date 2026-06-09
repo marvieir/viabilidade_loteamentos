@@ -13,11 +13,15 @@ from app.core.fmp import FonteFMPArquivo, get_fonte_fmp
 from app.core.jurisdicao import Municipio, get_fonte_malha
 from app.core.lista_municipios import FonteListaArquivo, get_fonte_lista
 from app.core.perfil_municipal import get_fonte_perfil
+from app.core.alertas_geo import get_provedor_alertas_geo
+from app.core.extrator_documento import get_extrator_documento
+from app.core.juridico_documental import AlertaGeo
+from app.core.juridico_store import get_fonte_juridica
 from app.core.store import STORE
 from app.core.declividade import DEMRecorte, get_fonte_dem
 from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
 from app.main import app
-from app.models.schemas import PerfilMunicipal
+from app.models.schemas import FichaJuridica, PerfilMunicipal
 
 _KML = """<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2"><Document>{placemarks}</Document></kml>"""
@@ -331,6 +335,95 @@ def fonte_perfil():
     app.dependency_overrides[get_fonte_perfil] = lambda: fonte
     yield fonte
     app.dependency_overrides.pop(get_fonte_perfil, None)
+
+
+# ----- Fase 3 — jurídico documental: extrator-stub + ficha em memória + alertas-stub -----
+class StubExtratorDocumento:
+    """Extrator de TESTE: devolve uma FichaJuridica fixa (proposta), sem PDF/rede/chave."""
+
+    def __init__(self, ficha: FichaJuridica):
+        self._ficha = ficha
+
+    def extrair(self, pdf_bytes, tipo, nome_arquivo=None):
+        return self._ficha.model_copy(deep=True)
+
+
+class FonteJuridicaMemoria:
+    """Fonte de fichas jurídicas em memória (injetável nos testes) — sem volume/arquivo."""
+
+    def __init__(self):
+        self._m: dict[str, list[FichaJuridica]] = {}
+
+    def carregar(self, analise_id):
+        return [f.model_copy(deep=True) for f in self._m.get(str(analise_id), [])]
+
+    def salvar(self, analise_id, ficha: FichaJuridica):
+        chave = (ficha.tipo, ficha.fonte_documento)
+        atuais = [
+            f
+            for f in self._m.get(str(analise_id), [])
+            if (f.tipo, f.fonte_documento) != chave
+        ]
+        atuais.append(ficha.model_copy(deep=True))
+        self._m[str(analise_id)] = atuais
+
+    def semear(self, analise_id, ficha: FichaJuridica):
+        self.salvar(analise_id, ficha)
+
+
+class StubProvedorAlertasGeo:
+    """Provedor de alertas geo de TESTE — devolve uma lista fixa, sem fontes/rede."""
+
+    def __init__(self, alertas: list[AlertaGeo]):
+        self._alertas = alertas
+
+    def coletar(self, analise_id):
+        return list(self._alertas)
+
+
+@pytest.fixture
+def extrator_documento():
+    """Injeta um extrator documental-stub. Uso: ``extrator_documento(FichaJuridica(...))``."""
+
+    def _set(ficha: FichaJuridica):
+        app.dependency_overrides[get_extrator_documento] = lambda: StubExtratorDocumento(
+            ficha
+        )
+
+    yield _set
+    app.dependency_overrides.pop(get_extrator_documento, None)
+
+
+@pytest.fixture
+def extrator_doc_indisponivel():
+    """Força o extrator documental a None (sem credencial)."""
+    app.dependency_overrides[get_extrator_documento] = lambda: None
+    yield
+    app.dependency_overrides.pop(get_extrator_documento, None)
+
+
+@pytest.fixture
+def fonte_juridica():
+    """Injeta a fonte de fichas jurídicas em memória e devolve a instância (semear/checar)."""
+    fonte = FonteJuridicaMemoria()
+    app.dependency_overrides[get_fonte_juridica] = lambda: fonte
+    yield fonte
+    app.dependency_overrides.pop(get_fonte_juridica, None)
+
+
+@pytest.fixture
+def alertas_geo():
+    """Injeta um provedor de alertas geo-stub. Uso: ``alertas_geo([AlertaGeo(...), ...])``.
+    Default sem alertas (lista vazia) se chamado sem argumento."""
+
+    def _set(alertas=None):
+        app.dependency_overrides[get_provedor_alertas_geo] = (
+            lambda: StubProvedorAlertasGeo(alertas or [])
+        )
+
+    _set([])  # default: provedor vazio (não tenta as fontes reais nos testes)
+    yield _set
+    app.dependency_overrides.pop(get_provedor_alertas_geo, None)
 
 
 @pytest.fixture

@@ -352,3 +352,175 @@ class CenarioDiretrizOut(BaseModel):
     n_lotes: int  # floor(aprov_diretriz / lote_legal)
     proveniencia: str
     ressalva: str
+
+
+# ----- Fase 3 — Pré-análise jurídica documental (dominial) -----
+# Mesma disciplina da 1.8: o LLM LÊ e PROPÕE (com referência ao ato R-x/Av-y); o humano
+# confirma; o número nunca passa por LLM. Ficha nasce status='proposto' — nada vira síntese
+# sem o gate. NUNCA afirma "imóvel livre" — ausência de achado ≠ imóvel limpo.
+
+TipoDocumento = Literal["matricula", "certidao"]
+StatusFicha = Literal["proposto", "confirmado"]
+SituacaoOnus = Literal["consta", "baixado", "cancelado"]
+
+
+class CampoDoc(BaseModel):
+    """Campo textual extraído + referência ao ato (R-x/Av-y) + página. valor=None = não
+    encontrado no documento (o LLM NUNCA inventa)."""
+
+    valor: Optional[str] = None
+    ato: Optional[str] = None
+    pagina: Optional[int] = None
+    trecho: Optional[str] = None
+    origem: OrigemParam = "proposto_llm"
+
+
+class CampoAreaDoc(BaseModel):
+    """Área registrada (m²) + proveniência. Numérica (entra no cross-check determinístico)."""
+
+    valor: Optional[float] = None
+    ato: Optional[str] = None
+    pagina: Optional[int] = None
+    trecho: Optional[str] = None
+    origem: OrigemParam = "proposto_llm"
+
+
+class IdentificacaoMatricula(BaseModel):
+    matricula: Optional[CampoDoc] = None
+    cartorio: Optional[CampoDoc] = None
+    proprietario_atual: Optional[CampoDoc] = None
+    area_registrada_m2: Optional[CampoAreaDoc] = None
+
+
+class AchadoOnus(BaseModel):
+    """Ônus real/gravame (hipoteca, alienação fiduciária, penhora, arresto, usufruto,
+    servidão, inalienabilidade/impenhorabilidade). Achado sem ``ato`` não é confirmável."""
+
+    tipo: str
+    descricao: Optional[str] = None
+    ato: Optional[str] = None  # "R-5"
+    pagina: Optional[int] = None
+    situacao: SituacaoOnus = "consta"
+    trecho: Optional[str] = None
+    origem: OrigemParam = "proposto_llm"
+
+
+class Averbacao(BaseModel):
+    """Averbação (reserva legal, APP, georreferenciamento, construção). Sem ``ato`` não
+    é confirmável."""
+
+    tipo: str
+    descricao: Optional[str] = None
+    ato: Optional[str] = None  # "Av-3"
+    pagina: Optional[int] = None
+    trecho: Optional[str] = None
+    origem: OrigemParam = "proposto_llm"
+
+
+class Indisponibilidade(BaseModel):
+    """``consta=false`` é reportado como 'não encontrado no documento', NUNCA como
+    'imóvel disponível' (fronteira §1 da spec)."""
+
+    consta: bool = False
+    obs: Optional[str] = None
+    ato: Optional[str] = None
+
+
+class DebitoAcao(BaseModel):
+    descricao: Optional[str] = None
+    valor: Optional[float] = None
+    referencia: Optional[str] = None  # processo nº / inscrição
+
+
+class FichaJuridica(BaseModel):
+    """Ficha de UM documento (matrícula ou certidão). Proposta e confirmada usam o mesmo
+    corpo; só ``status='confirmado'`` (via PUT, com ``validado_por``+``data_referencia``)
+    alimenta a síntese."""
+
+    tipo: TipoDocumento
+    status: StatusFicha = "proposto"
+    fonte_documento: Optional[str] = None
+    # --- matrícula ---
+    identificacao: Optional[IdentificacaoMatricula] = None
+    onus: list[AchadoOnus] = []
+    averbacoes: list[Averbacao] = []
+    indisponibilidade: Optional[Indisponibilidade] = None
+    # --- certidão ---
+    orgao: Optional[CampoDoc] = None
+    especie: Optional[CampoDoc] = None
+    resultado: Optional[Literal["negativa", "positiva"]] = None
+    debitos: list[DebitoAcao] = []
+    acoes: list[DebitoAcao] = []
+    # ---
+    avisos: list[str] = []
+    validado_por: Optional[str] = None
+    data_referencia: Optional[str] = None
+
+
+class FichaConfirmarIn(FichaJuridica):
+    """Corpo do PUT: ficha revisada/editada + quem validou (proveniência da confirmação)."""
+
+    validado_por: str
+
+
+# --- Saída agregada do GET (determinística: consolida fichas confirmadas + alertas geo) ---
+class DocumentoResumoOut(BaseModel):
+    tipo: str
+    status: str
+    fonte: Optional[str] = None
+    validado_por: Optional[str] = None
+    data_referencia: Optional[str] = None
+
+
+class OnusOut(BaseModel):
+    tipo: str
+    descricao: Optional[str] = None
+    ato: Optional[str] = None
+    situacao: str = "consta"
+    status: Literal["conforme", "atencao", "vedado"] = "atencao"
+    proveniencia: str
+
+
+class AverbacaoOut(BaseModel):
+    tipo: str
+    descricao: Optional[str] = None
+    ato: Optional[str] = None
+    proveniencia: str
+
+
+class AreaCheckOut(BaseModel):
+    """Cross-check determinístico: área da matrícula × área medida do KMZ (Fase 1)."""
+
+    area_matricula_m2: Optional[float] = None
+    area_kmz_m2: float
+    divergencia_pct: Optional[float] = None  # null se não há área de matrícula confirmada
+    status: Literal["conforme", "atencao", "indisponivel"]
+    proveniencia: str
+
+
+class CertidaoOut(BaseModel):
+    orgao: Optional[str] = None
+    especie: Optional[str] = None
+    resultado: Optional[str] = None
+    status: Literal["conforme", "atencao"]
+    proveniencia: str
+
+
+class SinteseRiscoOut(BaseModel):
+    """Roll-up determinístico: achados dominiais confirmados + alertas geo (2.1/2.3/2.5)."""
+
+    nivel: Literal["alto", "medio", "baixo"]
+    criticos: list[str] = []
+    atencao: list[str] = []
+    resumo: str
+
+
+class JuridicoDocumentalOut(BaseModel):
+    documentos: list[DocumentoResumoOut] = []
+    onus: list[OnusOut] = []
+    averbacoes: list[AverbacaoOut] = []
+    area_check: Optional[AreaCheckOut] = None
+    certidoes: list[CertidaoOut] = []
+    sintese_risco: SinteseRiscoOut
+    proveniencia: str
+    avisos: list[str] = []

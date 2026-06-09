@@ -2,6 +2,7 @@ import {
   IconAmbiental,
   IconAproveitamento,
   IconDeclividade,
+  IconJuridico,
   IconLuos,
   IconVerde,
   IconVisao,
@@ -13,6 +14,7 @@ export type Secao =
   | "verde"
   | "declividade"
   | "aproveitamento"
+  | "juridico"
   | "luos";
 
 export const SECOES: {
@@ -25,5 +27,6 @@ export const SECOES: {
   { id: "verde", rotulo: "Área verde", Icone: IconVerde },
   { id: "declividade", rotulo: "Declividade", Icone: IconDeclividade },
   { id: "aproveitamento", rotulo: "Aproveitamento", Icone: IconAproveitamento },
+  { id: "juridico", rotulo: "Jurídico", Icone: IconJuridico },
   { id: "luos", rotulo: "Diretriz (LUOS)", Icone: IconLuos },
 ];

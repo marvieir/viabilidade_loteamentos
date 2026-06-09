@@ -484,3 +484,161 @@ export async function obterPerfil(
   if (res.status === 404) return null;
   return jsonOrThrow(res);
 }
+
+// ----- Fase 3 — Pré-análise jurídica documental (dominial) -----
+export type TipoDocumento = "matricula" | "certidao";
+
+export interface CampoDoc {
+  valor: string | null;
+  ato: string | null;
+  pagina: number | null;
+  trecho: string | null;
+  origem: "proposto_llm" | "editado_humano";
+}
+export interface CampoAreaDoc {
+  valor: number | null;
+  ato: string | null;
+  pagina: number | null;
+  trecho: string | null;
+  origem: "proposto_llm" | "editado_humano";
+}
+export interface IdentificacaoMatricula {
+  matricula: CampoDoc | null;
+  cartorio: CampoDoc | null;
+  proprietario_atual: CampoDoc | null;
+  area_registrada_m2: CampoAreaDoc | null;
+}
+export interface AchadoOnus {
+  tipo: string;
+  descricao: string | null;
+  ato: string | null;
+  pagina: number | null;
+  situacao: "consta" | "baixado" | "cancelado";
+  trecho: string | null;
+  origem: "proposto_llm" | "editado_humano";
+}
+export interface Averbacao {
+  tipo: string;
+  descricao: string | null;
+  ato: string | null;
+  pagina: number | null;
+  trecho: string | null;
+  origem: "proposto_llm" | "editado_humano";
+}
+export interface Indisponibilidade {
+  consta: boolean;
+  obs: string | null;
+  ato: string | null;
+}
+
+// Ficha de UM documento (rascunho proposto OU confirmada). É o que o extrair devolve e o
+// PUT recebe (de volta editada). O front só edita/renderiza — nada de cálculo aqui.
+export interface FichaJuridica {
+  tipo: TipoDocumento;
+  status: "proposto" | "confirmado";
+  fonte_documento: string | null;
+  identificacao: IdentificacaoMatricula | null;
+  onus: AchadoOnus[];
+  averbacoes: Averbacao[];
+  indisponibilidade: Indisponibilidade | null;
+  orgao: CampoDoc | null;
+  especie: CampoDoc | null;
+  resultado: "negativa" | "positiva" | null;
+  debitos: unknown[];
+  acoes: unknown[];
+  avisos: string[];
+  validado_por: string | null;
+  data_referencia: string | null;
+}
+
+// Saída agregada do GET (consolidação determinística + roll-up de risco).
+export interface OnusOut {
+  tipo: string;
+  descricao: string | null;
+  ato: string | null;
+  situacao: string;
+  status: "conforme" | "atencao" | "vedado";
+  proveniencia: string;
+}
+export interface AverbacaoOut {
+  tipo: string;
+  descricao: string | null;
+  ato: string | null;
+  proveniencia: string;
+}
+export interface AreaCheckOut {
+  area_matricula_m2: number | null;
+  area_kmz_m2: number;
+  divergencia_pct: number | null;
+  status: "conforme" | "atencao" | "indisponivel";
+  proveniencia: string;
+}
+export interface CertidaoOut {
+  orgao: string | null;
+  especie: string | null;
+  resultado: string | null;
+  status: "conforme" | "atencao";
+  proveniencia: string;
+}
+export interface DocumentoResumoOut {
+  tipo: string;
+  status: string;
+  fonte: string | null;
+  validado_por: string | null;
+  data_referencia: string | null;
+}
+export interface SinteseRisco {
+  nivel: "alto" | "medio" | "baixo";
+  criticos: string[];
+  atencao: string[];
+  resumo: string;
+}
+export interface JuridicoDocumental {
+  documentos: DocumentoResumoOut[];
+  onus: OnusOut[];
+  averbacoes: AverbacaoOut[];
+  area_check: AreaCheckOut | null;
+  certidoes: CertidaoOut[];
+  sintese_risco: SinteseRisco;
+  proveniencia: string;
+  avisos: string[];
+}
+
+// Dispara a extração assistida (LLM lê o documento). RASCUNHO (status=proposto). NÃO persiste.
+// 503 = sem credencial de LLM; 422 = documento ilegível.
+export async function extrairJuridico(
+  analiseId: string,
+  documento: File,
+  tipo: TipoDocumento
+): Promise<FichaJuridica> {
+  const form = new FormData();
+  form.append("documento", documento);
+  form.append("tipo", tipo);
+  const res = await fetch(
+    `${API_BASE}/api/analises/${analiseId}/juridico/extrair`,
+    { method: "POST", body: form }
+  );
+  return jsonOrThrow(res);
+}
+
+// Gate humano: confirma a ficha revisada/editada (status=confirmado) e persiste.
+export async function confirmarJuridico(
+  analiseId: string,
+  ficha: FichaJuridica,
+  validadoPor: string
+): Promise<FichaJuridica> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/juridico`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...ficha, validado_por: validadoPor }),
+  });
+  return jsonOrThrow(res);
+}
+
+// Ficha consolidada + síntese de risco (sempre 200; degrada honesto sem documento).
+export async function buscarJuridico(
+  analiseId: string
+): Promise<JuridicoDocumental> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/juridico`);
+  return jsonOrThrow(res);
+}
