@@ -431,18 +431,56 @@ function Resultado({ r }: { r: JuridicoDocumental }) {
       )}
 
       {r.onus.length > 0 && (
-        <ul className="space-y-1">
-          {r.onus.map((o, i) => (
-            <li
-              key={i}
-              className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm"
-            >
-              <span className="font-medium">{o.tipo}</span>
-              {o.descricao ? ` — ${o.descricao}` : ""}{" "}
-              <span className="text-xs text-slate-500">· {o.proveniencia}</span>
-            </li>
-          ))}
-        </ul>
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Ônus / gravames
+          </p>
+          <ul className="space-y-1">
+            {r.onus.map((o, i) => {
+              const ativo = o.situacao === "consta";
+              return (
+                <li
+                  key={i}
+                  className={`rounded-lg border p-2 text-sm ${
+                    ativo
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-slate-200 bg-slate-50 opacity-60"
+                  }`}
+                >
+                  <span className="font-medium">{o.tipo}</span>
+                  <span
+                    className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                      ativo
+                        ? "bg-amber-200 text-amber-900"
+                        : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {ativo ? "ativo" : o.situacao}
+                  </span>
+                  {o.descricao ? ` — ${o.descricao}` : ""}{" "}
+                  <span className="text-xs text-slate-500">· {o.proveniencia}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {r.averbacoes.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Averbações registradas <span className="font-normal">(histórico)</span>
+          </p>
+          <ul className="space-y-1">
+            {r.averbacoes.map((a, i) => (
+              <li key={i} className="text-xs text-slate-600">
+                <span className="font-medium text-slate-700">{a.tipo}</span>
+                {a.descricao ? ` — ${a.descricao}` : ""}{" "}
+                <span className="text-slate-400">· {a.proveniencia}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {r.certidoes.length > 0 && (

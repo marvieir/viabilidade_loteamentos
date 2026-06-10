@@ -220,6 +220,28 @@ def test_sintese_alto_com_hipoteca_e_geo(client, fonte_juridica, alertas_geo):
     assert any("Reserva legal" in a for a in s["atencao"])
 
 
+def test_averbacoes_administrativas_fora_do_risco():
+    """Cancelamento/casamento/retificação são histórico de cartório, não risco. Reserva legal
+    e construção ficam como atenção."""
+    from app.models import schemas
+
+    averb = [
+        schemas.AverbacaoOut(tipo="reserva_legal", ato="Av-1", proveniencia="x"),
+        schemas.AverbacaoOut(tipo="cancelamento_hipoteca", ato="Av-7", proveniencia="x"),
+        schemas.AverbacaoOut(tipo="casamento", ato="Av-11", proveniencia="x"),
+        schemas.AverbacaoOut(tipo="retificacao_administrativa", ato="Av-8", proveniencia="x"),
+        schemas.AverbacaoOut(tipo="construcao", ato="Av-3", proveniencia="x"),
+    ]
+    s = nucleo.roll_up_risco([], averb, None, [], False, [])
+    txt = " ".join(s.atencao).lower()
+    assert "reserva legal" in txt
+    assert "constru" in txt
+    assert "cancelament" not in txt
+    assert "casament" not in txt
+    assert "retifica" not in txt
+    assert s.nivel == "medio"  # só atenção (reserva + construção)
+
+
 def test_sintese_baixo_sem_nada(client, fonte_juridica, alertas_geo):
     aid, area_kmz = _criar_analise(client)
     m = _matricula_confirmada(area=round(area_kmz))  # área casa com o KMZ → conforme

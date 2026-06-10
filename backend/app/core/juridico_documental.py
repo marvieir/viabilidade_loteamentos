@@ -203,6 +203,8 @@ def roll_up_risco(
         criticos.append(f"Divergência de área {pct:.1f}% (matrícula × KMZ)")
 
     for a in averbacoes_out:
+        if not _averbacao_e_risco(a.tipo):
+            continue  # cancelamento/casamento/retificação/georref = histórico, não risco
         rot = _rotulo_averbacao(a.tipo) + (f" ({a.ato})" if a.ato else "")
         atencao.append(rot)
 
@@ -233,6 +235,28 @@ def roll_up_risco(
     return schemas.SinteseRiscoOut(
         nivel=nivel, criticos=criticos, atencao=atencao, resumo=resumo
     )
+
+
+# Averbações que NÃO são risco — histórico de cartório (cancelamentos, estado civil,
+# retificação, georreferenciamento). Ficam na ficha, mas fora do painel de risco.
+_AVERBACOES_NEUTRAS = (
+    "cancelament",
+    "baixa",
+    "casament",
+    "divorcio",
+    "obito",
+    "estado_civil",
+    "estado civil",
+    "retifica",
+    "georref",
+)
+
+
+def _averbacao_e_risco(tipo: str) -> bool:
+    """Averbação relevante para a triagem (reduz/onera a gleba: reserva legal, APP,
+    servidão, restrição, construção). Atos meramente administrativos → False."""
+    t = (tipo or "").lower()
+    return not any(k in t for k in _AVERBACOES_NEUTRAS)
 
 
 def _rotulo_averbacao(tipo: str) -> str:
