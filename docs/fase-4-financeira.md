@@ -88,58 +88,127 @@ final; margem = resultado ÷ VGV próprio. Toda linha do fluxo referencia o bloc
 ## 4. Contrato de API
 
 ### 4.1 `POST /api/analises/{id}/financeira` (premissas no corpo) → `FinanceiraOut`
-Ver `models/schemas.py` (`PremissasFinanceiraIn` → `FinanceiraOut`). Resumo dos campos:
-`caso_base` (lotes/origem/aviso) · `vgv` (bruto/proprio/permuta, com `_fmt`) · `blocos`
-(total + proveniência por premissa) · `fluxo` (por mês: entradas/saidas/liquido/acumulado +
-`_fmt`) · `indicadores` (resultado_nominal, margem_sobre_vgv_proprio, exposicao_maxima
-{valor, mes}, horizonte_meses) · `proveniencia` · `avisos`.
+```jsonc
+// REQUEST (tudo opcional tem default rotulado; essenciais sem default → 422 pedindo)
+{
+  "lotes": { "origem": "auto" },            // auto = regra §3.1; ou {"origem":"declarado","n":120}
+  "eficiencia_projeto_pct": 1.0,
+  "preco_lote": 100000,                      // essencial (ou preco_m2 + area média) — sem default
+  "vendas": { "inicio_mes": 1, "duracao_meses": 10, "curva": "linear",
+              "modo": "avista" },            // ou {"modo":"parcelado","entrada_pct":0.2,"n_parcelas":36}
+  "inadimplencia_pct": 0.0,
+  "aquisicao": { "modo": "permuta_vgv", "pct": 0.20 },
+  "custos": {
+    "urbanizacao": { "base": "por_lote", "valor": 30000, "inicio_mes": 1, "duracao_meses": 6 },
+    "projetos_aprovacao": { "valor": 280000, "mes": 0 },
+    "topografia": { "valor": 100000, "mes": 0 },
+    "administracao_mensal": 10000,
+    "marketing": { "pct_vgv_proprio": 0.02, "inicio_mes": 1, "duracao_meses": 4 },
+    "comissao_pct": 0.05
+  },
+  "tributos": { "regime": "presumido", "aliquota_pct": 0.0593 }
+}
 
+// RESPONSE
+{
+  "caso_base": { "lotes": 100, "origem_lotes": "diretriz|teto_fisico|declarado",
+                 "aviso_lotes": null | "teto físico SEM doação/vias — tende a SUPERESTIMAR…" },
+  "vgv": { "bruto": 10000000, "bruto_fmt": "R$ 10.000.000,00",
+           "proprio": 8000000, "proprio_fmt": "R$ 8.000.000,00",
+           "permuta": { "modo": "permuta_vgv", "pct": 0.20, "valor": 2000000 } },
+  "blocos": [   // totais por bloco, com proveniência da premissa
+    { "bloco": "urbanizacao", "total": 3000000, "total_fmt": "…",
+      "proveniencia": "R$ 30.000/lote × 100 — declarado pelo usuário" },
+    { "bloco": "tributos", "total": 474400,
+      "proveniencia": "5,93% s/ receita própria — DEFAULT ROTULADO; confirme com contador" }
+    // … projetos, topografia, administracao, marketing, comissao …
+  ],
+  "fluxo": [    // POR MÊS — o insumo da Fase 5
+    { "mes": 0, "entradas": 0, "saidas": 390000, "liquido": -390000,
+      "liquido_fmt": "−R$ 390.000,00", "acumulado": -390000 },
+    { "mes": 1, "entradas": 800000, "saidas": 647440, "liquido": 152560, "acumulado": -237440 }
+    // … até o último mês com movimento …
+  ],
+  "indicadores": {
+    "resultado_nominal": 3375600, "resultado_nominal_fmt": "R$ 3.375.600,00",
+    "margem_sobre_vgv_proprio": 0.421950,
+    "exposicao_maxima": { "valor": -390000, "mes": 0 },
+    "horizonte_meses": 10
+  },
+  "proveniencia": "Premissas declaradas/defaults rotulados desta análise · lotes do cenário diretriz (São Roque/MUE)",
+  "avisos": [
+    "Fluxo NOMINAL (sem inflação/indexação) — avaliação (VPL/TIR) é a dimensão Econômica.",
+    "Tributação simplificada por alíquota efetiva — NÃO substitui apuração contábil; confirme com contador.",
+    "Pré-análise financeira (§1-A): premissas do usuário; não é recomendação de investimento."
+  ]
+}
+```
 Sem premissa essencial (`preco_lote`) → **422 pedindo o campo** (degradação honesta — não
 chuta preço). `GET` devolve a última execução persistida (premissas + resultado).
 
 ### 4.2 Persistência (decisão vetável B)
-Premissas persistem **por análise** em volume (padrão 1.8/3). `origem` por premissa:
-`declarado` × `default_rotulado`. **Sem gate `proposto→confirmado`** — a origem já é o humano;
-proveniência basta.
+Premissas persistem **por análise** em volume (padrão 1.8/3) — o operador não redigita.
+`origem` por premissa: `declarado` (com data) | `default_rotulado`. **Sem gate
+`proposto→confirmado`**: o gate da 1.8 protege contra o LLM; aqui a origem **já é o humano** —
+proveniência basta. (Vetável: exigir confirmação formal com `validado_por`.)
 
-## 5. Critérios de aceite (Caso Fechado A — valores-ouro)
+## 5. Critérios de aceite (testáveis — valores-ouro do Caso Fechado A)
 
-**Caso Fechado A:** 100 lotes × R$ 100.000; permuta_vgv 20%; vendas 10/mês meses 1–10 à
-vista; comissão 5% s/ bruto; tributo 5,93% s/ receita própria; urbanização R$ 30.000/lote
-linear meses 1–6; projetos 280.000 + topografia 100.000 no mês 0; administração 10.000/mês
-(0–10); marketing 2% do VGV próprio linear meses 1–4.
+**Caso Fechado A** (aritmética verificável à mão; substitui números da planilha com erros):
+100 lotes × R$ 100.000; permuta_vgv 20%; vendas 10/mês meses 1–10 à vista; comissão 5%
+s/ bruto; tributo 5,93% s/ receita própria; urbanização R$ 30.000/lote linear meses 1–6;
+projetos 280.000 + topografia 100.000 no mês 0; administração 10.000/mês (0–10);
+marketing 2% do VGV próprio linear meses 1–4.
 
-1. VGV: bruto 10.000.000; próprio 8.000.000; permuta 2.000.000.
-2. Fluxo-ouro: mês 0 = −390.000; meses 1–4 = +152.560; meses 5–6 = +192.560; meses 7–10 =
-   +692.560 (exatos, 2 casas).
-3. Acumulado final = **3.375.600,00** = resultado nominal; **exposição = −390.000 no mês 0**;
-   margem = **42,1950%**; horizonte = 10. Consistência: `Σ liquido == VGV próprio − Σ saídas`.
-4. Origem dos lotes (§3.1): diretriz sem aviso; teto com aviso de superestimação; declarado
-   sobrepõe.
-5. Tributação = parâmetro: alíquota 0 → resultado 3.850.000; proveniência "confirme com
-   contador" e **não menciona RET como aplicável**.
-6. Parcelado desloca o caixa; exposição **piora** vs à vista.
-7. Permuta por lotes `n=20` → `lotes_vendaveis=80`, VGV próprio 8.000.000 (≈20%).
-8. Eficiência 0.9 → 90 lotes vendáveis (rótulo "regra de mercado sem âncora legal").
-9. Degradação: sem `preco_lote` → 422 nomeando o campo; curva custom que não soma 1 → 422.
-10. Determinismo + `_fmt` pt-BR no backend; **nenhum** VPL/TIR/payback nos indicadores;
-    não-regressão 1…3.5.
+1. **VGV:** bruto = 10.000.000; próprio = 8.000.000; permuta = 2.000.000.
+2. **Fluxo-ouro por mês:** mês 0 = −390.000; meses 1–4 = +152.560; meses 5–6 = +192.560;
+   meses 7–10 = +692.560 (cada um exato, 2 casas).
+3. **Acumulado e indicadores:** acumulado final = **3.375.600,00** = resultado nominal;
+   **exposição máxima = −390.000 no mês 0**; margem = **42,1950%** (±0,0001);
+   horizonte = 10. Consistência interna: `Σ liquido == acumulado final == VGV próprio −
+   Σ blocos de saída` (tolerância 1 centavo).
+4. **Origem dos lotes (§3.1):** com `cenario_diretriz` no contexto → `origem_lotes="diretriz"`,
+   sem aviso; sem diretriz → `"teto_fisico"` **com** o aviso de superestimação; declarado
+   sobrepõe ambos.
+5. **Tributação = parâmetro:** mudar `aliquota_pct` para 0 muda só o bloco tributos
+   (resultado = 3.850.000,00); a proveniência do default contém "confirme com contador" e
+   **não menciona RET como aplicável**.
+6. **Parcelado:** vendas `entrada 20% + 4 parcelas` → recebimentos redistribuídos (mesma
+   receita total, caixa deslocado); exposição máxima **piora** vs à vista (teste relativo).
+7. **Permuta por lotes:** `permuta_lotes n=20` → `lotes_vendaveis=80`, VGV próprio =
+   8.000.000 (equivalência com o caso A exibida como 20%).
+8. **Eficiência de projeto:** `0.9` → 90 lotes vendáveis; proveniência rotula "regra de
+   mercado sem âncora legal".
+9. **Degradação honesta:** sem `preco_lote` → 422 nomeando o campo; curva custom que não
+   soma 1 → 422 diagnóstico. Nunca inventa premissa.
+10. **Determinismo + formatação no backend:** mesmas premissas → mesmo fluxo byte-a-byte;
+    todo valor monetário acompanha `_fmt` pt-BR gerado no backend; **nenhum** VPL/TIR/payback
+    na resposta (fronteira 4×5). Não-regressão: suítes 1…3.5 verdes.
 
 ## 6. Fora de escopo (registrado)
 
-- VPL/TIR/TMA/payback/sensibilidade → **Fase 5 (Econômica)**.
-- Precificação de mercado → dimensão Mercadológica (aqui preço é input).
-- Indexação/inflação, juros de tabela, financiamento → evolução (MVP nominal).
-- Apuração tributária real → contador; o motor multiplica a alíquota informada.
-- Cotas/captação e carteira avançada → evolução pós-Fase 5.
+- **VPL / TIR / TMA / payback / sensibilidade** → **Fase 5 (Econômica)**, que consome `fluxo`.
+- **Precificação de mercado** (quanto vale o lote ali) → dimensão Mercadológica; aqui preço
+  é **input**.
+- **Indexação/inflação (INCC/IPCA), juros de tabela em vendas parceladas, financiamento
+  bancário** → evolução (MVP nominal).
+- **Apuração tributária real** (Lucro Real, adicional IRPJ, reforma IBS/CBS — nota da §9)
+  → contador; o motor multiplica alíquota informada.
+- **Cotas/captação de investidores** (aba Cotas da planilha) e **ponto de equilíbrio/análise
+  de carteira avançada** → evolução pós-Fase 5.
 
-## 7. Arquivos (implementados)
+## 7. Arquivos esperados (latitude de implementação)
 
-- `core/financeira.py` — `montar_fluxo(premissas, ctx)` puro + formatador `brl`.
-- `core/financeira_store.py` — persistência por análise (volume).
-- `routers/financeira.py` — `POST`/`GET /analises/{id}/financeira`; resolve lotes (§3.1).
+- `core/financeira.py` — `montar_fluxo(premissas)` **puro** (validação + curvas + blocos +
+  fluxo + indicadores); formatador pt-BR no backend.
+- `routers/financeira.py` — `POST`/`GET /analises/{id}/financeira`; resolve lotes via
+  aproveitamento da análise (§3.1); persiste premissas+resultado em volume.
 - `models/schemas.py` — `PremissasFinanceiraIn`, `BlocoOut`, `LinhaFluxoOut`,
   `IndicadoresOut`, `FinanceiraOut`.
-- Frontend: item "Financeira" + `CardFinanceira` (premissas com defaults rotulados;
-  tabela do fluxo; KPIs VGV/resultado/exposição).
-- Testes: `tests/test_financeira.py` (Caso Fechado A + variações, offline).
+- Frontend: item "Financeira" na sidebar + `CardFinanceira` (formulário de premissas com
+  defaults rotulados e badges de origem; tabela do fluxo; KPIs VGV/resultado/exposição via
+  `onData`). Sem conta no front.
+- Testes: `tests/test_financeira.py` (Caso Fechado A + variações, offline, determinísticos).
+
+A spec fixa **contrato + critérios**; o resto é latitude. **Sem LLM, sem rede, sem
+credencial** — aritmética determinística sobre premissas declaradas, com proveniência.
