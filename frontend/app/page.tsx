@@ -15,6 +15,7 @@ import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
 import { CardDeclividade } from "@/components/cards/CardDeclividade";
 import { CardJuridico } from "@/components/cards/CardJuridico";
+import { CardConformidade } from "@/components/cards/CardConformidade";
 import { IconMap } from "@/components/Icons";
 import type {
   Ambiental,
@@ -182,6 +183,13 @@ export default function Home() {
                 analiseId={analise.analise_id}
                 perfil={perfil}
                 onData={setDadosAprov}
+                sinal={sinal}
+              />
+            </div>
+            <div className={secao === "conformidade" ? "" : "hidden"}>
+              <CardConformidade
+                analiseId={analise.analise_id}
+                perfil={perfil}
                 sinal={sinal}
               />
             </div>

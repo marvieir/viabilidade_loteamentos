@@ -643,3 +643,46 @@ export async function buscarJuridico(
   const res = await fetch(`${API_BASE}/api/analises/${analiseId}/juridico`);
   return jsonOrThrow(res);
 }
+
+// ----- Fase 3.5 — Conformidade urbanística (consumo puro do perfil da 1.8) -----
+export type StatusConformidade =
+  | "considerado"
+  | "exigencia_projeto"
+  | "atencao"
+  | "nao_extraido";
+
+export interface ItemConformidade {
+  parametro: string;
+  rotulo: string;
+  valor: string | null;
+  status: StatusConformidade;
+  leitura: string; // texto já calculado/formatado pelo backend — não reformatar
+  proveniencia: string | null;
+}
+
+export interface Conformidade {
+  avaliada: boolean;
+  motivo: string | null;
+  zona: string | null;
+  modalidade: string | null;
+  itens: ItemConformidade[];
+  zonas_disponiveis: string[];
+  proveniencia: string | null;
+  avisos: string[];
+}
+
+// Checklist da (zona, modalidade) contra a gleba. Sempre 200; degrada honesto
+// (avaliada=false + motivo) sem perfil confirmado ou sem zona.
+export async function buscarConformidade(
+  analiseId: string,
+  zona?: string | null,
+  modalidade?: string | null
+): Promise<Conformidade> {
+  const qs = new URLSearchParams();
+  if (zona) qs.set("zona", zona);
+  if (modalidade) qs.set("modalidade", modalidade);
+  const res = await fetch(
+    `${API_BASE}/api/analises/${analiseId}/conformidade?${qs.toString()}`
+  );
+  return jsonOrThrow(res);
+}

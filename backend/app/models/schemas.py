@@ -524,3 +524,40 @@ class JuridicoDocumentalOut(BaseModel):
     sintese_risco: SinteseRiscoOut
     proveniencia: str
     avisos: list[str] = []
+
+
+# ----- Fase 3.5 — Conformidade urbanística (consumo puro do perfil da 1.8) -----
+# Confronta a gleba com os índices extraídos+confirmados da LUOS que hoje não entram no
+# número (frente/CA/taxa de ocupação/split da doação). Checklist determinístico, cada item
+# com proveniência por artigo (herdada da 1.8). NÃO altera o aproveitável.
+
+StatusConformidade = Literal["considerado", "exigencia_projeto", "atencao", "nao_extraido"]
+
+
+class ItemConformidadeOut(BaseModel):
+    """Um índice da LUOS lido contra a gleba. ``status``:
+
+    - ``considerado`` — já entra no número (lote mínimo, doação) — aqui só evidenciado;
+    - ``exigencia_projeto`` — exigência legal que o projeto urbanístico deve atender
+      (frente, CA, taxa de ocupação, repartição da doação);
+    - ``atencao`` — inconsistência detectada (ex.: split da doação não fecha com o total);
+    - ``nao_extraido`` — ausente do perfil confirmado → NÃO avaliado (nunca inventa).
+    """
+
+    parametro: str
+    rotulo: str
+    valor: Optional[str] = None  # formatado pelo backend (front não reformata, §2)
+    status: StatusConformidade
+    leitura: str  # interpretação determinística (com números já calculados no backend)
+    proveniencia: Optional[str] = None  # artigo/página + documento + validado_por
+
+
+class ConformidadeOut(BaseModel):
+    avaliada: bool
+    motivo: Optional[str] = None  # quando avaliada=false (sem perfil/zona) — honesto
+    zona: Optional[str] = None
+    modalidade: Optional[str] = None
+    itens: list[ItemConformidadeOut] = []
+    zonas_disponiveis: list[str] = []  # para o front montar o seletor sem inventar
+    proveniencia: Optional[str] = None
+    avisos: list[str] = []
