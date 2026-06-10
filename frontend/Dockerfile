@@ -15,9 +15,12 @@ RUN npm run build
 FROM node:22-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+# Servidor standalone do Next: respeita PORT/HOSTNAME (convenção do projeto: > 3700).
+ENV PORT=3700
+ENV HOSTNAME=0.0.0.0
+# Copia só o necessário (sem o node_modules inteiro): servidor traçado + estáticos.
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
 EXPOSE 3700
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]
