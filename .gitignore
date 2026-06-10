@@ -38,6 +38,8 @@ backend/app/perfis/verde.tif
 backend/app/perfis/municipais/
 # Fichas jurídicas confirmadas por análise (Fase 3) — dado do operador, persistido em volume.
 backend/app/perfis/juridico/
+# Premissas/execução financeira por análise (Fase 4) — dado do operador, persistido em volume.
+backend/app/perfis/financeira/
 
 # .env do backend (segredos/caminhos da máquina) — versionamos só o .env.example.
 backend/.env

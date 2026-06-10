@@ -17,6 +17,7 @@ from app.core.alertas_geo import get_provedor_alertas_geo
 from app.core.extrator_documento import get_extrator_documento
 from app.core.juridico_documental import AlertaGeo
 from app.core.juridico_store import get_fonte_juridica
+from app.core.financeira_store import get_fonte_financeira
 from app.core.store import STORE
 from app.core.declividade import DEMRecorte, get_fonte_dem
 from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
@@ -409,6 +410,27 @@ def fonte_juridica():
     app.dependency_overrides[get_fonte_juridica] = lambda: fonte
     yield fonte
     app.dependency_overrides.pop(get_fonte_juridica, None)
+
+
+class FonteFinanceiraMemoria:
+    """Persistência financeira em memória (injetável nos testes)."""
+
+    def __init__(self):
+        self._m: dict[str, dict] = {}
+
+    def carregar(self, analise_id):
+        return self._m.get(str(analise_id))
+
+    def salvar(self, analise_id, dados):
+        self._m[str(analise_id)] = dados
+
+
+@pytest.fixture
+def fonte_financeira():
+    fonte = FonteFinanceiraMemoria()
+    app.dependency_overrides[get_fonte_financeira] = lambda: fonte
+    yield fonte
+    app.dependency_overrides.pop(get_fonte_financeira, None)
 
 
 @pytest.fixture

@@ -561,3 +561,154 @@ class ConformidadeOut(BaseModel):
     zonas_disponiveis: list[str] = []  # para o front montar o seletor sem inventar
     proveniencia: Optional[str] = None
     avisos: list[str] = []
+
+
+# ----- Fase 4 — Financeira (fluxo de caixa do empreendimento) -----
+# Aritmética PURA: sem LLM, sem rede. Toda premissa com proveniência (declarada × default
+# rotulado); todo valor monetário acompanha *_fmt pt-BR gerado no backend (§2). A 4 MONTA o
+# fluxo; a 5 (Econômica) AVALIA (sem VPL/TIR/payback aqui). NÃO altera o aproveitamento.
+
+
+class LotesIn(BaseModel):
+    origem: Literal["auto", "declarado"] = "auto"
+    n: Optional[int] = None  # quando origem=declarado
+    # Contexto vindo do aproveitamento já calculado (o front repassa o JSON que recebeu;
+    # não recalcula — §2). origem=auto aplica a regra §3.1 (diretriz > teto).
+    n_diretriz: Optional[int] = None
+    n_teto: Optional[int] = None
+
+
+class VendasIn(BaseModel):
+    inicio_mes: int = 1
+    duracao_meses: int = 1
+    curva: Literal["linear", "custom"] = "linear"
+    curva_custom: Optional[list[float]] = None  # % por mês; soma=1 (validado)
+    modo: Literal["avista", "parcelado"] = "avista"
+    entrada_pct: float = 1.0  # parcelado: % no mês da venda
+    n_parcelas: int = 0  # parcelado: nº de parcelas mensais após a entrada
+
+
+class AquisicaoIn(BaseModel):
+    modo: Literal["permuta_vgv", "permuta_lotes", "compra", "nenhuma"] = "nenhuma"
+    pct: Optional[float] = None  # permuta_vgv
+    n: Optional[int] = None  # permuta_lotes
+    valor: Optional[float] = None  # compra
+    condicao: Literal["avista", "parcelado"] = "avista"  # compra
+    inicio_mes: int = 0
+    n_parcelas: int = 1
+    itbi_pct: Optional[float] = None  # compra
+
+
+class CustoUrbanizacaoIn(BaseModel):
+    base: Literal["por_lote", "por_m2"] = "por_lote"
+    valor: float = 0.0
+    inicio_mes: int = 1
+    duracao_meses: int = 1
+
+
+class CustoPontualIn(BaseModel):
+    valor: float = 0.0
+    mes: int = 0
+
+
+class CustoMarketingIn(BaseModel):
+    pct_vgv_proprio: float = 0.0
+    inicio_mes: int = 1
+    duracao_meses: int = 1
+
+
+class CustosIn(BaseModel):
+    urbanizacao: CustoUrbanizacaoIn = Field(default_factory=CustoUrbanizacaoIn)
+    projetos_aprovacao: CustoPontualIn = Field(
+        default_factory=lambda: CustoPontualIn(valor=280000, mes=0)
+    )
+    topografia: CustoPontualIn = Field(
+        default_factory=lambda: CustoPontualIn(valor=100000, mes=0)
+    )
+    spe_itbi_cartorio: Optional[CustoPontualIn] = None
+    administracao_mensal: float = 0.0
+    marketing: CustoMarketingIn = Field(default_factory=CustoMarketingIn)
+    comissao_pct: float = 0.0
+
+
+class TributosIn(BaseModel):
+    regime: Literal["presumido", "real", "outro"] = "presumido"
+    aliquota_pct: float = 0.0593  # default ROTULADO (não é RET) — proveniência no bloco
+
+
+class PremissasFinanceiraIn(BaseModel):
+    lotes: LotesIn = Field(default_factory=LotesIn)
+    eficiencia_projeto_pct: float = 1.0
+    preco_lote: Optional[float] = None  # essencial (ou preco_m2) — sem default (422)
+    preco_m2: Optional[float] = None
+    area_aproveitavel_m2: Optional[float] = None  # contexto p/ preco_m2 e urbanização por_m2
+    vendas: VendasIn = Field(default_factory=VendasIn)
+    inadimplencia_pct: float = 0.0
+    aquisicao: AquisicaoIn = Field(default_factory=AquisicaoIn)
+    custos: CustosIn = Field(default_factory=CustosIn)
+    tributos: TributosIn = Field(default_factory=TributosIn)
+
+
+class PermutaOut(BaseModel):
+    modo: str
+    pct: Optional[float] = None
+    valor: float = 0.0
+    valor_fmt: str = "R$ 0,00"
+
+
+class VgvOut(BaseModel):
+    bruto: float
+    bruto_fmt: str
+    proprio: float
+    proprio_fmt: str
+    permuta: PermutaOut
+
+
+class BlocoOut(BaseModel):
+    bloco: str
+    total: float
+    total_fmt: str
+    proveniencia: str
+
+
+class LinhaFluxoOut(BaseModel):
+    mes: int
+    entradas: float
+    entradas_fmt: str
+    saidas: float
+    saidas_fmt: str
+    liquido: float
+    liquido_fmt: str
+    acumulado: float
+    acumulado_fmt: str
+
+
+class ExposicaoOut(BaseModel):
+    valor: float
+    valor_fmt: str
+    mes: int
+
+
+class IndicadoresOut(BaseModel):
+    resultado_nominal: float
+    resultado_nominal_fmt: str
+    margem_sobre_vgv_proprio: float
+    exposicao_maxima: ExposicaoOut
+    horizonte_meses: int
+
+
+class CasoBaseOut(BaseModel):
+    lotes: int  # caso-base (origem §3.1)
+    lotes_vendaveis: int  # após eficiência de projeto e permuta por lotes
+    origem_lotes: Literal["diretriz", "teto_fisico", "declarado"]
+    aviso_lotes: Optional[str] = None
+
+
+class FinanceiraOut(BaseModel):
+    caso_base: CasoBaseOut
+    vgv: VgvOut
+    blocos: list[BlocoOut]
+    fluxo: list[LinhaFluxoOut]
+    indicadores: IndicadoresOut
+    proveniencia: str
+    avisos: list[str] = []

@@ -47,6 +47,9 @@ export const IconMap = (p: P) => (
 export const IconChevron = (p: P) => (
   <svg {...base(p)}><path d="m9 18 6-6-6-6" /></svg>
 );
+export const IconFinanceira = (p: P) => (
+  <svg {...base(p)}><line x1="12" y1="2" x2="12" y2="22" /><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg>
+);
 export const IconConformidade = (p: P) => (
   <svg {...base(p)}><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M9 3v2h6V3" /><path d="m8.5 12.5 2.5 2.5 4.5-5" /></svg>
 );

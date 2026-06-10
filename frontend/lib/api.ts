@@ -686,3 +686,88 @@ export async function buscarConformidade(
   );
   return jsonOrThrow(res);
 }
+
+// ----- Fase 4 — Financeira (fluxo de caixa) -----
+export interface PremissasFinanceira {
+  lotes: {
+    origem: "auto" | "declarado";
+    n?: number | null;
+    n_diretriz?: number | null;
+    n_teto?: number | null;
+  };
+  eficiencia_projeto_pct?: number;
+  preco_lote?: number | null;
+  preco_m2?: number | null;
+  area_aproveitavel_m2?: number | null;
+  vendas?: Record<string, unknown>;
+  inadimplencia_pct?: number;
+  aquisicao?: Record<string, unknown>;
+  custos?: Record<string, unknown>;
+  tributos?: { regime?: string; aliquota_pct?: number };
+}
+
+export interface BlocoFin {
+  bloco: string;
+  total: number;
+  total_fmt: string;
+  proveniencia: string;
+}
+export interface LinhaFluxo {
+  mes: number;
+  entradas: number;
+  entradas_fmt: string;
+  saidas: number;
+  saidas_fmt: string;
+  liquido: number;
+  liquido_fmt: string;
+  acumulado: number;
+  acumulado_fmt: string;
+}
+export interface Financeira {
+  caso_base: {
+    lotes: number;
+    lotes_vendaveis: number;
+    origem_lotes: "diretriz" | "teto_fisico" | "declarado";
+    aviso_lotes: string | null;
+  };
+  vgv: {
+    bruto: number;
+    bruto_fmt: string;
+    proprio: number;
+    proprio_fmt: string;
+    permuta: { modo: string; pct: number | null; valor: number; valor_fmt: string };
+  };
+  blocos: BlocoFin[];
+  fluxo: LinhaFluxo[];
+  indicadores: {
+    resultado_nominal: number;
+    resultado_nominal_fmt: string;
+    margem_sobre_vgv_proprio: number;
+    exposicao_maxima: { valor: number; valor_fmt: string; mes: number };
+    horizonte_meses: number;
+  };
+  proveniencia: string;
+  avisos: string[];
+}
+
+// Calcula e persiste o fluxo. 422 = premissa essencial ausente (ex.: preço) / curva inválida.
+export async function calcularFinanceira(
+  analiseId: string,
+  premissas: PremissasFinanceira
+): Promise<Financeira> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/financeira`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(premissas),
+  });
+  return jsonOrThrow(res);
+}
+
+// Última execução persistida (404 → null: ainda não rodou).
+export async function obterFinanceira(
+  analiseId: string
+): Promise<Financeira | null> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/financeira`);
+  if (res.status === 404) return null;
+  return jsonOrThrow(res);
+}
