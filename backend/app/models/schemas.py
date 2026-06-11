@@ -578,14 +578,25 @@ class LotesIn(BaseModel):
     n_teto: Optional[int] = None
 
 
+class PerfilMesaIn(BaseModel):
+    """Perfil de financiamento da mesa de vendas (4.1): fração das vendas que fecha neste
+    prazo/taxa. PRICE; taxa 0 degrada para linear (= parcelado sem juros)."""
+
+    participacao: float  # fração das vendas (a mesa inteira soma 1, validado)
+    prazo_meses: int
+    taxa_am: float = 0.0  # taxa de juros ao mês (0.01 = 1% a.m.)
+
+
 class VendasIn(BaseModel):
     inicio_mes: int = 1
     duracao_meses: int = 1
     curva: Literal["linear", "custom"] = "linear"
     curva_custom: Optional[list[float]] = None  # % por mês; soma=1 (validado)
-    modo: Literal["avista", "parcelado"] = "avista"
-    entrada_pct: float = 1.0  # parcelado: % no mês da venda
+    modo: Literal["avista", "parcelado", "financiado"] = "avista"
+    entrada_pct: float = 1.0  # parcelado/financiado: % no mês da venda
     n_parcelas: int = 0  # parcelado: nº de parcelas mensais após a entrada
+    entrada_parcelas: int = 1  # financiado: entrada pode ser parcelada (default à vista)
+    mesa: Optional[list[PerfilMesaIn]] = None  # financiado; None = mesa default ROTULADA
 
 
 class AquisicaoIn(BaseModel):
@@ -629,6 +640,9 @@ class CustosIn(BaseModel):
     administracao_mensal: float = 0.0
     marketing: CustoMarketingIn = Field(default_factory=CustoMarketingIn)
     comissao_pct: float = 0.0
+    # 4.1: base da comissão. None = default por modo (financiado → recebimento; senão →
+    # venda). Corretor de loteamento recebe conforme a carteira paga (padrão TIV/mercado).
+    comissao_base: Optional[Literal["recebimento", "venda"]] = None
 
 
 class TributosIn(BaseModel):
@@ -643,7 +657,9 @@ class PremissasFinanceiraIn(BaseModel):
     preco_m2: Optional[float] = None
     area_aproveitavel_m2: Optional[float] = None  # contexto p/ preco_m2 e urbanização por_m2
     vendas: VendasIn = Field(default_factory=VendasIn)
-    inadimplencia_pct: float = 0.0
+    inadimplencia_pct: float = 0.0  # 0 = ninguém deixa de pagar (a lição do −19M)
+    # 4.1: inadimplência > 30% exige confirmação explícita (senão 422) — nunca silenciosa.
+    confirmar_inadimplencia_alta: bool = False
     aquisicao: AquisicaoIn = Field(default_factory=AquisicaoIn)
     custos: CustosIn = Field(default_factory=CustosIn)
     tributos: TributosIn = Field(default_factory=TributosIn)
@@ -657,10 +673,15 @@ class PermutaOut(BaseModel):
 
 
 class VgvOut(BaseModel):
-    bruto: float
+    bruto: float  # VGV NOMINAL (lotes vendáveis × preço)
     bruto_fmt: str
     proprio: float
     proprio_fmt: str
+    # 4.1 (modo financiado): juros do financiamento direto — separados do nominal.
+    receita_financeira: float = 0.0
+    receita_financeira_fmt: str = "R$ 0,00"
+    geral: float = 0.0  # nominal + receita financeira
+    geral_fmt: str = "R$ 0,00"
     permuta: PermutaOut
 
 
@@ -704,11 +725,37 @@ class CasoBaseOut(BaseModel):
     aviso_lotes: Optional[str] = None
 
 
+class FluxoVendaOut(BaseModel):
+    """Fluxo de VENDAS (quando vende — nominal) ≠ fluxo de RECEBIMENTO (quando o caixa
+    entra, em ``fluxo``). A diferença é a carteira financiada (4.1)."""
+
+    mes: int
+    lotes: float
+    valor_nominal: float
+    valor_nominal_fmt: str
+
+
+class ResumoAnualOut(BaseModel):
+    ano: int  # ano 1 = meses 0–11
+    entradas: float
+    entradas_fmt: str
+    saidas: float
+    saidas_fmt: str
+    liquido: float
+    liquido_fmt: str
+    acumulado: float  # do último mês do ano
+    acumulado_fmt: str
+
+
 class FinanceiraOut(BaseModel):
     caso_base: CasoBaseOut
     vgv: VgvOut
     blocos: list[BlocoOut]
-    fluxo: list[LinhaFluxoOut]
+    fluxo_vendas: list[FluxoVendaOut] = []  # nominal vendido por mês (informativo)
+    fluxo: list[LinhaFluxoOut]  # caixa (recebimento) — o insumo da Fase 5
+    fluxo_resumo_anual: list[ResumoAnualOut] = []
     indicadores: IndicadoresOut
+    # 4.1: guard de sanidade — nunca entregar um fluxo morto em silêncio.
+    alerta_critico: Optional[str] = None
     proveniencia: str
     avisos: list[str] = []

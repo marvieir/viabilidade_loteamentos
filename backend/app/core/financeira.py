@@ -36,6 +36,25 @@ AVISOS_SAIDA = [
     "confirme com contador.",
     "Pré-análise financeira (§1-A): premissas do usuário; não é recomendação de investimento.",
 ]
+AVISO_JUROS = (
+    "Receita financeira = juros do financiamento direto ao comprador; tributação sobre "
+    "juros: confirme com contador."
+)
+ALERTA_FLUXO_MORTO = (
+    "TODAS as entradas são zero — verifique inadimplência/preço/curva de vendas."
+)
+PROV_MESA_DEFAULT = (
+    "estrutura típica de mesa de loteamento (referência TIV 5.0) — calibre com sua corretora"
+)
+# Mesa default do modo financiado (ROTULADA — referência TIV 5.0).
+DEFAULT_MESA = [
+    {"participacao": 0.05, "prazo_meses": 12, "taxa_am": 0.0},
+    {"participacao": 0.20, "prazo_meses": 30, "taxa_am": 0.005},
+    {"participacao": 0.40, "prazo_meses": 60, "taxa_am": 0.01},
+    {"participacao": 0.35, "prazo_meses": 120, "taxa_am": 0.01},
+]
+# Acima deste limiar, inadimplência exige confirmação explícita (a lição do −19M).
+LIMIAR_INADIMPLENCIA = 0.30
 
 
 class PremissaFaltando(ValueError):
@@ -43,7 +62,23 @@ class PremissaFaltando(ValueError):
 
 
 class CurvaInvalida(ValueError):
-    """Curva custom inconsistente (tamanho ou soma) → 422 diagnóstico."""
+    """Curva/mesa/parâmetro inconsistente → 422 diagnóstico."""
+
+
+class InadimplenciaNaoConfirmada(ValueError):
+    """Inadimplência alta sem confirmação explícita → 422 (nunca zera receita em silêncio)."""
+
+
+def pmt_price(saldo: float, taxa_am: float, n: int) -> float:
+    """Parcela PRICE: ``saldo × i / (1 − (1+i)^−n)``. Taxa 0 degrada para linear (saldo/n).
+    Pura e determinística — o coração do modo financiado (4.1)."""
+    if n < 1:
+        raise CurvaInvalida("prazo do perfil da mesa deve ser ≥ 1 mês.")
+    if taxa_am < 0:
+        raise CurvaInvalida("taxa_am do perfil da mesa não pode ser negativa.")
+    if taxa_am == 0:
+        return saldo / n
+    return saldo * taxa_am / (1 - (1 + taxa_am) ** -n)
 
 
 def brl(v: float) -> str:
@@ -96,6 +131,15 @@ def montar_fluxo(
     """Monta o fluxo de caixa mensal. Determinístico: mesmas premissas+contexto → idem."""
     p = premissas
 
+    # --- Guard de inadimplência (4.1 — a lição do −19M): nunca derrubar receita em silêncio ---
+    if not (0.0 <= p.inadimplencia_pct <= 1.0):
+        raise CurvaInvalida("inadimplencia_pct deve estar em [0, 1] (fração; 0,10 = 10%).")
+    if p.inadimplencia_pct > LIMIAR_INADIMPLENCIA and not p.confirmar_inadimplencia_alta:
+        raise InadimplenciaNaoConfirmada(
+            f"inadimplência de {_pct_str(p.inadimplencia_pct)} zeraria/derrubaria as "
+            "receitas — confirme explicitamente com 'confirmar_inadimplencia_alta: true'."
+        )
+
     # --- Lotes vendáveis (eficiência de projeto + permuta por lotes) ---
     if p.eficiencia_projeto_pct <= 0 or p.eficiencia_projeto_pct > 1:
         raise CurvaInvalida("eficiencia_projeto_pct deve estar em (0, 1].")
@@ -139,13 +183,41 @@ def montar_fluxo(
         vgv_proprio = vgv_bruto
         permuta_out_pct = None
 
-    # --- Originação e recebimento das vendas (curva) ---
+    # --- Originação (fluxo de VENDAS — quando vende) ---
     v = p.vendas
     frac_vendas = _fracoes(v.inicio_mes, v.duracao_meses, v.curva, v.curva_custom)
     originado = {m: round(vgv_bruto * f, 2) for m, f in frac_vendas.items()}  # bruto/mês
 
+    # --- Recebimento (fluxo de CAIXA — quando o dinheiro entra) ---
+    # Acumulação em float CRU (sem arredondar por parcela); arredonda só na emissão mensal —
+    # é o que faz os valores-ouro PRICE baterem (pmt não é múltiplo exato de centavo).
     recebido_bruto: dict[int, float] = defaultdict(float)
-    if v.modo == "parcelado":
+    mesa_default = False
+    if v.modo == "financiado":
+        if not (0.0 <= v.entrada_pct <= 1.0):
+            raise CurvaInvalida("entrada_pct deve estar em [0, 1].")
+        mesa = v.mesa
+        if mesa is None:
+            mesa_default = True
+            from app.models.schemas import PerfilMesaIn
+
+            mesa = [PerfilMesaIn(**perfil) for perfil in DEFAULT_MESA]
+        soma_part = sum(perfil.participacao for perfil in mesa)
+        if abs(soma_part - 1.0) > 0.001:
+            raise CurvaInvalida(
+                f"participações da mesa devem somar 1,0 (soma atual: {soma_part:.4f})."
+            )
+        ent_parc = max(1, v.entrada_parcelas)
+        for m, val in originado.items():  # cada safra de venda
+            entrada_total = val * v.entrada_pct
+            for k in range(ent_parc):
+                recebido_bruto[m + k] += entrada_total / ent_parc
+            saldo = val * (1.0 - v.entrada_pct)
+            for perfil in mesa:
+                pmt = pmt_price(saldo * perfil.participacao, perfil.taxa_am, perfil.prazo_meses)
+                for k in range(1, perfil.prazo_meses + 1):
+                    recebido_bruto[m + k] += pmt
+    elif v.modo == "parcelado":
         if not (0.0 <= v.entrada_pct <= 1.0):
             raise CurvaInvalida("entrada_pct deve estar em [0, 1].")
         if v.n_parcelas < 0:
@@ -161,7 +233,14 @@ def montar_fluxo(
         for m, val in originado.items():
             recebido_bruto[m] += val
 
-    inad = max(0.0, min(1.0, p.inadimplencia_pct))
+    # Receita financeira (4.1) = juros da carteira = Σ recebido − nominal. Separada do
+    # nominal (não infla o VGV); 0 fora do financiado por construção.
+    receita_financeira = (
+        round(sum(recebido_bruto.values()) - vgv_bruto, 2) if v.modo == "financiado" else 0.0
+    )
+    vgv_geral = round(vgv_bruto + receita_financeira, 2)
+
+    inad = p.inadimplencia_pct
     # Receita PRÓPRIA recebida = bruto recebido × (1−inad) × (1−permuta_vgv_pct).
     entradas: dict[int, float] = defaultdict(float)
     for m, val in recebido_bruto.items():
@@ -243,13 +322,25 @@ def montar_fluxo(
             f"{_pct_str(c.marketing.pct_vgv_proprio)} do VGV próprio — declarado",
         )
 
-    # Comissão (% sobre venda bruta originada, no mês da venda)
+    # Comissão — base default por modo (4.1): financiado → sobre o RECEBIMENTO (corretor
+    # recebe conforme a carteira paga, padrão TIV/mercado); à vista/parcelado → sobre a venda.
+    base_comissao = c.comissao_base or (
+        "recebimento" if v.modo == "financiado" else "venda"
+    )
     if c.comissao_pct > 0:
-        _add_bloco(
-            "comissao",
-            {m: val * c.comissao_pct for m, val in originado.items()},
-            f"{_pct_str(c.comissao_pct)} sobre o valor bruto de cada venda — declarado",
-        )
+        if base_comissao == "recebimento":
+            _add_bloco(
+                "comissao",
+                {m: val * c.comissao_pct for m, val in recebido_bruto.items()},
+                f"{_pct_str(c.comissao_pct)} sobre o recebimento bruto de cada mês "
+                "(carteira) — declarado (base: recebimento)",
+            )
+        else:
+            _add_bloco(
+                "comissao",
+                {m: val * c.comissao_pct for m, val in originado.items()},
+                f"{_pct_str(c.comissao_pct)} sobre o valor bruto de cada venda — declarado",
+            )
 
     # Tributos (alíquota × receita própria recebida no mês — regime de caixa)
     if p.tributos.aliquota_pct > 0:
@@ -321,6 +412,53 @@ def montar_fluxo(
     resultado = round(acumulado, 2)
     margem = round(resultado / vgv_proprio, 6) if vgv_proprio else 0.0
 
+    # Fluxo de VENDAS (nominal por mês) — informativo, distinto do recebimento (4.1).
+    fluxo_vendas = [
+        schemas.FluxoVendaOut(
+            mes=m,
+            lotes=round(vendaveis * frac_vendas[m], 2),
+            valor_nominal=val,
+            valor_nominal_fmt=brl(val),
+        )
+        for m, val in sorted(originado.items())
+    ]
+
+    # Resumo anual (ano 1 = meses 0–11) — o front mostra anual por default no financiado.
+    resumo: dict[int, dict] = {}
+    for linha in fluxo:
+        ano = linha.mes // 12 + 1
+        r = resumo.setdefault(ano, {"entradas": 0.0, "saidas": 0.0, "liquido": 0.0, "acumulado": 0.0})
+        r["entradas"] += linha.entradas
+        r["saidas"] += linha.saidas
+        r["liquido"] += linha.liquido
+        r["acumulado"] = linha.acumulado  # do último mês do ano
+    fluxo_resumo_anual = [
+        schemas.ResumoAnualOut(
+            ano=a,
+            entradas=round(r["entradas"], 2), entradas_fmt=brl(r["entradas"]),
+            saidas=round(r["saidas"], 2), saidas_fmt=brl(r["saidas"]),
+            liquido=round(r["liquido"], 2), liquido_fmt=brl(r["liquido"]),
+            acumulado=round(r["acumulado"], 2), acumulado_fmt=brl(r["acumulado"]),
+        )
+        for a, r in sorted(resumo.items())
+    ]
+
+    # Guard de sanidade (4.1): fluxo morto nunca passa em silêncio (o caso do −19M).
+    alerta_critico = None
+    if vgv_bruto > 0 and round(sum(entradas.values()), 2) == 0:
+        alerta_critico = ALERTA_FLUXO_MORTO
+
+    avisos = list(AVISOS_SAIDA)
+    if v.modo == "financiado":
+        avisos.append(AVISO_JUROS)
+        if mesa_default:
+            avisos.append(f"Mesa de vendas: {PROV_MESA_DEFAULT}.")
+    if inad > LIMIAR_INADIMPLENCIA:
+        avisos.append(
+            f"Inadimplência ALTA de {_pct_str(inad)} aplicada — confirmada "
+            "explicitamente pelo usuário."
+        )
+
     return schemas.FinanceiraOut(
         caso_base=schemas.CasoBaseOut(
             lotes=ctx.lotes_base,
@@ -331,13 +469,18 @@ def montar_fluxo(
         vgv=schemas.VgvOut(
             bruto=vgv_bruto, bruto_fmt=brl(vgv_bruto),
             proprio=vgv_proprio, proprio_fmt=brl(vgv_proprio),
+            receita_financeira=receita_financeira,
+            receita_financeira_fmt=brl(receita_financeira),
+            geral=vgv_geral, geral_fmt=brl(vgv_geral),
             permuta=schemas.PermutaOut(
                 modo=aq.modo, pct=permuta_out_pct,
                 valor=permuta_valor, valor_fmt=brl(permuta_valor),
             ),
         ),
         blocos=blocos,
+        fluxo_vendas=fluxo_vendas,
         fluxo=fluxo,
+        fluxo_resumo_anual=fluxo_resumo_anual,
         indicadores=schemas.IndicadoresOut(
             resultado_nominal=resultado, resultado_nominal_fmt=brl(resultado),
             margem_sobre_vgv_proprio=margem,
@@ -346,9 +489,10 @@ def montar_fluxo(
             ),
             horizonte_meses=horizonte,
         ),
+        alerta_critico=alerta_critico,
         proveniencia=(
             "Premissas declaradas/defaults rotulados desta análise · lotes do "
             + (ctx.rotulo_origem or ctx.origem_lotes)
         ),
-        avisos=AVISOS_SAIDA,
+        avisos=avisos,
     )

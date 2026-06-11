@@ -701,9 +701,17 @@ export interface PremissasFinanceira {
   area_aproveitavel_m2?: number | null;
   vendas?: Record<string, unknown>;
   inadimplencia_pct?: number;
+  confirmar_inadimplencia_alta?: boolean;
   aquisicao?: Record<string, unknown>;
   custos?: Record<string, unknown>;
   tributos?: { regime?: string; aliquota_pct?: number };
+}
+
+// Perfil da mesa de vendas (4.1 — financiado/PRICE).
+export interface PerfilMesa {
+  participacao: number; // fração (a mesa soma 1)
+  prazo_meses: number;
+  taxa_am: number; // 0.01 = 1% a.m.
 }
 
 export interface BlocoFin {
@@ -723,6 +731,25 @@ export interface LinhaFluxo {
   acumulado: number;
   acumulado_fmt: string;
 }
+export interface FluxoVenda {
+  mes: number;
+  lotes: number;
+  valor_nominal: number;
+  valor_nominal_fmt: string;
+}
+
+export interface ResumoAnual {
+  ano: number;
+  entradas: number;
+  entradas_fmt: string;
+  saidas: number;
+  saidas_fmt: string;
+  liquido: number;
+  liquido_fmt: string;
+  acumulado: number;
+  acumulado_fmt: string;
+}
+
 export interface Financeira {
   caso_base: {
     lotes: number;
@@ -735,10 +762,16 @@ export interface Financeira {
     bruto_fmt: string;
     proprio: number;
     proprio_fmt: string;
+    receita_financeira: number;
+    receita_financeira_fmt: string;
+    geral: number;
+    geral_fmt: string;
     permuta: { modo: string; pct: number | null; valor: number; valor_fmt: string };
   };
   blocos: BlocoFin[];
+  fluxo_vendas: FluxoVenda[];
   fluxo: LinhaFluxo[];
+  fluxo_resumo_anual: ResumoAnual[];
   indicadores: {
     resultado_nominal: number;
     resultado_nominal_fmt: string;
@@ -746,6 +779,7 @@ export interface Financeira {
     exposicao_maxima: { valor: number; valor_fmt: string; mes: number };
     horizonte_meses: number;
   };
+  alerta_critico: string | null;
   proveniencia: string;
   avisos: string[];
 }

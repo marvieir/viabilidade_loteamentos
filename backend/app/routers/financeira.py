@@ -65,6 +65,9 @@ def calcular_financeira(
         resultado = motor.montar_fluxo(body, ctx)
     except motor.PremissaFaltando as exc:
         raise HTTPException(422, f"Premissa essencial ausente: {exc}")
+    except motor.InadimplenciaNaoConfirmada as exc:
+        # 4.1: inadimplência alta nunca passa em silêncio (a lição do −19M).
+        raise HTTPException(422, str(exc))
     except motor.CurvaInvalida as exc:
         raise HTTPException(422, str(exc))
 
