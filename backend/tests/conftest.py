@@ -19,6 +19,7 @@ from app.core.juridico_documental import AlertaGeo
 from app.core.juridico_store import get_fonte_juridica
 from app.core.economica_store import get_fonte_economica
 from app.core.financeira_store import get_fonte_financeira
+from app.core.localizacao import FonteLocalizacaoMemoria, get_fonte_localizacao
 from app.core.store import STORE
 from app.core.declividade import DEMRecorte, get_fonte_dem
 from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
@@ -456,6 +457,63 @@ def alertas_geo():
     _set([])  # default: provedor vazio (não tenta as fontes reais nos testes)
     yield _set
     app.dependency_overrides.pop(get_provedor_alertas_geo, None)
+
+
+# ----- Fase 6 — Localização: dataset embarcado de TESTE (offline) -----
+# São Roque = valores-ouro IBGE; UF SP + Brasil para as razões; Mairinque = município COM
+# déficit FJP (exercita o caminho preenchido); "9999999" não entra (INDISPONIVEL no router).
+LOCALIZACAO_DATASET = {
+    "_meta": {"data_geracao": "2026-06-12", "fontes": "IBGE/FJP (teste)"},
+    "registros": {
+        "3550605": {
+            "nivel": "municipio", "cod": "3550605", "nome": "São Roque", "uf": "SP",
+            "pop_2022": 79484, "pop_2010": 78821, "area_km2": 306.909,
+            "pib_per_capita": 57024.90, "pib_ano": 2023,
+            "domicilios_ocupados": 28490, "moradores_por_domicilio": 2.79,
+            "deficit": None,
+            "faixa_etaria": {"0-14": 0.1832, "15-29": 0.2103, "30-59": 0.4298, "60+": 0.1767},
+        },
+        "3528502": {  # Mairinque/SP — COM déficit FJP no fixture
+            "nivel": "municipio", "cod": "3528502", "nome": "Mairinque", "uf": "SP",
+            "pop_2022": 47714, "pop_2010": 43223, "area_km2": 210.0,
+            "pib_per_capita": 38000.00, "pib_ano": 2023,
+            "domicilios_ocupados": 16000, "moradores_por_domicilio": 2.98,
+            "deficit": {"valor": 1234, "fonte": "FJP", "ano": 2022},
+            "faixa_etaria": {"0-14": 0.20, "15-29": 0.22, "30-59": 0.43, "60+": 0.15},
+        },
+        "UF:SP": {
+            "nivel": "uf", "cod": "35", "nome": "São Paulo", "uf": "SP",
+            "pop_2022": 44411238, "pop_2010": 41262199, "area_km2": 248219.485,
+            "pib_per_capita": 64500.00, "pib_ano": 2023,
+            "domicilios_ocupados": 15273855, "moradores_por_domicilio": 2.91,
+            "deficit": None,
+            "faixa_etaria": {"0-14": 0.1789, "15-29": 0.2151, "30-59": 0.4318, "60+": 0.1742},
+        },
+        "BR": {
+            "nivel": "brasil", "cod": "0", "nome": "Brasil", "uf": None,
+            "pop_2022": 203080756, "pop_2010": 190755799, "area_km2": 8510295.914,
+            "pib_per_capita": 50200.00, "pib_ano": 2023,
+            "domicilios_ocupados": 68000000, "moradores_por_domicilio": 2.98,
+            "deficit": None,
+            "faixa_etaria": {"0-14": 0.1962, "15-29": 0.2238, "30-59": 0.4253, "60+": 0.1547},
+        },
+    },
+}
+
+
+@pytest.fixture
+def localizacao():
+    """Injeta um dataset de localização-stub. Uso: ``localizacao(LOCALIZACAO_DATASET)``.
+    Default = dataset padrão (São Roque + SP + Brasil + Mairinque-com-FJP)."""
+
+    def _set(dataset=LOCALIZACAO_DATASET):
+        app.dependency_overrides[get_fonte_localizacao] = lambda: FonteLocalizacaoMemoria(
+            dataset
+        )
+
+    _set()  # default já injetado
+    yield _set
+    app.dependency_overrides.pop(get_fonte_localizacao, None)
 
 
 @pytest.fixture

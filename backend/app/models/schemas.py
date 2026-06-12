@@ -875,3 +875,95 @@ class EconomicaOut(BaseModel):
     leituras: list[LeituraOut]  # chaves vpl/tir/payback — o dashboard 4.2 compõe os slots
     proveniencia: str
     avisos: list[str] = []
+
+
+# ----- Fase 6 — Localização (enriquecimento socioeconômico IBGE; INFORMATIVO, §1-A) -----
+# Nenhum campo desta seção é lido por outro router (critério-coração nº 8): é contexto,
+# não cálculo. Todo número formatável carrega o par valor + *_fmt pt-BR (gerado no backend).
+
+
+class PopulacaoOut(BaseModel):
+    disponivel: bool
+    censo_2022: Optional[int] = None
+    censo_2022_fmt: Optional[str] = None
+    censo_2010: Optional[int] = None
+    censo_2010_fmt: Optional[str] = None
+    crescimento_total_pct: Optional[float] = None  # variação total 2010→2022 (fração)
+    crescimento_total_fmt: Optional[str] = None
+    crescimento_aa_pct: Optional[float] = None  # CAGR geométrico 12 anos (fração)
+    crescimento_aa_fmt: Optional[str] = None
+    densidade_hab_km2: Optional[float] = None
+    densidade_fmt: Optional[str] = None
+    area_km2: Optional[float] = None
+    vs_uf: Optional[float] = None  # fração da população da UF (informativo)
+    fonte: Optional[str] = None
+    leitura: Optional[str] = None
+    aviso: Optional[str] = None
+
+
+class RendaOut(BaseModel):
+    disponivel: bool
+    pib_per_capita: Optional[float] = None
+    pib_per_capita_fmt: Optional[str] = None
+    ano: Optional[int] = None
+    vs_uf: Optional[float] = None  # razão município ÷ UF (calculada no backend)
+    vs_uf_fmt: Optional[str] = None
+    vs_brasil: Optional[float] = None  # razão município ÷ Brasil
+    vs_brasil_fmt: Optional[str] = None
+    fonte: Optional[str] = None
+    leitura: Optional[str] = None
+    aviso: Optional[str] = None
+
+
+class DeficitOut(BaseModel):
+    valor: int
+    valor_fmt: str
+    fonte: str  # "FJP"
+    ano: int
+
+
+class FallbackEstoqueOut(BaseModel):
+    domicilios_ocupados: int
+    domicilios_ocupados_fmt: str
+    moradores_por_domicilio: float
+    moradores_por_domicilio_fmt: str
+    fonte: str  # "IBGE Censo 2022"
+
+
+class HabitacaoOut(BaseModel):
+    disponivel: bool
+    deficit: Optional[DeficitOut] = None  # FJP quando no recorte; null → exibe fallback
+    fallback_estoque: Optional[FallbackEstoqueOut] = None  # estoque (NÃO é o déficit)
+    fonte: Optional[str] = None
+    aviso: Optional[str] = None
+
+
+class GrupoEtarioOut(BaseModel):
+    faixa: str  # "0-14" | "15-29" | "30-59" | "60+"
+    pct: float
+    pct_fmt: str
+
+
+class FaixaEtariaOut(BaseModel):
+    disponivel: bool
+    fonte: Optional[str] = None
+    grupos: list[GrupoEtarioOut] = []
+    aviso: Optional[str] = None
+
+
+class LocalizacaoMunicipioOut(BaseModel):
+    cod_ibge: Optional[str] = None
+    nome: Optional[str] = None
+    uf: Optional[str] = None
+
+
+class LocalizacaoOut(BaseModel):
+    avaliada: bool
+    cobertura: str  # COMPLETA (4 blocos) | PARCIAL (faltou algum) | INDISPONIVEL (fora do arquivo)
+    municipio: LocalizacaoMunicipioOut
+    populacao: PopulacaoOut
+    renda: RendaOut
+    habitacao: HabitacaoOut
+    faixa_etaria: FaixaEtariaOut
+    proveniencia: str
+    avisos: list[str] = []

@@ -1,0 +1,70 @@
+{
+  "_meta": {
+    "data_geracao": "2026-06-12",
+    "fontes": "IBGE — SIDRA (Censo Demográfico 2022 e 2010; PIB dos Municípios 2023) e Fundação João Pinheiro (Déficit Habitacional Municipal)",
+    "nota": "SEED embarcado (São Roque/SP + UF SP + Brasil). Os 4 indicadores-ouro de São Roque são verificados; UF/Brasil e a distribuição etária são populados/recalibrados pelo pipeline scripts/gerar_localizacao_ibge.py (egress IBGE bloqueado neste sandbox — ver ARCHITECTURE.md, padrão da lista leve / malha IBGE). O pipeline valida os ouros de São Roque antes de aceitar o arquivo gerado.",
+    "niveis": ["municipio", "uf", "brasil"]
+  },
+  "registros": {
+    "3550605": {
+      "nivel": "municipio",
+      "cod": "3550605",
+      "nome": "São Roque",
+      "uf": "SP",
+      "pop_2022": 79484,
+      "pop_2010": 78821,
+      "area_km2": 306.909,
+      "pib_per_capita": 57024.90,
+      "pib_ano": 2023,
+      "domicilios_ocupados": 28490,
+      "moradores_por_domicilio": 2.79,
+      "deficit": null,
+      "faixa_etaria": {
+        "0-14": 0.1832,
+        "15-29": 0.2103,
+        "30-59": 0.4298,
+        "60+": 0.1767
+      }
+    },
+    "UF:SP": {
+      "nivel": "uf",
+      "cod": "35",
+      "nome": "São Paulo",
+      "uf": "SP",
+      "pop_2022": 44411238,
+      "pop_2010": 41262199,
+      "area_km2": 248219.485,
+      "pib_per_capita": 64500.00,
+      "pib_ano": 2023,
+      "domicilios_ocupados": 15273855,
+      "moradores_por_domicilio": 2.91,
+      "deficit": null,
+      "faixa_etaria": {
+        "0-14": 0.1789,
+        "15-29": 0.2151,
+        "30-59": 0.4318,
+        "60+": 0.1742
+      }
+    },
+    "BR": {
+      "nivel": "brasil",
+      "cod": "0",
+      "nome": "Brasil",
+      "uf": null,
+      "pop_2022": 203080756,
+      "pop_2010": 190755799,
+      "area_km2": 8510295.914,
+      "pib_per_capita": 50200.00,
+      "pib_ano": 2023,
+      "domicilios_ocupados": 68000000,
+      "moradores_por_domicilio": 2.98,
+      "deficit": null,
+      "faixa_etaria": {
+        "0-14": 0.1962,
+        "15-29": 0.2238,
+        "30-59": 0.4253,
+        "60+": 0.1547
+      }
+    }
+  }
+}

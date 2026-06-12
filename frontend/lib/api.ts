@@ -905,3 +905,91 @@ export async function obterEconomica(
   if (res.status === 404) return null;
   return jsonOrThrow(res);
 }
+
+// ----- Fase 6 — Localização (enriquecimento socioeconômico IBGE; INFORMATIVO, §1-A) -----
+// O front só renderiza estes shapes; nenhum número é calculado/reformatado aqui (§2).
+export interface Populacao {
+  disponivel: boolean;
+  censo_2022: number | null;
+  censo_2022_fmt: string | null;
+  censo_2010: number | null;
+  censo_2010_fmt: string | null;
+  crescimento_total_pct: number | null;
+  crescimento_total_fmt: string | null;
+  crescimento_aa_pct: number | null;
+  crescimento_aa_fmt: string | null;
+  densidade_hab_km2: number | null;
+  densidade_fmt: string | null;
+  area_km2: number | null;
+  vs_uf: number | null;
+  fonte: string | null;
+  leitura: string | null;
+  aviso: string | null;
+}
+
+export interface Renda {
+  disponivel: boolean;
+  pib_per_capita: number | null;
+  pib_per_capita_fmt: string | null;
+  ano: number | null;
+  vs_uf: number | null;
+  vs_uf_fmt: string | null;
+  vs_brasil: number | null;
+  vs_brasil_fmt: string | null;
+  fonte: string | null;
+  leitura: string | null;
+  aviso: string | null;
+}
+
+export interface Deficit {
+  valor: number;
+  valor_fmt: string;
+  fonte: string;
+  ano: number;
+}
+
+export interface FallbackEstoque {
+  domicilios_ocupados: number;
+  domicilios_ocupados_fmt: string;
+  moradores_por_domicilio: number;
+  moradores_por_domicilio_fmt: string;
+  fonte: string;
+}
+
+export interface Habitacao {
+  disponivel: boolean;
+  deficit: Deficit | null;
+  fallback_estoque: FallbackEstoque | null;
+  fonte: string | null;
+  aviso: string | null;
+}
+
+export interface GrupoEtario {
+  faixa: string;
+  pct: number;
+  pct_fmt: string;
+}
+
+export interface FaixaEtaria {
+  disponivel: boolean;
+  fonte: string | null;
+  grupos: GrupoEtario[];
+  aviso: string | null;
+}
+
+export interface Localizacao {
+  avaliada: boolean;
+  cobertura: "COMPLETA" | "PARCIAL" | "INDISPONIVEL";
+  municipio: { cod_ibge: string | null; nome: string | null; uf: string | null };
+  populacao: Populacao;
+  renda: Renda;
+  habitacao: Habitacao;
+  faixa_etaria: FaixaEtaria;
+  proveniencia: string;
+  avisos: string[];
+}
+
+export async function buscarLocalizacao(analiseId: string): Promise<Localizacao> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/localizacao`);
+  return jsonOrThrow(res);
+}
