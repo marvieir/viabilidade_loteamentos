@@ -43,6 +43,7 @@ AVISO_SEM_INVERSAO = "Fluxo sem inversão de sinal — TIR não existe; use o VP
 _TIR_MIN, _TIR_MAX = -0.99, 10.0
 _TIR_TOL, _TIR_MAX_ITER = 1e-12, 500
 _TIR_VARREDURA = 0.01  # passo da varredura de sub-brackets (mensal)
+_MIN_FATOR = 1e-300  # piso do fator de desconto: evita /0 por underflow no extremo do bracket
 _LIMIAR_TIR_ALTA_AA = 2.0  # 200% a.a.
 
 
@@ -62,8 +63,22 @@ def tma_mensal(tma_aa: float) -> float:
 
 
 def vpl(fluxo: list[tuple[int, float]], i_m: float) -> float:
-    """Σ fluxo[m] / (1+i_m)^m — m é o mês da linha da Financeira (m=0 = primeiro mês)."""
-    return sum(v / (1.0 + i_m) ** m for m, v in fluxo)
+    """Σ fluxo[m] / (1+i_m)^m — m é o mês da linha da Financeira (m=0 = primeiro mês).
+
+    Guarda contra underflow: nos EXTREMOS do bracket da TIR (i_m perto de −1, base de
+    desconto perto de 0), ``base**m`` estoura para 0.0 em horizontes longos (ex.: m≥162
+    com base 0,01) e ``v/0.0`` lançaria ZeroDivisionError. A base é sempre > 0 na busca
+    da TIR (i_m ∈ (−1, …]), então o fator é ≥ 0; clampamos o fator a um mínimo positivo —
+    o termo fica enorme mas com o SINAL correto, que é tudo que o bracketing precisa.
+    Na região da raiz (taxas normais) não há underflow, logo o VPL/TIR fica exato."""
+    total = 0.0
+    base = 1.0 + i_m
+    for m, v in fluxo:
+        fator = base ** m
+        if fator == 0.0:  # base>0 ⇒ underflow só p/ 0.0 exato; preserva sinal sem estourar
+            fator = _MIN_FATOR
+        total += v / fator
+    return total
 
 
 def trocas_de_sinal(fluxo: list[tuple[int, float]]) -> int:

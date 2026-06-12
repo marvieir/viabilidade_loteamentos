@@ -90,6 +90,22 @@ def test_tir_ouro(client, analise_com_financeira):
     assert any("exposição" in a for a in tir["avisos"])  # TIR explosiva (>200% a.a.)
 
 
+# ----- 3b. Horizonte longo (regressão do ZeroDivisionError no extremo do bracket) -----
+def test_tir_horizonte_longo_nao_estoura():
+    """Fluxo financiado real chega a ~180 meses; no extremo i=−0,99 do bracket a base
+    0,01 faz 0,01**m underflow→0.0 (m≥162). vpl guardado não pode lançar ZeroDivisionError."""
+    fluxo = [(0, -2_000_000.0)] + [(m, 25_000.0) for m in range(1, 181)]  # horizonte 180
+    assert motor.trocas_de_sinal(fluxo) == 1
+    tir, status = motor.tir_bissecao(fluxo)  # não pode estourar
+    assert status == "unica" and tir is not None
+    assert abs(motor.vpl(fluxo, tir)) <= 1.0  # raiz coerente
+    out = motor.avaliar(
+        fluxo, _acum(fluxo), PremissasEconomicaIn(tma_aa_real=0.12), proveniencia="t"
+    )
+    assert out.vpl.valor == out.vpl.valor  # não é NaN
+    assert out.tir.status == "unica"
+
+
 # ----- 4. TIR trivial -----
 def test_tir_trivial():
     tir, status = motor.tir_bissecao([(0, -1000.0), (1, 1100.0)])
