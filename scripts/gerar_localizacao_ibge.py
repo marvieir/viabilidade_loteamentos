@@ -322,6 +322,14 @@ def aplicar_fjp(registros: dict[str, dict], caminho: Path) -> int:
     Espera colunas: cod_ibge (7 díg.), deficit (inteiro), ano. Município ausente fica null
     (fallback de estoque assume no runtime). NUNCA estima.
     """
+    if not Path(caminho).exists():
+        print(
+            f"  (aviso: planilha FJP não encontrada em '{caminho}' — pulei o déficit "
+            "(fica null; o fallback de estoque assume no runtime). Para incluir o déficit, "
+            "baixe a planilha da FJP e aponte o caminho real com --fjp.)",
+            file=sys.stderr,
+        )
+        return 0
     try:
         import openpyxl  # opcional; só o operador com a planilha precisa
     except ImportError:
@@ -331,7 +339,11 @@ def aplicar_fjp(registros: dict[str, dict], caminho: Path) -> int:
             file=sys.stderr,
         )
         return 0
-    wb = openpyxl.load_workbook(caminho, read_only=True, data_only=True)
+    try:
+        wb = openpyxl.load_workbook(caminho, read_only=True, data_only=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (aviso: não consegui abrir a planilha FJP ({exc}) — déficit fica null)", file=sys.stderr)
+        return 0
     ws = wb.active
     cabecalho = [str(c.value).strip().lower() if c.value else "" for c in next(ws.iter_rows(max_row=1))]
     try:
