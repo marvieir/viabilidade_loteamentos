@@ -12,8 +12,10 @@ import { Button } from "@/components/ui/button";
 import {
   calcularFinanceira,
   type Aproveitamento,
+  type Economica,
   type Financeira,
 } from "@/lib/api";
+import { comporLeituras } from "@/lib/compor";
 
 /* Wizard de 6 passos (Fase 4.2). O ESTADO mora no front; o número de cada passo vem do
    backend (POST a cada avanço) — nada é calculado aqui (§2). Microcopy em todo campo. */
@@ -74,12 +76,13 @@ const MESA_PADRAO: LinhaMesa[] = [
 const PASSOS = ["Lotes & Preço", "Parceria", "Venda", "Custos", "Tributos", "Resultado"];
 
 export function CardFinanceira({
-  analiseId, aprov, onData, sinal,
+  analiseId, aprov, onData, sinal, econ,
 }: {
   analiseId: string;
   aprov?: Aproveitamento | null;
   onData?: (d: Financeira) => void;
   sinal?: number;
+  econ?: Economica | null; // Fase 5: preenche os slots vpl/tir/payback do semáforo
 }) {
   const [f, setF] = useState<Form>(PADRAO);
   const [mesa, setMesa] = useState<LinhaMesa[]>(MESA_PADRAO);
@@ -339,8 +342,8 @@ export function CardFinanceira({
           </Passo>
         )}
 
-        {/* PASSO 6 — Dashboard */}
-        {passo === 6 && prev && <Dashboard d={prev} />}
+        {/* PASSO 6 — Dashboard (slots vpl/tir/payback compostos com a Econômica, se houver) */}
+        {passo === 6 && prev && <Dashboard d={prev} econ={econ} />}
 
         {/* Navegação */}
         <div className="flex items-center justify-between pt-1">
@@ -412,11 +415,13 @@ const SEMA: Record<string, { cor: string; rotulo: string }> = {
   pendente: { cor: "bg-slate-300", rotulo: "Fase 5" },
 };
 
-function Dashboard({ d }: { d: Financeira }) {
+function Dashboard({ d, econ }: { d: Financeira; econ?: Economica | null }) {
   const ind = d.indicadores;
   const lucro = ind.resultado_nominal >= 0;
   const inc = d.participantes?.incorporador;
   const ter = d.participantes?.terrenista;
+  // Composição de dois JSONs do backend (§2): zero cálculo aqui.
+  const leituras = comporLeituras(d.leituras, econ);
   return (
     <div className="space-y-4">
       {d.alerta_critico && (
@@ -435,7 +440,7 @@ function Dashboard({ d }: { d: Financeira }) {
       <div className="rounded-xl border border-slate-200 p-4">
         <p className="mb-2 text-sm font-semibold text-slate-800">Leitura sob as premissas declaradas</p>
         <ul className="space-y-1.5">
-          {d.leituras.map((l) => (
+          {leituras.map((l) => (
             <li key={l.chave} className="flex items-center gap-2 text-sm">
               <span className={`h-2.5 w-2.5 rounded-full ${SEMA[l.status].cor}`} />
               <span className="text-slate-700">{l.texto}</span>

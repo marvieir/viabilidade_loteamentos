@@ -3,6 +3,7 @@ import {
   IconAproveitamento,
   IconConformidade,
   IconDeclividade,
+  IconEconomica,
   IconFinanceira,
   IconJuridico,
   IconLuos,
@@ -19,6 +20,7 @@ export type Secao =
   | "conformidade"
   | "juridico"
   | "financeira"
+  | "economica"
   | "luos";
 
 export const SECOES: {
@@ -34,5 +36,6 @@ export const SECOES: {
   { id: "conformidade", rotulo: "Conformidade", Icone: IconConformidade },
   { id: "juridico", rotulo: "Jurídico", Icone: IconJuridico },
   { id: "financeira", rotulo: "Financeira", Icone: IconFinanceira },
+  { id: "economica", rotulo: "Econômica", Icone: IconEconomica },
   { id: "luos", rotulo: "Diretriz (LUOS)", Icone: IconLuos },
 ];

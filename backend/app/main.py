@@ -21,6 +21,7 @@ from app.routers import (
     analises,
     conformidade,
     declividade,
+    economica,
     financeira,
     juridico,
     perfil,
@@ -51,6 +52,7 @@ app.include_router(perfil.router, prefix="/api")
 app.include_router(juridico.router, prefix="/api")
 app.include_router(conformidade.router, prefix="/api")
 app.include_router(financeira.router, prefix="/api")
+app.include_router(economica.router, prefix="/api")
 
 
 @app.get("/health")

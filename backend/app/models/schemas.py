@@ -809,3 +809,69 @@ class FinanceiraOut(BaseModel):
     alerta_critico: Optional[str] = None
     proveniencia: str
     avisos: list[str] = []
+
+# ----- Fase 5 — Econômica (avalia o fluxo da Financeira: VPL/TIR/paybacks/curva) -----
+
+
+class CurvaVplIn(BaseModel):
+    """Range da curva VPL×TMA (a sensibilidade do MVP — handoff §0.2)."""
+
+    min_aa: float = 0.0
+    max_aa: float = 0.40
+    passo_pp: float = 1.0  # passo em pontos percentuais
+
+
+class PremissasEconomicaIn(BaseModel):
+    # TMA REAL (acima do IPCA — handoff §0.1), obrigatória SEM default (422 se ausente):
+    # é a premissa que decide o veredito, não pode vir escondida.
+    tma_aa_real: float
+    curva: CurvaVplIn = Field(default_factory=CurvaVplIn)
+
+
+class TmaOut(BaseModel):
+    aa_real: float
+    aa_real_fmt: str
+    mensal: float  # equivalência composta (1+t)^(1/12) − 1
+    origem: str = "declarado"
+    data: str  # data da declaração (proveniência)
+
+
+class VplOut(BaseModel):
+    valor: float
+    valor_fmt: str
+
+
+class TirOut(BaseModel):
+    """TIR honesta: null rotulado quando degenerada — NUNCA número inventado."""
+
+    mensal: Optional[float] = None
+    aa: Optional[float] = None
+    aa_fmt: Optional[str] = None
+    status: Literal["unica", "indefinida", "multipla_possivel"]
+    avisos: list[str] = []
+
+
+class PaybackOut(BaseModel):
+    simples_mes: Optional[int] = None  # null = não recuperado no horizonte
+    descontado_mes: Optional[int] = None
+    avisos: list[str] = []
+
+
+class PontoCurvaOut(BaseModel):
+    tma_aa: float
+    vpl: float
+    vpl_fmt: str
+
+
+class EconomicaOut(BaseModel):
+    convencao: str  # moeda constante (Fisher) — explícita, nunca implícita (handoff §0.1)
+    tma: TmaOut
+    vpl: VplOut
+    tir: TirOut
+    payback: PaybackOut
+    exposicao_descontada: ExposicaoOut
+    indice_lucratividade: Optional[float] = None  # VPL ÷ |exposição descontada|
+    curva_vpl_tma: list[PontoCurvaOut]
+    leituras: list[LeituraOut]  # chaves vpl/tir/payback — o dashboard 4.2 compõe os slots
+    proveniencia: str
+    avisos: list[str] = []

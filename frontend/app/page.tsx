@@ -17,6 +17,7 @@ import { CardDeclividade } from "@/components/cards/CardDeclividade";
 import { CardJuridico } from "@/components/cards/CardJuridico";
 import { CardConformidade } from "@/components/cards/CardConformidade";
 import { CardFinanceira } from "@/components/cards/CardFinanceira";
+import { CardEconomica } from "@/components/cards/CardEconomica";
 import { IconMap } from "@/components/Icons";
 import type {
   Ambiental,
@@ -24,6 +25,7 @@ import type {
   Aproveitamento,
   ChaveOverlay,
   Declividade,
+  Economica,
   Financeira,
   JuridicoDocumental,
   PerfilMunicipal,
@@ -50,6 +52,7 @@ export default function Home() {
   const [dadosAprov, setDadosAprov] = useState<Aproveitamento | null>(null);
   const [dadosJuridico, setDadosJuridico] = useState<JuridicoDocumental | null>(null);
   const [dadosFinanceira, setDadosFinanceira] = useState<Financeira | null>(null);
+  const [dadosEconomica, setDadosEconomica] = useState<Economica | null>(null);
 
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
   const [sinal, setSinal] = useState(0);
@@ -70,6 +73,7 @@ export default function Home() {
     setDadosAprov(null);
     setDadosJuridico(null);
     setDadosFinanceira(null);
+    setDadosEconomica(null);
     setSinal(0);
   }
 
@@ -210,6 +214,13 @@ export default function Home() {
                 aprov={dadosAprov}
                 onData={setDadosFinanceira}
                 sinal={sinal}
+                econ={dadosEconomica}
+              />
+            </div>
+            <div className={secao === "economica" ? "" : "hidden"}>
+              <CardEconomica
+                analiseId={analise.analise_id}
+                onData={setDadosEconomica}
               />
             </div>
             <div className={secao === "luos" ? "" : "hidden"}>

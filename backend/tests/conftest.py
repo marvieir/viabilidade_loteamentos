@@ -17,6 +17,7 @@ from app.core.alertas_geo import get_provedor_alertas_geo
 from app.core.extrator_documento import get_extrator_documento
 from app.core.juridico_documental import AlertaGeo
 from app.core.juridico_store import get_fonte_juridica
+from app.core.economica_store import get_fonte_economica
 from app.core.financeira_store import get_fonte_financeira
 from app.core.store import STORE
 from app.core.declividade import DEMRecorte, get_fonte_dem
@@ -431,6 +432,15 @@ def fonte_financeira():
     app.dependency_overrides[get_fonte_financeira] = lambda: fonte
     yield fonte
     app.dependency_overrides.pop(get_fonte_financeira, None)
+
+
+@pytest.fixture
+def fonte_economica():
+    """Persistência econômica em memória (Fase 5) — mesmo formato da financeira."""
+    fonte = FonteFinanceiraMemoria()
+    app.dependency_overrides[get_fonte_economica] = lambda: fonte
+    yield fonte
+    app.dependency_overrides.pop(get_fonte_economica, None)
 
 
 @pytest.fixture

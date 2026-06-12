@@ -843,3 +843,65 @@ export async function obterFinanceira(
   if (res.status === 404) return null;
   return jsonOrThrow(res);
 }
+
+// ----- Fase 5 — Econômica (avalia o fluxo da Financeira: VPL/TIR/paybacks/curva) -----
+export interface TmaEco {
+  aa_real: number;
+  aa_real_fmt: string;
+  mensal: number;
+  origem: string;
+  data: string;
+}
+export interface TirEco {
+  mensal: number | null;
+  aa: number | null;
+  aa_fmt: string | null;
+  status: "unica" | "indefinida" | "multipla_possivel";
+  avisos: string[];
+}
+export interface PaybackEco {
+  simples_mes: number | null;
+  descontado_mes: number | null;
+  avisos: string[];
+}
+export interface PontoCurva {
+  tma_aa: number;
+  vpl: number;
+  vpl_fmt: string;
+}
+export interface Economica {
+  convencao: string;
+  tma: TmaEco;
+  vpl: { valor: number; valor_fmt: string };
+  tir: TirEco;
+  payback: PaybackEco;
+  exposicao_descontada: { valor: number; valor_fmt: string; mes: number };
+  indice_lucratividade: number | null;
+  curva_vpl_tma: PontoCurva[];
+  leituras: Leitura[]; // chaves vpl/tir/payback — o dashboard da Financeira compõe
+  proveniencia: string;
+  avisos: string[];
+}
+
+// Avalia e persiste. 409 = Financeira ainda não executada; 422 = TMA ausente/curva inválida.
+export async function calcularEconomica(
+  analiseId: string,
+  tmaAaReal: number,
+  curva?: { min_aa: number; max_aa: number; passo_pp: number }
+): Promise<Economica> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/economica`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tma_aa_real: tmaAaReal, ...(curva ? { curva } : {}) }),
+  });
+  return jsonOrThrow(res);
+}
+
+// Última avaliação persistida (404 → null: ainda não rodou).
+export async function obterEconomica(
+  analiseId: string
+): Promise<Economica | null> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/economica`);
+  if (res.status === 404) return null;
+  return jsonOrThrow(res);
+}

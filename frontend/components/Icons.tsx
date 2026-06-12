@@ -56,3 +56,6 @@ export const IconConformidade = (p: P) => (
 export const IconJuridico = (p: P) => (
   <svg {...base(p)}><path d="M12 3v18" /><path d="M5 7h14" /><path d="m5 7-3 6a3 3 0 0 0 6 0L5 7Z" /><path d="m19 7-3 6a3 3 0 0 0 6 0l-3-6Z" /><path d="M7 21h10" /></svg>
 );
+export const IconEconomica = (p: P) => (
+  <svg {...base(p)}><path d="M3 3v18h18" /><path d="m7 14 4-4 3 3 5-6" /><path d="M19 7h-4" /><path d="M19 7v4" /></svg>
+);

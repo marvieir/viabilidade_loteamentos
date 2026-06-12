@@ -40,6 +40,8 @@ backend/app/perfis/municipais/
 backend/app/perfis/juridico/
 # Premissas/execução financeira por análise (Fase 4) — dado do operador, persistido em volume.
 backend/app/perfis/financeira/
+# Avaliação econômica por análise (Fase 5) — dado do operador, persistido em volume.
+backend/app/perfis/economica/
 
 # .env do backend (segredos/caminhos da máquina) — versionamos só o .env.example.
 backend/.env
