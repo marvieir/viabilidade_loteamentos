@@ -1,11 +1,27 @@
 # Pedido de spec — Fase 5 (Econômica)
 
-> Para a sessão de especificação (claude.ai). Contexto: **1 → 1.5 → 1.7 → 1.8 → 2 → 2.1 →
-> 2.2 → 2.3 → 2.5 → 3 → 3.5 → 4 concluídas e validadas** (166 testes). A Fase 4 acabou de
-> **padronizar o fluxo de caixa mensal** — a Fase 5 é **curta a partir daqui**: ela só
-> **AVALIA** esse fluxo (VPL/TIR/TMA/payback/sensibilidade). Este documento dá o contexto
+> Para a sessão de especificação (claude.ai). Contexto: **1 → … → 4 → 4.1 → 4.2 concluídas e
+> validadas** (195 testes + 4 skip). A Fase 4 (e os incrementos 4.1 PRICE / 4.2 wizard +
+> parceria) **padronizou o fluxo de caixa mensal** — a Fase 5 é **curta a partir daqui**: ela
+> só **AVALIA** esse fluxo (VPL/TIR/TMA/payback/sensibilidade). Este documento dá o contexto
 > para escrever `docs/fase-5-economica.md` no formato das specs anteriores (a 4 é o melhor
-> exemplo, mesma família).
+> exemplo, mesma família). O `CardFinanceira` já deixou os **slots `vpl`/`tir`/`payback` com
+> status `pendente`** no semáforo — a 5 só os preenche.
+
+## 0. Decisões já tomadas pelo OPERADOR (2026-06-12) — a spec parte daqui
+
+1. **TMA em termos de IPCA (taxa REAL).** Decisão do operador: *"loteamento não usa PRICE,
+   coloque IPCA."* Recebível de loteamento é **corrigido por IPCA** — logo a TMA da Fase 5 é
+   uma **taxa real (spread acima do IPCA)**, não uma taxa nominal solta. **A spec PRECISA
+   resolver a consistência nominal × real** entre o fluxo que a Fase 4 entrega e o desconto da
+   Fase 5 (ver §3, item TMA — agora o ponto central). A Fase 4 está **travada/validada**: a 5
+   não a reescreve; ela decide como tratar (descontar em real sobre fluxo já indexado, ou
+   deflacionar, etc.) — mas **explicitamente e com proveniência**, nunca escondido.
+2. **Sensibilidade no MVP = só curva VPL × TMA.** Sem ±% em preço/custo nesta fase (fica para
+   evolução). Responde "a que taxa o VPL zera" (≈ TIR) de forma barata e determinística.
+3. **A spec será escrita na sessão de especificação (claude.ai)**, não na sessão de
+   implementação — este handoff é o insumo. (Implementação só começa com a
+   `docs/fase-5-economica.md` em mãos.)
 
 ## 1. Estado atual (o que a 5 consome — já pronto)
 
@@ -24,9 +40,10 @@
 
 ## 2. O que a Fase 5 precisa entregar (esboço — a spec detalha e decide)
 
-- **Entradas:** o `fluxo` da 4 (lido da análise) + **TMA** (taxa mínima de atratividade
-  **mensal ou anual** — decidir e converter; é a premissa-chave, declarada com proveniência,
-  sem default escondido) + opcionais (data-base, periodicidade).
+- **Entradas:** o `fluxo` da 4 (lido da análise) + **TMA real** (taxa mínima de atratividade
+  **acima do IPCA** — ver §0.1; declarada com proveniência, sem default escondido; decidir
+  unidade e conversão para descontar o fluxo mensal) + opcionais (data-base, expectativa de
+  IPCA se o tratamento nominal×real exigir, periodicidade).
 - **Saídas (determinísticas) sobre o fluxo:**
   - **VPL** à TMA (e talvez uma curva VPL × taxa para leitura);
   - **TIR** (mensal e anualizada) — método numérico robusto (bissecção/Newton com
@@ -36,8 +53,8 @@
     "não recuperado no horizonte" se não ocorrer);
   - **exposição máxima descontada** (opcional); **índice de lucratividade** (VPL/investimento)
     se fizer sentido.
-- **Sensibilidade (se barato):** VPL para um range de TMA; talvez ±% em preço/custo
-  (vetável — pode ficar para evolução).
+- **Sensibilidade (MVP — decidido em §0.2):** **só a curva VPL × TMA** para um range de taxa
+  (ex.: deflator real de X% a Y%). **Sem** ±% em preço/custo nesta fase (evolução).
 - **Leitura/veredito de triagem:** texto rotulado ("VPL>0 à TMA X% → cria valor"; "TIR < TMA
   → destrói"), **sempre com a ressalva** §1-A (premissas do usuário; não é recomendação de
   investimento).
@@ -47,12 +64,16 @@
 - **Contrato:** `POST /analises/{id}/economica` (TMA + opções no corpo) vs `GET`. Como obtém o
   fluxo — relê a persistência da 4 (recomendado) ou recebe o fluxo no corpo? (Reler garante
   consistência e evita o front mandar números.)
-- **TMA:** unidade (mensal/anual) e conversão; **sem default** (ou default claramente rotulado
-  "exemplo, defina sua TMA"). É a premissa que decide o veredito — não pode vir escondida.
+- **TMA real × IPCA (PONTO CENTRAL — §0.1):** o operador fixou que loteamento é corrigido por
+  **IPCA**, logo a TMA é **real**. A spec deve decidir e deixar EXPLÍCITO: (a) o fluxo da Fase 4
+  é nominal ou já em termos reais? (b) descontamos o fluxo por uma **taxa real** direto, ou
+  deflacionamos por IPCA e depois descontamos? (c) unidade da TMA real (mensal/anual) e
+  conversão; **sem default escondido** (no máximo um "exemplo, defina sua TMA"). É a premissa
+  que decide o veredito — e a relação nominal×real não pode ficar implícita.
 - **TIR degenerada:** convenção para fluxo sem investimento inicial, sem troca de sinal, ou
   com múltiplas raízes — rótulo honesto, nunca um número arbitrário.
 - **Periodicidade:** o fluxo da 4 é mensal; VPL/TIR mensais com anualização exibida — confirmar.
-- **Escopo de sensibilidade** no MVP (só VPL×TMA? ou ±% em variáveis?).
+- ~~**Escopo de sensibilidade** no MVP~~ → **decidido (§0.2): só VPL×TMA.**
 - **Persistência** das premissas econômicas por análise (padrão 1.8/3/4).
 
 ## 4. Restrições inegociáveis herdadas (não contradizer)
