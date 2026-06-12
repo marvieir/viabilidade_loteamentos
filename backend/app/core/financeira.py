@@ -125,6 +125,56 @@ def _campo_setado(modelo, nome: str) -> bool:
     return nome in modelo.model_fields_set
 
 
+def _receber(originado: dict[int, float], v, mesa) -> dict[int, float]:
+    """``recebido_bruto[m]`` a partir das safras (``originado`` = nominal vendido por mês),
+    conforme o modo de venda. ``mesa`` = lista de perfis PRICE já validada (só financiado).
+    Acumula em float CRU (arredonda só na emissão mensal — é o que faz os ouros baterem).
+    Reusado pelo incorporador e pelo terrenista em ``permuta_lotes`` (4.2)."""
+    recebido: dict[int, float] = defaultdict(float)
+    if v.modo == "financiado":
+        ent_parc = max(1, v.entrada_parcelas)
+        for m, val in originado.items():  # cada safra de venda
+            entrada_total = val * v.entrada_pct
+            for k in range(ent_parc):
+                recebido[m + k] += entrada_total / ent_parc
+            saldo = val * (1.0 - v.entrada_pct)
+            for perfil in mesa:
+                pmt = pmt_price(saldo * perfil.participacao, perfil.taxa_am, perfil.prazo_meses)
+                for k in range(1, perfil.prazo_meses + 1):
+                    recebido[m + k] += pmt
+    elif v.modo == "parcelado":
+        for m, val in originado.items():
+            recebido[m] += val * v.entrada_pct
+            resto = val * (1.0 - v.entrada_pct)
+            if v.n_parcelas > 0 and resto > 0:
+                parc = resto / v.n_parcelas
+                for k in range(1, v.n_parcelas + 1):
+                    recebido[m + k] += parc
+    else:  # à vista
+        for m, val in originado.items():
+            recebido[m] += val
+    return recebido
+
+
+def _fluxo_recebimento(entradas: dict[int, float], horizonte: int) -> list:
+    """Linhas de fluxo com SÓ entradas (recebimento), saídas 0 — usado para o terrenista
+    (no MVP ele só recebe; sem custos)."""
+    linhas, acumulado = [], 0.0
+    for mes in range(0, horizonte + 1):
+        ent = round(entradas.get(mes, 0.0), 2)
+        acumulado = round(acumulado + ent, 2)
+        linhas.append(
+            schemas.LinhaFluxoOut(
+                mes=mes,
+                entradas=ent, entradas_fmt=brl(ent),
+                saidas=0.0, saidas_fmt=brl(0.0),
+                liquido=ent, liquido_fmt=brl(ent),
+                acumulado=acumulado, acumulado_fmt=brl(acumulado),
+            )
+        )
+    return linhas
+
+
 def montar_fluxo(
     premissas: PremissasFinanceiraIn, ctx: ContextoFinanceira
 ) -> schemas.FinanceiraOut:
@@ -152,12 +202,15 @@ def montar_fluxo(
     # --- Preço do lote (essencial) ---
     if p.preco_lote is not None:
         preco = float(p.preco_lote)
+    elif p.preco_m2 is not None and p.area_lote_m2 is not None:
+        # 4.2: preço = R$/m² × área do lote (paridade com o curso: 350 × 263,21 = 92.123,50).
+        preco = round(float(p.preco_m2) * float(p.area_lote_m2), 2)
     elif p.preco_m2 is not None:
         area = p.area_aproveitavel_m2 or ctx.area_aproveitavel_m2
         if not area or lotes_fisicos <= 0:
             raise PremissaFaltando(
-                "preco_m2 exige 'area_aproveitavel_m2' e lotes > 0 para derivar o preço "
-                "médio do lote."
+                "preco_m2 exige 'area_lote_m2' (ou 'area_aproveitavel_m2' + lotes) para "
+                "derivar o preço do lote."
             )
         preco = float(p.preco_m2) * (area / lotes_fisicos)
     else:
@@ -189,49 +242,30 @@ def montar_fluxo(
     originado = {m: round(vgv_bruto * f, 2) for m, f in frac_vendas.items()}  # bruto/mês
 
     # --- Recebimento (fluxo de CAIXA — quando o dinheiro entra) ---
-    # Acumulação em float CRU (sem arredondar por parcela); arredonda só na emissão mensal —
-    # é o que faz os valores-ouro PRICE baterem (pmt não é múltiplo exato de centavo).
-    recebido_bruto: dict[int, float] = defaultdict(float)
+    # Valida/resolve a mesa (financiado) uma vez; o recebimento em si vive em `_receber`.
     mesa_default = False
+    mesa_resolved = None
     if v.modo == "financiado":
         if not (0.0 <= v.entrada_pct <= 1.0):
             raise CurvaInvalida("entrada_pct deve estar em [0, 1].")
-        mesa = v.mesa
-        if mesa is None:
+        mesa_resolved = v.mesa
+        if mesa_resolved is None:
             mesa_default = True
             from app.models.schemas import PerfilMesaIn
 
-            mesa = [PerfilMesaIn(**perfil) for perfil in DEFAULT_MESA]
-        soma_part = sum(perfil.participacao for perfil in mesa)
+            mesa_resolved = [PerfilMesaIn(**perfil) for perfil in DEFAULT_MESA]
+        soma_part = sum(perfil.participacao for perfil in mesa_resolved)
         if abs(soma_part - 1.0) > 0.001:
             raise CurvaInvalida(
                 f"participações da mesa devem somar 1,0 (soma atual: {soma_part:.4f})."
             )
-        ent_parc = max(1, v.entrada_parcelas)
-        for m, val in originado.items():  # cada safra de venda
-            entrada_total = val * v.entrada_pct
-            for k in range(ent_parc):
-                recebido_bruto[m + k] += entrada_total / ent_parc
-            saldo = val * (1.0 - v.entrada_pct)
-            for perfil in mesa:
-                pmt = pmt_price(saldo * perfil.participacao, perfil.taxa_am, perfil.prazo_meses)
-                for k in range(1, perfil.prazo_meses + 1):
-                    recebido_bruto[m + k] += pmt
     elif v.modo == "parcelado":
         if not (0.0 <= v.entrada_pct <= 1.0):
             raise CurvaInvalida("entrada_pct deve estar em [0, 1].")
         if v.n_parcelas < 0:
             raise CurvaInvalida("n_parcelas deve ser ≥ 0.")
-        for m, val in originado.items():
-            recebido_bruto[m] += val * v.entrada_pct
-            resto = val * (1.0 - v.entrada_pct)
-            if v.n_parcelas > 0 and resto > 0:
-                parc = resto / v.n_parcelas
-                for k in range(1, v.n_parcelas + 1):
-                    recebido_bruto[m + k] += parc
-    else:  # à vista
-        for m, val in originado.items():
-            recebido_bruto[m] += val
+
+    recebido_bruto = _receber(originado, v, mesa_resolved)
 
     # Receita financeira (4.1) = juros da carteira = Σ recebido − nominal. Separada do
     # nominal (não infla o VGV); 0 fora do financiado por construção.
@@ -412,6 +446,124 @@ def montar_fluxo(
     resultado = round(acumulado, 2)
     margem = round(resultado / vgv_proprio, 6) if vgv_proprio else 0.0
 
+    # --- Participantes da parceria (4.2): incorporador (custos+resultado) × terrenista (só recebe) ---
+    custos_total = round(sum(b.total for b in blocos), 2)
+    rec_incorp = round(sum(entradas.values()), 2)
+    if aq.modo == "permuta_vgv":
+        pct_terr = permuta_pct
+        pct_incorp = round(1 - pct_terr, 4)
+        rf_incorp = round(receita_financeira * (1 - pct_terr), 2)
+    elif aq.modo == "permuta_lotes":
+        total_lotes = vendaveis + permuta_lotes_n
+        pct_terr = round(permuta_lotes_n / total_lotes, 4) if total_lotes else 0.0
+        pct_incorp = round(vendaveis / total_lotes, 4) if total_lotes else 1.0
+        rf_incorp = receita_financeira
+    else:  # compra / nenhuma
+        pct_terr = 0.0
+        pct_incorp = 1.0
+        rf_incorp = receita_financeira
+
+    incorporador = schemas.ParticipanteOut(
+        papel="incorporador",
+        pct=pct_incorp,
+        modo=None,
+        vgv=schemas.VgvParteOut(
+            nominal=vgv_proprio, nominal_fmt=brl(vgv_proprio),
+            receita_financeira=rf_incorp, receita_financeira_fmt=brl(rf_incorp),
+            geral=round(vgv_proprio + rf_incorp, 2), geral_fmt=brl(round(vgv_proprio + rf_incorp, 2)),
+        ),
+        recebimento_total=rec_incorp, recebimento_total_fmt=brl(rec_incorp),
+        custos_total=custos_total, custos_total_fmt=brl(custos_total),
+        resultado_nominal=resultado, resultado_nominal_fmt=brl(resultado),
+        margem=margem,
+        exposicao_maxima=schemas.ExposicaoOut(valor=exp_valor, valor_fmt=brl(exp_valor), mes=exp_mes),
+        fluxo=fluxo,
+        nota="Custos 100% no incorporador (MVP); tributo de cada parte sobre a sua receita — confirme com contador.",
+    )
+
+    terrenista = None
+    if aq.modo == "permuta_vgv":
+        ent_terr = {m: round(val * (1 - inad) * pct_terr, 2) for m, val in recebido_bruto.items()}
+        rec_terr = round(sum(ent_terr.values()), 2)
+        nom_terr = round(vgv_bruto * pct_terr, 2)
+        rf_terr = round(receita_financeira * pct_terr, 2)
+        terrenista = schemas.ParticipanteOut(
+            papel="terrenista", pct=pct_terr, modo="parceria_vgv",
+            vgv=schemas.VgvParteOut(
+                nominal=nom_terr, nominal_fmt=brl(nom_terr),
+                receita_financeira=rf_terr, receita_financeira_fmt=brl(rf_terr),
+                geral=round(nom_terr + rf_terr, 2), geral_fmt=brl(round(nom_terr + rf_terr, 2)),
+            ),
+            recebimento_total=rec_terr, recebimento_total_fmt=brl(rec_terr),
+            fluxo=_fluxo_recebimento(ent_terr, max(ent_terr) if ent_terr else 0),
+            nota="Terrenista recebe pro-rata cada recebimento (parceria % do VGV); sem custos no MVP.",
+        )
+    elif aq.modo == "permuta_lotes" and permuta_lotes_n > 0:
+        originado_terr = {m: round(permuta_lotes_n * preco * f, 2) for m, f in frac_vendas.items()}
+        receb_terr = _receber(originado_terr, v, mesa_resolved)
+        ent_terr = {m: round(val * (1 - inad), 2) for m, val in receb_terr.items()}
+        rec_terr = round(sum(ent_terr.values()), 2)
+        nom_terr = round(permuta_lotes_n * preco, 2)
+        rf_terr = round(rec_terr - nom_terr, 2) if v.modo == "financiado" else 0.0
+        terrenista = schemas.ParticipanteOut(
+            papel="terrenista", pct=pct_terr, modo="permuta_lotes",
+            vgv=schemas.VgvParteOut(
+                nominal=nom_terr, nominal_fmt=brl(nom_terr),
+                receita_financeira=rf_terr, receita_financeira_fmt=brl(rf_terr),
+                geral=round(nom_terr + rf_terr, 2), geral_fmt=brl(round(nom_terr + rf_terr, 2)),
+            ),
+            recebimento_total=rec_terr, recebimento_total_fmt=brl(rec_terr),
+            fluxo=_fluxo_recebimento(ent_terr, max(ent_terr) if ent_terr else 0),
+            nota="Terrenista recebe a venda dos lotes dele pela mesma curva/mesa (premissa); sem custos no MVP.",
+        )
+    participantes = schemas.ParticipantesOut(incorporador=incorporador, terrenista=terrenista)
+
+    # --- Leituras do semáforo (4.2): regra fixa, linguagem §1-A (NUNCA "viável") ---
+    leituras: list[schemas.LeituraOut] = []
+    if resultado > 0:
+        leituras.append(schemas.LeituraOut(
+            chave="resultado_nominal", status="favoravel",
+            texto="Resultado nominal positivo sob as premissas declaradas.",
+            valor_fmt=brl(resultado)))
+    elif resultado < 0:
+        leituras.append(schemas.LeituraOut(
+            chave="resultado_nominal", status="desfavoravel",
+            texto="Resultado nominal negativo sob as premissas declaradas.",
+            valor_fmt=brl(resultado)))
+    else:
+        leituras.append(schemas.LeituraOut(
+            chave="resultado_nominal", status="atencao",
+            texto="Resultado nominal nulo sob as premissas declaradas.", valor_fmt=brl(resultado)))
+
+    ref = p.margem_referencia_pct
+    if margem >= ref:
+        leituras.append(schemas.LeituraOut(
+            chave="margem", status="favoravel",
+            texto=f"Margem {_pct_str(margem)} ≥ referência {_pct_str(ref)} (sob as premissas).",
+            valor_fmt=_pct_str(margem)))
+    else:
+        leituras.append(schemas.LeituraOut(
+            chave="margem", status="atencao",
+            texto=f"Margem {_pct_str(margem)} abaixo da referência {_pct_str(ref)} "
+                  "(prática de mercado; defina a sua).",
+            valor_fmt=_pct_str(margem)))
+
+    if p.capital_disponivel is not None:
+        cap = p.capital_disponivel
+        if abs(exp_valor) <= cap:
+            leituras.append(schemas.LeituraOut(
+                chave="exposicao_vs_capital", status="favoravel",
+                texto="Exposição máxima de caixa dentro do capital informado.", valor_fmt=brl(exp_valor)))
+        else:
+            leituras.append(schemas.LeituraOut(
+                chave="exposicao_vs_capital", status="atencao",
+                texto="Exposição máxima supera o capital informado — estruturar funding.",
+                valor_fmt=brl(exp_valor)))
+
+    for chave in ("vpl", "tir", "payback"):
+        leituras.append(schemas.LeituraOut(
+            chave=chave, status="pendente", texto="Disponível na dimensão Econômica (Fase 5)."))
+
     # Fluxo de VENDAS (nominal por mês) — informativo, distinto do recebimento (4.1).
     fluxo_vendas = [
         schemas.FluxoVendaOut(
@@ -449,6 +601,10 @@ def montar_fluxo(
         alerta_critico = ALERTA_FLUXO_MORTO
 
     avisos = list(AVISOS_SAIDA)
+    avisos.append(
+        "Indicadores condicionados às premissas informadas — pré-análise (§1-A), não "
+        "recomendação de investimento nem garantia de resultado."
+    )
     if v.modo == "financiado":
         avisos.append(AVISO_JUROS)
         if mesa_default:
@@ -489,6 +645,8 @@ def montar_fluxo(
             ),
             horizonte_meses=horizonte,
         ),
+        participantes=participantes,
+        leituras=leituras,
         alerta_critico=alerta_critico,
         proveniencia=(
             "Premissas declaradas/defaults rotulados desta análise · lotes do "

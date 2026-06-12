@@ -750,6 +750,42 @@ export interface ResumoAnual {
   acumulado_fmt: string;
 }
 
+// Fase 4.2 — split da parceria + semáforo de leituras
+export interface VgvParte {
+  nominal: number;
+  nominal_fmt: string;
+  receita_financeira: number;
+  receita_financeira_fmt: string;
+  geral: number;
+  geral_fmt: string;
+}
+export interface Participante {
+  papel: "incorporador" | "terrenista";
+  pct: number | null;
+  modo: string | null;
+  vgv: VgvParte;
+  recebimento_total: number;
+  recebimento_total_fmt: string;
+  custos_total: number | null;
+  custos_total_fmt: string | null;
+  resultado_nominal: number | null;
+  resultado_nominal_fmt: string | null;
+  margem: number | null;
+  exposicao_maxima: { valor: number; valor_fmt: string; mes: number } | null;
+  fluxo: LinhaFluxo[];
+  nota: string | null;
+}
+export interface Participantes {
+  incorporador: Participante;
+  terrenista: Participante | null;
+}
+export interface Leitura {
+  chave: string;
+  status: "favoravel" | "atencao" | "desfavoravel" | "pendente";
+  texto: string;
+  valor_fmt: string | null;
+}
+
 export interface Financeira {
   caso_base: {
     lotes: number;
@@ -779,6 +815,8 @@ export interface Financeira {
     exposicao_maxima: { valor: number; valor_fmt: string; mes: number };
     horizonte_meses: number;
   };
+  participantes: Participantes | null;
+  leituras: Leitura[];
   alerta_critico: string | null;
   proveniencia: string;
   avisos: string[];

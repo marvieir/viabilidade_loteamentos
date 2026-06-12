@@ -655,6 +655,7 @@ class PremissasFinanceiraIn(BaseModel):
     eficiencia_projeto_pct: float = 1.0
     preco_lote: Optional[float] = None  # essencial (ou preco_m2) — sem default (422)
     preco_m2: Optional[float] = None
+    area_lote_m2: Optional[float] = None  # 4.2: preço = preco_m2 × área do lote (como o curso)
     area_aproveitavel_m2: Optional[float] = None  # contexto p/ preco_m2 e urbanização por_m2
     vendas: VendasIn = Field(default_factory=VendasIn)
     inadimplencia_pct: float = 0.0  # 0 = ninguém deixa de pagar (a lição do −19M)
@@ -663,6 +664,9 @@ class PremissasFinanceiraIn(BaseModel):
     aquisicao: AquisicaoIn = Field(default_factory=AquisicaoIn)
     custos: CustosIn = Field(default_factory=CustosIn)
     tributos: TributosIn = Field(default_factory=TributosIn)
+    # 4.2: parâmetros do semáforo (dashboard). Referência editável + capital opcional.
+    margem_referencia_pct: float = 0.20  # default ROTULADO ("prática de mercado; defina a sua")
+    capital_disponivel: Optional[float] = None  # se informado, compara com a exposição máxima
 
 
 class PermutaOut(BaseModel):
@@ -747,6 +751,50 @@ class ResumoAnualOut(BaseModel):
     acumulado_fmt: str
 
 
+class VgvParteOut(BaseModel):
+    nominal: float
+    nominal_fmt: str
+    receita_financeira: float = 0.0
+    receita_financeira_fmt: str = "R$ 0,00"
+    geral: float = 0.0
+    geral_fmt: str = "R$ 0,00"
+
+
+class ParticipanteOut(BaseModel):
+    """Um lado da parceria (4.2). O incorporador carrega custos/resultado; o terrenista
+    (no MVP) só recebe — split de custos entre sócios é evolução."""
+
+    papel: Literal["incorporador", "terrenista"]
+    pct: Optional[float] = None
+    modo: Optional[str] = None  # parceria_vgv | permuta_lotes | None (compra)
+    vgv: VgvParteOut
+    recebimento_total: float
+    recebimento_total_fmt: str
+    custos_total: Optional[float] = None
+    custos_total_fmt: Optional[str] = None
+    resultado_nominal: Optional[float] = None
+    resultado_nominal_fmt: Optional[str] = None
+    margem: Optional[float] = None
+    exposicao_maxima: Optional[ExposicaoOut] = None
+    fluxo: list[LinhaFluxoOut] = []
+    nota: Optional[str] = None  # rotulagem (custos 100% incorporador; tributo por parte)
+
+
+class ParticipantesOut(BaseModel):
+    incorporador: ParticipanteOut
+    terrenista: Optional[ParticipanteOut] = None  # null no modo compra
+
+
+class LeituraOut(BaseModel):
+    """Semáforo do dashboard (4.2) — regra fixa, linguagem §1-A (NUNCA 'viável'). Slots
+    da Fase 5 (vpl/tir/payback) nascem com status 'pendente'."""
+
+    chave: str
+    status: Literal["favoravel", "atencao", "desfavoravel", "pendente"]
+    texto: str
+    valor_fmt: Optional[str] = None
+
+
 class FinanceiraOut(BaseModel):
     caso_base: CasoBaseOut
     vgv: VgvOut
@@ -755,6 +803,8 @@ class FinanceiraOut(BaseModel):
     fluxo: list[LinhaFluxoOut]  # caixa (recebimento) — o insumo da Fase 5
     fluxo_resumo_anual: list[ResumoAnualOut] = []
     indicadores: IndicadoresOut
+    participantes: Optional[ParticipantesOut] = None  # 4.2: os dois lados da parceria
+    leituras: list[LeituraOut] = []  # 4.2: semáforo do dashboard
     # 4.1: guard de sanidade — nunca entregar um fluxo morto em silêncio.
     alerta_critico: Optional[str] = None
     proveniencia: str
