@@ -126,47 +126,56 @@ def _valores_por_localidade(agregado: str, variavel: str, periodo: str, nivel: s
     return out
 
 
+def _coletar_niveis(agregado: str, variavel: str, periodo: str, rotulo: str) -> dict[str, float]:
+    """Coleta N6+N3+N1 com resiliência POR NÍVEL: um 500 (ex.: N6 grande demais) não
+    derruba o bloco nem o programa — apenas registra o aviso e segue."""
+    out: dict[str, float] = {}
+    for nivel in ("N6", "N3", "N1"):
+        try:
+            out.update(_valores_por_localidade(agregado, variavel, periodo, nivel))
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (aviso: {rotulo} [{nivel}] falhou: {exc})", file=sys.stderr)
+    return out
+
+
 def coletar_ibge(pib_ano: str) -> dict[str, dict]:
-    """Monta os registros por município/UF/Brasil a partir do SIDRA. Best-effort por bloco."""
+    """Monta os registros por município/UF/Brasil a partir do SIDRA. Resiliente por bloco:
+    cada indicador que falhar fica ausente (runtime degrada para PARCIAL), nunca aborta tudo."""
     # Níveis SIDRA: N6 = município, N3 = UF, N1 = Brasil.
     registros: dict[str, dict] = {}
 
     print("→ população 2022 (Censo, agregado 4714 v93)…", file=sys.stderr)
-    pop22 = {}
-    for nivel in ("N6", "N3", "N1"):
-        pop22.update(_valores_por_localidade("4714", "93", "2022", nivel))
+    pop22 = _coletar_niveis("4714", "93", "2022", "população 2022")
     print("→ densidade 2022 (agregado 4714 v614)…", file=sys.stderr)
-    dens = {}
-    for nivel in ("N6", "N3", "N1"):
-        dens.update(_valores_por_localidade("4714", "614", "2022", nivel))
+    dens = _coletar_niveis("4714", "614", "2022", "densidade")
     print("→ população 2010 (Censo, agregado 1378 v93)…", file=sys.stderr)
-    pop10 = {}
-    for nivel in ("N6", "N3", "N1"):
-        pop10.update(_valores_por_localidade("1378", "93", "2010", nivel))
+    pop10 = _coletar_niveis("1378", "93", "2010", "população 2010")
 
-    # PIB per capita — PIB dos Municípios (agregado 5938). A v37 é o PIB TOTAL (mil R$);
-    # o per capita é a v6575 (variável derivada que NÃO consta no metadados → fallback fixo).
-    # O período é resolvido para o ano disponível mais próximo (evita HTTP 500 em ano inexistente).
+    # PIB per capita: o agregado 5938 NÃO tem variável per capita (só PIB total = v37, em
+    # mil R$ — a lista de candidatos confirmou). Então CALCULAMOS: pib_pc = v37 × 1000 ÷ pop.
+    # É o caminho determinístico do projeto (cálculo no backend, não confiar em campo de API).
     pib_periodo = _resolver_periodo("5938", pib_ano)
-    print(f"→ PIB per capita (agregado 5938, {pib_periodo})…", file=sys.stderr)
-    var_pib = _variavel_por_nome("5938", "per capita", fallback="6575")
-    pib = {}
-    for nivel in ("N6", "N3", "N1"):
-        pib.update(_valores_por_localidade("5938", var_pib, pib_periodo, nivel))
-    pib_ano = pib_periodo  # o ano realmente usado vai para a proveniência (pib_ano)
+    print(f"→ PIB total (agregado 5938 v37, {pib_periodo}) → per capita = ÷ população…", file=sys.stderr)
+    pib_total = _coletar_niveis("5938", "37", pib_periodo, "PIB total")  # mil R$
+    pib_ano = pib_periodo  # o ano realmente usado vai para a proveniência
 
     print("→ domicílios e moradores/domicílio (Censo 2022)…", file=sys.stderr)
-    # Agregado 4712 = domicílios; v5930 moradores/domicílio (ajuste conforme o recorte real).
-    dom = {}
-    mpd = {}
-    for nivel in ("N6", "N3", "N1"):
-        dom.update(_valores_por_localidade("4712", "381", "2022", nivel))
-        mpd.update(_valores_por_localidade("4712", "5930", "2022", nivel))
+    dom = _coletar_niveis("4712", "381", "2022", "domicílios")
+    mpd = _coletar_niveis("4712", "5930", "2022", "moradores/domicílio")
 
     print("→ faixa etária (Censo 2022, agregado 9514)…", file=sys.stderr)
-    faixas = _coletar_faixa_etaria()
+    try:
+        faixas = _coletar_faixa_etaria()
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (aviso: faixa etária falhou inteira: {exc} — fica null, runtime → PARCIAL)", file=sys.stderr)
+        faixas = {}
 
-    todos_cods = set(pop22) | set(pop10) | set(pib)
+    def _pib_pc(cod: str) -> Optional[float]:
+        if cod in pib_total and cod in pop22 and pop22.get(cod):
+            return round(pib_total[cod] * 1000 / pop22[cod], 2)
+        return None
+
+    todos_cods = set(pop22) | set(pop10) | set(pib_total)
     for cod in todos_cods:
         if len(cod) == 7:
             chave, nivel = cod, "municipio"
@@ -184,7 +193,7 @@ def coletar_ibge(pib_ano: str) -> dict[str, dict]:
             "pop_2022": int(pop22[cod]) if cod in pop22 else None,
             "pop_2010": int(pop10[cod]) if cod in pop10 else None,
             "area_km2": round(pop22[cod] / dens[cod], 3) if cod in dens and cod in pop22 and dens.get(cod) else None,
-            "pib_per_capita": round(pib[cod], 2) if cod in pib else None,
+            "pib_per_capita": _pib_pc(cod),
             "pib_ano": int(pib_ano),
             "domicilios_ocupados": int(dom[cod]) if cod in dom else None,
             "moradores_por_domicilio": round(mpd[cod], 2) if cod in mpd else None,
@@ -236,17 +245,10 @@ def _coletar_faixa_etaria() -> dict[str, dict]:
         return "0-14" if lb < 15 else "15-29" if lb < 30 else "30-59" if lb < 60 else "60+"
 
     somas: dict[str, dict[str, float]] = {}
-    ids = ",".join(cats)
-    for nivel in ("N6", "N3", "N1"):
-        url = (
-            f"{API}/{agregado}/periodos/2022/variaveis/93"
-            f"?localidades={nivel}&classificacao={classif['id']}[{ids}]"
-        )
-        dados = _get(url)
+    def _acumular(dados: list) -> None:
         for var in dados:
             for res in var.get("resultados", []):
-                # categoria deste resultado (a chave do dict 'categoria' é o id)
-                cat_id = None
+                cat_id = None  # categoria deste resultado (a chave do dict 'categoria' é o id)
                 for cl in res.get("classificacoes", []):
                     if str(cl.get("id")) == str(classif["id"]):
                         cat_id = next(iter(cl.get("categoria", {})), None)
@@ -264,6 +266,21 @@ def _coletar_faixa_etaria() -> dict[str, dict]:
                         continue
                     g = somas.setdefault(cod, {"0-14": 0.0, "15-29": 0.0, "30-59": 0.0, "60+": 0.0})
                     g[grupo] += v
+
+    ids = ",".join(cats)
+    base = f"{API}/{agregado}/periodos/2022/variaveis/93"
+    # N3/N1: payload pequeno (27+1 localidades) → todas as faixas numa requisição.
+    for nivel in ("N3", "N1"):
+        try:
+            _acumular(_get(f"{base}?localidades={nivel}&classificacao={classif['id']}[{ids}]"))
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (aviso: faixa etária [{nivel}] falhou: {exc})", file=sys.stderr)
+    # N6: 5.570 municípios × 21 faixas numa tacada estoura (HTTP 500) → UMA faixa por vez.
+    for cat_id in cats:
+        try:
+            _acumular(_get(f"{base}?localidades=N6&classificacao={classif['id']}[{cat_id}]"))
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (aviso: faixa etária [N6 cat {cat_id}] falhou: {exc})", file=sys.stderr)
 
     if "1" in somas:  # sanidade visível: Σ idades Brasil deve ≈ população 2022 (203.080.756)
         total_br = int(sum(somas["1"].values()))
@@ -355,7 +372,9 @@ def validar_ouro(registros: dict[str, dict]) -> None:
         "pop_2022": (reg.get("pop_2022"), OURO_SAO_ROQUE["pop_2022"], 0),
         "pop_2010": (reg.get("pop_2010"), OURO_SAO_ROQUE["pop_2010"], 0),
         "densidade": (densidade, OURO_SAO_ROQUE["densidade"], 0.05),
-        "pib_per_capita": (reg.get("pib_per_capita"), OURO_SAO_ROQUE["pib_per_capita"], 0.01),
+        # per capita CALCULADO (v37×1000÷pop censo) — IBGE divide pela pop estimada do ano,
+        # então a tolerância é relativa (±2%), não ao centavo.
+        "pib_per_capita": (reg.get("pib_per_capita"), OURO_SAO_ROQUE["pib_per_capita"], 0.02 * OURO_SAO_ROQUE["pib_per_capita"]),
         "moradores_por_domicilio": (reg.get("moradores_por_domicilio"), OURO_SAO_ROQUE["moradores_por_domicilio"], 0.01),
     }
     erros = []
