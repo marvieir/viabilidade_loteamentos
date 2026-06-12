@@ -64,19 +64,47 @@ def _get(url: str) -> list | dict:
 def _variavel_por_nome(agregado: str, trecho: str, fallback: str) -> str:
     """Resolve o id da variável pelos METADADOS do agregado (não chuta id fixo).
 
-    Caso real: no 5938, a v37 é o PIB *total* (mil R$); o per capita é outra variável.
-    Buscar por nome ("per capita") torna a geração imune a esse engano.
+    Caso real: no 5938, a v37 é o PIB *total* (mil R$); o per capita é a v6575 —
+    e ela NÃO aparece na lista `variaveis` do metadados (variável derivada). Por isso,
+    além de buscar por nome, imprimimos os candidatos e caímos num fallback conhecido.
     """
     try:
         meta = _get(f"{API}/{agregado}/metadados")
-        for v in meta.get("variaveis", []):
+        variaveis = meta.get("variaveis", []) if isinstance(meta, dict) else []
+        for v in variaveis:
             if trecho.lower() in str(v.get("nome", "")).lower():
                 print(f"  variável {v['id']} = “{v['nome']}”", file=sys.stderr)
                 return str(v["id"])
-        print(f"  (aviso: nenhuma variável com “{trecho}” no agregado {agregado}; uso v{fallback})", file=sys.stderr)
+        candidatos = ", ".join(f"{v.get('id')}={v.get('nome')}" for v in variaveis) or "(lista vazia)"
+        print(
+            f"  (aviso: nenhuma variável com “{trecho}” no {agregado} → uso fallback v{fallback}. "
+            f"Candidatos: {candidatos})",
+            file=sys.stderr,
+        )
     except Exception as exc:  # noqa: BLE001
         print(f"  (aviso: metadados do agregado {agregado} indisponíveis: {exc}; uso v{fallback})", file=sys.stderr)
     return fallback
+
+
+def _resolver_periodo(agregado: str, preferido: str) -> str:
+    """Devolve `preferido` se existir no agregado; senão o período mais recente (evita 500)."""
+    try:
+        per = _get(f"{API}/{agregado}/periodos")
+        disponiveis = sorted(str(p["id"]) for p in per) if isinstance(per, list) else []
+    except Exception as exc:  # noqa: BLE001
+        print(f"  (aviso: períodos do {agregado} indisponíveis: {exc}; tento {preferido})", file=sys.stderr)
+        return preferido
+    if not disponiveis:
+        return preferido
+    if preferido in disponiveis:
+        return preferido
+    ultimo = disponiveis[-1]
+    print(
+        f"  ⚠ período {preferido} indisponível no {agregado}; uso o mais recente {ultimo} "
+        f"(disponíveis: …{', '.join(disponiveis[-4:])})",
+        file=sys.stderr,
+    )
+    return ultimo
 
 
 def _valores_por_localidade(agregado: str, variavel: str, periodo: str, nivel: str) -> dict[str, float]:
@@ -116,14 +144,16 @@ def coletar_ibge(pib_ano: str) -> dict[str, dict]:
     for nivel in ("N6", "N3", "N1"):
         pop10.update(_valores_por_localidade("1378", "93", "2010", nivel))
 
-    # PIB per capita — PIB dos Municípios (agregado 5938). A variável é resolvida
-    # pelos metadados ("per capita" no nome): a v37 é o PIB TOTAL em mil R$ — usar
-    # ela quebra o gate de São Roque (3.450.779 ≠ 57.024,90), como visto na 1ª rodada.
-    print(f"→ PIB per capita (agregado 5938, {pib_ano})…", file=sys.stderr)
-    var_pib = _variavel_por_nome("5938", "per capita", fallback="593")
+    # PIB per capita — PIB dos Municípios (agregado 5938). A v37 é o PIB TOTAL (mil R$);
+    # o per capita é a v6575 (variável derivada que NÃO consta no metadados → fallback fixo).
+    # O período é resolvido para o ano disponível mais próximo (evita HTTP 500 em ano inexistente).
+    pib_periodo = _resolver_periodo("5938", pib_ano)
+    print(f"→ PIB per capita (agregado 5938, {pib_periodo})…", file=sys.stderr)
+    var_pib = _variavel_por_nome("5938", "per capita", fallback="6575")
     pib = {}
     for nivel in ("N6", "N3", "N1"):
-        pib.update(_valores_por_localidade("5938", var_pib, pib_ano, nivel))
+        pib.update(_valores_por_localidade("5938", var_pib, pib_periodo, nivel))
+    pib_ano = pib_periodo  # o ano realmente usado vai para a proveniência (pib_ano)
 
     print("→ domicílios e moradores/domicílio (Censo 2022)…", file=sys.stderr)
     # Agregado 4712 = domicílios; v5930 moradores/domicílio (ajuste conforme o recorte real).
@@ -313,6 +343,14 @@ def validar_ouro(registros: dict[str, dict]) -> None:
     if reg is None:
         raise SystemExit("ERRO: São Roque (3550605) ausente do recorte — não gravo.")
     densidade = round(reg["pop_2022"] / reg["area_km2"], 2) if reg.get("area_km2") else None
+    # Retrato do São Roque ANTES do veredito — assim uma rodada já mostra tudo, mesmo falhando.
+    print(
+        "  São Roque coletado: "
+        f"pop2022={reg.get('pop_2022')} pop2010={reg.get('pop_2010')} "
+        f"densidade={densidade} pib_pc={reg.get('pib_per_capita')} "
+        f"(ano {reg.get('pib_ano')}) morad/dom={reg.get('moradores_por_domicilio')}",
+        file=sys.stderr,
+    )
     checks = {
         "pop_2022": (reg.get("pop_2022"), OURO_SAO_ROQUE["pop_2022"], 0),
         "pop_2010": (reg.get("pop_2010"), OURO_SAO_ROQUE["pop_2010"], 0),
@@ -323,7 +361,13 @@ def validar_ouro(registros: dict[str, dict]) -> None:
     erros = []
     for nome, (obtido, esperado, tol) in checks.items():
         if obtido is None or abs(obtido - esperado) > tol:
-            erros.append(f"  {nome}: obtido {obtido} ≠ ouro {esperado} (tol {tol})")
+            extra = ""
+            if nome == "pib_per_capita" and str(reg.get("pib_ano")) != "2023":
+                extra = (
+                    f" — ATENÇÃO: PIB veio do ano {reg.get('pib_ano')}, não 2023 (ano do ouro). "
+                    "O PIB dos Municípios pode não ter 2023 publicado; reconcilie o ano com a spec."
+                )
+            erros.append(f"  {nome}: obtido {obtido} ≠ ouro {esperado} (tol {tol}){extra}")
     fe = reg.get("faixa_etaria")
     if fe and abs(sum(fe.values()) - 1.0) > 0.001:
         erros.append(f"  faixa_etaria Σ = {sum(fe.values()):.4f} ≠ 1,000")
