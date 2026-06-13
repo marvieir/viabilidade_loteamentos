@@ -270,7 +270,7 @@ export function CardFinanceira({
             <div>
               <p className="text-[11px] text-slate-500">Modo de venda</p>
               <select value={f.modo} onChange={(e) => set("modo", e.target.value as Form["modo"])} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm">
-                <option value="financiado">Financiado (PRICE) — padrão de loteamento</option>
+                <option value="financiado">Financiado (PRICE, corrigido por IPCA) — padrão de loteamento</option>
                 <option value="avista">À vista</option>
                 <option value="parcelado">Parcelado sem juros</option>
               </select>
@@ -281,8 +281,9 @@ export function CardFinanceira({
             {f.modo === "parcelado" && <Campo rotulo="Nº de parcelas" ajuda="Em quantas vezes o saldo é dividido (sem juros)." valor={f.n_parcelas} on={(v) => set("n_parcelas", v)} />}
             {f.modo === "financiado" && (
               <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-3">
-                <p className="text-sm font-medium text-slate-700">Mesa de vendas (PRICE) <Badge>default — edite</Badge></p>
+                <p className="text-sm font-medium text-slate-700">Mesa de vendas (PRICE, corrigido por IPCA) <Badge>default — edite</Badge></p>
                 <p className="mb-2 text-[11px] text-slate-500">Como as vendas se repartem por prazo de financiamento (soma = 100%). Referência TIV 5.0 — calibre com sua corretora.</p>
+                <p className="mb-2 text-[11px] text-amber-700">A parcela já corrige por IPCA. O <strong>% a.m.</strong> abaixo é o juro <strong>real, além do IPCA</strong> (contrato “IPCA + X”): use <strong>0</strong> para correção pura. Tudo em R$ de hoje — o IPCA cancela no fluxo.</p>
                 {mesa.map((l, i) => (
                   <div key={i} className="flex flex-wrap items-center gap-2 py-0.5 text-xs">
                     <input type="number" value={l.participacao} onChange={(e) => setMesaLinha(i, { participacao: parseFloat(e.target.value) || 0 })} className="w-16 rounded border border-slate-200 px-2 py-1" />
@@ -290,7 +291,7 @@ export function CardFinanceira({
                     <input type="number" value={l.prazo_meses} onChange={(e) => setMesaLinha(i, { prazo_meses: parseInt(e.target.value) || 1 })} className="w-16 rounded border border-slate-200 px-2 py-1" />
                     <span className="text-slate-500">meses a</span>
                     <input type="number" step={0.1} value={l.taxa_am} onChange={(e) => setMesaLinha(i, { taxa_am: parseFloat(e.target.value) || 0 })} className="w-16 rounded border border-slate-200 px-2 py-1" />
-                    <span className="text-slate-500">% a.m.</span>
+                    <span className="text-slate-500" title="Juro real além do IPCA. 0 = só correção IPCA.">% a.m. (real, +IPCA)</span>
                     <button onClick={() => setMesa((m) => m.filter((_, k) => k !== i))} className="text-slate-400 hover:text-rose-600">✕</button>
                   </div>
                 ))}
