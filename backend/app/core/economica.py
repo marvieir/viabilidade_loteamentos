@@ -235,6 +235,16 @@ def avaliar(
     if tir_aa is None:
         leituras.append(schemas.LeituraOut(
             chave="tir", status="atencao", texto=f"TIR indefinida: {AVISO_SEM_INVERSAO.lower()}"))
+    elif tir_status == "multipla_possivel":
+        # Fluxo não-convencional (>1 troca de sinal) → a TIR não é única; a bissecção pode
+        # devolver a raiz "de baixo" (ex.: −100% a.a.), que contradiria um VPL positivo.
+        # Sem veredito de TIR aqui: o critério honesto é o VPL (caso real do operador,
+        # mesa PRICE com cauda de administração negativa após a carteira secar).
+        leituras.append(schemas.LeituraOut(
+            chave="tir", status="atencao",
+            texto="Fluxo não-convencional (mais de uma troca de sinal) — a TIR não é única "
+                  f"e não serve de critério aqui; use o VPL à TMA de {tma_fmt} "
+                  "(sob as premissas declaradas)."))
     elif tir_aa >= p.tma_aa_real:
         leituras.append(schemas.LeituraOut(
             chave="tir", status="favoravel", valor_fmt=tir.aa_fmt,

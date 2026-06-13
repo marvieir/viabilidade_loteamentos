@@ -131,6 +131,27 @@ def test_tir_multipla_possivel():
     assert any("prefira o VPL" in a for a in out.tir.avisos)
 
 
+def test_tir_multipla_sem_veredito_na_leitura():
+    """Caso real do operador: fluxo não-convencional (− no início, + no miolo, cauda −
+    de administração após a carteira secar). A bissecção devolve a raiz 'de baixo'
+    (≈−100% a.a.), que CONTRADIRIA o VPL positivo — a leitura da TIR não pode emitir
+    veredito (favorável/desfavorável): vira 'atencao' mandando usar o VPL."""
+    fluxo = (
+        [(m, -90000.0) for m in range(0, 36)]
+        + [(m, 180000.0) for m in range(36, 121)]
+        + [(m, -10000.0) for m in range(121, 198)]
+    )
+    out = motor.avaliar(
+        fluxo, _acum(fluxo), PremissasEconomicaIn(tma_aa_real=0.15), proveniencia="t"
+    )
+    assert out.vpl.valor > 0  # o fluxo cria valor à TMA declarada
+    assert out.tir.status == "multipla_possivel"
+    tir_l = next(l for l in out.leituras if l.chave == "tir")
+    assert tir_l.status == "atencao"  # NUNCA 'desfavoravel' com VPL positivo
+    assert "não é única" in tir_l.texto and "VPL" in tir_l.texto
+    assert tir_l.valor_fmt is None  # sem o número enganoso (−100%) em destaque
+
+
 def _acum(fluxo):
     ac, out = 0.0, []
     for m, v in sorted(fluxo):

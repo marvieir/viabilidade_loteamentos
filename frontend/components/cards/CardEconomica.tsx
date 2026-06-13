@@ -130,10 +130,22 @@ function Resultado({ d }: { d: Economica }) {
           valor={d.vpl.valor_fmt}
           tom={d.vpl.valor > 0 ? "emerald" : d.vpl.valor < 0 ? "rose" : "slate"}
         />
+        {/* TIR múltipla (fluxo não-convencional): o número não é critério — o backend
+            manda o status e a leitura manda usar o VPL; aqui exibimos "não única". */}
         <Kpi
           rotulo="TIR real (a.a.)"
-          valor={d.tir.aa_fmt ?? `— (${d.tir.status})`}
-          sub={d.tir.mensal != null ? `${(d.tir.mensal * 100).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}% a.m.` : undefined}
+          valor={
+            d.tir.status === "multipla_possivel"
+              ? "não única"
+              : d.tir.aa_fmt ?? `— (${d.tir.status})`
+          }
+          sub={
+            d.tir.status === "multipla_possivel"
+              ? "fluxo não-convencional — use o VPL"
+              : d.tir.mensal != null
+                ? `${(d.tir.mensal * 100).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}% a.m.`
+                : undefined
+          }
         />
         <Kpi
           rotulo="Payback simples / descontado"
