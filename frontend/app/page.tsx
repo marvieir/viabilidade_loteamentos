@@ -112,6 +112,18 @@ export default function Home() {
           />
 
           <main className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-5">
+            {analise.agrupamento && (
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+                <p className="font-semibold">
+                  Projeto unificado — {analise.agrupamento.n_glebas} glebas contíguas
+                </p>
+                <p className="text-indigo-800">
+                  {analise.agrupamento.proveniencia}. Área da união:{" "}
+                  {analise.geometria.area_ha.toLocaleString("pt-BR")} ha (sem dupla
+                  contagem). Arquivos: {analise.agrupamento.arquivos.join(", ")}.
+                </p>
+              </div>
+            )}
             <KpiRow
               analise={analise}
               aprov={dadosAprov}

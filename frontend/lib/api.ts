@@ -40,12 +40,45 @@ export interface OrigemGeometria {
   descricao: string;
 }
 
+// Fase 8 — proveniência da união de 2+ KMZ contíguos (ausente quando 1 só arquivo).
+export interface Agrupamento {
+  n_glebas: number;
+  arquivos: string[];
+  municipio_comum: { cod_ibge: string | null; nome: string | null; uf: string | null };
+  fronteira: "compartilhada";
+  tolerancia_encosto_m: number;
+  area_total_m2: number;
+  proveniencia: string;
+}
+
 export interface Analise {
   analise_id: string;
   geometria: Geometria;
   jurisdicao: Jurisdicao;
   origem_geometria: OrigemGeometria;
   avisos: string[];
+  agrupamento?: Agrupamento | null;
+}
+
+// Fase 8 — recusa diagnóstica do agrupamento (glebas não contíguas / sobrepostas / municípios).
+export class GrupoRecusado extends Error {
+  erro: string;
+  detalhe: string;
+  diagnostico: Record<string, unknown>;
+  arquivos: string[];
+  constructor(
+    erro: string,
+    detalhe: string,
+    diagnostico: Record<string, unknown>,
+    arquivos: string[]
+  ) {
+    super(detalhe || erro);
+    this.name = "GrupoRecusado";
+    this.erro = erro;
+    this.detalhe = detalhe;
+    this.diagnostico = diagnostico;
+    this.arquivos = arquivos;
+  }
 }
 
 // Recusa diagnóstica da ingestão (Fase 1.5): arquivo de topografia/CAD, etc.
@@ -161,9 +194,17 @@ async function jsonOrThrow(res: Response) {
   return res.json();
 }
 
-export async function criarAnalise(kmz: File): Promise<Analise> {
+// Aceita 1 arquivo (fluxo de hoje) ou 2+ (Fase 8 — projeto unificado por união geométrica).
+const ERROS_AGRUPAMENTO = new Set([
+  "GLEBAS_NAO_CONTIGUAS",
+  "GLEBAS_SOBREPOSTAS",
+  "MUNICIPIOS_DIFERENTES",
+]);
+
+export async function criarAnalise(kmz: File | File[]): Promise<Analise> {
+  const arquivos = Array.isArray(kmz) ? kmz : [kmz];
   const form = new FormData();
-  form.append("kmz", kmz);
+  arquivos.forEach((f) => form.append("kmz", f));
   const res = await fetch(`${API_BASE}/api/analises`, {
     method: "POST",
     body: form,
@@ -176,6 +217,15 @@ export async function criarAnalise(kmz: File): Promise<Analise> {
       /* corpo não-JSON */
     }
     const b = body as Record<string, unknown> | null;
+    // Recusa diagnóstica do agrupamento (Fase 8): glebas não contíguas/sobrepostas/municípios.
+    if (b && typeof b.erro === "string" && ERROS_AGRUPAMENTO.has(b.erro)) {
+      throw new GrupoRecusado(
+        b.erro,
+        String(b.detalhe ?? ""),
+        (b.diagnostico as Record<string, unknown>) ?? {},
+        (b.arquivos as string[]) ?? []
+      );
+    }
     // Recusa diagnóstica da ingestão (corpo estruturado, não {detail}).
     if (b && b.erro === "geometria_nao_ingerivel") {
       throw new IngestaoRecusada(
