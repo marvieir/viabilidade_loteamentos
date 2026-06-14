@@ -50,12 +50,34 @@ class OrigemGeometriaOut(BaseModel):
     descricao: str
 
 
+class MunicipioComumOut(BaseModel):
+    """Município comum às glebas agrupadas (Fase 8)."""
+
+    cod_ibge: Optional[str]
+    nome: Optional[str]
+    uf: Optional[str]
+
+
+class AgrupamentoOut(BaseModel):
+    """Proveniência da união de 2+ KMZ contíguos (Fase 8). Ausente quando 1 só arquivo."""
+
+    n_glebas: int
+    arquivos: list[str]
+    municipio_comum: MunicipioComumOut
+    fronteira: Literal["compartilhada"]
+    tolerancia_encosto_m: float
+    area_total_m2: float
+    proveniencia: str
+
+
 class AnaliseOut(BaseModel):
     analise_id: str
     geometria: GeometriaOut
     jurisdicao: JurisdicaoOut
     origem_geometria: OrigemGeometriaOut
     avisos: list[str] = []
+    # Fase 8 — presente apenas quando a análise nasceu de 2+ KMZ agrupados.
+    agrupamento: Optional[AgrupamentoOut] = None
 
 
 # ----- POST /api/analises/{id}/aproveitamento -----

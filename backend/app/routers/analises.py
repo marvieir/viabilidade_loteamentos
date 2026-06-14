@@ -11,8 +11,12 @@ import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
+from pyproj import CRS, Transformer
 from shapely.geometry import mapping, shape
+from shapely.ops import transform as shp_transform
+from shapely.ops import unary_union
 
+from app.core import agrupamento as agrupamento_mod
 from app.core import ambiental as ambiental_motor
 from app.core import aproveitamento as motor
 from app.core import aproveitavel
@@ -158,14 +162,23 @@ def _jurisdicao_to_schema(jur: Jurisdicao) -> schemas.JurisdicaoOut:
 
 @router.post("/analises", response_model=schemas.AnaliseOut)
 async def criar_analise(
-    kmz: UploadFile | None = File(None),
-    kml: UploadFile | None = File(None),
+    kmz: list[UploadFile] = File(default=[]),
+    kml: list[UploadFile] = File(default=[]),
     fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
 ):
-    upload = kmz or kml
-    if upload is None:
+    # O NÚMERO DE ARQUIVOS É A INTENÇÃO (Fase 8): 1 = fluxo de hoje (intacto), 2+ = projeto
+    # unificado (união geométrica). Aceita os arquivos sob a chave ``kmz`` e/ou ``kml``.
+    arquivos = [a for a in (*kmz, *kml) if a is not None and a.filename]
+    if not arquivos:
         raise HTTPException(422, "Envie um arquivo KMZ ou KML.")
 
+    if len(arquivos) == 1:
+        return await _criar_analise_unica(arquivos[0], fonte_malha)
+    return await _criar_analise_agrupada(arquivos, fonte_malha)
+
+
+async def _criar_analise_unica(upload: UploadFile, fonte_malha):
+    """Caminho de UM arquivo — comportamento idêntico ao da Fase 1.5/1.7 (não-regressão)."""
     conteudo = await upload.read()
     if not conteudo:
         raise HTTPException(422, "Arquivo vazio.")
@@ -232,6 +245,155 @@ async def criar_analise(
             rota=res.rota, descricao=res.descricao
         ),
         avisos=avisos,
+    )
+
+
+def _crs_local_aeqd(lon: float, lat: float) -> CRS:
+    """CRS métrico local (AEQD), igual ao padrão da consolidação/declividade — área,
+    distância e a tolerância de encosto medidas em METROS, nunca em graus."""
+    return CRS.from_proj4(
+        f"+proj=aeqd +lat_0={lat} +lon_0={lon} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+    )
+
+
+async def _ler_gleba(upload: UploadFile):
+    """Lê um arquivo → (polígono da gleba, conteúdo, avisos). 1 gleba por arquivo: vários
+    polígonos no mesmo arquivo → o de maior área (mesma regra do caminho único). Levanta
+    ``HTTPException`` (arquivo vazio/inválido) ou devolve ``(None, res, [])`` em recusa de
+    ingestão para o chamador emitir o 422 diagnóstico por arquivo."""
+    conteudo = await upload.read()
+    if not conteudo:
+        raise HTTPException(422, f"Arquivo vazio: {upload.filename}.")
+    try:
+        res = ingestao_mod.ingerir(conteudo)
+    except kmz_parser.KmzInvalido as exc:
+        raise HTTPException(422, f"{upload.filename}: {exc}")
+    if not res.ok:
+        return None, res, []
+
+    medidos = []
+    for poly in res.poligonos:
+        try:
+            area, _ = geometria.medir(poly)
+        except geometria.GeometriaInvalida as exc:
+            raise HTTPException(422, f"{upload.filename}: {exc}")
+        medidos.append((poly, area))
+    medidos.sort(key=lambda t: t[1], reverse=True)
+
+    avisos = [f"{upload.filename}: {a}" for a in res.avisos]
+    if len(medidos) > 1:
+        avisos.append(
+            f"{upload.filename}: continha {len(medidos)} polígonos; usado o de maior área."
+        )
+    return medidos[0][0], conteudo, avisos
+
+
+async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha):
+    """Caminho de 2+ arquivos (Fase 8): valida contiguidade + município comum e produz a
+    UNIÃO como geometria da análise. Recusa é sempre diagnóstica e NÃO cria análise parcial.
+    A jusante nada muda — o pipeline recebe um Polygon, cego à origem múltipla."""
+    geoms_wgs: list = []
+    conteudos: list[bytes] = []
+    nomes: list[str] = []
+    avisos: list[str] = []
+
+    for up in arquivos:
+        gleba, res_ou_conteudo, av = await _ler_gleba(up)
+        if gleba is None:  # recusa de ingestão deste arquivo → 422 diagnóstico
+            res = res_ou_conteudo
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "erro": res.erro,
+                    "arquivo": up.filename,
+                    "rota": res.rota,
+                    "diagnostico": res.diagnostico,
+                    "orientacao": res.orientacao,
+                },
+            )
+        geoms_wgs.append(gleba)
+        conteudos.append(res_ou_conteudo)
+        nomes.append(up.filename)
+        avisos.extend(av)
+
+    # Detecção do município por gleba (a divergência recusa antes da geometria, §3).
+    municipios = [resolver_jurisdicao(g, fonte_malha).cod_ibge for g in geoms_wgs]
+
+    # Reprojeta para CRS métrico local e agrupa com a TOLERÂNCIA DE ENCOSTO da ingestão.
+    centro = unary_union(geoms_wgs).centroid
+    local = _crs_local_aeqd(centro.x, centro.y)
+    to_local = Transformer.from_crs("EPSG:4326", local, always_xy=True).transform
+    to_wgs = Transformer.from_crs(local, "EPSG:4326", always_xy=True).transform
+    geoms_m = [shp_transform(to_local, g) for g in geoms_wgs]
+
+    res_agr = agrupamento_mod.agrupar(
+        geoms_m, municipios, tolerancia=ingestao_mod.TOLERANCIA_FECHAMENTO_M
+    )
+    if not res_agr.ok:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "erro": res_agr.erro,
+                "detalhe": res_agr.detalhe,
+                "diagnostico": res_agr.diagnostico,
+                "arquivos": nomes,
+            },
+        )
+
+    uniao_wgs = shp_transform(to_wgs, res_agr.uniao)
+    area, perimetro = geometria.medir(uniao_wgs)
+    jur = resolver_jurisdicao(uniao_wgs, fonte_malha)
+
+    if res_agr.encostou:
+        avisos.append(
+            "Folga de digitalização ≤ tolerância de encosto pontada entre glebas vizinhas."
+        )
+
+    # ID determinístico independe da ORDEM de upload: hash dos conteúdos, ordenado.
+    semente = "|".join(sorted(hashlib.sha256(c).hexdigest() for c in conteudos))
+    analise_id = str(uuid.uuid5(_NS_ANALISE, semente))
+
+    agr_out = schemas.AgrupamentoOut(
+        n_glebas=res_agr.n_glebas,
+        arquivos=nomes,
+        municipio_comum=schemas.MunicipioComumOut(
+            cod_ibge=jur.cod_ibge, nome=jur.municipio, uf=jur.uf
+        ),
+        fronteira="compartilhada",
+        tolerancia_encosto_m=ingestao_mod.TOLERANCIA_FECHAMENTO_M,
+        area_total_m2=round(area, 2),
+        proveniencia=(
+            f"União geométrica de {res_agr.n_glebas} KMZ contíguos (fronteira comum) — "
+            "mesmo município"
+        ),
+    )
+
+    STORE[analise_id] = {
+        "poly": uniao_wgs,
+        "area_m2": area,
+        "perimetro_m": perimetro,
+        "jurisdicao": jur,
+        "agrupamento": agr_out.model_dump(),
+    }
+
+    return schemas.AnaliseOut(
+        analise_id=analise_id,
+        geometria=schemas.GeometriaOut(
+            area_m2=round(area, 2),
+            area_ha=round(area / 10_000, 2),
+            perimetro_m=round(perimetro, 2),
+            geojson=mapping(uniao_wgs),
+        ),
+        jurisdicao=_jurisdicao_to_schema(jur),
+        origem_geometria=schemas.OrigemGeometriaOut(
+            rota="POLYGON_DIRETO",
+            descricao=(
+                f"união geométrica de {res_agr.n_glebas} glebas contíguas "
+                "(ver bloco 'agrupamento')"
+            ),
+        ),
+        avisos=avisos,
+        agrupamento=agr_out,
     )
 
 
