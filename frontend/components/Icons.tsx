@@ -41,6 +41,9 @@ export const IconPlus = (p: P) => (
 export const IconPlay = (p: P) => (
   <svg {...base(p)}><polygon points="6 3 20 12 6 21 6 3" /></svg>
 );
+export const IconDownload = (p: P) => (
+  <svg {...base(p)}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" /></svg>
+);
 export const IconMap = (p: P) => (
   <svg {...base(p)}><path d="M14.1 4.1 9 2 3.6 3.8a1 1 0 0 0-.6.9V20a.5.5 0 0 0 .7.5L9 18l6 2 5.4-1.8a1 1 0 0 0 .6-.9V4a.5.5 0 0 0-.7-.5L15 5" /><path d="M9 2v16M15 5v16" /></svg>
 );

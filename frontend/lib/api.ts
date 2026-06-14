@@ -241,6 +241,23 @@ export async function criarAnalise(kmz: File | File[]): Promise<Analise> {
   return res.json();
 }
 
+// Fase 7 — gera o laudo de triagem em PDF. O front apenas REPASSA os JSONs que cada card
+// já recebeu do backend (não recalcula nada, §2); o backend compõe e devolve o PDF.
+export async function gerarLaudo(
+  analiseId: string,
+  dims: Record<string, unknown>
+): Promise<Blob> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/laudo`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dims),
+  });
+  if (!res.ok) {
+    throw new Error(`Falha ao gerar o laudo: ${res.status} ${res.statusText}`);
+  }
+  return res.blob();
+}
+
 // Autocomplete por NOME sobre a malha local (offline). O código IBGE volta no
 // payload para resolver internamente — o usuário nunca digita nem vê o código.
 export async function buscarMunicipios(q: string): Promise<MunicipioRef[]> {

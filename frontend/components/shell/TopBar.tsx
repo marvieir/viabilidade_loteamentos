@@ -1,6 +1,6 @@
 "use client";
 
-import { IconMap, IconPlay, IconPlus } from "@/components/Icons";
+import { IconDownload, IconMap, IconPlay, IconPlus } from "@/components/Icons";
 import type { Analise } from "@/lib/api";
 
 const ROTULO_COBERTURA: Record<string, string> = {
@@ -14,11 +14,15 @@ export function TopBar({
   onNova,
   onAnalisarTudo,
   analisando,
+  onLaudo,
+  gerandoLaudo,
 }: {
   analise: Analise | null;
   onNova: () => void;
   onAnalisarTudo: () => void;
   analisando?: boolean;
+  onLaudo?: () => void;
+  gerandoLaudo?: boolean;
 }) {
   const jur = analise?.jurisdicao;
   const local =
@@ -62,6 +66,18 @@ export function TopBar({
               <IconPlay width={15} height={15} />
               {analisando ? "Analisando…" : "Analisar tudo"}
             </button>
+            {onLaudo && (
+              <button
+                type="button"
+                onClick={onLaudo}
+                disabled={gerandoLaudo}
+                title="Gera o laudo de triagem em PDF (composição das dimensões já analisadas)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <IconDownload width={15} height={15} />
+                {gerandoLaudo ? "Gerando…" : "Gerar laudo (PDF)"}
+              </button>
+            )}
           </>
         )}
         <button

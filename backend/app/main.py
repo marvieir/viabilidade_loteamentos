@@ -24,6 +24,7 @@ from app.routers import (
     economica,
     financeira,
     juridico,
+    laudo,
     localizacao,
     perfil,
     vegetacao,
@@ -55,6 +56,7 @@ app.include_router(conformidade.router, prefix="/api")
 app.include_router(financeira.router, prefix="/api")
 app.include_router(economica.router, prefix="/api")
 app.include_router(localizacao.router, prefix="/api")
+app.include_router(laudo.router, prefix="/api")
 
 
 @app.get("/health")

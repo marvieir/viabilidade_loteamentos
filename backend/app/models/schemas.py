@@ -989,3 +989,65 @@ class LocalizacaoOut(BaseModel):
     faixa_etaria: FaixaEtariaOut
     proveniencia: str
     avisos: list[str] = []
+
+
+# ----- Fase 7 — Consolidação (laudo de triagem em PDF) -----
+# Composição PURA do que as dimensões já devolveram (zero cálculo novo, §2). O laudo NUNCA
+# emite veredito global de viabilidade (§1-A): tem luzes por dimensão + a ressalva-mestre.
+
+LuzTipo = Literal["favoravel", "atencao", "restricao", "informativa", "nao_analisada"]
+
+
+class LaudoIn(BaseModel):
+    """Corpo do POST do laudo: os JSONs das dimensões JÁ EXECUTADAS (o front repassa o que
+    o backend devolveu — não recalcula nada). Dimensão ausente → seção 'não analisada'."""
+
+    aproveitamento: Optional[dict] = None
+    ambiental: Optional[dict] = None
+    vegetacao: Optional[dict] = None
+    declividade: Optional[dict] = None
+    juridico: Optional[dict] = None
+    financeira: Optional[dict] = None
+    economica: Optional[dict] = None
+    localizacao: Optional[dict] = None
+
+
+class LuzSemaforo(BaseModel):
+    """Uma luz por dimensão, DERIVADA do que a dimensão já reporta — nunca juízo novo."""
+
+    dimensao: str
+    luz: LuzTipo
+    justificativa: str
+
+
+class ItemLaudo(BaseModel):
+    rotulo: str
+    valor: str
+    proveniencia: Optional[str] = None
+
+
+class SecaoLaudo(BaseModel):
+    chave: str
+    titulo: str
+    analisada: bool
+    luz: LuzTipo
+    itens: list[ItemLaudo] = []
+    avisos: list[str] = []  # ressalvas §1-A da própria dimensão
+
+
+class FonteConsolidada(BaseModel):
+    dimensao: str
+    fonte: str
+
+
+class LaudoData(BaseModel):
+    """Modelo de dados do laudo — a fonte do PDF. Determinístico e auditável."""
+
+    analise_id: str
+    titulo: str
+    data_geracao: str
+    ressalva_capa: str  # §1-A na capa
+    rodape: str  # §1-A no rodapé de TODA página
+    semaforo: list[LuzSemaforo]
+    secoes: list[SecaoLaudo]
+    proveniencia_consolidada: list[FonteConsolidada]

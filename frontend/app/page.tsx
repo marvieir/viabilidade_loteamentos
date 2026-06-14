@@ -20,6 +20,7 @@ import { CardFinanceira } from "@/components/cards/CardFinanceira";
 import { CardEconomica } from "@/components/cards/CardEconomica";
 import { CardLocalizacao } from "@/components/cards/CardLocalizacao";
 import { IconMap } from "@/components/Icons";
+import { gerarLaudo } from "@/lib/api";
 import type {
   Ambiental,
   Analise,
@@ -59,8 +60,40 @@ export default function Home() {
 
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
   const [sinal, setSinal] = useState(0);
+  const [gerandoLaudo, setGerandoLaudo] = useState(false);
 
   const overlays: Overlays = { ...overlaysAmb, ...overlaysVerde, ...overlaysDecliv };
+
+  // Fase 7 — laudo PDF: repassa os JSONs que os cards já receberam (front não recalcula).
+  async function onLaudo() {
+    if (!analise) return;
+    setGerandoLaudo(true);
+    try {
+      const dims = {
+        aproveitamento: dadosAprov,
+        ambiental: dadosAmb,
+        vegetacao: dadosVerde,
+        declividade: dadosDecliv,
+        juridico: dadosJuridico,
+        financeira: dadosFinanceira,
+        economica: dadosEconomica,
+        localizacao: dadosLocalizacao,
+      };
+      const blob = await gerarLaudo(analise.analise_id, dims);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `laudo_${analise.analise_id.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Falha ao gerar o laudo.");
+    } finally {
+      setGerandoLaudo(false);
+    }
+  }
 
   function onAnalise(a: Analise | null) {
     setAnalise(a);
@@ -98,6 +131,8 @@ export default function Home() {
         analise={analise}
         onNova={() => onAnalise(null)}
         onAnalisarTudo={() => setSinal((s) => s + 1)}
+        onLaudo={onLaudo}
+        gerandoLaudo={gerandoLaudo}
       />
 
       {!analise ? (
