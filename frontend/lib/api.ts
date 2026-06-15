@@ -1172,6 +1172,29 @@ export interface Fidelidade {
   topografia: { orientacao_por_declividade: boolean; obs: string };
 }
 
+// Fase 9.2 — mix heterogêneo medido (distribuição de tamanhos + correlação tamanho×score).
+export interface FaixaMix {
+  faixa: string;
+  n: number;
+  pct: number;
+  area_media_m2: number;
+}
+export interface LoteUrb {
+  lote_id: string;
+  area_m2: number;
+  faixa: string;
+  score: number;
+  zona_motivo: string[];
+}
+export interface MixMedido {
+  distribuicao: FaixaMix[];
+  correlacao_tamanho_score: number;
+  sobra_retalho_m2: number;
+  sobra_retalho_pct: number;
+  arruamento_pct: number;
+  lotes: LoteUrb[];
+}
+
 export interface PropostaUrbanistica {
   proposta_id: string;
   versao: number;
@@ -1183,6 +1206,7 @@ export interface PropostaUrbanistica {
   indicadores: IndicadoresUrb;
   heatmap: HeatmapUrb;
   fidelidade: Fidelidade | null;
+  mix_medido: MixMedido | null;
   conformidade_programa: ItemConformidadePrograma[];
   esqueleto_ignorado: string[];
   proveniencia: string;

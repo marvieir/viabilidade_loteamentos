@@ -45,8 +45,12 @@ class Programa:
     testada_m: float
     profundidade_m: float
     pct_institucional: float = 0.0
-    # esqueleto grosseiro de vias principais (polilinhas, CRS métrico da tela) — SUGESTÃO.
+    # esqueleto grosseiro de vias principais (polilinhas, coords normalizadas 0..1) — SUGESTÃO.
     esqueleto: list[list[list[float]]] = field(default_factory=list)
+    # Fase 9.2 — POLÍTICA de mix (faixas de tamanho + proporção) e heurísticas de valorização.
+    # São intenção/estratégia: o Python zoneia/dimensiona/mede; nenhum tamanho/score vem daqui.
+    estrategia_mix: list[dict] = field(default_factory=list)
+    heuristicas: dict = field(default_factory=dict)
     origem: str = "preset"
     justificativa: str = ""
 
@@ -83,6 +87,36 @@ PRESETS: dict[str, dict] = {
 # Razão testada:profundidade típica de lote (frente menor que a profundidade).
 _RAZAO_TESTADA = 0.72
 
+# Fase 9.2 — POLÍTICA de mix de tamanhos (faixas de área + proporção-alvo) por perfil. Defaults
+# calibrados por referência de mercado (urbIA); EDITÁVEIS — NUNCA são meta, só ponto de partida.
+MIX_PRESETS: dict[str, list[dict]] = {
+    "baixa": [
+        {"faixa": "premium", "min_m2": 250.0, "max_m2": 350.0, "prop_alvo": 0.15},
+        {"faixa": "padrao", "min_m2": 180.0, "max_m2": 250.0, "prop_alvo": 0.55},
+        {"faixa": "compacto", "min_m2": 125.0, "max_m2": 180.0, "prop_alvo": 0.30},
+    ],
+    "media": [
+        {"faixa": "premium", "min_m2": 450.0, "max_m2": 600.0, "prop_alvo": 0.20},
+        {"faixa": "padrao", "min_m2": 300.0, "max_m2": 420.0, "prop_alvo": 0.55},
+        {"faixa": "compacto", "min_m2": 220.0, "max_m2": 300.0, "prop_alvo": 0.25},
+    ],
+    "alta": [
+        {"faixa": "premium", "min_m2": 700.0, "max_m2": 900.0, "prop_alvo": 0.25},
+        {"faixa": "padrao", "min_m2": 450.0, "max_m2": 600.0, "prop_alvo": 0.55},
+        {"faixa": "compacto", "min_m2": 350.0, "max_m2": 450.0, "prop_alvo": 0.20},
+    ],
+}
+# Heurísticas de valorização (conhecimento estável de urbanismo) — ONDE pôr o premium.
+HEURISTICAS_DEFAULT = {
+    "premium_em": ["fundo_mata", "frente_lazer", "cota_alta"],
+    "penalizar": ["via_principal", "entrada"],
+    "origem": "preset",
+    "justificativa": (
+        "Táticas de valorização: lote grande na cota alta, fundo para mata, frente para "
+        "lazer; penaliza ruído da via principal/entrada. Referência de mercado — calibre."
+    ),
+}
+
 
 def _dims_lote(area: float) -> tuple[float, float]:
     """(testada, profundidade) de um retângulo de ``area`` com razão fixa — determinístico."""
@@ -115,6 +149,8 @@ def programa_do_preset(publico_alvo: str, overrides: Optional[dict] = None) -> P
         profundidade_m=profundidade,
         pct_institucional=float(ov.get("pct_institucional", 0.0)),
         esqueleto=list(ov.get("esqueleto", [])),
+        estrategia_mix=list(ov.get("estrategia_mix", MIX_PRESETS.get(publico_alvo, MIX_PRESETS["media"]))),
+        heuristicas=dict(ov.get("heuristicas", HEURISTICAS_DEFAULT)),
         origem="preset+override" if ov else "preset",
         justificativa=(
             f"Preset de público-alvo '{publico_alvo}' (perfil de referência de mercado — "
@@ -134,8 +170,11 @@ _INSTRUCAO = (
     "Você é urbanista de PRÉ-ANÁLISE. Propõe um PROGRAMA de estudo de massa (não o projeto "
     "executivo) para uma gleba, dado o público-alvo. Regras INEGOCIÁVEIS:\n"
     "1. Você propõe ESTRATÉGIA (lote-alvo em m², hierarquia viária, % de lazer, arquétipo, "
-    "densidade, esqueleto grosseiro de vias principais). NUNCA devolva nº de lotes, área "
-    "vendável ou polígono de lote — isso é MEDIDO pelo motor depois, não por você.\n"
+    "densidade, esqueleto, MIX de tamanhos por faixa + proporção, e heurísticas de "
+    "valorização — onde pôr lotes premium: cota alta, fundo de mata, frente para lazer). "
+    "NUNCA devolva nº de lotes, área vendável, tamanho ou polígono de lote — isso é MEDIDO "
+    "pelo motor depois, não por você. O mix é POLÍTICA, não otimização: você não busca a "
+    "distribuição 'ótima', só propõe a estratégia; o heatmap mede a consequência.\n"
     "2. Coerência com o público-alvo: alta renda → lotes maiores, mais lazer, viário "
     "sinuoso; baixa renda → lotes menores, grelha eficiente, lazer mínimo.\n"
     "3. O esqueleto é OPCIONAL e apenas uma SUGESTÃO de eixos de via, em coordenadas "
@@ -168,6 +207,22 @@ _FERRAMENTA = {
                     "(x oeste→leste, y sul→norte); eixos de via principais (opcional)"
                 ),
                 "items": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
+            },
+            "estrategia_mix": {
+                "type": "array",
+                "description": (
+                    "faixas de tamanho de lote + proporção-alvo (mix heterogêneo); ex.: "
+                    '[{"faixa":"premium","min_m2":700,"max_m2":900,"prop_alvo":0.25}, …]. '
+                    "POLÍTICA — o motor dimensiona e mede; não é meta."
+                ),
+                "items": {"type": "object"},
+            },
+            "heuristicas": {
+                "type": "object",
+                "description": (
+                    'onde aplicar valorização: {"premium_em":["cota_alta","fundo_mata",'
+                    '"frente_lazer"],"penalizar":["via_principal","entrada"]}'
+                ),
             },
             "justificativa": {"type": "string"},
         },
@@ -219,7 +274,7 @@ class GeradorProgramaClaude:
         # Funde a proposta do LLM com o preset (defaults) e aplica overrides do usuário por cima.
         merged = dict(overrides or {})
         for k in ("lote_alvo_m2", "pct_lazer", "largura_via_m", "amenidades",
-                  "pct_institucional", "esqueleto"):
+                  "pct_institucional", "esqueleto", "estrategia_mix", "heuristicas"):
             if k in bruto and k not in merged:
                 merged[k] = bruto[k]
         prog = programa_do_preset(publico_alvo, merged)

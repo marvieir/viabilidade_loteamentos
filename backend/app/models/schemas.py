@@ -1094,8 +1094,35 @@ class ProgramaOut(BaseModel):
     testada_m: float
     profundidade_m: float
     pct_institucional: float = 0.0
+    estrategia_mix: list[dict] = []  # Fase 9.2 — faixas de tamanho + proporção (política)
+    heuristicas: dict = {}  # Fase 9.2 — onde aplicar valorização (política)
     origem: str
     justificativa: str
+
+
+# Fase 9.2 — mix heterogêneo MEDIDO (distribuição de tamanhos + correlação tamanho×score).
+class FaixaMixOut(BaseModel):
+    faixa: str
+    n: int
+    pct: float
+    area_media_m2: float
+
+
+class LoteOut(BaseModel):
+    lote_id: str
+    area_m2: float
+    faixa: str
+    score: float
+    zona_motivo: list[str] = []
+
+
+class MixMedidoOut(BaseModel):
+    distribuicao: list[FaixaMixOut] = []
+    correlacao_tamanho_score: float
+    sobra_retalho_m2: float
+    sobra_retalho_pct: float
+    arruamento_pct: float
+    lotes: list[LoteOut] = []
 
 
 class UsoAreaOut(BaseModel):
@@ -1203,6 +1230,7 @@ class PropostaUrbanisticaOut(BaseModel):
     indicadores: IndicadoresUrbOut
     heatmap: HeatmapOut
     fidelidade: Optional[FidelidadeOut] = None  # Fase 9.1
+    mix_medido: Optional[MixMedidoOut] = None  # Fase 9.2
     conformidade_programa: list[ItemConformidadePrograma] = []
     esqueleto_ignorado: list[str] = []
     proveniencia: str

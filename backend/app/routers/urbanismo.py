@@ -50,6 +50,8 @@ def _programa_out(prog) -> schemas.ProgramaOut:
         testada_m=prog.testada_m,
         profundidade_m=prog.profundidade_m,
         pct_institucional=prog.pct_institucional,
+        estrategia_mix=list(prog.estrategia_mix or []),
+        heuristicas=dict(prog.heuristicas or {}),
         origem=prog.origem,
         justificativa=prog.justificativa,
     )
@@ -162,6 +164,7 @@ def propor(
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
     fidelidade = schemas.FidelidadeOut(**medida.construir_fidelidade(med, layout))
+    mix = schemas.MixMedidoOut(**medida.mix_medido(med, layout))
 
     versao = fonte_urb.proxima_versao(analise_id)
     proposta_id = f"u_{analise_id[:8]}_{versao:03d}"
@@ -171,6 +174,9 @@ def propor(
         *layout.avisos,
         "Fidelidade: o quadro de áreas converge para o programa quando a gleba comporta; "
         "divergências são rotuladas, nunca forçadas.",
+        "Mix e posicionamento são ESTRATÉGIA aplicada, NÃO otimização: a distribuição é a "
+        "consequência medida; o urbanista extrai mais valor com recursos de projeto (lago, "
+        "traçado, remembramento) — fora desta triagem.",
     ]
 
     out = schemas.PropostaUrbanisticaOut(
@@ -183,6 +189,7 @@ def propor(
         indicadores=indicadores,
         heatmap=heatmap,
         fidelidade=fidelidade,
+        mix_medido=mix,
         conformidade_programa=conformidade,
         esqueleto_ignorado=layout.ignorados,
         proveniencia=(

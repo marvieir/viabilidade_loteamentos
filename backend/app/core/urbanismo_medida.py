@@ -70,6 +70,10 @@ class Layout:
     avisos: list[str] = field(default_factory=list)
     # Fase 9.1 — flags de fidelidade (alvos/efetivo, arquétipo, esqueleto, topografia).
     meta: dict = field(default_factory=dict)
+    # Fase 9.2 — faixa de mix (premium/padrao/compacto) e motivo de zona POR lote (paralelo a
+    # ``lotes``). Vazio na Fase 9 (lote uniforme); preenchido pelo zoneamento heterogêneo.
+    lote_faixas: list[str] = field(default_factory=list)
+    lote_motivos: list[list[str]] = field(default_factory=list)
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -362,3 +366,61 @@ def construir_fidelidade(med: "Medicao", layout: "Layout") -> dict:
         ),
     }
     return {"areas": areas, "viario": viario, "topografia": topo}
+
+
+# ----------------------------- mix medido (Fase 9.2) -----------------------------
+def _pearson(xs: list[float], ys: list[float]) -> float:
+    """Correlação de Pearson (0 se variância nula). Determinístico."""
+    n = len(xs)
+    if n < 2:
+        return 0.0
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx <= 1e-12 or syy <= 1e-12:
+        return 0.0
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    return sxy / math.sqrt(sxx * syy)
+
+
+_ORDEM_FAIXA = ("premium", "padrao", "compacto")
+
+
+def mix_medido(med: "Medicao", layout: "Layout") -> dict:
+    """Distribuição de tamanhos por faixa, correlação tamanho×score (consequência da
+    estratégia, NÃO meta), sobra/retalho e % de viário — tudo MEDIDO (§2)."""
+    por_lote = med.heatmap.get("por_lote", [])
+    faixas = layout.lote_faixas or []
+    motivos = layout.lote_motivos or []
+    n = len(por_lote)
+    lotes_out, areas, scores, grupos = [], [], [], {}
+    for i, p in enumerate(por_lote):
+        fx = faixas[i] if i < len(faixas) else "padrao"
+        mot = motivos[i] if i < len(motivos) else []
+        lotes_out.append({
+            "lote_id": p["lote_id"], "area_m2": p["area_m2"], "faixa": fx,
+            "score": p["score"], "zona_motivo": mot,
+        })
+        areas.append(p["area_m2"])
+        scores.append(p["score"])
+        grupos.setdefault(fx, []).append(p["area_m2"])
+
+    distribuicao = []
+    for fx in _ORDEM_FAIXA:
+        ar = grupos.get(fx)
+        if ar:
+            distribuicao.append({
+                "faixa": fx, "n": len(ar), "pct": round(len(ar) / n, 4) if n else 0.0,
+                "area_media_m2": round(sum(ar) / len(ar), 2),
+            })
+
+    liq = med.quadro["area_liquida_m2"] or 1.0
+    retalho = float(layout.meta.get("sobra_retalho_m2", 0.0))
+    return {
+        "distribuicao": distribuicao,
+        "correlacao_tamanho_score": round(_pearson(areas, scores), 3),
+        "sobra_retalho_m2": round(retalho, 2),
+        "sobra_retalho_pct": round(retalho / liq, 4),
+        "arruamento_pct": med.quadro["arruamento"]["pct_apo"],
+        "lotes": lotes_out,
+    }
