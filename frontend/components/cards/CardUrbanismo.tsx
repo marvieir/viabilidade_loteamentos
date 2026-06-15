@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import {
   proporUrbanismo,
   type ChaveOverlay,
+  type ItemFidelidadeArea,
   type PropostaUrbanistica,
   type PublicoAlvo,
   type TipoLoteamento,
@@ -253,6 +254,33 @@ export function CardUrbanismo({
               </p>
             </div>
 
+            {/* Fidelidade: convergência programa × medido (Fase 9.1) */}
+            {proposta.fidelidade && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Fidelidade — programa × medido
+                </p>
+                <div className="space-y-2">
+                  {proposta.fidelidade.areas.map((a) => (
+                    <ConvergeBar key={a.item} a={a} />
+                  ))}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                    Viário: {proposta.fidelidade.viario.arquetipo}
+                    {proposta.fidelidade.viario.esqueleto_usado
+                      ? " · eixos da IA"
+                      : " · grelha"}
+                  </span>
+                  {proposta.fidelidade.topografia.orientacao_por_declividade && (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                      Quarteirões orientados pela declividade (triagem)
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Heatmap de valorização (qualidade relativa, sem preço) */}
             {proposta.heatmap.score_medio != null && (
               <div className="rounded-xl border border-slate-200 p-4">
@@ -316,6 +344,40 @@ export function CardUrbanismo({
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// Barra de convergência: alvo do programa (marcador) × medido pelo motor.
+function ConvergeBar({ a }: { a: ItemFidelidadeArea }) {
+  const alvo = a.alvo_pct ?? 0;
+  const medido = a.medido_pct ?? 0;
+  const cor =
+    a.status === "atendido"
+      ? "bg-emerald-500"
+      : a.status === "degradado"
+      ? "bg-amber-500"
+      : "bg-indigo-500";
+  const esc = (v: number) => `${Math.min(Math.round(v * 100), 100)}%`;
+  return (
+    <div className="text-sm">
+      <div className="flex items-center justify-between text-slate-700">
+        <span className="capitalize">{a.item}</span>
+        <span className="tabular-nums text-slate-500">
+          {(medido * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% medido ·
+          alvo {(alvo * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
+        </span>
+      </div>
+      <div className="relative mt-1 h-3 overflow-hidden rounded bg-slate-100">
+        <div className={`h-full ${cor}`} style={{ width: esc(medido) }} />
+        {/* marcador do alvo do programa */}
+        <div
+          className="absolute top-0 h-full w-0.5 bg-slate-900"
+          style={{ left: esc(alvo) }}
+          title="alvo do programa"
+        />
+      </div>
+      {a.leitura && <p className="mt-1 text-xs text-slate-500">{a.leitura}</p>}
+    </div>
   );
 }
 

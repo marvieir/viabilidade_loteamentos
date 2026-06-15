@@ -138,8 +138,11 @@ _INSTRUCAO = (
     "vendável ou polígono de lote — isso é MEDIDO pelo motor depois, não por você.\n"
     "2. Coerência com o público-alvo: alta renda → lotes maiores, mais lazer, viário "
     "sinuoso; baixa renda → lotes menores, grelha eficiente, lazer mínimo.\n"
-    "3. O esqueleto é OPCIONAL e apenas uma SUGESTÃO de eixos de via (polilinhas em metros, "
-    "relativas à tela informada) — o motor valida/regulariza e pode ignorar trecho inviável."
+    "3. O esqueleto é OPCIONAL e apenas uma SUGESTÃO de eixos de via, em coordenadas "
+    "NORMALIZADAS 0..1 relativas ao bounding box da gleba (x=0 oeste, x=1 leste; y=0 sul, "
+    "y=1 norte) — o motor mapeia para a gleba real, valida/regulariza e pode ignorar trecho "
+    "inviável. Coerência com o arquétipo: 'sinuoso_fundo_vale' → eixos curvos/diagonais; "
+    "'grelha_eficiente' → o motor usa grelha (o esqueleto pode ser omitido)."
 )
 
 _FERRAMENTA = {
@@ -160,7 +163,10 @@ _FERRAMENTA = {
             "pct_institucional": {"type": "number", "description": "fração; 0 se não souber"},
             "esqueleto": {
                 "type": "array",
-                "description": "polilinhas [[x,y],...] em metros relativos à tela (opcional)",
+                "description": (
+                    "polilinhas [[x,y],...] em coordenadas NORMALIZADAS 0..1 do bbox da gleba "
+                    "(x oeste→leste, y sul→norte); eixos de via principais (opcional)"
+                ),
                 "items": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
             },
             "justificativa": {"type": "string"},

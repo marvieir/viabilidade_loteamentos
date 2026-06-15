@@ -138,6 +138,15 @@ def propor(
     to_local, to_wgs = medida.transformadores([aprov_wgs])
     aprov_m = transform(to_local, aprov_wgs)
 
+    # 1b) (c) Topografia: orienta a grelha pela curva de nível do DEM (2.5), se disponível.
+    orientacao = 0.0
+    if fonte_dem is not None:
+        try:
+            ang = geom.orientacao_contorno(fonte_dem.amostrar(registro["poly"]))
+            orientacao = ang if ang is not None else 0.0
+        except Exception:  # noqa: BLE001 — DEM indisponível → sem orientação (degrada honesto)
+            orientacao = 0.0
+
     # 2) BORDA: o LLM propõe o PROGRAMA (estratégia), nunca a geometria/número.
     contexto = {
         "area_aproveitavel_m2": round(aprov_m.area, 2),
@@ -148,15 +157,21 @@ def propor(
     except GeradorIndisponivel as exc:
         raise HTTPException(503, str(exc))
 
-    # 3) NÚCLEO: Python gera a geometria (recorta na tela) e MEDE tudo.
-    layout = geom.gerar_layout(aprov_m, prog)
+    # 3) NÚCLEO: Python materializa (reserva lazer/institucional → loteia) e MEDE tudo.
+    layout = geom.gerar_layout(aprov_m, prog, orientacao_rad=orientacao)
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
+    fidelidade = schemas.FidelidadeOut(**medida.construir_fidelidade(med, layout))
 
     versao = fonte_urb.proxima_versao(analise_id)
     proposta_id = f"u_{analise_id[:8]}_{versao:03d}"
     conformidade = _conformidade_programa(prog)
-    avisos = [*medida.AVISOS_1A, *layout.avisos]
+    avisos = [
+        *medida.AVISOS_1A,
+        *layout.avisos,
+        "Fidelidade: o quadro de áreas converge para o programa quando a gleba comporta; "
+        "divergências são rotuladas, nunca forçadas.",
+    ]
 
     out = schemas.PropostaUrbanisticaOut(
         proposta_id=proposta_id,
@@ -167,6 +182,7 @@ def propor(
         quadro_areas=quadro,
         indicadores=indicadores,
         heatmap=heatmap,
+        fidelidade=fidelidade,
         conformidade_programa=conformidade,
         esqueleto_ignorado=layout.ignorados,
         proveniencia=(

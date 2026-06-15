@@ -1162,6 +1162,34 @@ class ItemConformidadePrograma(BaseModel):
     leitura: str
 
 
+# Fase 9.1 — fidelidade do traçado ao programa proposto (convergência + viário + topografia).
+class ItemFidelidadeArea(BaseModel):
+    item: str
+    alvo_pct: Optional[float] = None
+    medido_pct: Optional[float] = None
+    status: str  # atendido | degradado | atencao
+    tol_pp: Optional[float] = None
+    leitura: Optional[str] = None
+
+
+class FidelidadeViario(BaseModel):
+    arquetipo: str
+    esqueleto_usado: bool
+    trechos_descartados: int
+    obs: str
+
+
+class FidelidadeTopografia(BaseModel):
+    orientacao_por_declividade: bool
+    obs: str
+
+
+class FidelidadeOut(BaseModel):
+    areas: list[ItemFidelidadeArea] = []
+    viario: FidelidadeViario
+    topografia: FidelidadeTopografia
+
+
 class PropostaUrbanisticaOut(BaseModel):
     """Snapshot versionado: programa proposto pelo LLM + geometria/medidas do Python."""
 
@@ -1174,6 +1202,7 @@ class PropostaUrbanisticaOut(BaseModel):
     quadro_areas: QuadroAreasOut
     indicadores: IndicadoresUrbOut
     heatmap: HeatmapOut
+    fidelidade: Optional[FidelidadeOut] = None  # Fase 9.1
     conformidade_programa: list[ItemConformidadePrograma] = []
     esqueleto_ignorado: list[str] = []
     proveniencia: str

@@ -1152,6 +1152,26 @@ export interface ItemConformidadePrograma {
   leitura: string;
 }
 
+// Fase 9.1 — fidelidade do traçado ao programa (convergência + viário + topografia).
+export interface ItemFidelidadeArea {
+  item: string;
+  alvo_pct: number | null;
+  medido_pct: number | null;
+  status: string; // atendido | degradado | atencao
+  tol_pp: number | null;
+  leitura: string | null;
+}
+export interface Fidelidade {
+  areas: ItemFidelidadeArea[];
+  viario: {
+    arquetipo: string;
+    esqueleto_usado: boolean;
+    trechos_descartados: number;
+    obs: string;
+  };
+  topografia: { orientacao_por_declividade: boolean; obs: string };
+}
+
 export interface PropostaUrbanistica {
   proposta_id: string;
   versao: number;
@@ -1162,6 +1182,7 @@ export interface PropostaUrbanistica {
   quadro_areas: QuadroAreas;
   indicadores: IndicadoresUrb;
   heatmap: HeatmapUrb;
+  fidelidade: Fidelidade | null;
   conformidade_programa: ItemConformidadePrograma[];
   esqueleto_ignorado: string[];
   proveniencia: string;

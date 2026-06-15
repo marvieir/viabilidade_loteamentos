@@ -68,6 +68,8 @@ class Layout:
     via_largura_m: float = 12.0
     ignorados: list[str] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
+    # Fase 9.1 — flags de fidelidade (alvos/efetivo, arquétipo, esqueleto, topografia).
+    meta: dict = field(default_factory=dict)
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -280,3 +282,83 @@ def geojson_do_layout(layout: Layout, to_wgs) -> dict:
         "sistema_lazer": _gj(layout.sistema_lazer),
         "institucional": _gj(layout.institucional),
     }
+
+
+# ----------------------------- fidelidade (Fase 9.1) -----------------------------
+TOL_CONVERGENCIA_PP = 0.03
+
+
+def construir_fidelidade(med: "Medicao", layout: "Layout") -> dict:
+    """Compara o quadro MEDIDO com o programa proposto (alvos em ``layout.meta``): convergência
+    por item (lazer/institucional) com tolerância ou degradação rotulada + estado de viário e
+    topografia. Determinístico — só leitura do que já foi medido (§2)."""
+    q = med.quadro
+    liq = q["area_liquida_m2"] or 1.0
+    m = layout.meta or {}
+    lazer_m = (q["sistema_lazer"]["m2"] + q["areas_verdes"]["m2"]) / liq
+    inst_m = q["institucional"]["m2"] / liq
+
+    areas: list[dict] = []
+    alvo_l = m.get("lazer_alvo_pct", 0.0)
+    if alvo_l > 0 or lazer_m > 0:
+        if m.get("lazer_degradado"):
+            usado = m.get("lazer_usado_pct", lazer_m)
+            areas.append({
+                "item": "lazer",
+                "alvo_pct": alvo_l,
+                "medido_pct": round(lazer_m, 4),
+                "status": "degradado",
+                "tol_pp": TOL_CONVERGENCIA_PP * 100,
+                "leitura": (
+                    f"lazer reduzido de {_fmt(alvo_l * 100, 1)}% para "
+                    f"{_fmt(usado * 100, 1)}% — a gleba não comporta o programa preservando "
+                    "lotes; verificar prioridades com urbanista."
+                ),
+            })
+        else:
+            atende = abs(lazer_m - alvo_l) <= TOL_CONVERGENCIA_PP
+            areas.append({
+                "item": "lazer",
+                "alvo_pct": alvo_l,
+                "medido_pct": round(lazer_m, 4),
+                "status": "atendido" if atende else "atencao",
+                "tol_pp": TOL_CONVERGENCIA_PP * 100,
+                "leitura": (
+                    f"lazer/verde materializado {_fmt(lazer_m * 100, 1)}% "
+                    f"(alvo {_fmt(alvo_l * 100, 1)}%)."
+                ),
+            })
+
+    alvo_i = m.get("inst_alvo_pct", 0.0)
+    if alvo_i > 0 or inst_m > 0:
+        areas.append({
+            "item": "institucional",
+            "alvo_pct": alvo_i,
+            "medido_pct": round(inst_m, 4),
+            "status": "atendido" if inst_m + 1e-6 >= alvo_i - TOL_CONVERGENCIA_PP else "atencao",
+            "tol_pp": TOL_CONVERGENCIA_PP * 100,
+            "leitura": (
+                f"doação institucional {_fmt(inst_m * 100, 1)}% (alvo {_fmt(alvo_i * 100, 1)}%)."
+            ),
+        })
+
+    descartados = m.get("trechos_descartados", 0)
+    viario = {
+        "arquetipo": m.get("arquetipo", "—"),
+        "esqueleto_usado": bool(m.get("esqueleto_usado")),
+        "trechos_descartados": descartados,
+        "obs": (
+            "viário a partir dos eixos sugeridos pela IA (snapados/regularizados)"
+            if m.get("esqueleto_usado")
+            else "grelha axial (sem esqueleto válido da IA)"
+        ) + (f"; {descartados} trecho(s) descartado(s)" if descartados else ""),
+    }
+    topo = {
+        "orientacao_por_declividade": bool(m.get("topo_aplicada")),
+        "obs": (
+            "quarteirões orientados às curvas de nível (DEM 2.5) — triagem, não terraplenagem"
+            if m.get("topo_aplicada")
+            else "sem orientação por topografia (DEM indisponível ou terreno plano)"
+        ),
+    }
+    return {"areas": areas, "viario": viario, "topografia": topo}
