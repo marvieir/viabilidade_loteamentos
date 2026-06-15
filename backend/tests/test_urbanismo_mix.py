@@ -36,7 +36,7 @@ def test_sobra_minimizada_quadra_ouro():
     bandas = _bandas(prog.estrategia_mix, prog.profundidade_m)
     strip = box(0.0, 0.0, 6000.0 / prog.profundidade_m, prog.profundidade_m)  # 6.000 m²
     saida, retalho = _tile_faixa(
-        strip, 0.0, prog.profundidade_m, lambda pt: (0.0, []), float("inf"), float("-inf"), bandas
+        strip, 0.0, prog.profundidade_m, lambda pt: (0.0, []), lambda q: "padrao", bandas
     )
     assert retalho / strip.area <= 0.01
 
@@ -75,6 +75,18 @@ def test_proporcao_converge_ou_degrada():
     alvo = {"premium": 0.25, "padrao": 0.55, "compacto": 0.20}
     for d in mix["distribuicao"]:
         assert abs(d["pct"] - alvo[d["faixa"]]) <= 0.05
+
+
+def test_qualidade_constante_nao_explode_premium():
+    """Regressão (achado de campo São Roque): com verde central, o miolo vira um anel de
+    qualidade quase-constante; o zoneamento por RANK relativo NÃO pode classificar todos como
+    premium (a v1 fazia isso → poucos lotes gigantes). Padrão deve dominar."""
+    layout, mix = _mix(box(0.0, 0.0, 500.0, 500.0), programa_do_preset("alta", {"pct_lazer": 0.2}))
+    dist = {d["faixa"]: d["pct"] for d in mix["distribuicao"]}
+    assert dist.get("premium", 0.0) <= 0.35  # não explode em premium
+    assert dist.get("padrao", 0.0) >= 0.45  # o miolo é majoritariamente padrão
+    # mais lotes do que se fossem todos premium (o nº não desaba)
+    assert medida.medir(layout).indicadores["n_lotes"] > 100
 
 
 def test_fronteira_stub_sem_tamanho_nem_premium_inventado():

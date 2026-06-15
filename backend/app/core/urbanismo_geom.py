@@ -120,9 +120,11 @@ def _linhas_de_quadra(comp: Polygon, via: float, prof: float):
     return faixas
 
 
-def _tile_faixa(comp, y0, y1, qfn, q_hi, q_lo, bandas):
+def _tile_faixa(comp, y0, y1, qfn, clf, bandas):
     """Tila UMA faixa de quadra com lotes de largura POR FAIXA (premium maior), fechando a
-    quadra sem sobra (redistribui o resto). Devolve ``([(geom, faixa, motivos)], retalho_m2)``."""
+    quadra sem sobra (redistribui o resto). ``clf(q)->faixa`` classifica por RANK relativo (não
+    limiar absoluto) — qualidade quase-constante → padrão, sem explodir em premium. Devolve
+    ``([(geom, faixa, motivos)], retalho_m2)``."""
     strip = comp.intersection(box(comp.bounds[0], y0, comp.bounds[2], y1))
     saida = []
     retalho = 0.0
@@ -133,8 +135,7 @@ def _tile_faixa(comp, y0, y1, qfn, q_hi, q_lo, bandas):
 
         def _faixa_em(x):
             q, mot = qfn(Point(x + 1.0, ymid))
-            f = "premium" if q >= q_hi else ("compacto" if q <= q_lo else "padrao")
-            return (f if f in bandas else next(iter(bandas))), mot
+            return clf(q), mot
 
         plano = []  # (faixa, w, motivos) — só lotes INTEIROS (sem retalho fino no fim)
         x = x0
@@ -169,7 +170,7 @@ def _tile_faixa(comp, y0, y1, qfn, q_hi, q_lo, bandas):
     return saida, retalho
 
 
-def _lotear_heterogeneo(miolo, via, prof, qfn, q_hi, q_lo, bandas, ang_rad):
+def _lotear_heterogeneo(miolo, via, prof, qfn, clf, bandas, ang_rad):
     """Loteia o miolo com MIX por qualidade, orientado por ``ang_rad`` (topografia). Gera no
     frame rotacionado (verde/lazer já rotacionados no ``qfn``) e volta. Acumula o retalho
     (sobra dentro das quadras) — métrica da Fase 9.2."""
@@ -181,7 +182,7 @@ def _lotear_heterogeneo(miolo, via, prof, qfn, q_hi, q_lo, bandas, ang_rad):
     lotes, faixas, motivos, retalho = [], [], [], 0.0
     for comp in _componentes(reg):
         for (y0, y1) in _linhas_de_quadra(comp, via, prof):
-            saida, ret = _tile_faixa(comp, y0, y1, qfn, q_hi, q_lo, bandas)
+            saida, ret = _tile_faixa(comp, y0, y1, qfn, clf, bandas)
             retalho += ret
             for geom, faixa, mot in saida:
                 lotes.append(rotate(geom, ang_deg, origin=cen) if ang_deg else geom)
@@ -190,15 +191,20 @@ def _lotear_heterogeneo(miolo, via, prof, qfn, q_hi, q_lo, bandas, ang_rad):
     return lotes, faixas, motivos, retalho
 
 
-def _prescan_thresholds(miolo, via, prof, qfn, bandas, ang_rad):
-    """Pré-varre posições candidatas (largura nominal) e fixa os cortes de quantil para as
-    proporções-alvo (premium = topo; compacto = base) → zoneamento estável e auditável."""
+def _classificador(miolo, via, prof, qfn, bandas, ang_rad):
+    """Pré-varre as posições candidatas e devolve ``clf(q)->faixa`` por **rank relativo**
+    (percentil de meio-rank): premium = topo, compacto = base, resto padrão. Qualidade
+    quase-CONSTANTE → meio-rank ≈ 0,5 p/ todos → **todos padrão** (sem explodir em premium —
+    o defeito da gleba de verde central). Largura compensada (premium é mais largo → recebe
+    mais POSIÇÕES p/ a proporção de LOTES bater o alvo)."""
+    import bisect
+
     if not bandas:
-        return 0.0, 0.0
+        return lambda q: "padrao"
     ang_deg = math.degrees(ang_rad)
     cen = miolo.centroid
     reg = rotate(miolo, -ang_deg, origin=cen) if ang_deg else miolo
-    w_nom = bandas.get("padrao", next(iter(bandas.values())))["w"]
+    w_pad = bandas.get("padrao", next(iter(bandas.values())))["w"]
     qs = []
     for comp in _componentes(reg):
         for (y0, y1) in _linhas_de_quadra(comp, via, prof):
@@ -209,17 +215,30 @@ def _prescan_thresholds(miolo, via, prof, qfn, bandas, ang_rad):
                 x = x0
                 while x < x1 - 1e-6:
                     qs.append(qfn(Point(x + 1.0, ymid))[0])
-                    x += w_nom
-    # Compensa a largura: lote premium é mais largo (cabe menos por comprimento), então para
-    # a PROPORÇÃO de LOTES bater o alvo, dou a ele uma fração maior de POSIÇÕES (∝ largura).
-    w_pad = bandas.get("padrao", next(iter(bandas.values())))["w"]
+                    x += w_pad
+    qs_sorted = sorted(qs)
+    n = len(qs_sorted)
     prem = bandas.get("premium", {})
     comp = bandas.get("compacto", {})
-    eff_prem = min(prem.get("prop", 0.0) * (prem.get("w", w_pad) / w_pad), 0.95)
-    eff_comp = min(comp.get("prop", 0.0) * (comp.get("w", w_pad) / w_pad), 0.95)
-    q_hi = _quantil(qs, 1.0 - eff_prem) if eff_prem > 0 else float("inf")
-    q_lo = _quantil(qs, eff_comp) if eff_comp > 0 else float("-inf")
-    return q_hi, q_lo
+    eff_prem = min(prem.get("prop", 0.0) * (prem.get("w", w_pad) / w_pad), 0.9) if prem else 0.0
+    eff_comp = min(comp.get("prop", 0.0) * (comp.get("w", w_pad) / w_pad), 0.9) if comp else 0.0
+    fallback = "padrao" if "padrao" in bandas else next(iter(bandas))
+    # Variância desprezível → sem zoneamento possível: tudo padrão (honesto).
+    spread = (qs_sorted[-1] - qs_sorted[0]) if n else 0.0
+
+    def clf(q: float) -> str:
+        if n == 0 or spread < 1e-9:
+            return fallback
+        lo = bisect.bisect_left(qs_sorted, q)
+        hi = bisect.bisect_right(qs_sorted, q)
+        rank = (lo + (hi - lo) * 0.5) / n  # meio-rank (trata empates pelo centro)
+        if eff_prem > 0 and rank >= 1.0 - eff_prem:
+            return "premium" if "premium" in bandas else fallback
+        if eff_comp > 0 and rank <= eff_comp:
+            return "compacto" if "compacto" in bandas else fallback
+        return fallback
+
+    return clf
 
 
 # ============================ reserva de áreas (área EXATA) ============================
@@ -374,9 +393,9 @@ def gerar_layout(
     verde_r = rotate(verde, -ang_deg, origin=cen) if (verde is not None and ang_deg) else verde
     clube_r = rotate(clube, -ang_deg, origin=cen) if (clube is not None and ang_deg) else clube
     qfn = lambda pt: _quality(pt, verde_r, clube_r, None, premium_em)  # noqa: E731
-    q_hi, q_lo = _prescan_thresholds(miolo, via, prof, qfn, bandas, orientacao_rad)
+    clf = _classificador(miolo, via, prof, qfn, bandas, orientacao_rad)
     lotes, lote_faixas, lote_motivos, retalho_m2 = _lotear_heterogeneo(
-        miolo, via, prof, qfn, q_hi, q_lo, bandas, orientacao_rad
+        miolo, via, prof, qfn, clf, bandas, orientacao_rad
     )
 
     # Arruamento = aproveitável − lotes − reservas (o road_skel cai aqui, como via).
