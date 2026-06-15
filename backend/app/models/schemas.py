@@ -1051,3 +1051,130 @@ class LaudoData(BaseModel):
     semaforo: list[LuzSemaforo]
     secoes: list[SecaoLaudo]
     proveniencia_consolidada: list[FonteConsolidada]
+
+
+# ===================== Fase 9 — Urbanismo (estudo de massa por IA) =====================
+# IA na BORDA propõe o PROGRAMA; o Python MEDE toda a geometria e todos os números (§2).
+# Rótulo "ESTUDO DE MASSA ESQUEMÁTICO" + avisos §1-A em TODA saída.
+
+TipoLoteamento = Literal[
+    "aberto", "fechado", "condominio_lotes", "desmembramento", "loteamento_rural"
+]
+PublicoAlvo = Literal["baixa", "media", "alta"]
+
+
+class ProporUrbanismoIn(BaseModel):
+    """Perfil declarado pelo usuário — condiciona o programa que o LLM propõe."""
+
+    tipo_loteamento: TipoLoteamento = "aberto"
+    publico_alvo: PublicoAlvo = "media"
+    overrides: Optional[dict] = None  # lote_alvo_m2, pct_lazer, largura_via_m, amenidades…
+
+
+class MedirUrbanismoIn(BaseModel):
+    """Layout (GeoJSON WGS84) a medir — endpoint /medir, SEM LLM. ``lotes`` = um Polygon por
+    lote (para contar e medir cada um); demais camadas como (Multi)Polygon único."""
+
+    lotes: list[dict] = []
+    arruamento: Optional[dict] = None
+    areas_verdes: Optional[dict] = None
+    sistema_lazer: Optional[dict] = None
+    institucional: Optional[dict] = None
+
+
+class ProgramaOut(BaseModel):
+    """O que o LLM PROPÔS (proveniência) — estratégia, não medida."""
+
+    lote_alvo_m2: float
+    densidade: str
+    pct_lazer: float
+    amenidades: list[str]
+    arquetipo_viario: str
+    largura_via_m: float
+    testada_m: float
+    profundidade_m: float
+    pct_institucional: float = 0.0
+    origem: str
+    justificativa: str
+
+
+class UsoAreaOut(BaseModel):
+    m2: float
+    m2_fmt: str
+    pct_apo: float  # fração sobre a área líquida
+    pct_fmt: str
+
+
+class QuadroAreasOut(BaseModel):
+    area_liquida_m2: float
+    area_liquida_fmt: str
+    vendavel: UsoAreaOut
+    areas_verdes: UsoAreaOut
+    sistema_lazer: UsoAreaOut
+    institucional: UsoAreaOut
+    arruamento: UsoAreaOut
+
+
+class IndicadoresUrbOut(BaseModel):
+    n_lotes: int
+    area_media_m2: Optional[float] = None
+    area_media_fmt: Optional[str] = None
+    testada_media_m: Optional[float] = None
+    profundidade_media_m: Optional[float] = None
+    comprimento_vias_m: Optional[float] = None
+    leito_carrocavel_m2: Optional[float] = None
+    calcadas_m2: Optional[float] = None
+
+
+class FaixaHeatmapOut(BaseModel):
+    faixa: str
+    n: int
+    pct: float
+
+
+class LoteScoreOut(BaseModel):
+    lote_id: str
+    score: float
+    area_m2: float
+
+
+class HeatmapOut(BaseModel):
+    score_medio: Optional[float] = None
+    faixas: list[FaixaHeatmapOut] = []
+    por_lote: list[LoteScoreOut] = []
+    proveniencia: str = ""
+
+
+class MedicaoUrbOut(BaseModel):
+    """Saída de /medir (determinística, sem LLM): o quadro/indicadores/heatmap MEDIDOS."""
+
+    rotulo: str = "ESTUDO DE MASSA ESQUEMÁTICO"
+    geometria: dict  # camadas GeoJSON WGS84 (rotulado 'esquemático')
+    quadro_areas: QuadroAreasOut
+    indicadores: IndicadoresUrbOut
+    heatmap: HeatmapOut
+    avisos: list[str]
+
+
+class ItemConformidadePrograma(BaseModel):
+    item: str
+    status: Literal["considerado", "atencao", "nao_avaliado"]
+    leitura: str
+
+
+class PropostaUrbanisticaOut(BaseModel):
+    """Snapshot versionado: programa proposto pelo LLM + geometria/medidas do Python."""
+
+    proposta_id: str
+    versao: int
+    rotulo: str = "ESTUDO DE MASSA ESQUEMÁTICO"
+    perfil: dict  # {tipo_loteamento, publico_alvo}
+    programa: ProgramaOut
+    geometria: dict
+    quadro_areas: QuadroAreasOut
+    indicadores: IndicadoresUrbOut
+    heatmap: HeatmapOut
+    conformidade_programa: list[ItemConformidadePrograma] = []
+    esqueleto_ignorado: list[str] = []
+    proveniencia: str
+    avisos: list[str]

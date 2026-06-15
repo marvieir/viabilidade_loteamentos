@@ -13,6 +13,12 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   verde_dura: "#dc2626", // verde em APP/UC = restrição dura (Fase 2.3)
   verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
   declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5)
+  // Fase 9 — estudo de massa esquemático
+  urb_lotes: "#6366f1",
+  urb_arruamento: "#94a3b8",
+  urb_verde: "#16a34a",
+  urb_lazer: "#22c55e",
+  urb_institucional: "#f59e0b",
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -26,4 +32,9 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   verde_dura: "Verde em APP/UC (restrição dura)",
   verde_verificar: "Verde a verificar",
   declividade_vedada: "Declividade ≥30% (vedada)",
+  urb_lotes: "Lotes (vendável)",
+  urb_arruamento: "Sistema viário",
+  urb_verde: "Áreas verdes",
+  urb_lazer: "Sistema de lazer",
+  urb_institucional: "Institucional",
 };

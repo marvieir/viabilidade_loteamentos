@@ -10,6 +10,7 @@ import { KpiRow } from "@/components/dashboard/KpiRow";
 import { MapHero } from "@/components/dashboard/MapHero";
 import { VisaoGeral } from "@/components/dashboard/VisaoGeral";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
+import { CardUrbanismo } from "@/components/cards/CardUrbanismo";
 import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
@@ -243,6 +244,12 @@ export default function Home() {
                 perfil={perfil}
                 onData={setDadosAprov}
                 sinal={sinal}
+              />
+            </div>
+            <div className={secao === "urbanismo" ? "" : "hidden"}>
+              <CardUrbanismo
+                analiseId={analise.analise_id}
+                glebaGeojson={analise.geometria.geojson}
               />
             </div>
             <div className={secao === "conformidade" ? "" : "hidden"}>

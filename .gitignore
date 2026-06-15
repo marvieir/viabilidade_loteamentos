@@ -42,6 +42,8 @@ backend/app/perfis/juridico/
 backend/app/perfis/financeira/
 # Avaliação econômica por análise (Fase 5) — dado do operador, persistido em volume.
 backend/app/perfis/economica/
+# Estudos de massa (Fase 9) — snapshots versionados por análise, persistidos em volume.
+backend/app/perfis/urbanismo/
 
 # .env do backend (segredos/caminhos da máquina) — versionamos só o .env.example.
 backend/.env

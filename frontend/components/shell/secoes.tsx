@@ -8,6 +8,7 @@ import {
   IconJuridico,
   IconLocalizacao,
   IconLuos,
+  IconUrbanismo,
   IconVerde,
   IconVisao,
 } from "@/components/Icons";
@@ -18,6 +19,7 @@ export type Secao =
   | "verde"
   | "declividade"
   | "aproveitamento"
+  | "urbanismo"
   | "conformidade"
   | "juridico"
   | "financeira"
@@ -35,6 +37,7 @@ export const SECOES: {
   { id: "verde", rotulo: "Área verde", Icone: IconVerde },
   { id: "declividade", rotulo: "Declividade", Icone: IconDeclividade },
   { id: "aproveitamento", rotulo: "Aproveitamento", Icone: IconAproveitamento },
+  { id: "urbanismo", rotulo: "Urbanismo (IA)", Icone: IconUrbanismo },
   { id: "conformidade", rotulo: "Conformidade", Icone: IconConformidade },
   { id: "juridico", rotulo: "Jurídico", Icone: IconJuridico },
   { id: "financeira", rotulo: "Financeira", Icone: IconFinanceira },

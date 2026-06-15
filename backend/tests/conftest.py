@@ -444,6 +444,127 @@ def fonte_economica():
     app.dependency_overrides.pop(get_fonte_economica, None)
 
 
+# ----- Fase 9 — Urbanismo: gerador-stub (offline), store em memória, layout sintético -----
+from app.core.urbanismo_programa import (  # noqa: E402
+    get_gerador_programa,
+    programa_do_preset,
+)
+from app.core.urbanismo_store import get_fonte_urbanismo  # noqa: E402
+
+
+class StubGeradorPrograma:
+    """Gerador de TESTE: devolve um Programa do preset (sem rede/chave). Pode injetar
+    ``esqueleto`` para exercer a validação da fronteira. NÃO fornece nenhum número de medida."""
+
+    def __init__(self, esqueleto=None, overrides=None):
+        self._esqueleto = esqueleto
+        self._overrides = overrides or {}
+
+    def propor(self, contexto, tipo_loteamento, publico_alvo, overrides=None):
+        ov = {**self._overrides, **(overrides or {})}
+        if self._esqueleto is not None:
+            ov.setdefault("esqueleto", self._esqueleto)
+        prog = programa_do_preset(publico_alvo, ov)
+        prog.origem = "proposto_llm"  # finge a borda
+        return prog
+
+
+class FonteUrbanismoMemoria:
+    """Snapshots versionados em memória (injetável nos testes)."""
+
+    def __init__(self):
+        self._m: dict[str, list[dict]] = {}
+
+    def listar(self, analise_id):
+        return [dict(p) for p in self._m.get(str(analise_id), [])]
+
+    def carregar(self, analise_id, proposta_id):
+        for p in self._m.get(str(analise_id), []):
+            if p.get("proposta_id") == proposta_id:
+                return dict(p)
+        return None
+
+    def salvar(self, analise_id, proposta):
+        self._m.setdefault(str(analise_id), []).append(dict(proposta))
+
+    def proxima_versao(self, analise_id):
+        return len(self._m.get(str(analise_id), [])) + 1
+
+
+@pytest.fixture
+def gerador_urbanismo():
+    """Injeta um gerador-stub. Uso: ``gerador_urbanismo(esqueleto=[...])``."""
+
+    def _set(esqueleto=None, overrides=None):
+        app.dependency_overrides[get_gerador_programa] = (
+            lambda: StubGeradorPrograma(esqueleto, overrides)
+        )
+
+    _set()  # default já injetado
+    yield _set
+    app.dependency_overrides.pop(get_gerador_programa, None)
+
+
+@pytest.fixture
+def gerador_urbanismo_indisponivel():
+    """Força o gerador a None (sem credencial) — exerce o 503."""
+    app.dependency_overrides[get_gerador_programa] = lambda: None
+    yield
+    app.dependency_overrides.pop(get_gerador_programa, None)
+
+
+@pytest.fixture
+def fonte_urbanismo():
+    fonte = FonteUrbanismoMemoria()
+    app.dependency_overrides[get_fonte_urbanismo] = lambda: fonte
+    yield fonte
+    app.dependency_overrides.pop(get_fonte_urbanismo, None)
+
+
+# Conversão metros (frame local) → lon/lat, ancorada em (LON0, LAT0) — para montar layouts
+# sintéticos com ÁREA EXATA conhecida e medi-los pelo motor (valores-ouro de São Roque).
+def _metros_para_wgs(geom_m):
+    from pyproj import CRS, Transformer
+    from shapely.ops import transform as _t
+
+    local = CRS.from_proj4(
+        f"+proj=aeqd +lat_0={LAT0} +lon_0={LON0} +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+    )
+    to_wgs = Transformer.from_crs(local, "EPSG:4326", always_xy=True).transform
+    return _t(to_wgs, geom_m)
+
+
+def layout_sao_roque_sintetico():
+    """Layout cujo quadro REPRODUZ os valores-ouro de São Roque (TIV 5.0):
+    vendável 74.644,40 (167 lotes), verdes 36.686,92, arruamento 20.102,43 → líquida
+    131.433,75. Retângulos disjuntos em metros, com área exata, convertidos a GeoJSON WGS84.
+    """
+    from shapely.geometry import box, mapping
+
+    # 167 lotes idênticos: 17,94 m de testada × d → área = 74.644,40 / 167 (testada 17,94,
+    # profundidade ~24,91). Soma exata = 74.644,40.
+    n = 167
+    area_lote = 74644.40 / n
+    w = 17.94
+    d = area_lote / w
+    lotes = []
+    x = 0.0
+    for _ in range(n):
+        lotes.append(_metros_para_wgs(box(x, 0.0, x + w, d)))
+        x += w  # disjuntos lado a lado
+    # Verde: retângulo de área 36.686,92, afastado dos lotes (disjunto).
+    hv = 36686.92 / 200.0
+    verde = _metros_para_wgs(box(0.0, 100.0, 200.0, 100.0 + hv))
+    # Arruamento: retângulo de área 20.102,43, afastado (disjunto).
+    ha = 20102.43 / 200.0
+    arru = _metros_para_wgs(box(0.0, 400.0, 200.0, 400.0 + ha))
+    return {
+        "lotes": [mapping(g) for g in lotes],
+        "areas_verdes": mapping(verde),
+        "arruamento": mapping(arru),
+    }
+
+
 @pytest.fixture
 def alertas_geo():
     """Injeta um provedor de alertas geo-stub. Uso: ``alertas_geo([AlertaGeo(...), ...])``.

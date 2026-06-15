@@ -65,3 +65,6 @@ export const IconEconomica = (p: P) => (
 export const IconLocalizacao = (p: P) => (
   <svg {...base(p)}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
 );
+export const IconUrbanismo = (p: P) => (
+  <svg {...base(p)}><path d="M3 21h18" /><path d="M5 21V7l5-4v18" /><path d="M19 21V11l-9-4" /><path d="M9 9v.01M9 13v.01M9 17v.01" /></svg>
+);

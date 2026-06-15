@@ -364,7 +364,13 @@ export type ChaveOverlay =
   | "verde"
   | "verde_dura"
   | "verde_verificar"
-  | "declividade_vedada";
+  | "declividade_vedada"
+  // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
+  | "urb_lotes"
+  | "urb_arruamento"
+  | "urb_verde"
+  | "urb_lazer"
+  | "urb_institucional";
 
 export interface Ambiental {
   alertas: AlertaAmbiental[];
@@ -1058,5 +1064,137 @@ export interface Localizacao {
 
 export async function buscarLocalizacao(analiseId: string): Promise<Localizacao> {
   const res = await fetch(`${API_BASE}/api/analises/${analiseId}/localizacao`);
+  return jsonOrThrow(res);
+}
+
+// ----- Fase 9 — Urbanismo (estudo de massa esquemático proposto por IA) -----
+// IA na BORDA propõe o PROGRAMA; o Python MEDE geometria e números (§2). O front só
+// renderiza estes shapes — zero geo-matemática/recálculo aqui.
+export type TipoLoteamento =
+  | "aberto"
+  | "fechado"
+  | "condominio_lotes"
+  | "desmembramento"
+  | "loteamento_rural";
+export type PublicoAlvo = "baixa" | "media" | "alta";
+
+export interface ProgramaUrb {
+  lote_alvo_m2: number;
+  densidade: string;
+  pct_lazer: number;
+  amenidades: string[];
+  arquetipo_viario: string;
+  largura_via_m: number;
+  testada_m: number;
+  profundidade_m: number;
+  pct_institucional: number;
+  origem: string;
+  justificativa: string;
+}
+
+export interface UsoArea {
+  m2: number;
+  m2_fmt: string;
+  pct_apo: number;
+  pct_fmt: string;
+}
+
+export interface QuadroAreas {
+  area_liquida_m2: number;
+  area_liquida_fmt: string;
+  vendavel: UsoArea;
+  areas_verdes: UsoArea;
+  sistema_lazer: UsoArea;
+  institucional: UsoArea;
+  arruamento: UsoArea;
+}
+
+export interface IndicadoresUrb {
+  n_lotes: number;
+  area_media_m2: number | null;
+  area_media_fmt: string | null;
+  testada_media_m: number | null;
+  profundidade_media_m: number | null;
+  comprimento_vias_m: number | null;
+  leito_carrocavel_m2: number | null;
+  calcadas_m2: number | null;
+}
+
+export interface FaixaHeatmap {
+  faixa: string;
+  n: number;
+  pct: number;
+}
+export interface LoteScore {
+  lote_id: string;
+  score: number;
+  area_m2: number;
+}
+export interface HeatmapUrb {
+  score_medio: number | null;
+  faixas: FaixaHeatmap[];
+  por_lote: LoteScore[];
+  proveniencia: string;
+}
+
+export interface GeometriaUrb {
+  rotulo: string;
+  lotes: GeoJSON.Geometry | null;
+  arruamento: GeoJSON.Geometry | null;
+  areas_verdes: GeoJSON.Geometry | null;
+  sistema_lazer: GeoJSON.Geometry | null;
+  institucional: GeoJSON.Geometry | null;
+}
+
+export interface ItemConformidadePrograma {
+  item: string;
+  status: "considerado" | "atencao" | "nao_avaliado";
+  leitura: string;
+}
+
+export interface PropostaUrbanistica {
+  proposta_id: string;
+  versao: number;
+  rotulo: string;
+  perfil: { tipo_loteamento: TipoLoteamento; publico_alvo: PublicoAlvo };
+  programa: ProgramaUrb;
+  geometria: GeometriaUrb;
+  quadro_areas: QuadroAreas;
+  indicadores: IndicadoresUrb;
+  heatmap: HeatmapUrb;
+  conformidade_programa: ItemConformidadePrograma[];
+  esqueleto_ignorado: string[];
+  proveniencia: string;
+  avisos: string[];
+}
+
+// IA propõe o programa; o backend gera+mede e devolve o snapshot versionado.
+// 503 = sem credencial de IA (use /medir com layout pronto ou configure ANTHROPIC_API_KEY).
+export async function proporUrbanismo(
+  analiseId: string,
+  tipoLoteamento: TipoLoteamento,
+  publicoAlvo: PublicoAlvo,
+  overrides?: Record<string, unknown>
+): Promise<PropostaUrbanistica> {
+  const res = await fetch(
+    `${API_BASE}/api/analises/${analiseId}/urbanismo/propor`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tipo_loteamento: tipoLoteamento,
+        publico_alvo: publicoAlvo,
+        ...(overrides ? { overrides } : {}),
+      }),
+    }
+  );
+  return jsonOrThrow(res);
+}
+
+// Lista as propostas (snapshots versionados) já geradas para a análise.
+export async function listarUrbanismo(
+  analiseId: string
+): Promise<PropostaUrbanistica[]> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/urbanismo`);
   return jsonOrThrow(res);
 }
