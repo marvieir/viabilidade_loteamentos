@@ -33,6 +33,18 @@ def test_recorte_contra_restricoes():
     assert soma_invasao < 1e-6
 
 
+def test_loteia_todas_as_ilhas():
+    """Regressão (achado de campo): quando a restrição PARTE a gleba em duas ilhas, AMBAS são
+    loteadas — versões anteriores ficavam só com a maior (metade do terreno vazia)."""
+    gleba = box(0.0, 0.0, 1000.0, 300.0)
+    restr = box(480.0, 0.0, 520.0, 300.0)  # faixa vedada no "pescoço" → esquerda + direita
+    layout = geom.gerar_layout(gleba, programa_do_preset("alta"), restricoes=restr)
+    esquerda = sum(1 for l in layout.lotes if l.centroid.x < 480)
+    direita = sum(1 for l in layout.lotes if l.centroid.x > 520)
+    assert esquerda > 0 and direita > 0  # nenhuma ilha foi descartada
+    assert sum(l.intersection(restr).area for l in layout.lotes) < 1e-6
+
+
 def test_esqueleto_invalido_ignorado_nao_propaga():
     """Critério 4: polilinha auto-intersectada do LLM é IGNORADA e registrada; os lotes saem
     da grelha do Python (não da geometria crua do LLM)."""
