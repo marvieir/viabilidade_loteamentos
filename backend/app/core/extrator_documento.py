@@ -23,6 +23,7 @@ from app.core.extrator_luos import (
     PdfIlegivel,
     _json_tolerante,
     _opcoes_tls,
+    chamar_com_retry,
 )
 from app.models.schemas import FichaJuridica
 
@@ -226,18 +227,22 @@ class ExtratorDocumentoClaude:
         conteudo = [_bloco_conteudo(d, m) for d, m in arquivos]
         conteudo.append({"type": "text", "text": instrucao})
         try:
-            resp = client.messages.create(
-                model=self.modelo,
-                max_tokens=16000,
-                system=_INSTRUCAO_ANTIALUCINACAO,
-                tools=[ferramenta],
-                tool_choice={"type": "tool", "name": ferramenta["name"]},
-                messages=[{"role": "user", "content": conteudo}],
+            # Retry com backoff em erros transitórios da API (ex.: 529 Overloaded).
+            resp = chamar_com_retry(
+                lambda: client.messages.create(
+                    model=self.modelo,
+                    max_tokens=16000,
+                    system=_INSTRUCAO_ANTIALUCINACAO,
+                    tools=[ferramenta],
+                    tool_choice={"type": "tool", "name": ferramenta["name"]},
+                    messages=[{"role": "user", "content": conteudo}],
+                )
             )
         except Exception as exc:  # noqa: BLE001 — falha de leitura/serviço → honesta
             raise PdfIlegivel(
                 f"Não foi possível extrair o documento — {type(exc).__name__}: {exc}. "
-                "Revise manualmente."
+                "O serviço de IA pode estar sobrecarregado (erro 529) — tente novamente em "
+                "instantes ou revise manualmente."
             ) from exc
 
         bruto = next(

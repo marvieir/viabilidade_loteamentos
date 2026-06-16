@@ -291,14 +291,19 @@ class GeradorProgramaClaude:
             f"Contexto medido pelo motor (NÃO recalcule): {contexto}. "
             "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
         )
+        from app.core.extrator_luos import chamar_com_retry
+
         try:
-            resp = client.messages.create(
-                model=self.modelo,
-                max_tokens=4000,
-                system=_INSTRUCAO,
-                tools=[_FERRAMENTA],
-                tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
-                messages=[{"role": "user", "content": prompt}],
+            # Retry com backoff em erros transitórios (ex.: 529 Overloaded) antes de degradar.
+            resp = chamar_com_retry(
+                lambda: client.messages.create(
+                    model=self.modelo,
+                    max_tokens=4000,
+                    system=_INSTRUCAO,
+                    tools=[_FERRAMENTA],
+                    tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
+                    messages=[{"role": "user", "content": prompt}],
+                )
             )
         except Exception:  # noqa: BLE001 — serviço fora → preset (não inventa, degrada)
             prog = programa_do_preset(publico_alvo, overrides)

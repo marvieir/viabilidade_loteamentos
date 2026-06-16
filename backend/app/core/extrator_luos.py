@@ -184,34 +184,38 @@ class ExtratorLUOSClaude:
         client = anthropic.Anthropic(api_key=self.api_key, **_opcoes_tls())
         b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
         try:
-            resp = client.messages.create(
-                model=self.modelo,
-                max_tokens=16000,
-                system=_INSTRUCAO_ANTIALUCINACAO,
-                tools=[_FERRAMENTA],
-                # Força a saída estruturada: o modelo PRECISA chamar a ferramenta, então não
-                # há prosa para parsear (robusto ao raciocínio em texto do Opus).
-                tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "document",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "application/pdf",
-                                    "data": b64,
+            # Retry com backoff em erros transitórios da API (ex.: 529 Overloaded).
+            resp = chamar_com_retry(
+                lambda: client.messages.create(
+                    model=self.modelo,
+                    max_tokens=16000,
+                    system=_INSTRUCAO_ANTIALUCINACAO,
+                    tools=[_FERRAMENTA],
+                    # Força a saída estruturada: o modelo PRECISA chamar a ferramenta, então não
+                    # há prosa para parsear (robusto ao raciocínio em texto do Opus).
+                    tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "document",
+                                    "source": {
+                                        "type": "base64",
+                                        "media_type": "application/pdf",
+                                        "data": b64,
+                                    },
                                 },
-                            },
-                            {"type": "text", "text": _INSTRUCAO_FORMATO},
-                        ],
-                    }
-                ],
+                                {"type": "text", "text": _INSTRUCAO_FORMATO},
+                            ],
+                        }
+                    ],
+                )
             )
         except Exception as exc:  # noqa: BLE001 — falha de leitura/serviço → honesta
             raise PdfIlegivel(
                 f"Não foi possível extrair a LUOS — {type(exc).__name__}: {exc}. "
+                "O serviço de IA pode estar sobrecarregado (529) — tente novamente. "
                 "Revise manualmente."
             ) from exc
 
@@ -307,6 +311,42 @@ def _opcoes_tls() -> dict:
         ctx = ssl.create_default_context()
     ctx.load_verify_locations(cafile=ca)
     return {"http_client": httpx.Client(verify=ctx)}
+
+
+# Erros TRANSITÓRIOS da API (capacidade/limite/rede) — vale a pena reTENTAR antes de desistir.
+_STATUS_TRANSITORIO = {408, 409, 429, 500, 502, 503, 504, 529}
+_NOMES_TRANSITORIOS = {
+    "OverloadedError", "RateLimitError", "InternalServerError", "ServiceUnavailableError",
+    "APIConnectionError", "APITimeoutError", "APIStatusError",
+}
+
+
+def _erro_transitorio(exc: Exception) -> bool:
+    """True para 529 Overloaded / 429 / 5xx / timeout / conexão — erros que somem ao reTENTAR
+    (não confundir com 4xx de conteúdo, que não adianta repetir)."""
+    sc = getattr(exc, "status_code", None)
+    if isinstance(sc, int) and sc in _STATUS_TRANSITORIO:
+        return True
+    if type(exc).__name__ in _NOMES_TRANSITORIOS:
+        return sc is None or sc >= 500 or sc in (408, 409, 429)
+    s = str(exc).lower()
+    return any(t in s for t in ("overloaded", "529", "rate limit", "timeout", "503", "502"))
+
+
+def chamar_com_retry(fn, tentativas: int = 4, base_s: float = 1.0):
+    """Chama ``fn()`` com backoff exponencial (1s, 2s, 4s + jitter) em erros TRANSITÓRIOS
+    (ex.: 529 Overloaded da API). Erro não-transitório ou esgotadas as tentativas → propaga
+    (o chamador degrada honesto). Determinístico no RESULTADO (só varia o tempo de espera)."""
+    import random
+    import time
+
+    for i in range(tentativas):
+        try:
+            return fn()
+        except Exception as exc:  # noqa: BLE001 — decide reTENTAR vs propagar
+            if i >= tentativas - 1 or not _erro_transitorio(exc):
+                raise
+            time.sleep(base_s * (2 ** i) + random.uniform(0.0, 0.5))
 
 
 def get_extrator_luos() -> Optional[ExtratorLUOS]:
