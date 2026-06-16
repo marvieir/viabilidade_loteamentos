@@ -41,6 +41,8 @@ VIA_LOCAL_M = 8.0
 # Fileira parcial na borda só vira lote se couber ≥ esta fração da profundidade (calibrado no
 # São Roque real: aproveita a borda sem criar lote raso demais).
 FRAC_FILEIRA_RASA = 0.8
+# Frente mínima legal (Lei 6.766/79 art. 4º II) — testada nunca abaixo disso.
+FRENTE_MIN_M = 5.0
 
 
 # ============================ componentes / grelha ============================
@@ -93,56 +95,90 @@ def _maior_parte(geom: BaseGeometry) -> Optional[Polygon]:
     return max(polis, key=lambda g: g.area) if polis else None
 
 
-def _fundir_pontas(cols: list[Polygon], area_min: float) -> tuple[list[Polygon], float]:
-    """Funde colunas pequenas (ponta de quadra / clip de borda) com a vizinha — não viram
-    retalho nem lote minúsculo (§3.3). Sobra só o que não tem vizinho. Devolve (lotes, retalho)."""
-    cols = [c for c in cols if c is not None and not c.is_empty and c.geom_type == "Polygon"]
-    res: list[Polygon] = []
-    retalho = 0.0
+def _split_largura(c: Polygon, teto: float) -> list[Polygon]:
+    """Pedaço > teto → subdivide em ``ceil(area/teto)`` faixas de largura igual (nunca um lote
+    gigante; regra legal de remate, §3.4)."""
+    if c.area <= teto:
+        return [c]
+    import math as _m
+    k = max(int(_m.ceil(c.area / teto)), 2)
+    x0, y0, x1, y1 = c.bounds
+    w = (x1 - x0) / k
+    out = []
+    for i in range(k):
+        p = _maior_parte(box(x0 + i * w, y0, x0 + (i + 1) * w, y1).intersection(c))
+        if p is not None and p.area > 0:
+            out.append(p)
+    return out or [c]
+
+
+def _clamp_faixa(cols: list[Polygon], piso: float, teto: float) -> tuple[list[Polygon], float]:
+    """CLAMP LEGAL (§3.4): todo lote emitido fica em [piso, teto]. Colunas < piso são fundidas
+    com a vizinha (até caber em teto); pedaços > teto são subdivididos; o que não vira lote
+    viável (não alcança o piso sem estourar o teto) é devolvido como retalho (→ área pública).
+    Garante ``fora_da_faixa == 0`` por construção (os lotes de 50 e 850 ficam impossíveis)."""
+    base: list[Polygon] = []
     for c in cols:
-        if c.area < area_min and res:
-            uni = unary_union([res[-1], c])
-            res[-1] = _maior_parte(uni) or res[-1]
+        if c is None or c.is_empty or c.geom_type != "Polygon":
+            continue
+        base.extend(_split_largura(c, teto)) if c.area > teto else base.append(c)
+
+    lotes: list[Polygon] = []
+    retalho = 0.0
+    cur: Optional[Polygon] = None
+    a = 0.0
+    for c in base:
+        if cur is None:
+            cur, a = c, c.area
+        elif a < piso and a + c.area <= teto:  # ainda pequeno → funde p/ alcançar o piso
+            cur = _maior_parte(unary_union([cur, c])) or cur
+            a = cur.area
+        else:  # cur já é lote viável (ou somar estouraria teto) → fecha cur, começa novo
+            if a + 1e-6 >= piso:
+                lotes.append(cur)
+            else:
+                retalho += a  # não alcançou o piso sem estourar o teto → devolve à área pública
+            cur, a = c, c.area
+    if cur is not None:
+        if a + 1e-6 >= piso:
+            lotes.append(cur)
+        elif lotes and lotes[-1].area + a <= teto:  # remate: funde no último se couber
+            lotes[-1] = _maior_parte(unary_union([lotes[-1], cur])) or lotes[-1]
         else:
-            res.append(c)
-    # se a última ainda for pequena, funde para trás
-    while len(res) >= 2 and res[-1].area < area_min:
-        uni = unary_union([res[-2], res[-1]])
-        res[-2] = _maior_parte(uni) or res[-2]
-        res.pop()
-    if res and res[0].area < area_min and len(res) == 1:
-        retalho += res[0].area  # quadra isolada minúscula → vira retalho (não inventa lote)
-        res = []
-    return res, retalho
+            retalho += a
+    return lotes, retalho
 
 
 def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float,
-                       area_min: float) -> tuple[list[Polygon], float]:
-    """Subdivide UMA quadra inteira: n = round(largura/testada_alvo); testada_real fecha a
-    quadra (retalho→0); cada lote = INTERSEÇÃO da faixa com a quadra (área emerge da forma)."""
+                       alvo_area: float, piso: float, teto: float) -> tuple[list[Polygon], float]:
+    """Subdivide UMA quadra: n escolhido pela PROFUNDIDADE da quadra para a área mirar ``alvo``
+    (quadra rasa → lote mais largo), depois CLAMP legal por lote em [piso, teto]. O tamanho
+    emerge da quadra (9.3), mas nunca sai da faixa legal (9.4)."""
     x0, _, x1, _ = piece.bounds
     L = x1 - x0
-    if L <= 0:
-        return [], 0.0
-    n = max(int(round(L / testada_alvo)), 1)
+    if L <= 0 or piece.area < piso * 0.5:
+        return [], piece.area  # quadra menor que meio lote → área pública, não lote minúsculo
+    depth = piece.area / L  # profundidade média da quadra
+    alvo = min(max(alvo_area, piso), teto)
+    testada_eff = max(min(alvo / depth, teto / depth), FRENTE_MIN_M)
+    n = max(int(round(L / testada_eff)), 1)
     tr = L / n  # testada real → fecha a quadra exatamente
     cols: list[Polygon] = []
     usado = 0.0
     for k in range(n):
-        cel = box(x0 + k * tr, y0, x0 + (k + 1) * tr, y1).intersection(piece)
-        parte = _maior_parte(cel)
+        parte = _maior_parte(box(x0 + k * tr, y0, x0 + (k + 1) * tr, y1).intersection(piece))
         if parte is not None and parte.area > 0:
             cols.append(parte)
             usado += parte.area
-    lotes, retalho = _fundir_pontas(cols, area_min)
+    lotes, retalho = _clamp_faixa(cols, piso, teto)
     retalho += max(piece.area - usado, 0.0)  # perda por clip de profundidade (borda da gleba)
     return lotes, retalho
 
 
-def _subdividir(miolo, via, testada_alvo, prof_alvo, area_min, ang_rad):
+def _subdividir(miolo, via, testada_alvo, prof_alvo, alvo_area, piso, teto, ang_rad):
     """Desenha as quadras (faixas de profundidade ``prof_alvo`` entre vias) em TODAS as ilhas e
-    subdivide cada uma. Orientado por ``ang_rad`` (topografia da 9.1). Devolve (lotes, retalho,
-    quadra_ids)."""
+    subdivide cada uma com CLAMP legal. Orientado por ``ang_rad`` (topografia da 9.1). Devolve
+    (lotes, retalho, quadra_ids)."""
     if miolo is None or miolo.is_empty:
         return [], 0.0, []
     ang_deg = math.degrees(ang_rad)
@@ -157,7 +193,7 @@ def _subdividir(miolo, via, testada_alvo, prof_alvo, area_min, ang_rad):
             strip = comp.intersection(box(comp.bounds[0], y0, comp.bounds[2], y1))
             for piece in _componentes(strip):
                 qid += 1
-                sub, ret = _subdividir_quadra(piece, y0, y1, testada_alvo, area_min)
+                sub, ret = _subdividir_quadra(piece, y0, y1, testada_alvo, alvo_area, piso, teto)
                 retalho += ret
                 for lote in sub:
                     lotes.append(rotate(lote, ang_deg, origin=cen) if ang_deg else lote)
@@ -263,10 +299,17 @@ def gerar_layout(
     programa: Programa,
     restricoes: Optional[BaseGeometry] = None,
     orientacao_rad: float = 0.0,
+    diretrizes: Optional[dict] = None,
 ) -> Layout:
-    """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico), com fidelidade
-    ao programa. ``restricoes`` (cinta de segurança do teste) é recortado antes; ``orientacao_rad``
-    gira a grelha para acompanhar a curva de nível (0 = sem topografia)."""
+    """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
+    (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
+    cai nas faixas de mercado do perfil. ``orientacao_rad`` gira a grelha (topografia 9.1)."""
+    # Diretrizes: piso/teto LEGAL do lote + reservas mínimas (lei vence o mercado). Sem 1.8 →
+    # piso federal + mercado (rotulado pelo chamador).
+    if diretrizes is None:
+        from app.core.urbanismo_diretrizes import resolver_diretrizes
+        diretrizes = resolver_diretrizes(None, None, None, programa.publico_alvo)
+
     canvas = aproveitavel
     if restricoes is not None and not restricoes.is_empty:
         canvas = canvas.difference(restricoes)
@@ -277,15 +320,20 @@ def gerar_layout(
     aprov_area = aprov.area
 
     via, _, _ = _dims(programa)
-    # Fase 9.3 — MIRA de subdivisão por perfil (o tamanho do lote emerge da quadra).
-    testada_alvo = max(programa.testada_alvo_m, 5.0)
-    perfil = PERFIL_LOTE.get(programa.publico_alvo, PERFIL_LOTE["media"])
-    prof = max(perfil["prof"], 10.0)
-    faixa_min = programa.faixa_lote_m2[0] if programa.faixa_lote_m2 else perfil["faixa"][0]
-    # lote pequeno demais (ponta) funde com vizinho — piso de "lote de verdade" ~55% da faixa.
-    area_min_lote = 0.55 * faixa_min
-    pct_lazer0 = max(0.0, min(programa.pct_lazer, 0.6))
-    pct_inst = max(0.0, min(programa.pct_institucional, 0.3))
+    # Mira de subdivisão (9.3) + CLAMP LEGAL (9.4): tamanho emerge da quadra, dentro de [piso,teto].
+    testada_alvo = max(diretrizes.get("testada_alvo_m", programa.testada_alvo_m), FRENTE_MIN_M)
+    prof = max(diretrizes.get("prof_alvo_m", 28.0), 10.0)
+    piso_lote = float(diretrizes["piso_lote_efetivo_m2"])
+    teto_lote = float(diretrizes["teto_lote_m2"])
+    alvo_area = float(diretrizes.get("alvo_lote_m2", (piso_lote + teto_lote) / 2.0))
+
+    # Reserva de verde/institucional: o município é PISO — reserva o MAIOR entre o que a IA
+    # propôs e o mínimo da LUOS (doacao_split). Pode propor mais, nunca menos (§0).
+    split = diretrizes.get("doacao_split") or {}
+    pct_verde_min = float(split.get("verde") or 0.0)
+    pct_inst_min = float(split.get("institucional") or 0.0)
+    pct_lazer0 = max(0.0, min(max(programa.pct_lazer, pct_verde_min), 0.6))
+    pct_inst = max(0.0, min(max(programa.pct_institucional, pct_inst_min), 0.3))
 
     # (b) esqueleto da IA → eixos; usado quando o arquétipo NÃO é grelha pura e há eixo válido.
     centerlines, descartes = _eixos(programa.esqueleto, aprov)
@@ -298,7 +346,7 @@ def gerar_layout(
 
     # (a) materializar lazer/institucional (9.1): CAP analítico — reserva lazer só até sobrar
     # área p/ ~MIN_LOTES_RESERVA lotes; acima disso DEGRADA rotulado (nunca infla nem ignora).
-    lote_area = max(testada_alvo * prof, 1.0)
+    lote_area = max(alvo_area, 1.0)
     inst_area = pct_inst * aprov_area
     disp_lazer = max(aprov_area - inst_area - MIN_LOTES_RESERVA * lote_area, 0.0)
     alvo_lazer_area = pct_lazer0 * aprov_area
@@ -316,7 +364,7 @@ def gerar_layout(
     # quadra (varia naturalmente em torno do alvo do perfil — nada imposto).
     via_local = min(via, VIA_LOCAL_M)  # rua de quadra estreita (a via principal é o esqueleto)
     lotes, retalho_m2, lote_quadra = _subdividir(
-        miolo, via_local, testada_alvo, prof, area_min_lote, orientacao_rad
+        miolo, via_local, testada_alvo, prof, alvo_area, piso_lote, teto_lote, orientacao_rad
     )
 
     # Arruamento = aproveitável − lotes − reservas (o road_skel cai aqui, como via).
@@ -343,10 +391,12 @@ def gerar_layout(
         "orientacao_rad": round(orientacao_rad, 6),
         "topo_aplicada": abs(orientacao_rad) > 1e-9,
         "sobra_retalho_m2": round(retalho_m2, 2),
-        # Fase 9.3 — calibração do perfil (a mira; o tamanho emerge da quadra).
+        # Fase 9.3/9.4 — mira da subdivisão + CLAMP legal [piso, teto] (o tamanho emerge da quadra).
         "testada_alvo_m": round(testada_alvo, 2),
         "prof_alvo_m": round(prof, 2),
-        "faixa_lote_m2": [round(faixa_min, 2), round(programa.faixa_lote_m2[1], 2)],
+        "piso_lote_m2": round(piso_lote, 2),
+        "teto_lote_m2": round(teto_lote, 2),
+        "faixa_lote_m2": [round(piso_lote, 2), round(teto_lote, 2)],
         "lote_alvo_origem": programa.lote_alvo_origem,
     }
 

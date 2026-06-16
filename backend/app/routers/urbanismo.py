@@ -23,7 +23,9 @@ from app.core import urbanismo_geom as geom
 from app.core import urbanismo_medida as medida
 from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.declividade import FonteDEM, get_fonte_dem
+from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
+from app.core.urbanismo_diretrizes import resolver_diretrizes
 from app.core.urbanismo_programa import (
     GeradorIndisponivel,
     GeradorPrograma,
@@ -127,6 +129,7 @@ def propor(
     fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
+    fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -162,12 +165,33 @@ def propor(
     except GeradorIndisponivel as exc:
         raise HTTPException(503, str(exc))
 
-    # 3) NÚCLEO: Python materializa (reserva lazer/institucional → loteia) e MEDE tudo.
-    layout = geom.gerar_layout(aprov_m, prog, orientacao_rad=orientacao)
+    # 2b) DIRETRIZES (Fase 9.4): hierarquia LUOS(1.8)→mercado→federal. Lei vence o mercado.
+    jur = registro["jurisdicao"]
+    perfil = (
+        fonte_perfil.carregar(jur.cod_ibge)
+        if (fonte_perfil is not None and getattr(jur, "cod_ibge", None) and body.zona)
+        else None
+    )
+    diretrizes = resolver_diretrizes(perfil, body.zona, body.modalidade, body.publico_alvo)
+
+    # 3) NÚCLEO: Python materializa (reserva conforme diretriz → subdivide → CLAMP legal) e MEDE.
+    layout = geom.gerar_layout(
+        aprov_m, prog, orientacao_rad=orientacao, diretrizes=diretrizes
+    )
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
     fidelidade = schemas.FidelidadeOut(**medida.construir_fidelidade(med, layout))
     distribuicao = schemas.DistribuicaoTamanhosOut(**medida.distribuicao_tamanhos(med, layout))
+    diretrizes_out = schemas.DiretrizesOut(
+        fonte=diretrizes["fonte"], cobertura=diretrizes["cobertura"],
+        confirmada=diretrizes["confirmada"], lote_min_zona_m2=diretrizes["lote_min_zona_m2"],
+        piso_lote_efetivo_m2=diretrizes["piso_lote_efetivo_m2"], teto_lote_m2=diretrizes["teto_lote_m2"],
+        doacao_min_pct=diretrizes["doacao_min_pct"], doacao_split=diretrizes["doacao_split"],
+        aviso=diretrizes["aviso"],
+    )
+    conf_legal = [
+        schemas.ConformidadeLegalOut(**c) for c in medida.conformidade_legal(med, layout, diretrizes)
+    ]
 
     versao = fonte_urb.proxima_versao(analise_id)
     proposta_id = f"u_{analise_id[:8]}_{versao:03d}"
@@ -180,6 +204,10 @@ def propor(
         "Tamanho do lote = o que a quadra comporta (subdivisão), mirando a faixa do perfil; "
         "lote grande é exceção geométrica. Quem quer maior junta dois lotes.",
         "Valor da posição vai para o R$/m² (seu input por faixa de score), não para o tamanho.",
+        "Dimensionamento ancorado em: diretrizes do município (LUOS/1.8) + piso legal 125 m² "
+        "(Lei 6.766) + boas práticas de mercado. Nenhum lote fora da faixa legal.",
+        "Mínimos de doação/área verde/institucional MEDIDOS contra a exigência do município — "
+        "verificar na prefeitura (art. 6º Lei 6.766).",
     ]
 
     out = schemas.PropostaUrbanisticaOut(
@@ -193,6 +221,8 @@ def propor(
         heatmap=heatmap,
         fidelidade=fidelidade,
         distribuicao_tamanhos=distribuicao,
+        diretrizes=diretrizes_out,
+        conformidade_legal=conf_legal,
         conformidade_programa=conformidade,
         esqueleto_ignorado=layout.ignorados,
         proveniencia=(

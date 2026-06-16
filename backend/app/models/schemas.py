@@ -1068,6 +1068,8 @@ class ProporUrbanismoIn(BaseModel):
 
     tipo_loteamento: TipoLoteamento = "aberto"
     publico_alvo: PublicoAlvo = "media"
+    zona: Optional[str] = None  # Fase 9.4 — zona da LUOS (1.8) p/ o lote legal e a doação
+    modalidade: Optional[str] = None
     overrides: Optional[dict] = None  # lote_alvo_m2, pct_lazer, largura_via_m, amenidades…
 
 
@@ -1127,6 +1129,7 @@ class DistribuicaoTamanhosOut(BaseModel):
     cv: float
     min_m2: float
     max_m2: float
+    fora_da_faixa: int = 0  # Fase 9.4 — lotes fora de [piso,teto] legal (deve ser 0 — clamp)
     faixas: list[FaixaHistogramaOut] = []
     correlacao_tamanho_score: float  # reportada só p/ provar o DESACOPLAMENTO (não é meta)
     retalho_perdido_m2: float
@@ -1135,6 +1138,28 @@ class DistribuicaoTamanhosOut(BaseModel):
     lote_alvo_origem: str = ""
     faixa_lote_m2: list[float] = []
     lotes: list[LoteOut] = []
+
+
+# Fase 9.4 — diretrizes municipais (hierarquia LUOS→mercado→federal) + conformidade legal.
+class DiretrizesOut(BaseModel):
+    fonte: str
+    cobertura: str  # COMPLETA | BASE_FEDERAL
+    confirmada: bool
+    lote_min_zona_m2: Optional[float] = None
+    piso_lote_efetivo_m2: float
+    teto_lote_m2: float
+    doacao_min_pct: Optional[float] = None
+    doacao_split: Optional[dict] = None
+    aviso: str = ""
+
+
+class ConformidadeLegalOut(BaseModel):
+    item: str
+    exigido: Optional[float] = None
+    medido: float
+    unidade: str
+    status: str  # atende | atende_com_folga | nao_atende | nao_avaliado
+    leitura: str
 
 
 class UsoAreaOut(BaseModel):
@@ -1243,6 +1268,8 @@ class PropostaUrbanisticaOut(BaseModel):
     heatmap: HeatmapOut
     fidelidade: Optional[FidelidadeOut] = None  # Fase 9.1
     distribuicao_tamanhos: Optional[DistribuicaoTamanhosOut] = None  # Fase 9.3
+    diretrizes: Optional[DiretrizesOut] = None  # Fase 9.4 (LUOS→mercado→federal)
+    conformidade_legal: list[ConformidadeLegalOut] = []  # Fase 9.4 (medido × mínimo legal)
     conformidade_programa: list[ItemConformidadePrograma] = []
     esqueleto_ignorado: list[str] = []
     proveniencia: str

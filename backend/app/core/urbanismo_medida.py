@@ -423,12 +423,17 @@ def distribuicao_tamanhos(med: "Medicao", layout: "Layout") -> dict:
 
     liq = med.quadro["area_liquida_m2"] or 1.0
     retalho = float(layout.meta.get("sobra_retalho_m2", 0.0))
+    # Fase 9.4 — clamp legal: nº de lotes FORA da faixa [piso, teto] (deve ser 0 por construção).
+    piso = float(layout.meta.get("piso_lote_m2", 0.0))
+    teto = float(layout.meta.get("teto_lote_m2", 1e12))
+    fora = sum(1 for a in areas if a < piso - 0.5 or a > teto + 0.5)
     return {
         "media_m2": media,
         "desvio_m2": desvio,
         "cv": cv,
         "min_m2": round(min(areas), 2) if areas else 0.0,
         "max_m2": round(max(areas), 2) if areas else 0.0,
+        "fora_da_faixa": fora,
         "faixas": faixas,
         "correlacao_tamanho_score": round(_pearson(areas, scores), 3),
         "retalho_perdido_m2": round(retalho, 2),
@@ -438,3 +443,61 @@ def distribuicao_tamanhos(med: "Medicao", layout: "Layout") -> dict:
         "faixa_lote_m2": layout.meta.get("faixa_lote_m2", []),
         "lotes": lotes_out,
     }
+
+
+def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> list[dict]:
+    """Confronta o que foi MEDIDO com os MÍNIMOS do município (LUOS/1.8) + piso federal. Mede,
+    não decide (§1-A): cada item recebe atende / atende_com_folga / não_atende / não_avaliado."""
+    q = med.quadro
+    liq = q["area_liquida_m2"] or 1.0
+    areas = [g.area for g in layout.lotes if g is not None and not g.is_empty]
+    itens: list[dict] = []
+
+    def _status(medido, exigido):
+        if exigido is None:
+            return "nao_avaliado"
+        if medido + 1e-6 < exigido:
+            return "nao_atende"
+        return "atende_com_folga" if medido > exigido * 1.25 + 1e-9 else "atende"
+
+    # lote mínimo (piso efetivo) — o menor lote medido ≥ piso?
+    piso = float(diretrizes.get("piso_lote_efetivo_m2", 125.0))
+    exig_lote = diretrizes.get("lote_min_zona_m2") or 125.0
+    min_lote = round(min(areas), 2) if areas else 0.0
+    itens.append({
+        "item": "lote_minimo", "exigido": round(exig_lote, 2), "medido": min_lote,
+        "unidade": "m2", "status": _status(min_lote, exig_lote),
+        "leitura": f"menor lote {_fmt(min_lote)} m² — piso efetivo {_fmt(piso)} m² "
+                   f"(zona {_fmt(exig_lote)} m² / federal 125 m²).",
+    })
+
+    # doação total (verde + institucional + viário) × mínimo do município.
+    doa_med = round((q["areas_verdes"]["m2"] + q["sistema_lazer"]["m2"]
+                     + q["institucional"]["m2"] + q["arruamento"]["m2"]) / liq, 4)
+    doa_exig = diretrizes.get("doacao_min_pct")
+    itens.append({
+        "item": "doacao", "exigido": doa_exig, "medido": doa_med, "unidade": "pct",
+        "status": _status(doa_med, doa_exig),
+        "leitura": f"doação medida {_fmt(doa_med * 100, 1)}% (viário+verde+lazer+institucional)"
+                   + (f" — mínimo {_fmt((doa_exig or 0) * 100, 1)}%." if doa_exig is not None
+                      else " — mínimo não confirmado na LUOS."),
+    })
+
+    split = diretrizes.get("doacao_split") or {}
+    verde_med = round((q["areas_verdes"]["m2"] + q["sistema_lazer"]["m2"]) / liq, 4)
+    itens.append({
+        "item": "area_verde", "exigido": split.get("verde"), "medido": verde_med,
+        "unidade": "pct", "status": _status(verde_med, split.get("verde")),
+        "leitura": f"verde/lazer medido {_fmt(verde_med * 100, 1)}%"
+                   + (f" — mínimo {_fmt((split.get('verde') or 0) * 100, 1)}%."
+                      if split.get("verde") is not None else " — mínimo não confirmado."),
+    })
+    inst_med = round(q["institucional"]["m2"] / liq, 4)
+    itens.append({
+        "item": "institucional", "exigido": split.get("institucional"), "medido": inst_med,
+        "unidade": "pct", "status": _status(inst_med, split.get("institucional")),
+        "leitura": f"institucional medido {_fmt(inst_med * 100, 1)}%"
+                   + (f" — mínimo {_fmt((split.get('institucional') or 0) * 100, 1)}%."
+                      if split.get("institucional") is not None else " — mínimo não confirmado."),
+    })
+    return itens

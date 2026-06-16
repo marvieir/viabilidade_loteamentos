@@ -250,6 +250,7 @@ export default function Home() {
               <CardUrbanismo
                 analiseId={analise.analise_id}
                 glebaGeojson={analise.geometria.geojson}
+                perfil={perfil}
               />
             </div>
             <div className={secao === "conformidade" ? "" : "hidden"}>

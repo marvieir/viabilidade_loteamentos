@@ -1198,6 +1198,7 @@ export interface DistribuicaoTamanhos {
   cv: number;
   min_m2: number;
   max_m2: number;
+  fora_da_faixa: number; // Fase 9.4 — clamp legal: deve ser 0
   faixas: FaixaHistograma[];
   correlacao_tamanho_score: number;
   retalho_perdido_m2: number;
@@ -1206,6 +1207,27 @@ export interface DistribuicaoTamanhos {
   lote_alvo_origem: string;
   faixa_lote_m2: number[];
   lotes: LoteUrb[];
+}
+
+// Fase 9.4 — diretrizes municipais (LUOS→mercado→federal) + conformidade legal.
+export interface Diretrizes {
+  fonte: string;
+  cobertura: string; // COMPLETA | BASE_FEDERAL
+  confirmada: boolean;
+  lote_min_zona_m2: number | null;
+  piso_lote_efetivo_m2: number;
+  teto_lote_m2: number;
+  doacao_min_pct: number | null;
+  doacao_split: Record<string, number | null> | null;
+  aviso: string;
+}
+export interface ConformidadeLegal {
+  item: string;
+  exigido: number | null;
+  medido: number;
+  unidade: string;
+  status: string; // atende | atende_com_folga | nao_atende | nao_avaliado
+  leitura: string;
 }
 
 export interface PropostaUrbanistica {
@@ -1220,6 +1242,8 @@ export interface PropostaUrbanistica {
   heatmap: HeatmapUrb;
   fidelidade: Fidelidade | null;
   distribuicao_tamanhos: DistribuicaoTamanhos | null;
+  diretrizes: Diretrizes | null;
+  conformidade_legal: ConformidadeLegal[];
   conformidade_programa: ItemConformidadePrograma[];
   esqueleto_ignorado: string[];
   proveniencia: string;
@@ -1232,6 +1256,7 @@ export async function proporUrbanismo(
   analiseId: string,
   tipoLoteamento: TipoLoteamento,
   publicoAlvo: PublicoAlvo,
+  zona?: string | null,
   overrides?: Record<string, unknown>
 ): Promise<PropostaUrbanistica> {
   const res = await fetch(
@@ -1242,6 +1267,7 @@ export async function proporUrbanismo(
       body: JSON.stringify({
         tipo_loteamento: tipoLoteamento,
         publico_alvo: publicoAlvo,
+        ...(zona ? { zona } : {}),
         ...(overrides ? { overrides } : {}),
       }),
     }

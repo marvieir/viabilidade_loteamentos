@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   Card,
@@ -13,7 +13,9 @@ import { Button } from "@/components/ui/button";
 import {
   proporUrbanismo,
   type ChaveOverlay,
+  type ConformidadeLegal,
   type ItemFidelidadeArea,
+  type PerfilMunicipal,
   type PropostaUrbanistica,
   type PublicoAlvo,
   type TipoLoteamento,
@@ -71,23 +73,32 @@ function LinhaArea({
 export function CardUrbanismo({
   analiseId,
   glebaGeojson,
+  perfil,
   onData,
 }: {
   analiseId: string;
   glebaGeojson: GeoJSON.Polygon;
+  perfil?: PerfilMunicipal | null;
   onData?: (p: PropostaUrbanistica | null) => void;
 }) {
+  const zonas = perfil?.zonas.map((z) => z.codigo) ?? [];
   const [tipo, setTipo] = useState<TipoLoteamento>("aberto");
   const [publico, setPublico] = useState<PublicoAlvo>("media");
+  const [zona, setZona] = useState<string>("");
   const [proposta, setProposta] = useState<PropostaUrbanistica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+
+  useEffect(() => {
+    if (!zona && zonas.length > 0) setZona(zonas[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil]);
 
   async function gerar() {
     setCarregando(true);
     setErro(null);
     try {
-      const p = await proporUrbanismo(analiseId, tipo, publico);
+      const p = await proporUrbanismo(analiseId, tipo, publico, zona || null);
       setProposta(p);
       onData?.(p);
     } catch (e) {
@@ -153,6 +164,22 @@ export function CardUrbanismo({
               </option>
             ))}
           </select>
+          {zonas.length > 0 && (
+            <>
+              <label className="text-sm text-slate-600">Zona (LUOS)</label>
+              <select
+                value={zona}
+                onChange={(e) => setZona(e.target.value)}
+                className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+              >
+                {zonas.map((z) => (
+                  <option key={z} value={z}>
+                    {z}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <Button onClick={gerar} disabled={carregando}>
             {carregando ? "Gerando…" : "Gerar estudo de massa (IA)"}
           </Button>
@@ -160,6 +187,34 @@ export function CardUrbanismo({
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
+        )}
+
+        {/* Diretrizes do município (Fase 9.4) — hierarquia LUOS → mercado → federal */}
+        {proposta?.diretrizes && (
+          <div
+            className={`rounded-xl border p-3 text-sm ${
+              proposta.diretrizes.confirmada
+                ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                : "border-amber-200 bg-amber-50 text-amber-900"
+            }`}
+          >
+            <p className="font-semibold">Diretrizes — {proposta.diretrizes.fonte}</p>
+            <p className="mt-0.5">
+              Lote legal de{" "}
+              <strong>
+                {proposta.diretrizes.piso_lote_efetivo_m2.toLocaleString("pt-BR")} a{" "}
+                {proposta.diretrizes.teto_lote_m2.toLocaleString("pt-BR")} m²
+              </strong>
+              {proposta.diretrizes.doacao_min_pct != null && (
+                <>
+                  {" "}
+                  · doação mínima{" "}
+                  {(proposta.diretrizes.doacao_min_pct * 100).toLocaleString("pt-BR")}%
+                </>
+              )}
+              . {proposta.diretrizes.aviso}
+            </p>
+          </div>
         )}
 
         {proposta && (
@@ -345,13 +400,43 @@ export function CardUrbanismo({
                     })}
                     % · tamanho e valor desacoplados (posição → R$/m², não tamanho)
                   </p>
-                  {proposta.distribuicao_tamanhos.lote_alvo_origem && (
-                    <p className="mt-1 text-xs text-slate-400">
-                      {proposta.distribuicao_tamanhos.lote_alvo_origem}
-                    </p>
-                  )}
+                  <p className="mt-1 text-xs text-slate-400">
+                    {proposta.distribuicao_tamanhos.fora_da_faixa === 0
+                      ? "Todos os lotes dentro da faixa legal (clamp município → federal)."
+                      : `${proposta.distribuicao_tamanhos.fora_da_faixa} lote(s) fora da faixa legal — verificar.`}
+                    {proposta.distribuicao_tamanhos.lote_alvo_origem
+                      ? ` ${proposta.distribuicao_tamanhos.lote_alvo_origem}`
+                      : ""}
+                  </p>
                 </div>
               )}
+
+            {/* Conformidade legal (Fase 9.4) — medido × mínimo do município */}
+            {proposta.conformidade_legal.length > 0 && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Conformidade legal — medido × mínimo do município
+                </p>
+                <ul className="space-y-1.5">
+                  {proposta.conformidade_legal.map((c: ConformidadeLegal) => (
+                    <li key={c.item} className="flex items-start gap-2 text-sm">
+                      <span
+                        className={`mt-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                          c.status === "nao_atende"
+                            ? "bg-rose-200 text-rose-900"
+                            : c.status === "nao_avaliado"
+                            ? "bg-slate-200 text-slate-600"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {c.status.replace(/_/g, " ")}
+                      </span>
+                      <span className="text-slate-700">{c.leitura}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Heatmap de valorização (qualidade relativa, sem preço) */}
             {proposta.heatmap.score_medio != null && (
