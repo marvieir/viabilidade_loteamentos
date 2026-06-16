@@ -406,13 +406,13 @@ def mix_medido(med: "Medicao", layout: "Layout") -> dict:
         grupos.setdefault(fx, []).append(p["area_m2"])
 
     distribuicao = []
-    for fx in _ORDEM_FAIXA:
-        ar = grupos.get(fx)
-        if ar:
-            distribuicao.append({
-                "faixa": fx, "n": len(ar), "pct": round(len(ar) / n, 4) if n else 0.0,
-                "area_media_m2": round(sum(ar) / len(ar), 2),
-            })
+    # Ordena por tamanho médio (maior→menor), AGNÓSTICO ao nome da faixa que a IA propôs.
+    for fx in sorted(grupos, key=lambda k: sum(grupos[k]) / len(grupos[k]), reverse=True):
+        ar = grupos[fx]
+        distribuicao.append({
+            "faixa": fx, "n": len(ar), "pct": round(len(ar) / n, 4) if n else 0.0,
+            "area_media_m2": round(sum(ar) / len(ar), 2),
+        })
 
     liq = med.quadro["area_liquida_m2"] or 1.0
     retalho = float(layout.meta.get("sobra_retalho_m2", 0.0))

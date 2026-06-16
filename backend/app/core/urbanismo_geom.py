@@ -192,11 +192,11 @@ def _lotear_heterogeneo(miolo, via, prof, qfn, clf, bandas, ang_rad):
 
 
 def _classificador(miolo, via, prof, qfn, bandas, ang_rad):
-    """Pré-varre as posições candidatas e devolve ``clf(q)->faixa`` por **rank relativo**
-    (percentil de meio-rank): premium = topo, compacto = base, resto padrão. Qualidade
-    quase-CONSTANTE → meio-rank ≈ 0,5 p/ todos → **todos padrão** (sem explodir em premium —
-    o defeito da gleba de verde central). Largura compensada (premium é mais largo → recebe
-    mais POSIÇÕES p/ a proporção de LOTES bater o alvo)."""
+    """Pré-varre as posições e devolve ``clf(q)->faixa`` por **rank relativo**, AGNÓSTICO AO
+    NOME das faixas (a IA pode chamar de premium/superior/padrão-alto/…): ordena as faixas por
+    TAMANHO (maior→menor) e distribui as posições pela qualidade — melhores posições → faixas
+    maiores. Qualidade quase-CONSTANTE → todos na faixa do MEIO (sem explodir em premium).
+    Largura compensada (faixa maior cabe menos por comprimento → recebe mais posições)."""
     import bisect
 
     if not bandas:
@@ -218,25 +218,36 @@ def _classificador(miolo, via, prof, qfn, bandas, ang_rad):
                     x += w_pad
     qs_sorted = sorted(qs)
     n = len(qs_sorted)
-    prem = bandas.get("premium", {})
-    comp = bandas.get("compacto", {})
-    eff_prem = min(prem.get("prop", 0.0) * (prem.get("w", w_pad) / w_pad), 0.9) if prem else 0.0
-    eff_comp = min(comp.get("prop", 0.0) * (comp.get("w", w_pad) / w_pad), 0.9) if comp else 0.0
-    fallback = "padrao" if "padrao" in bandas else next(iter(bandas))
-    # Variância desprezível → sem zoneamento possível: tudo padrão (honesto).
     spread = (qs_sorted[-1] - qs_sorted[0]) if n else 0.0
+
+    # Faixas da MAIOR para a MENOR; fração de POSIÇÕES ∝ proporção-alvo × largura (compensa
+    # que a faixa maior cabe menos por comprimento), normalizada para somar 1.
+    ordem = sorted(bandas.keys(), key=lambda k: bandas[k]["area_min"], reverse=True)
+    w_avg = sum(bandas[k]["w"] for k in ordem) / len(ordem)
+    effs = [max(bandas[k].get("prop", 0.0), 0.0) * bandas[k]["w"] / w_avg for k in ordem]
+    tot = sum(effs) or 1.0
+    effs = [e / tot for e in effs]
+    cum, c = [], 0.0
+    for e in effs:
+        c += e
+        cum.append(c)
+
+    def _faixa_por_pct(p: float) -> str:
+        # p = percentil de qualidade (1 = melhor). Faixa maior fica com o topo do rank.
+        for k, cc in zip(ordem, cum):
+            if p >= 1.0 - cc - 1e-9:
+                return k
+        return ordem[-1]
+
+    meio = _faixa_por_pct(0.5)  # faixa do meio — usada quando não há gradiente de qualidade
 
     def clf(q: float) -> str:
         if n == 0 or spread < 1e-9:
-            return fallback
+            return meio
         lo = bisect.bisect_left(qs_sorted, q)
         hi = bisect.bisect_right(qs_sorted, q)
-        rank = (lo + (hi - lo) * 0.5) / n  # meio-rank (trata empates pelo centro)
-        if eff_prem > 0 and rank >= 1.0 - eff_prem:
-            return "premium" if "premium" in bandas else fallback
-        if eff_comp > 0 and rank <= eff_comp:
-            return "compacto" if "compacto" in bandas else fallback
-        return fallback
+        p = (lo + (hi - lo) * 0.5) / n  # meio-rank (empates pelo centro)
+        return _faixa_por_pct(p)
 
     return clf
 
