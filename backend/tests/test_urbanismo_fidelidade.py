@@ -19,7 +19,10 @@ from app.core.urbanismo_programa import programa_do_preset
 from tests.conftest import RET_RETANGULO, make_kmz
 
 
-def _frac_lazer(med):
+def _frac_lazer(med, layout=None):
+    # Lazer RESERVADO (9.4): a sobra de ponta anexada ao verde não conta como lazer do programa.
+    if layout is not None and layout.meta.get("lazer_reservado_pct") is not None:
+        return layout.meta["lazer_reservado_pct"]
     q = med.quadro
     liq = q["area_liquida_m2"] or 1.0
     return (q["sistema_lazer"]["m2"] + q["areas_verdes"]["m2"]) / liq
@@ -33,7 +36,7 @@ def test_convergencia_lazer_ouro():
     prog = programa_do_preset("alta", {"pct_lazer": 0.25, "pct_institucional": 0.05})
     layout = geom.gerar_layout(aprov, prog)
     med = medida.medir(layout)
-    lazer = _frac_lazer(med)
+    lazer = _frac_lazer(med, layout)
     inst = med.quadro["institucional"]["m2"] / med.quadro["area_liquida_m2"]
     assert 0.22 <= lazer <= 0.28  # convergiu (a v1 dava ~0,025 → reprovava)
     assert inst >= 0.05 - 0.001
@@ -70,7 +73,7 @@ def test_degradacao_honesta():
     layout = geom.gerar_layout(aprov, prog)
     med = medida.medir(layout)
     assert layout.meta["lazer_degradado"] is True
-    assert _frac_lazer(med) < 0.25  # reduzido
+    assert _frac_lazer(med, layout) < 0.25  # reduzido
     assert med.indicadores["n_lotes"] > 0  # lotes preservados
     fid = medida.construir_fidelidade(med, layout)
     item = next(a for a in fid["areas"] if a["item"] == "lazer")

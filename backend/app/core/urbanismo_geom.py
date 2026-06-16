@@ -112,11 +112,11 @@ def _split_largura(c: Polygon, teto: float) -> list[Polygon]:
     return out or [c]
 
 
-def _clamp_faixa(cols: list[Polygon], piso: float, teto: float) -> tuple[list[Polygon], float]:
+def _clamp_faixa(cols: list[Polygon], piso: float, teto: float) -> list[Polygon]:
     """CLAMP LEGAL (§3.4): todo lote emitido fica em [piso, teto]. Colunas < piso são fundidas
     com a vizinha (até caber em teto); pedaços > teto são subdivididos; o que não vira lote
-    viável (não alcança o piso sem estourar o teto) é devolvido como retalho (→ área pública).
-    Garante ``fora_da_faixa == 0`` por construção (os lotes de 50 e 850 ficam impossíveis)."""
+    viável é DESCARTADO aqui (a sobra é capturada como ``quadra − lotes`` e devolvida à área
+    verde no §4). Garante ``fora_da_faixa == 0`` por construção (50 e 850 ficam impossíveis)."""
     base: list[Polygon] = []
     for c in cols:
         if c is None or c.is_empty or c.geom_type != "Polygon":
@@ -124,7 +124,6 @@ def _clamp_faixa(cols: list[Polygon], piso: float, teto: float) -> tuple[list[Po
         base.extend(_split_largura(c, teto)) if c.area > teto else base.append(c)
 
     lotes: list[Polygon] = []
-    retalho = 0.0
     cur: Optional[Polygon] = None
     a = 0.0
     for c in base:
@@ -136,69 +135,68 @@ def _clamp_faixa(cols: list[Polygon], piso: float, teto: float) -> tuple[list[Po
         else:  # cur já é lote viável (ou somar estouraria teto) → fecha cur, começa novo
             if a + 1e-6 >= piso:
                 lotes.append(cur)
-            else:
-                retalho += a  # não alcançou o piso sem estourar o teto → devolve à área pública
-            cur, a = c, c.area
+            cur, a = c, c.area  # cur descartado (se < piso) → vira sobra (não lote)
     if cur is not None:
         if a + 1e-6 >= piso:
             lotes.append(cur)
         elif lotes and lotes[-1].area + a <= teto:  # remate: funde no último se couber
             lotes[-1] = _maior_parte(unary_union([lotes[-1], cur])) or lotes[-1]
-        else:
-            retalho += a
-    return lotes, retalho
+    return lotes
 
 
 def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float,
-                       alvo_area: float, piso: float, teto: float) -> tuple[list[Polygon], float]:
+                       alvo_area: float, piso: float, teto: float):
     """Subdivide UMA quadra: n escolhido pela PROFUNDIDADE da quadra para a área mirar ``alvo``
     (quadra rasa → lote mais largo), depois CLAMP legal por lote em [piso, teto]. O tamanho
-    emerge da quadra (9.3), mas nunca sai da faixa legal (9.4)."""
+    emerge da quadra (9.3), nunca sai da faixa legal (9.4). Devolve ``(lotes, residual)`` —
+    ``residual = quadra − lotes`` (a sobra de ponta, devolvida à área verde no §4)."""
     x0, _, x1, _ = piece.bounds
     L = x1 - x0
     if L <= 0 or piece.area < piso * 0.5:
-        return [], piece.area  # quadra menor que meio lote → área pública, não lote minúsculo
+        return [], piece  # quadra menor que meio lote → toda residual (vira área verde)
     depth = piece.area / L  # profundidade média da quadra
     alvo = min(max(alvo_area, piso), teto)
     testada_eff = max(min(alvo / depth, teto / depth), FRENTE_MIN_M)
     n = max(int(round(L / testada_eff)), 1)
     tr = L / n  # testada real → fecha a quadra exatamente
     cols: list[Polygon] = []
-    usado = 0.0
     for k in range(n):
         parte = _maior_parte(box(x0 + k * tr, y0, x0 + (k + 1) * tr, y1).intersection(piece))
         if parte is not None and parte.area > 0:
             cols.append(parte)
-            usado += parte.area
-    lotes, retalho = _clamp_faixa(cols, piso, teto)
-    retalho += max(piece.area - usado, 0.0)  # perda por clip de profundidade (borda da gleba)
-    return lotes, retalho
+    lotes = _clamp_faixa(cols, piso, teto)
+    # Sobra de ponta (§4) = tudo da quadra que não virou lote → devolvido à ÁREA VERDE adjacente
+    # (NUNCA retalho perdido nem viário inflado). Operação geométrica determinística (§2).
+    residual = piece.difference(unary_union(lotes)) if lotes else piece
+    return lotes, (residual if not residual.is_empty else None)
 
 
 def _subdividir(miolo, via, testada_alvo, prof_alvo, alvo_area, piso, teto, ang_rad):
     """Desenha as quadras (faixas de profundidade ``prof_alvo`` entre vias) em TODAS as ilhas e
     subdivide cada uma com CLAMP legal. Orientado por ``ang_rad`` (topografia da 9.1). Devolve
-    (lotes, retalho, quadra_ids)."""
+    (lotes, residual_geom, quadra_ids) — ``residual_geom`` é a sobra de ponta (→ área verde)."""
     if miolo is None or miolo.is_empty:
-        return [], 0.0, []
+        return [], None, []
     ang_deg = math.degrees(ang_rad)
     cen = miolo.centroid
     reg = rotate(miolo, -ang_deg, origin=cen) if ang_deg else miolo
     lotes: list[Polygon] = []
     quadras: list[str] = []
-    retalho = 0.0
+    residual_parts: list[BaseGeometry] = []
     qid = 0
     for comp in _componentes(reg):
         for (y0, y1) in _linhas_de_quadra(comp, via, prof_alvo):
             strip = comp.intersection(box(comp.bounds[0], y0, comp.bounds[2], y1))
             for piece in _componentes(strip):
                 qid += 1
-                sub, ret = _subdividir_quadra(piece, y0, y1, testada_alvo, alvo_area, piso, teto)
-                retalho += ret
+                sub, res = _subdividir_quadra(piece, y0, y1, testada_alvo, alvo_area, piso, teto)
+                if res is not None and not res.is_empty:
+                    residual_parts.append(rotate(res, ang_deg, origin=cen) if ang_deg else res)
                 for lote in sub:
                     lotes.append(rotate(lote, ang_deg, origin=cen) if ang_deg else lote)
                     quadras.append(f"Q{qid}")
-    return lotes, retalho, quadras
+    residual_union = unary_union(residual_parts) if residual_parts else None
+    return lotes, residual_union, quadras
 
 # ============================ reserva de áreas (área EXATA) ============================
 def _raio_max(poly: BaseGeometry, seed: Point) -> float:
@@ -363,11 +361,23 @@ def gerar_layout(
     # inteira por testada_alvo (fecha sem retalho); o tamanho de cada lote EMERGE da forma da
     # quadra (varia naturalmente em torno do alvo do perfil — nada imposto).
     via_local = min(via, VIA_LOCAL_M)  # rua de quadra estreita (a via principal é o esqueleto)
-    lotes, retalho_m2, lote_quadra = _subdividir(
+    lotes, residual_geom, lote_quadra = _subdividir(
         miolo, via_local, testada_alvo, prof, alvo_area, piso_lote, teto_lote, orientacao_rad
     )
 
-    # Arruamento = aproveitável − lotes − reservas (o road_skel cai aqui, como via).
+    # §4 (9.4) — a SOBRA DE PONTA (quadra − lotes, que o clamp não deixou virar lote) é
+    # devolvida à ÁREA VERDE adjacente: vira verde no quadro/conformidade, NUNCA retalho
+    # perdido nem viário inflado. ``verde_reservado`` (a reserva original) alimenta a fidelidade
+    # do lazer; o residual entra só no quadro/doação. Operação geométrica determinística (§2).
+    verde_reservado = verde
+    if residual_geom is not None and not residual_geom.is_empty:
+        verde = unary_union([g for g in (verde, residual_geom) if g is not None and not g.is_empty])
+    lazer_reservado_m2 = sum(
+        g.area for g in (clube, verde_reservado) if g is not None and not g.is_empty
+    )
+    retalho_m2 = 0.0  # a sobra foi destinada à área pública (sem retalho perdido)
+
+    # Arruamento = aproveitável − lotes − reservas (verde já inclui a sobra → viário fica real).
     consumido = [g for g in (unary_union(lotes) if lotes else None, clube, verde, inst)
                  if g is not None and not g.is_empty]
     sobra = aprov.difference(unary_union(consumido)) if consumido else aprov
@@ -383,6 +393,8 @@ def gerar_layout(
     meta = {
         "lazer_alvo_pct": round(pct_lazer0, 4),
         "lazer_usado_pct": round(pct_usado, 4),
+        # fidelidade do lazer usa a RESERVA original (não a sobra de ponta anexada ao verde).
+        "lazer_reservado_pct": round(lazer_reservado_m2 / aprov_area, 4) if aprov_area else 0.0,
         "lazer_degradado": degradado,
         "inst_alvo_pct": round(pct_inst, 4),
         "arquetipo": programa.arquetipo_viario,

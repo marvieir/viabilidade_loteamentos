@@ -95,6 +95,21 @@ def test_reserva_e_conformidade():
     assert itens["area_verde"]["medido"] >= (dd["doacao_split"]["verde"] - 1e-6)
 
 
+def test_sobra_de_ponta_vai_para_area_verde():
+    """Regressão (achado de campo): a sobra de ponta (quadra − lotes) é DEVOLVIDA à área verde,
+    nunca contabilizada como retalho perdido nem inflada no viário (§4 da spec). retalho≈0,
+    soma das classes = 100%, e a fidelidade do lazer usa a RESERVA (não a sobra)."""
+    layout, d, med, _ = _dist(SAO_ROQUE, "alta", _perfil_mue(), "MUE")
+    q = med.quadro
+    assert d["retalho_perdido_pct"] <= 0.005  # praticamente zero — a sobra foi destinada
+    soma = (q["vendavel"]["pct_apo"] + q["areas_verdes"]["pct_apo"] + q["sistema_lazer"]["pct_apo"]
+            + q["institucional"]["pct_apo"] + q["arruamento"]["pct_apo"])
+    assert abs(soma - 1.0) < 0.001  # sem double-counting nem área perdida
+    fid = medida.construir_fidelidade(med, layout)
+    lazer = next(a for a in fid["areas"] if a["item"] == "lazer")
+    assert lazer["status"] == "atendido"  # reserva ~alvo, não inflada pela sobra
+
+
 def test_subdivisao_preservada_calibrada():
     """Critério 5: tamanho emerge da quadra (lotes diferentes), média na faixa, cv contido,
     retalho ≤1,5%, viário ≤~20% — calibrado no São Roque/MUE real."""

@@ -295,7 +295,11 @@ def construir_fidelidade(med: "Medicao", layout: "Layout") -> dict:
     q = med.quadro
     liq = q["area_liquida_m2"] or 1.0
     m = layout.meta or {}
-    lazer_m = (q["sistema_lazer"]["m2"] + q["areas_verdes"]["m2"]) / liq
+    # Fidelidade do lazer usa a RESERVA original (9.4): a sobra de ponta anexada ao verde
+    # entra no quadro/doação, mas NÃO conta como "lazer materializado" do programa.
+    lazer_m = m.get("lazer_reservado_pct")
+    if lazer_m is None:
+        lazer_m = (q["sistema_lazer"]["m2"] + q["areas_verdes"]["m2"]) / liq
     inst_m = q["institucional"]["m2"] / liq
 
     areas: list[dict] = []
