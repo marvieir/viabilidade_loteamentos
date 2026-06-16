@@ -23,7 +23,6 @@ from app.core.extrator_luos import (
     PdfIlegivel,
     _json_tolerante,
     _opcoes_tls,
-    chamar_com_retry,
 )
 from app.models.schemas import FichaJuridica
 
@@ -222,21 +221,19 @@ class ExtratorDocumentoClaude:
             ) from exc
 
         instrucao, ferramenta = _PROMPT[tipo]
-        client = anthropic.Anthropic(api_key=self.api_key, **_opcoes_tls())
+        # max_retries: o PRÓPRIO SDK reTENTA 429/5xx/529 com backoff (sem aninhar wrappers).
+        client = anthropic.Anthropic(api_key=self.api_key, max_retries=4, **_opcoes_tls())
         # Um bloco por arquivo (PDF→document, imagem→image) + a instrução em texto.
         conteudo = [_bloco_conteudo(d, m) for d, m in arquivos]
         conteudo.append({"type": "text", "text": instrucao})
         try:
-            # Retry com backoff em erros transitórios da API (ex.: 529 Overloaded).
-            resp = chamar_com_retry(
-                lambda: client.messages.create(
-                    model=self.modelo,
-                    max_tokens=16000,
-                    system=_INSTRUCAO_ANTIALUCINACAO,
-                    tools=[ferramenta],
-                    tool_choice={"type": "tool", "name": ferramenta["name"]},
-                    messages=[{"role": "user", "content": conteudo}],
-                )
+            resp = client.messages.create(
+                model=self.modelo,
+                max_tokens=16000,
+                system=_INSTRUCAO_ANTIALUCINACAO,
+                tools=[ferramenta],
+                tool_choice={"type": "tool", "name": ferramenta["name"]},
+                messages=[{"role": "user", "content": conteudo}],
             )
         except Exception as exc:  # noqa: BLE001 — falha de leitura/serviço → honesta
             raise PdfIlegivel(

@@ -285,25 +285,23 @@ class GeradorProgramaClaude:
         except ImportError as exc:
             raise GeradorIndisponivel("Pacote 'anthropic' ausente.") from exc
 
-        client = anthropic.Anthropic(api_key=self.api_key, **_opcoes_tls())
+        # Esta chamada TEM fallback (preset) — então poucas retentativas do SDK p/ degradar
+        # RÁPIDO se a API estiver sobrecarregada (evita o request travar e o front cair).
+        # (sem ``timeout=`` aqui: é mutuamente exclusivo com o http_client da TLS corporativa.)
+        client = anthropic.Anthropic(api_key=self.api_key, max_retries=1, **_opcoes_tls())
         prompt = (
             f"Gleba: público-alvo '{publico_alvo}', tipo '{tipo_loteamento}'. "
             f"Contexto medido pelo motor (NÃO recalcule): {contexto}. "
             "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
         )
-        from app.core.extrator_luos import chamar_com_retry
-
         try:
-            # Retry com backoff em erros transitórios (ex.: 529 Overloaded) antes de degradar.
-            resp = chamar_com_retry(
-                lambda: client.messages.create(
-                    model=self.modelo,
-                    max_tokens=4000,
-                    system=_INSTRUCAO,
-                    tools=[_FERRAMENTA],
-                    tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
-                    messages=[{"role": "user", "content": prompt}],
-                )
+            resp = client.messages.create(
+                model=self.modelo,
+                max_tokens=4000,
+                system=_INSTRUCAO,
+                tools=[_FERRAMENTA],
+                tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
+                messages=[{"role": "user", "content": prompt}],
             )
         except Exception:  # noqa: BLE001 — serviço fora → preset (não inventa, degrada)
             prog = programa_do_preset(publico_alvo, overrides)
