@@ -266,17 +266,57 @@ def layout_de_geojson(
     return layout, to_wgs
 
 
-def geojson_do_layout(layout: Layout, to_wgs) -> dict:
-    """Camadas do layout (métrico) → GeoJSON WGS84 para o mapa. Lotes vão como MultiPolygon."""
+def _faixa_de_score(score) -> Optional[str]:
+    """Faixa de score do lote (mesmos limites do heatmap) — p/ colorir o mapa lote a lote."""
+    if score is None:
+        return None
+    anterior = -0.01
+    for rotulo, teto in _FAIXAS:
+        if anterior < score <= teto:
+            return rotulo
+        anterior = teto
+    return _FAIXAS[-1][0]
+
+
+def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
+    """Camadas do layout (métrico) → GeoJSON WGS84 para o mapa.
+
+    Fase 9.5 — PARCELAMENTO LEGÍVEL: ``lotes_features`` é uma FeatureCollection com **uma Feature
+    por lote** (geometria + props que JÁ existem, casadas por índice: ``por_lote[i]``,
+    ``layout.lote_quadra[i]``, ``_lados_mrr``). NENHUM número novo — só deixa de fundir. O
+    ``lotes`` (MultiPolygon unido) permanece por compatibilidade/fallback."""
+    por_lote = por_lote or []
+
     def _gj(geom):
         if geom is None or geom.is_empty:
             return None
         return mapping(transform(to_wgs, geom))
 
-    lotes_wgs = unary_union(layout.lotes) if layout.lotes else None
+    feats = []
+    for i, geom in enumerate(layout.lotes):
+        if geom is None or geom.is_empty:
+            continue
+        t, p = _lados_mrr(geom)  # testada/profundidade — exatamente como já se mede
+        pl = por_lote[i] if i < len(por_lote) else {}
+        score = pl.get("score")
+        feats.append({
+            "type": "Feature",
+            "geometry": mapping(transform(to_wgs, geom)),
+            "properties": {
+                "lote_id": pl.get("lote_id", f"L{i + 1:03d}"),
+                "area_m2": pl.get("area_m2"),
+                "score": score,
+                "testada_m": t,
+                "profundidade_m": p,
+                "quadra_id": layout.lote_quadra[i] if i < len(layout.lote_quadra) else None,
+                "faixa_score": _faixa_de_score(score),
+            },
+        })
+
     return {
         "rotulo": "esquemático",
-        "lotes": _gj(lotes_wgs),
+        "lotes_features": {"type": "FeatureCollection", "features": feats},  # 9.5 — lote a lote
+        "lotes": _gj(unary_union(layout.lotes)) if layout.lotes else None,  # fundido (compat)
         "arruamento": _gj(layout.arruamento),
         "areas_verdes": _gj(layout.areas_verdes),
         "sistema_lazer": _gj(layout.sistema_lazer),

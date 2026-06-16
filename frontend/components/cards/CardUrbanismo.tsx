@@ -110,13 +110,17 @@ export function CardUrbanismo({
 
   // Camadas do layout → overlays do mapa (o front só renderiza o GeoJSON do backend, §2).
   const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {};
+  const lotesFeatures = proposta?.geometria.lotes_features ?? null;
+  const temFeatures = !!lotesFeatures && lotesFeatures.features.length > 0;
   if (proposta) {
     const g = proposta.geometria;
     if (g.arruamento) overlays.urb_arruamento = g.arruamento;
     if (g.areas_verdes) overlays.urb_verde = g.areas_verdes;
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
-    if (g.lotes) overlays.urb_lotes = g.lotes; // por cima
+    // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback
+    // para o polígono fundido (compat com versões antigas do backend).
+    if (!temFeatures && g.lotes) overlays.urb_lotes = g.lotes;
   }
 
   const q = proposta?.quadro_areas;
@@ -223,12 +227,38 @@ export function CardUrbanismo({
               {/* Mapa do layout esquemático */}
               <div className="overflow-hidden rounded-xl border border-slate-200">
                 <div className="h-[300px] w-full">
-                  <MapaLeaflet geojson={glebaGeojson} overlays={overlays} />
+                  <MapaLeaflet
+                    geojson={glebaGeojson}
+                    overlays={overlays}
+                    lotesFeatures={lotesFeatures}
+                  />
                 </div>
-                <p className="bg-slate-50 px-3 py-1.5 text-[11px] text-slate-500">
-                  Traçado ESQUEMÁTICO — eixos de via aproximados; o valor é o quadro de
-                  áreas, não a precisão do desenho.
-                </p>
+                <div className="space-y-1 bg-slate-50 px-3 py-1.5">
+                  {temFeatures && (
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+                      <span>Cor do lote = score:</span>
+                      {[
+                        ["0-3", "#2563eb"],
+                        ["3-5", "#06b6d4"],
+                        ["5-7", "#84cc16"],
+                        ["7-9", "#f59e0b"],
+                        ["9-10", "#ef4444"],
+                      ].map(([faixa, cor]) => (
+                        <span key={faixa} className="inline-flex items-center gap-1">
+                          <span
+                            className="inline-block h-2.5 w-2.5 rounded-sm"
+                            style={{ backgroundColor: cor }}
+                          />
+                          {faixa}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[11px] text-slate-500">
+                    Traçado ESQUEMÁTICO — eixos de via aproximados; o valor é o quadro de
+                    áreas, não a precisão do desenho. Clique num lote para área/score.
+                  </p>
+                </div>
               </div>
 
               {/* Quadro de áreas */}

@@ -38,3 +38,12 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_lazer: "Sistema de lazer",
   urb_institucional: "Institucional",
 };
+
+// Fase 9.5 — cores das faixas de score (frio→quente) p/ colorir cada LOTE no mapa (heatmap real).
+export const CORES_FAIXA: Record<string, string> = {
+  "0-3": "#2563eb", // frio
+  "3-5": "#06b6d4",
+  "5-7": "#84cc16",
+  "7-9": "#f59e0b",
+  "9-10": "#ef4444", // quente
+};

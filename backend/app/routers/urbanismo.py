@@ -84,7 +84,7 @@ def medir_layout(analise_id: str, body: schemas.MedirUrbanismoIn):
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
     return schemas.MedicaoUrbOut(
-        geometria=medida.geojson_do_layout(layout, to_wgs),
+        geometria=medida.geojson_do_layout(layout, to_wgs, med.heatmap.get("por_lote")),
         quadro_areas=quadro,
         indicadores=indicadores,
         heatmap=heatmap,
@@ -215,7 +215,7 @@ def propor(
         versao=versao,
         perfil={"tipo_loteamento": body.tipo_loteamento, "publico_alvo": body.publico_alvo},
         programa=_programa_out(prog),
-        geometria=medida.geojson_do_layout(layout, to_wgs),
+        geometria=medida.geojson_do_layout(layout, to_wgs, med.heatmap.get("por_lote")),
         quadro_areas=quadro,
         indicadores=indicadores,
         heatmap=heatmap,

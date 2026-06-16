@@ -1144,6 +1144,9 @@ export interface HeatmapUrb {
 
 export interface GeometriaUrb {
   rotulo: string;
+  // Fase 9.5 — parcelamento legível: 1 Feature por lote (geometria + props: lote_id, area_m2,
+  // score, testada_m, profundidade_m, quadra_id, faixa_score). ``lotes`` (fundido) é fallback.
+  lotes_features: GeoJSON.FeatureCollection | null;
   lotes: GeoJSON.Geometry | null;
   arruamento: GeoJSON.Geometry | null;
   areas_verdes: GeoJSON.Geometry | null;
