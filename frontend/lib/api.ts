@@ -1088,6 +1088,11 @@ export interface ProgramaUrb {
   testada_m: number;
   profundidade_m: number;
   pct_institucional: number;
+  // Fase 9.3 — calibração do perfil (o tamanho emerge da quadra, mirando estes)
+  publico_alvo: string;
+  testada_alvo_m: number;
+  faixa_lote_m2: number[];
+  lote_alvo_origem: string;
   origem: string;
   justificativa: string;
 }
@@ -1172,26 +1177,34 @@ export interface Fidelidade {
   topografia: { orientacao_por_declividade: boolean; obs: string };
 }
 
-// Fase 9.2 — mix heterogêneo medido (distribuição de tamanhos + correlação tamanho×score).
-export interface FaixaMix {
-  faixa: string;
+// Fase 9.3 — distribuição de tamanhos MEDIDA (o lote emerge da subdivisão da quadra).
+export interface FaixaHistograma {
+  de: number;
+  ate: number;
   n: number;
   pct: number;
-  area_media_m2: number;
 }
 export interface LoteUrb {
   lote_id: string;
   area_m2: number;
-  faixa: string;
+  testada_m: number;
+  profundidade_m: number;
   score: number;
-  zona_motivo: string[];
+  quadra_id: string | null;
 }
-export interface MixMedido {
-  distribuicao: FaixaMix[];
+export interface DistribuicaoTamanhos {
+  media_m2: number;
+  desvio_m2: number;
+  cv: number;
+  min_m2: number;
+  max_m2: number;
+  faixas: FaixaHistograma[];
   correlacao_tamanho_score: number;
-  sobra_retalho_m2: number;
-  sobra_retalho_pct: number;
-  arruamento_pct: number;
+  retalho_perdido_m2: number;
+  retalho_perdido_pct: number;
+  viario_pct: number;
+  lote_alvo_origem: string;
+  faixa_lote_m2: number[];
   lotes: LoteUrb[];
 }
 
@@ -1206,7 +1219,7 @@ export interface PropostaUrbanistica {
   indicadores: IndicadoresUrb;
   heatmap: HeatmapUrb;
   fidelidade: Fidelidade | null;
-  mix_medido: MixMedido | null;
+  distribuicao_tamanhos: DistribuicaoTamanhos | null;
   conformidade_programa: ItemConformidadePrograma[];
   esqueleto_ignorado: string[];
   proveniencia: string;

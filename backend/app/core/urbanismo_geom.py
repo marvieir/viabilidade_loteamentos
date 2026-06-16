@@ -26,7 +26,7 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import nearest_points, unary_union
 
 from app.core.urbanismo_medida import Layout
-from app.core.urbanismo_programa import Programa
+from app.core.urbanismo_programa import PERFIL_LOTE, Programa
 
 # Convergência: |medido − alvo| ≤ tol → "atendido" (spec §4.1).
 TOL_CONVERGENCIA_PP = 0.03
@@ -35,6 +35,12 @@ MIN_LOTES_RESERVA = 8
 # Fração da reserva de lazer destinada ao clube central (resto = áreas verdes ao redor).
 LAZER_CLUBE_FRAC = 0.40
 ARQUETIPO_GRELHA = "grelha_eficiente"
+# Via LOCAL (rua de quadra) — separa as quadras na grelha. A via PRINCIPAL (esqueleto) usa a
+# largura do programa; ruas locais são estreitas (~8 m), o que mantém o viário realista.
+VIA_LOCAL_M = 8.0
+# Fileira parcial na borda só vira lote se couber ≥ esta fração da profundidade (calibrado no
+# São Roque real: aproveita a borda sem criar lote raso demais).
+FRAC_FILEIRA_RASA = 0.8
 
 
 # ============================ componentes / grelha ============================
@@ -49,208 +55,114 @@ def _componentes(geom: BaseGeometry) -> list[Polygon]:
     return []
 
 
-# ---- Fase 9.2: zoneamento por qualidade + dimensionamento por faixa (mix heterogêneo) ----
-def _bandas(estrategia_mix: list[dict], prof: float) -> dict:
-    """Da política de mix (faixas de ÁREA + proporção) → larguras-alvo por faixa (área÷prof).
-    Ordena premium→compacto. ``None`` se sem política (cai p/ lote uniforme no chamador)."""
-    if not estrategia_mix:
-        return {}
-    faixas = {}
-    for b in estrategia_mix:
-        nome = b["faixa"]
-        amid = (float(b["min_m2"]) + float(b["max_m2"])) / 2.0
-        faixas[nome] = {
-            "w": amid / prof,
-            "w_min": float(b["min_m2"]) / prof,
-            "w_max": float(b["max_m2"]) / prof,
-            "area_min": float(b["min_m2"]),
-            "prop": float(b.get("prop_alvo", 0.0)),
-        }
-    return faixas
-
-
-def _quality(pt: Point, verde, lazer, elev_fn, premium_em: list[str]):
-    """Qualidade geométrica de uma POSIÇÃO (cota/verde/lazer) + motivos — base do zoneamento.
-    Só conta os atributos que a heurística da IA pediu E que existem (degrada honesto)."""
-    q, mot = 0.0, []
-    if verde is not None and "fundo_mata" in premium_em:
-        qv = math.exp(-pt.distance(verde) / 40.0)
-        q += qv
-        if qv > 0.4:
-            mot.append("fundo_mata")
-    if lazer is not None and "frente_lazer" in premium_em:
-        ql = math.exp(-pt.distance(lazer) / 40.0)
-        q += ql
-        if ql > 0.4:
-            mot.append("frente_lazer")
-    if elev_fn is not None and "cota_alta" in premium_em:
-        e = max(0.0, min(elev_fn(pt), 1.0))
-        q += e
-        if e > 0.6:
-            mot.append("cota_alta")
-    return q, mot
-
-
-def _quantil(vals: list[float], q: float) -> float:
-    if not vals:
-        return 0.0
-    s = sorted(vals)
-    i = max(0, min(len(s) - 1, int(round(q * (len(s) - 1)))))
-    return s[i]
+# ---- Fase 9.3: SUBDIVISÃO DE QUADRAS (o lote = o que a quadra comporta; §3 da spec) ----
+# Substitui o modelo de "faixas premium/padrão/compacto" da 9.2 (origem do bug do lote uniforme).
+# O viário recorta a gleba em QUADRAS; cada quadra é subdividida inteira por uma testada-alvo
+# do perfil; o tamanho de cada lote EMERGE da interseção com a quadra (varia pela forma, sem
+# impor área). Determinístico.
 
 
 def _linhas_de_quadra(comp: Polygon, via: float, prof: float):
-    """Faixas (strips) horizontais de profundidade ``prof`` que formam as quadras da ilha."""
+    """Faixas (quadras) horizontais que formam o miolo: fileiras de profundidade ``prof``
+    COSTAS-COM-COSTAS (par sem via entre elas) e UMA via local a cada par. A última fileira
+    parcial vira fileira RASA se couber ≥60% da profundidade (aproveita a borda → menos viário
+    perdido, fiel ao real). Profundidade da quadra ≤ ``prof`` perto da borda → lote menor."""
     minx, miny, maxx, maxy = comp.bounds
-    if (maxx - minx) <= 0 or (maxy - miny) < prof:
+    if (maxx - minx) <= 0 or (maxy - miny) < FRAC_FILEIRA_RASA * prof:
         return []
-    passo = 2 * prof + via
     faixas = []
     y = miny
+    par = 0
     guarda = 0
-    while y + prof <= maxy + 1e-6:
-        for desloc in (0.0, prof):
-            yb = y + desloc
-            if yb + prof <= maxy + 1e-6:
-                faixas.append((yb, yb + prof))
-        y += passo
+    while y + FRAC_FILEIRA_RASA * prof <= maxy + 1e-6:
+        topo = min(y + prof, maxy)
+        if topo - y >= FRAC_FILEIRA_RASA * prof:
+            faixas.append((y, topo))
+        y = topo
+        par += 1
+        if par % 2 == 0:  # via local a cada DUAS fileiras (costas-com-costas)
+            y += via
         guarda += 1
         if guarda > 5000:
             break
     return faixas
 
 
-def _tile_faixa(comp, y0, y1, qfn, clf, bandas):
-    """Tila UMA faixa de quadra com lotes de largura POR FAIXA (premium maior), fechando a
-    quadra sem sobra (redistribui o resto). ``clf(q)->faixa`` classifica por RANK relativo (não
-    limiar absoluto) — qualidade quase-constante → padrão, sem explodir em premium. Devolve
-    ``([(geom, faixa, motivos)], retalho_m2)``."""
-    strip = comp.intersection(box(comp.bounds[0], y0, comp.bounds[2], y1))
-    saida = []
+def _maior_parte(geom: BaseGeometry) -> Optional[Polygon]:
+    polis = _componentes(geom)
+    return max(polis, key=lambda g: g.area) if polis else None
+
+
+def _fundir_pontas(cols: list[Polygon], area_min: float) -> tuple[list[Polygon], float]:
+    """Funde colunas pequenas (ponta de quadra / clip de borda) com a vizinha — não viram
+    retalho nem lote minúsculo (§3.3). Sobra só o que não tem vizinho. Devolve (lotes, retalho)."""
+    cols = [c for c in cols if c is not None and not c.is_empty and c.geom_type == "Polygon"]
+    res: list[Polygon] = []
     retalho = 0.0
-    for piece in _componentes(strip):
-        x0, _, x1, _ = piece.bounds
-        ymid = (y0 + y1) / 2.0
-        L = x1 - x0
-
-        def _faixa_em(x):
-            q, mot = qfn(Point(x + 1.0, ymid))
-            return clf(q), mot
-
-        plano = []  # (faixa, w, motivos) — só lotes INTEIROS (sem retalho fino no fim)
-        x = x0
-        guarda = 0
-        while guarda < 5000:
-            guarda += 1
-            faixa, mot = _faixa_em(x)
-            w = bandas[faixa]["w"]
-            if x + w > x1 + 1e-6:
-                break
-            plano.append((faixa, w, mot))
-            x += w
-        if not plano:
-            # Quadra mais curta que um lote: um lote ocupa a faixa toda.
-            faixa, mot = _faixa_em((x0 + x1) / 2.0)
-            plano = [(faixa, L, mot)]
+    for c in cols:
+        if c.area < area_min and res:
+            uni = unary_union([res[-1], c])
+            res[-1] = _maior_parte(uni) or res[-1]
         else:
-            # Fecha a quadra sem retalho: distribui a folga restante entre os lotes inteiros.
-            folga = x1 - x
-            if folga > 1e-6:
-                add = folga / len(plano)
-                plano = [(f, w + add, m) for f, w, m in plano]
-        usado = 0.0
-        xx = x0
-        for faixa, w, mot in plano:
-            cel = box(xx, y0, xx + w, y1).intersection(piece)
-            xx += w
-            if cel.geom_type == "Polygon" and cel.area >= 0.5 * bandas[faixa]["area_min"]:
-                saida.append((cel, faixa, mot))
-                usado += cel.area
-        retalho += max(piece.area - usado, 0.0)
-    return saida, retalho
+            res.append(c)
+    # se a última ainda for pequena, funde para trás
+    while len(res) >= 2 and res[-1].area < area_min:
+        uni = unary_union([res[-2], res[-1]])
+        res[-2] = _maior_parte(uni) or res[-2]
+        res.pop()
+    if res and res[0].area < area_min and len(res) == 1:
+        retalho += res[0].area  # quadra isolada minúscula → vira retalho (não inventa lote)
+        res = []
+    return res, retalho
 
 
-def _lotear_heterogeneo(miolo, via, prof, qfn, clf, bandas, ang_rad):
-    """Loteia o miolo com MIX por qualidade, orientado por ``ang_rad`` (topografia). Gera no
-    frame rotacionado (verde/lazer já rotacionados no ``qfn``) e volta. Acumula o retalho
-    (sobra dentro das quadras) — métrica da Fase 9.2."""
-    if miolo is None or miolo.is_empty or not bandas:
-        return [], [], [], 0.0
+def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float,
+                       area_min: float) -> tuple[list[Polygon], float]:
+    """Subdivide UMA quadra inteira: n = round(largura/testada_alvo); testada_real fecha a
+    quadra (retalho→0); cada lote = INTERSEÇÃO da faixa com a quadra (área emerge da forma)."""
+    x0, _, x1, _ = piece.bounds
+    L = x1 - x0
+    if L <= 0:
+        return [], 0.0
+    n = max(int(round(L / testada_alvo)), 1)
+    tr = L / n  # testada real → fecha a quadra exatamente
+    cols: list[Polygon] = []
+    usado = 0.0
+    for k in range(n):
+        cel = box(x0 + k * tr, y0, x0 + (k + 1) * tr, y1).intersection(piece)
+        parte = _maior_parte(cel)
+        if parte is not None and parte.area > 0:
+            cols.append(parte)
+            usado += parte.area
+    lotes, retalho = _fundir_pontas(cols, area_min)
+    retalho += max(piece.area - usado, 0.0)  # perda por clip de profundidade (borda da gleba)
+    return lotes, retalho
+
+
+def _subdividir(miolo, via, testada_alvo, prof_alvo, area_min, ang_rad):
+    """Desenha as quadras (faixas de profundidade ``prof_alvo`` entre vias) em TODAS as ilhas e
+    subdivide cada uma. Orientado por ``ang_rad`` (topografia da 9.1). Devolve (lotes, retalho,
+    quadra_ids)."""
+    if miolo is None or miolo.is_empty:
+        return [], 0.0, []
     ang_deg = math.degrees(ang_rad)
     cen = miolo.centroid
     reg = rotate(miolo, -ang_deg, origin=cen) if ang_deg else miolo
-    lotes, faixas, motivos, retalho = [], [], [], 0.0
+    lotes: list[Polygon] = []
+    quadras: list[str] = []
+    retalho = 0.0
+    qid = 0
     for comp in _componentes(reg):
-        for (y0, y1) in _linhas_de_quadra(comp, via, prof):
-            saida, ret = _tile_faixa(comp, y0, y1, qfn, clf, bandas)
-            retalho += ret
-            for geom, faixa, mot in saida:
-                lotes.append(rotate(geom, ang_deg, origin=cen) if ang_deg else geom)
-                faixas.append(faixa)
-                motivos.append(mot)
-    return lotes, faixas, motivos, retalho
-
-
-def _classificador(miolo, via, prof, qfn, bandas, ang_rad):
-    """Pré-varre as posições e devolve ``clf(q)->faixa`` por **rank relativo**, AGNÓSTICO AO
-    NOME das faixas (a IA pode chamar de premium/superior/padrão-alto/…): ordena as faixas por
-    TAMANHO (maior→menor) e distribui as posições pela qualidade — melhores posições → faixas
-    maiores. Qualidade quase-CONSTANTE → todos na faixa do MEIO (sem explodir em premium).
-    Largura compensada (faixa maior cabe menos por comprimento → recebe mais posições)."""
-    import bisect
-
-    if not bandas:
-        return lambda q: "padrao"
-    ang_deg = math.degrees(ang_rad)
-    cen = miolo.centroid
-    reg = rotate(miolo, -ang_deg, origin=cen) if ang_deg else miolo
-    w_pad = bandas.get("padrao", next(iter(bandas.values())))["w"]
-    qs = []
-    for comp in _componentes(reg):
-        for (y0, y1) in _linhas_de_quadra(comp, via, prof):
+        for (y0, y1) in _linhas_de_quadra(comp, via, prof_alvo):
             strip = comp.intersection(box(comp.bounds[0], y0, comp.bounds[2], y1))
             for piece in _componentes(strip):
-                x0, _, x1, _ = piece.bounds
-                ymid = (y0 + y1) / 2.0
-                x = x0
-                while x < x1 - 1e-6:
-                    qs.append(qfn(Point(x + 1.0, ymid))[0])
-                    x += w_pad
-    qs_sorted = sorted(qs)
-    n = len(qs_sorted)
-    spread = (qs_sorted[-1] - qs_sorted[0]) if n else 0.0
-
-    # Faixas da MAIOR para a MENOR; fração de POSIÇÕES ∝ proporção-alvo × largura (compensa
-    # que a faixa maior cabe menos por comprimento), normalizada para somar 1.
-    ordem = sorted(bandas.keys(), key=lambda k: bandas[k]["area_min"], reverse=True)
-    w_avg = sum(bandas[k]["w"] for k in ordem) / len(ordem)
-    effs = [max(bandas[k].get("prop", 0.0), 0.0) * bandas[k]["w"] / w_avg for k in ordem]
-    tot = sum(effs) or 1.0
-    effs = [e / tot for e in effs]
-    cum, c = [], 0.0
-    for e in effs:
-        c += e
-        cum.append(c)
-
-    def _faixa_por_pct(p: float) -> str:
-        # p = percentil de qualidade (1 = melhor). Faixa maior fica com o topo do rank.
-        for k, cc in zip(ordem, cum):
-            if p >= 1.0 - cc - 1e-9:
-                return k
-        return ordem[-1]
-
-    meio = _faixa_por_pct(0.5)  # faixa do meio — usada quando não há gradiente de qualidade
-
-    def clf(q: float) -> str:
-        if n == 0 or spread < 1e-9:
-            return meio
-        lo = bisect.bisect_left(qs_sorted, q)
-        hi = bisect.bisect_right(qs_sorted, q)
-        p = (lo + (hi - lo) * 0.5) / n  # meio-rank (empates pelo centro)
-        return _faixa_por_pct(p)
-
-    return clf
-
+                qid += 1
+                sub, ret = _subdividir_quadra(piece, y0, y1, testada_alvo, area_min)
+                retalho += ret
+                for lote in sub:
+                    lotes.append(rotate(lote, ang_deg, origin=cen) if ang_deg else lote)
+                    quadras.append(f"Q{qid}")
+    return lotes, retalho, quadras
 
 # ============================ reserva de áreas (área EXATA) ============================
 def _raio_max(poly: BaseGeometry, seed: Point) -> float:
@@ -364,7 +276,14 @@ def gerar_layout(
     aprov = unary_union(comps)
     aprov_area = aprov.area
 
-    via, testada, prof = _dims(programa)
+    via, _, _ = _dims(programa)
+    # Fase 9.3 — MIRA de subdivisão por perfil (o tamanho do lote emerge da quadra).
+    testada_alvo = max(programa.testada_alvo_m, 5.0)
+    perfil = PERFIL_LOTE.get(programa.publico_alvo, PERFIL_LOTE["media"])
+    prof = max(perfil["prof"], 10.0)
+    faixa_min = programa.faixa_lote_m2[0] if programa.faixa_lote_m2 else perfil["faixa"][0]
+    # lote pequeno demais (ponta) funde com vizinho — piso de "lote de verdade" ~55% da faixa.
+    area_min_lote = 0.55 * faixa_min
     pct_lazer0 = max(0.0, min(programa.pct_lazer, 0.6))
     pct_inst = max(0.0, min(programa.pct_institucional, 0.3))
 
@@ -377,9 +296,9 @@ def gerar_layout(
         if road_skel.is_empty:
             road_skel = None
 
-    # (a) materializar: CAP analítico — reserva lazer só até sobrar área p/ ~MIN_LOTES_RESERVA
-    # lotes (preserva o parcelamento). Acima disso, DEGRADA rotulado (nunca infla nem ignora).
-    lote_area = max(testada * prof, 1.0)
+    # (a) materializar lazer/institucional (9.1): CAP analítico — reserva lazer só até sobrar
+    # área p/ ~MIN_LOTES_RESERVA lotes; acima disso DEGRADA rotulado (nunca infla nem ignora).
+    lote_area = max(testada_alvo * prof, 1.0)
     inst_area = pct_inst * aprov_area
     disp_lazer = max(aprov_area - inst_area - MIN_LOTES_RESERVA * lote_area, 0.0)
     alvo_lazer_area = pct_lazer0 * aprov_area
@@ -392,21 +311,12 @@ def gerar_layout(
     reservas = [g for g in (clube, verde, inst, road_skel) if g is not None and not g.is_empty]
     miolo = aprov.difference(unary_union(reservas)) if reservas else aprov
 
-    # (9.2) MIX heterogêneo: zoneia por qualidade (verde/lazer/cota) e dimensiona por faixa,
-    # fechando a quadra sem sobra. Sem política de mix → uma faixa só (lote uniforme — compat).
-    bandas = _bandas(programa.estrategia_mix, prof)
-    if not bandas:
-        bandas = {"padrao": {"w": testada, "w_min": testada, "w_max": testada,
-                             "area_min": testada * prof, "prop": 1.0}}
-    cen = miolo.centroid if (miolo is not None and not miolo.is_empty) else aprov.centroid
-    ang_deg = math.degrees(orientacao_rad)
-    premium_em = (programa.heuristicas or {}).get("premium_em", [])
-    verde_r = rotate(verde, -ang_deg, origin=cen) if (verde is not None and ang_deg) else verde
-    clube_r = rotate(clube, -ang_deg, origin=cen) if (clube is not None and ang_deg) else clube
-    qfn = lambda pt: _quality(pt, verde_r, clube_r, None, premium_em)  # noqa: E731
-    clf = _classificador(miolo, via, prof, qfn, bandas, orientacao_rad)
-    lotes, lote_faixas, lote_motivos, retalho_m2 = _lotear_heterogeneo(
-        miolo, via, prof, qfn, clf, bandas, orientacao_rad
+    # (9.3) SUBDIVISÃO de quadras: o viário recorta o miolo em quadras; cada uma é subdividida
+    # inteira por testada_alvo (fecha sem retalho); o tamanho de cada lote EMERGE da forma da
+    # quadra (varia naturalmente em torno do alvo do perfil — nada imposto).
+    via_local = min(via, VIA_LOCAL_M)  # rua de quadra estreita (a via principal é o esqueleto)
+    lotes, retalho_m2, lote_quadra = _subdividir(
+        miolo, via_local, testada_alvo, prof, area_min_lote, orientacao_rad
     )
 
     # Arruamento = aproveitável − lotes − reservas (o road_skel cai aqui, como via).
@@ -418,8 +328,8 @@ def gerar_layout(
     avisos: list[str] = []
     if not lotes:
         avisos.append(
-            "A grelha esquemática não acomodou lotes na área aproveitável "
-            "(gleba pequena/irregular para o lote-alvo)."
+            "A subdivisão não acomodou lotes na área aproveitável "
+            "(gleba pequena/irregular para o perfil)."
         )
 
     meta = {
@@ -433,6 +343,11 @@ def gerar_layout(
         "orientacao_rad": round(orientacao_rad, 6),
         "topo_aplicada": abs(orientacao_rad) > 1e-9,
         "sobra_retalho_m2": round(retalho_m2, 2),
+        # Fase 9.3 — calibração do perfil (a mira; o tamanho emerge da quadra).
+        "testada_alvo_m": round(testada_alvo, 2),
+        "prof_alvo_m": round(prof, 2),
+        "faixa_lote_m2": [round(faixa_min, 2), round(programa.faixa_lote_m2[1], 2)],
+        "lote_alvo_origem": programa.lote_alvo_origem,
     }
 
     return Layout(
@@ -446,8 +361,7 @@ def gerar_layout(
         ignorados=descartes,
         avisos=avisos,
         meta=meta,
-        lote_faixas=lote_faixas,
-        lote_motivos=lote_motivos,
+        lote_quadra=lote_quadra,
     )
 
 

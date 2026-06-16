@@ -70,10 +70,8 @@ class Layout:
     avisos: list[str] = field(default_factory=list)
     # Fase 9.1 — flags de fidelidade (alvos/efetivo, arquétipo, esqueleto, topografia).
     meta: dict = field(default_factory=dict)
-    # Fase 9.2 — faixa de mix (premium/padrao/compacto) e motivo de zona POR lote (paralelo a
-    # ``lotes``). Vazio na Fase 9 (lote uniforme); preenchido pelo zoneamento heterogêneo.
-    lote_faixas: list[str] = field(default_factory=list)
-    lote_motivos: list[list[str]] = field(default_factory=list)
+    # Fase 9.3 — id da quadra de cada lote (paralelo a ``lotes``); o tamanho emerge da quadra.
+    lote_quadra: list[str] = field(default_factory=list)
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -178,17 +176,15 @@ def _score_lote(
     centro,
     raio_max: float,
 ) -> float:
-    """Score 0–10 por atributos GEOMÉTRICOS medíveis (sem preço). Determinístico."""
+    """Score 0–10 por POSIÇÃO (cota/verde/lazer/ruído) — DESACOPLADO do tamanho (Fase 9.3 §3:
+    o valor da posição vai para o R$/m², não para a área). Sem preço. Determinístico."""
     s = 5.0
-    # área relativa (lote maior → melhor) — até +2
-    if area_max > 0:
-        s += 2.0 * (lote.area / area_max)
-    # fundo contra verde (privacidade) — +2
+    # fundo contra verde (privacidade/vista) — +3
     if verde is not None and not verde.is_empty and lote.distance(verde) <= _PROX_VERDE_M:
-        s += 2.0
-    # afastamento do centro/entrada (menos ruído na borda) — até +1
+        s += 3.0
+    # afastamento do centro/entrada (sossego, menos ruído da via) — até +2
     if raio_max > 0 and centro is not None:
-        s += 1.0 * min(lote.centroid.distance(centro) / raio_max, 1.0)
+        s += 2.0 * min(lote.centroid.distance(centro) / raio_max, 1.0)
     return round(max(0.0, min(10.0, s)), 2)
 
 
@@ -368,9 +364,10 @@ def construir_fidelidade(med: "Medicao", layout: "Layout") -> dict:
     return {"areas": areas, "viario": viario, "topografia": topo}
 
 
-# ----------------------------- mix medido (Fase 9.2) -----------------------------
+# ----------------------------- distribuição de tamanhos (Fase 9.3) -----------------------------
 def _pearson(xs: list[float], ys: list[float]) -> float:
-    """Correlação de Pearson (0 se variância nula). Determinístico."""
+    """Correlação de Pearson (0 se variância nula). Determinístico — usada só p/ REPORTAR o
+    desacoplamento tamanho×score (não é meta)."""
     n = len(xs)
     if n < 2:
         return 0.0
@@ -383,44 +380,61 @@ def _pearson(xs: list[float], ys: list[float]) -> float:
     return sxy / math.sqrt(sxx * syy)
 
 
-_ORDEM_FAIXA = ("premium", "padrao", "compacto")
-
-
-def mix_medido(med: "Medicao", layout: "Layout") -> dict:
-    """Distribuição de tamanhos por faixa, correlação tamanho×score (consequência da
-    estratégia, NÃO meta), sobra/retalho e % de viário — tudo MEDIDO (§2)."""
+def distribuicao_tamanhos(med: "Medicao", layout: "Layout") -> dict:
+    """Distribuição dos tamanhos de lote (média/desvio/cv + histograma por faixa de área),
+    retalho e % viário. O tamanho EMERGE da subdivisão da quadra (Fase 9.3) — aqui só se MEDE.
+    Reporta a correlação tamanho×score apenas como prova de DESACOPLAMENTO (não é meta)."""
     por_lote = med.heatmap.get("por_lote", [])
-    faixas = layout.lote_faixas or []
-    motivos = layout.lote_motivos or []
+    quadras = layout.lote_quadra or []
+    lados = [_lados_mrr(g) for g in layout.lotes if g is not None and not g.is_empty]
     n = len(por_lote)
-    lotes_out, areas, scores, grupos = [], [], [], {}
+    lotes_out, areas, scores = [], [], []
     for i, p in enumerate(por_lote):
-        fx = faixas[i] if i < len(faixas) else "padrao"
-        mot = motivos[i] if i < len(motivos) else []
+        testada, prof = (lados[i] if i < len(lados) else (0.0, 0.0))
         lotes_out.append({
-            "lote_id": p["lote_id"], "area_m2": p["area_m2"], "faixa": fx,
-            "score": p["score"], "zona_motivo": mot,
+            "lote_id": p["lote_id"], "area_m2": p["area_m2"], "testada_m": testada,
+            "profundidade_m": prof, "score": p["score"],
+            "quadra_id": quadras[i] if i < len(quadras) else None,
         })
         areas.append(p["area_m2"])
         scores.append(p["score"])
-        grupos.setdefault(fx, []).append(p["area_m2"])
 
-    distribuicao = []
-    # Ordena por tamanho médio (maior→menor), AGNÓSTICO ao nome da faixa que a IA propôs.
-    for fx in sorted(grupos, key=lambda k: sum(grupos[k]) / len(grupos[k]), reverse=True):
-        ar = grupos[fx]
-        distribuicao.append({
-            "faixa": fx, "n": len(ar), "pct": round(len(ar) / n, 4) if n else 0.0,
-            "area_media_m2": round(sum(ar) / len(ar), 2),
-        })
+    media = round(sum(areas) / n, 2) if n else 0.0
+    if n >= 2:
+        var = sum((a - media) ** 2 for a in areas) / n
+        desvio = round(math.sqrt(var), 2)
+    else:
+        desvio = 0.0
+    cv = round(desvio / media, 4) if media else 0.0
+
+    # Histograma por faixas de 50 m² do mínimo ao máximo (até ~8 baldes) — vê massa e cauda.
+    faixas = []
+    if areas:
+        lo = int(min(areas) // 50 * 50)
+        hi = int(max(areas) // 50 * 50 + 50)
+        passo = 50 if (hi - lo) <= 400 else int(((hi - lo) / 8) // 50 * 50 or 50)
+        b = lo
+        while b < hi:
+            cont = sum(1 for a in areas if b <= a < b + passo)
+            if cont:
+                faixas.append({"de": b, "ate": b + passo, "n": cont,
+                               "pct": round(cont / n, 4) if n else 0.0})
+            b += passo
 
     liq = med.quadro["area_liquida_m2"] or 1.0
     retalho = float(layout.meta.get("sobra_retalho_m2", 0.0))
     return {
-        "distribuicao": distribuicao,
+        "media_m2": media,
+        "desvio_m2": desvio,
+        "cv": cv,
+        "min_m2": round(min(areas), 2) if areas else 0.0,
+        "max_m2": round(max(areas), 2) if areas else 0.0,
+        "faixas": faixas,
         "correlacao_tamanho_score": round(_pearson(areas, scores), 3),
-        "sobra_retalho_m2": round(retalho, 2),
-        "sobra_retalho_pct": round(retalho / liq, 4),
-        "arruamento_pct": med.quadro["arruamento"]["pct_apo"],
+        "retalho_perdido_m2": round(retalho, 2),
+        "retalho_perdido_pct": round(retalho / liq, 4),
+        "viario_pct": med.quadro["arruamento"]["pct_apo"],
+        "lote_alvo_origem": layout.meta.get("lote_alvo_origem", ""),
+        "faixa_lote_m2": layout.meta.get("faixa_lote_m2", []),
         "lotes": lotes_out,
     }

@@ -1094,34 +1094,46 @@ class ProgramaOut(BaseModel):
     testada_m: float
     profundidade_m: float
     pct_institucional: float = 0.0
-    estrategia_mix: list[dict] = []  # Fase 9.2 — faixas de tamanho + proporção (política)
-    heuristicas: dict = {}  # Fase 9.2 — onde aplicar valorização (política)
+    # Fase 9.3 — calibração do perfil (o tamanho do lote emerge da quadra, mirando estes).
+    publico_alvo: str = "media"
+    testada_alvo_m: float = 12.0
+    faixa_lote_m2: list[float] = []
+    lote_alvo_origem: str = ""
+    heuristicas: dict = {}  # heurísticas de valorização → score/R$/m² (não tamanho)
     origem: str
     justificativa: str
 
 
-# Fase 9.2 — mix heterogêneo MEDIDO (distribuição de tamanhos + correlação tamanho×score).
-class FaixaMixOut(BaseModel):
-    faixa: str
+# Fase 9.3 — distribuição de tamanhos MEDIDA (o lote emerge da subdivisão da quadra).
+class FaixaHistogramaOut(BaseModel):
+    de: float
+    ate: float
     n: int
     pct: float
-    area_media_m2: float
 
 
 class LoteOut(BaseModel):
     lote_id: str
     area_m2: float
-    faixa: str
+    testada_m: float
+    profundidade_m: float
     score: float
-    zona_motivo: list[str] = []
+    quadra_id: Optional[str] = None
 
 
-class MixMedidoOut(BaseModel):
-    distribuicao: list[FaixaMixOut] = []
-    correlacao_tamanho_score: float
-    sobra_retalho_m2: float
-    sobra_retalho_pct: float
-    arruamento_pct: float
+class DistribuicaoTamanhosOut(BaseModel):
+    media_m2: float
+    desvio_m2: float
+    cv: float
+    min_m2: float
+    max_m2: float
+    faixas: list[FaixaHistogramaOut] = []
+    correlacao_tamanho_score: float  # reportada só p/ provar o DESACOPLAMENTO (não é meta)
+    retalho_perdido_m2: float
+    retalho_perdido_pct: float
+    viario_pct: float
+    lote_alvo_origem: str = ""
+    faixa_lote_m2: list[float] = []
     lotes: list[LoteOut] = []
 
 
@@ -1230,7 +1242,7 @@ class PropostaUrbanisticaOut(BaseModel):
     indicadores: IndicadoresUrbOut
     heatmap: HeatmapOut
     fidelidade: Optional[FidelidadeOut] = None  # Fase 9.1
-    mix_medido: Optional[MixMedidoOut] = None  # Fase 9.2
+    distribuicao_tamanhos: Optional[DistribuicaoTamanhosOut] = None  # Fase 9.3
     conformidade_programa: list[ItemConformidadePrograma] = []
     esqueleto_ignorado: list[str] = []
     proveniencia: str

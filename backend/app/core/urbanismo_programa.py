@@ -47,12 +47,46 @@ class Programa:
     pct_institucional: float = 0.0
     # esqueleto grosseiro de vias principais (polilinhas, coords normalizadas 0..1) — SUGESTÃO.
     esqueleto: list[list[list[float]]] = field(default_factory=list)
-    # Fase 9.2 — POLÍTICA de mix (faixas de tamanho + proporção) e heurísticas de valorização.
-    # São intenção/estratégia: o Python zoneia/dimensiona/mede; nenhum tamanho/score vem daqui.
+    # Fase 9.3 — CALIBRAÇÃO por perfil (o lote emerge da subdivisão da quadra, mirando estes).
+    publico_alvo: str = "media"
+    testada_alvo_m: float = 12.0
+    faixa_lote_m2: tuple[float, float] = (300.0, 450.0)
+    lote_alvo_origem: str = ""
+    # Fase 9.2 (HISTÓRICO — não governa mais o tamanho; mantido só p/ proveniência da proposta).
     estrategia_mix: list[dict] = field(default_factory=list)
     heuristicas: dict = field(default_factory=dict)
     origem: str = "preset"
     justificativa: str = ""
+
+
+# ----------------------------- CALIBRAÇÃO de lote por perfil (Fase 9.3, §4) -----------------------------
+# O tamanho NÃO é imposto — emerge da quadra; estes são a MIRA (testada/prof) e a FAIXA do perfil.
+# testada × prof ≈ piso da faixa (lote grande é exceção; massa no piso). Referência de mercado.
+PERFIL_LOTE: dict[str, dict] = {
+    "baixa": {"testada": 9.0, "prof": 20.0, "faixa": (125.0, 250.0)},   # ~180 m²
+    "media": {"testada": 12.0, "prof": 28.0, "faixa": (300.0, 450.0)},  # ~336 m²
+    "alta": {"testada": 15.0, "prof": 31.0, "faixa": (450.0, 640.0)},   # ~465 m²
+}
+
+
+def dims_perfil(publico_alvo: str, lote_alvo_m2: float) -> dict:
+    """Mira de subdivisão (testada/prof) + faixa do perfil. O ``lote_alvo`` da IA é REFERÊNCIA:
+    se cair fora da faixa, registra o rebaixamento — nunca força uma área única (§3)."""
+    p = PERFIL_LOTE.get(publico_alvo, PERFIL_LOTE["media"])
+    lo, hi = p["faixa"]
+    if lote_alvo_m2 > hi:
+        origem = (
+            f"rebaixado para a faixa: IA propôs {lote_alvo_m2:.0f} m²; perfil '{publico_alvo}' "
+            f"= {lo:.0f}–{hi:.0f} m² — o tamanho emerge da quadra, mirando o piso."
+        )
+    elif lote_alvo_m2 < lo:
+        origem = (
+            f"elevado para a faixa: IA propôs {lote_alvo_m2:.0f} m²; perfil '{publico_alvo}' "
+            f"= {lo:.0f}–{hi:.0f} m²."
+        )
+    else:
+        origem = f"referência da IA ({lote_alvo_m2:.0f} m²) dentro da faixa do perfil."
+    return {"testada": p["testada"], "prof": p["prof"], "faixa": (lo, hi), "lote_alvo_origem": origem}
 
 
 # ----------------------------- PRESETS EMBARCADOS (§5) -----------------------------
@@ -138,6 +172,8 @@ def programa_do_preset(publico_alvo: str, overrides: Optional[dict] = None) -> P
     if "testada_m" in ov:
         testada = float(ov["testada_m"])
         profundidade = round(lote_alvo / testada, 2) if testada else profundidade
+    # Fase 9.3 — mira de subdivisão por perfil (o tamanho emerge da quadra, não do lote_alvo).
+    cal = dims_perfil(publico_alvo, lote_alvo)
     return Programa(
         lote_alvo_m2=lote_alvo,
         densidade=base["densidade"],
@@ -149,7 +185,11 @@ def programa_do_preset(publico_alvo: str, overrides: Optional[dict] = None) -> P
         profundidade_m=profundidade,
         pct_institucional=float(ov.get("pct_institucional", 0.0)),
         esqueleto=list(ov.get("esqueleto", [])),
-        estrategia_mix=list(ov.get("estrategia_mix", MIX_PRESETS.get(publico_alvo, MIX_PRESETS["media"]))),
+        publico_alvo=publico_alvo,
+        testada_alvo_m=float(ov.get("testada_alvo_m", cal["testada"])),
+        faixa_lote_m2=cal["faixa"],
+        lote_alvo_origem=cal["lote_alvo_origem"],
+        estrategia_mix=list(ov.get("estrategia_mix", [])),
         heuristicas=dict(ov.get("heuristicas", HEURISTICAS_DEFAULT)),
         origem="preset+override" if ov else "preset",
         justificativa=(

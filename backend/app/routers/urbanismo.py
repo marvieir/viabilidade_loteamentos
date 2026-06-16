@@ -50,7 +50,10 @@ def _programa_out(prog) -> schemas.ProgramaOut:
         testada_m=prog.testada_m,
         profundidade_m=prog.profundidade_m,
         pct_institucional=prog.pct_institucional,
-        estrategia_mix=list(prog.estrategia_mix or []),
+        publico_alvo=prog.publico_alvo,
+        testada_alvo_m=prog.testada_alvo_m,
+        faixa_lote_m2=list(prog.faixa_lote_m2),
+        lote_alvo_origem=prog.lote_alvo_origem,
         heuristicas=dict(prog.heuristicas or {}),
         origem=prog.origem,
         justificativa=prog.justificativa,
@@ -164,7 +167,7 @@ def propor(
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
     fidelidade = schemas.FidelidadeOut(**medida.construir_fidelidade(med, layout))
-    mix = schemas.MixMedidoOut(**medida.mix_medido(med, layout))
+    distribuicao = schemas.DistribuicaoTamanhosOut(**medida.distribuicao_tamanhos(med, layout))
 
     versao = fonte_urb.proxima_versao(analise_id)
     proposta_id = f"u_{analise_id[:8]}_{versao:03d}"
@@ -174,9 +177,9 @@ def propor(
         *layout.avisos,
         "Fidelidade: o quadro de áreas converge para o programa quando a gleba comporta; "
         "divergências são rotuladas, nunca forçadas.",
-        "Mix e posicionamento são ESTRATÉGIA aplicada, NÃO otimização: a distribuição é a "
-        "consequência medida; o urbanista extrai mais valor com recursos de projeto (lago, "
-        "traçado, remembramento) — fora desta triagem.",
+        "Tamanho do lote = o que a quadra comporta (subdivisão), mirando a faixa do perfil; "
+        "lote grande é exceção geométrica. Quem quer maior junta dois lotes.",
+        "Valor da posição vai para o R$/m² (seu input por faixa de score), não para o tamanho.",
     ]
 
     out = schemas.PropostaUrbanisticaOut(
@@ -189,7 +192,7 @@ def propor(
         indicadores=indicadores,
         heatmap=heatmap,
         fidelidade=fidelidade,
-        mix_medido=mix,
+        distribuicao_tamanhos=distribuicao,
         conformidade_programa=conformidade,
         esqueleto_ignorado=layout.ignorados,
         proveniencia=(

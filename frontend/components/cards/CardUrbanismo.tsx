@@ -281,53 +281,77 @@ export function CardUrbanismo({
               </div>
             )}
 
-            {/* Mix de lotes (Fase 9.2) — distribuição de tamanhos, não um número só */}
-            {proposta.mix_medido && proposta.mix_medido.distribuicao.length > 0 && (
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Mix de lotes — tamanhos heterogêneos por valorização
-                </p>
-                <div className="space-y-1.5">
-                  {proposta.mix_medido.distribuicao.map((d) => (
-                    <div key={d.faixa} className="flex items-center gap-2 text-sm">
-                      <span className="w-20 capitalize text-slate-600">{d.faixa}</span>
-                      <div className="h-3 flex-1 overflow-hidden rounded bg-slate-100">
+            {/* Distribuição de tamanhos (Fase 9.3) — o lote emerge da subdivisão da quadra */}
+            {proposta.distribuicao_tamanhos &&
+              proposta.distribuicao_tamanhos.faixas.length > 0 && (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Distribuição de tamanhos — o lote é o que a quadra comporta
+                  </p>
+                  <p className="mb-2 text-sm text-slate-700">
+                    Média{" "}
+                    <strong>
+                      {proposta.distribuicao_tamanhos.media_m2.toLocaleString("pt-BR", {
+                        maximumFractionDigits: 0,
+                      })}{" "}
+                      m²
+                    </strong>{" "}
+                    · variação{" "}
+                    {(proposta.distribuicao_tamanhos.cv * 100).toLocaleString("pt-BR", {
+                      maximumFractionDigits: 0,
+                    })}
+                    % · de{" "}
+                    {proposta.distribuicao_tamanhos.min_m2.toLocaleString("pt-BR", {
+                      maximumFractionDigits: 0,
+                    })}{" "}
+                    a{" "}
+                    {proposta.distribuicao_tamanhos.max_m2.toLocaleString("pt-BR", {
+                      maximumFractionDigits: 0,
+                    })}{" "}
+                    m²
+                  </p>
+                  <div className="flex items-end gap-1" style={{ height: 80 }}>
+                    {(() => {
+                      const fx = proposta.distribuicao_tamanhos!.faixas;
+                      const max = Math.max(...fx.map((f) => f.n), 1);
+                      return fx.map((f) => (
                         <div
-                          className={`h-full ${
-                            d.faixa === "premium"
-                              ? "bg-emerald-500"
-                              : d.faixa === "compacto"
-                              ? "bg-slate-400"
-                              : "bg-indigo-500"
-                          }`}
-                          style={{ width: `${Math.round(d.pct * 100)}%` }}
-                        />
-                      </div>
-                      <span className="w-40 text-right tabular-nums text-slate-500">
-                        {d.n} lotes ·{" "}
-                        {d.area_media_m2.toLocaleString("pt-BR", {
-                          maximumFractionDigits: 0,
-                        })}{" "}
-                        m² méd.
-                      </span>
-                    </div>
-                  ))}
+                          key={f.de}
+                          className="flex flex-1 flex-col items-center justify-end"
+                          title={`${f.de}–${f.ate} m²: ${f.n} lotes`}
+                        >
+                          <span className="text-[10px] tabular-nums text-slate-400">
+                            {f.n}
+                          </span>
+                          <div
+                            className="w-full rounded-t bg-emerald-500"
+                            style={{ height: `${Math.round((f.n / max) * 60)}px` }}
+                          />
+                          <span className="mt-1 text-[9px] tabular-nums text-slate-400">
+                            {f.de}
+                          </span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Retalho perdido{" "}
+                    {(
+                      proposta.distribuicao_tamanhos.retalho_perdido_pct * 100
+                    ).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                    % · viário{" "}
+                    {(proposta.distribuicao_tamanhos.viario_pct * 100).toLocaleString("pt-BR", {
+                      maximumFractionDigits: 1,
+                    })}
+                    % · tamanho e valor desacoplados (posição → R$/m², não tamanho)
+                  </p>
+                  {proposta.distribuicao_tamanhos.lote_alvo_origem && (
+                    <p className="mt-1 text-xs text-slate-400">
+                      {proposta.distribuicao_tamanhos.lote_alvo_origem}
+                    </p>
+                  )}
                 </div>
-                <p className="mt-2 text-xs text-slate-500">
-                  Correlação tamanho × score:{" "}
-                  <strong>{proposta.mix_medido.correlacao_tamanho_score}</strong> (lotes maiores
-                  nas posições melhores — consequência da estratégia, não otimização) · retalho
-                  perdido {(proposta.mix_medido.sobra_retalho_pct * 100).toLocaleString("pt-BR", {
-                    maximumFractionDigits: 1,
-                  })}
-                  % · viário{" "}
-                  {(proposta.mix_medido.arruamento_pct * 100).toLocaleString("pt-BR", {
-                    maximumFractionDigits: 1,
-                  })}
-                  %
-                </p>
-              </div>
-            )}
+              )}
 
             {/* Heatmap de valorização (qualidade relativa, sem preço) */}
             {proposta.heatmap.score_medio != null && (

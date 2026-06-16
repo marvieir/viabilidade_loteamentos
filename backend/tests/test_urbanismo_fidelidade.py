@@ -65,7 +65,7 @@ def test_reserva_antes_de_lotear():
 def test_degradacao_honesta():
     """Critério 3: numa gleba pequena para o lote-alvo, o lazer 25% é REDUZIDO (preservando
     lotes), rotulado 'degradado', medido < alvo — nunca inflado nem zerado."""
-    aprov = box(0.0, 0.0, 200.0, 40.0)  # 8.000 m² — não comporta 25% + lotes
+    aprov = box(0.0, 0.0, 150.0, 33.0)  # ~4.950 m² — não comporta 25% + lotes (calibração 9.3)
     prog = programa_do_preset("alta", {"pct_lazer": 0.25, "pct_institucional": 0.05})
     layout = geom.gerar_layout(aprov, prog)
     med = medida.medir(layout)
