@@ -427,7 +427,7 @@ def gerar_layout(
     # do lazer; o residual entra só no quadro/doação. Operação geométrica determinística (§2).
     verde_reservado = verde
     if residual_geom is not None and not residual_geom.is_empty:
-        verde = _uniao_segura([verde, residual_geom])
+        verde = _uniao_segura([verde, residual_geom])  # TOTAL (reservado ∪ sobra) p/ o quadro
     lazer_reservado_m2 = sum(
         g.area for g in (clube, verde_reservado) if g is not None and not g.is_empty
     )
@@ -470,7 +470,9 @@ def gerar_layout(
     return Layout(
         lotes=lotes,
         arruamento=arruamento,
-        areas_verdes=verde,
+        areas_verdes=verde,  # TOTAL (reservado ∪ sobra) — quadro/conformidade usam este
+        areas_verdes_reservada=verde_reservado,  # 9.6 — bloco limpo (só p/ o mapa)
+        sobra_ponta=(residual_geom if residual_geom is not None and not residual_geom.is_empty else None),
         sistema_lazer=clube,
         institucional=inst,
         centerlines=centerlines if usar_esqueleto else [],

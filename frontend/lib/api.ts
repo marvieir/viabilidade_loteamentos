@@ -369,6 +369,8 @@ export type ChaveOverlay =
   | "urb_lotes"
   | "urb_arruamento"
   | "urb_verde"
+  | "urb_verde_reservada"
+  | "urb_verde_sobra"
   | "urb_lazer"
   | "urb_institucional";
 
@@ -1150,6 +1152,9 @@ export interface GeometriaUrb {
   lotes: GeoJSON.Geometry | null;
   arruamento: GeoJSON.Geometry | null;
   areas_verdes: GeoJSON.Geometry | null;
+  // Fase 9.6 — verde separado p/ o mapa: bloco reservado (destaque) × sobra de ponta (discreto).
+  areas_verdes_reservada: GeoJSON.Geometry | null;
+  areas_verdes_sobra: GeoJSON.Geometry | null;
   sistema_lazer: GeoJSON.Geometry | null;
   institucional: GeoJSON.Geometry | null;
 }

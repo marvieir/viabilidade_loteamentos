@@ -64,6 +64,10 @@ class Layout:
     areas_verdes: Optional[BaseGeometry] = None
     sistema_lazer: Optional[BaseGeometry] = None
     institucional: Optional[BaseGeometry] = None
+    # Fase 9.6 — verde SEPARADO para o mapa: bloco reservado (limpo) × sobra de ponta (9.4).
+    # ``areas_verdes`` (acima) continua sendo o TOTAL (reservada ∪ sobra) p/ o quadro/conformidade.
+    areas_verdes_reservada: Optional[BaseGeometry] = None
+    sobra_ponta: Optional[BaseGeometry] = None
     centerlines: list[BaseGeometry] = field(default_factory=list)
     via_largura_m: float = 12.0
     ignorados: list[str] = field(default_factory=list)
@@ -337,7 +341,11 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
         "lotes_features": {"type": "FeatureCollection", "features": feats},  # 9.5 — lote a lote
         "lotes": _gj(_uniao(layout.lotes)) if layout.lotes else None,  # fundido (compat)
         "arruamento": _gj(layout.arruamento),
+        # Fase 9.6 — verde separado p/ o mapa: bloco reservado (destaque) × sobra de ponta
+        # (discreto); ``areas_verdes`` (total) é o que o quadro/conformidade usam (idêntico).
         "areas_verdes": _gj(layout.areas_verdes),
+        "areas_verdes_reservada": _gj(layout.areas_verdes_reservada),
+        "areas_verdes_sobra": _gj(layout.sobra_ponta),
         "sistema_lazer": _gj(layout.sistema_lazer),
         "institucional": _gj(layout.institucional),
     }
@@ -547,13 +555,19 @@ def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> li
     })
 
     split = diretrizes.get("doacao_split") or {}
+    # Quando a LUOS confirma a DOAÇÃO TOTAL mas não detalha o split → texto explica (não "vago").
+    _sem_split = (
+        f" — a LUOS confirma a doação total ({_fmt((doa_exig or 0) * 100, 1)}%), mas não "
+        "detalha o split verde/institucional; verificar na prefeitura."
+        if doa_exig is not None else " — mínimo do município não confirmado na LUOS."
+    )
     verde_med = round((q["areas_verdes"]["m2"] + q["sistema_lazer"]["m2"]) / liq, 4)
     itens.append({
         "item": "area_verde", "exigido": split.get("verde"), "medido": verde_med,
         "unidade": "pct", "status": _status(verde_med, split.get("verde")),
         "leitura": f"verde/lazer medido {_fmt(verde_med * 100, 1)}%"
                    + (f" — mínimo {_fmt((split.get('verde') or 0) * 100, 1)}%."
-                      if split.get("verde") is not None else " — mínimo não confirmado."),
+                      if split.get("verde") is not None else _sem_split),
     })
     inst_med = round(q["institucional"]["m2"] / liq, 4)
     itens.append({
@@ -561,6 +575,6 @@ def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> li
         "unidade": "pct", "status": _status(inst_med, split.get("institucional")),
         "leitura": f"institucional medido {_fmt(inst_med * 100, 1)}%"
                    + (f" — mínimo {_fmt((split.get('institucional') or 0) * 100, 1)}%."
-                      if split.get("institucional") is not None else " — mínimo não confirmado."),
+                      if split.get("institucional") is not None else _sem_split),
     })
     return itens

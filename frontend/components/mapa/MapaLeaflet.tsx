@@ -7,7 +7,7 @@ import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import type { Feature, GeoJsonObject } from "geojson";
 import L from "leaflet";
 import type { ChaveOverlay } from "@/lib/api";
-import { CORES_FAIXA, CORES_OVERLAY } from "@/components/mapa/overlays";
+import { CORES_FAIXA, CORES_OVERLAY, ESTILO_OVERLAY } from "@/components/mapa/overlays";
 
 // O front apenas RENDERIZA o GeoJSON que veio do backend. Nenhuma geo-matemática
 // aqui — fitBounds é só enquadramento de tela, não cálculo de viabilidade.
@@ -45,18 +45,19 @@ export default function MapaLeaflet({
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       />
 
-      {/* Camadas de área (via/verde/lazer/institucional) — cada uma com estilo próprio */}
+      {/* Camadas de área (via/verde reservado/remanescente/lazer/institucional) — estilo próprio
+          com contraste sobre satélite (Fase 9.6) */}
       {overlays &&
         (Object.keys(overlays) as ChaveOverlay[]).map((chave) => {
           const g = overlays[chave];
           if (!g) return null;
           const cor = CORES_OVERLAY[chave];
+          const e = ESTILO_OVERLAY[chave];
+          const estilo = e
+            ? { color: e.color, weight: e.weight, fillColor: e.fillColor, fillOpacity: e.fillOpacity, dashArray: e.dashArray }
+            : { color: cor, weight: 1, fillColor: cor, fillOpacity: 0.3 };
           return (
-            <GeoJSON
-              key={`${chave}-${JSON.stringify(g)}`}
-              data={g as GeoJsonObject}
-              style={{ color: cor, weight: 1, fillColor: cor, fillOpacity: 0.3 }}
-            />
+            <GeoJSON key={`${chave}-${JSON.stringify(g)}`} data={g as GeoJsonObject} style={estilo} />
           );
         })}
 

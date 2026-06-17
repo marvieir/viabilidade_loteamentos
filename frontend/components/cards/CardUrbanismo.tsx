@@ -20,6 +20,11 @@ import {
   type PublicoAlvo,
   type TipoLoteamento,
 } from "@/lib/api";
+import {
+  CORES_OVERLAY,
+  ESTILO_OVERLAY,
+  ROTULO_OVERLAY,
+} from "@/components/mapa/overlays";
 
 const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
   ssr: false,
@@ -88,6 +93,7 @@ export function CardUrbanismo({
   const [proposta, setProposta] = useState<PropostaUrbanistica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
+  const [mapaExpandido, setMapaExpandido] = useState(false); // Fase 9.6 — mapa maior
 
   useEffect(() => {
     if (!zona && zonas.length > 0) setZona(zonas[0]);
@@ -115,13 +121,19 @@ export function CardUrbanismo({
   if (proposta) {
     const g = proposta.geometria;
     if (g.arruamento) overlays.urb_arruamento = g.arruamento;
-    if (g.areas_verdes) overlays.urb_verde = g.areas_verdes;
+    // Fase 9.6 — verde SEPARADO: bloco reservado (destaque) × sobra de ponta (discreto).
+    if (g.areas_verdes_reservada) overlays.urb_verde_reservada = g.areas_verdes_reservada;
+    if (g.areas_verdes_sobra) overlays.urb_verde_sobra = g.areas_verdes_sobra;
+    if (!g.areas_verdes_reservada && !g.areas_verdes_sobra && g.areas_verdes)
+      overlays.urb_verde = g.areas_verdes; // fallback (backend antigo)
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
     // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback
     // para o polígono fundido (compat com versões antigas do backend).
     if (!temFeatures && g.lotes) overlays.urb_lotes = g.lotes;
   }
+  // Camadas presentes (para a legenda do mapa).
+  const camadasMapa = Object.keys(overlays) as ChaveOverlay[];
 
   const q = proposta?.quadro_areas;
   const ind = proposta?.indicadores;
@@ -223,44 +235,73 @@ export function CardUrbanismo({
 
         {proposta && (
           <>
-            <div className="grid gap-4 lg:grid-cols-2">
-              {/* Mapa do layout esquemático */}
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="h-[300px] w-full">
-                  <MapaLeaflet
-                    geojson={glebaGeojson}
-                    overlays={overlays}
-                    lotesFeatures={lotesFeatures}
-                  />
-                </div>
-                <div className="space-y-1 bg-slate-50 px-3 py-1.5">
-                  {temFeatures && (
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-                      <span>Cor do lote = score:</span>
-                      {[
-                        ["0-3", "#2563eb"],
-                        ["3-5", "#06b6d4"],
-                        ["5-7", "#84cc16"],
-                        ["7-9", "#f59e0b"],
-                        ["9-10", "#ef4444"],
-                      ].map(([faixa, cor]) => (
-                        <span key={faixa} className="inline-flex items-center gap-1">
-                          <span
-                            className="inline-block h-2.5 w-2.5 rounded-sm"
-                            style={{ backgroundColor: cor }}
-                          />
-                          {faixa}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <p className="text-[11px] text-slate-500">
-                    Traçado ESQUEMÁTICO — eixos de via aproximados; o valor é o quadro de
-                    áreas, não a precisão do desenho. Clique num lote para área/score.
-                  </p>
-                </div>
+            {/* Mapa do layout esquemático — full width e maior (Fase 9.6) */}
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="flex items-center justify-between bg-slate-50 px-3 py-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                  Parcelamento esquemático
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMapaExpandido((v) => !v)}
+                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+                >
+                  {mapaExpandido ? "Recolher mapa" : "Expandir mapa"}
+                </button>
               </div>
+              <div className={`w-full ${mapaExpandido ? "h-[680px]" : "h-[440px]"}`}>
+                <MapaLeaflet
+                  geojson={glebaGeojson}
+                  overlays={overlays}
+                  lotesFeatures={lotesFeatures}
+                />
+              </div>
+              <div className="space-y-1.5 bg-slate-50 px-3 py-2">
+                {/* Legenda das camadas de área */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-600">
+                  {camadasMapa
+                    .filter((c) => c !== "urb_lotes")
+                    .map((c) => (
+                      <span key={c} className="inline-flex items-center gap-1">
+                        <span
+                          className="inline-block h-2.5 w-3 rounded-sm border"
+                          style={{
+                            backgroundColor: (ESTILO_OVERLAY[c]?.fillColor ?? CORES_OVERLAY[c]) + "cc",
+                            borderColor: ESTILO_OVERLAY[c]?.color ?? CORES_OVERLAY[c],
+                          }}
+                        />
+                        {ROTULO_OVERLAY[c]}
+                      </span>
+                    ))}
+                </div>
+                {temFeatures && (
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+                    <span>Cor do lote = score:</span>
+                    {[
+                      ["0-3", "#2563eb"],
+                      ["3-5", "#06b6d4"],
+                      ["5-7", "#84cc16"],
+                      ["7-9", "#f59e0b"],
+                      ["9-10", "#ef4444"],
+                    ].map(([faixa, cor]) => (
+                      <span key={faixa} className="inline-flex items-center gap-1">
+                        <span
+                          className="inline-block h-2.5 w-2.5 rounded-sm"
+                          style={{ backgroundColor: cor }}
+                        />
+                        {faixa}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-500">
+                  Traçado ESQUEMÁTICO — eixos de via aproximados; o valor é o quadro de áreas,
+                  não a precisão do desenho. Clique num lote para área/score.
+                </p>
+              </div>
+            </div>
 
+            <div>
               {/* Quadro de áreas */}
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
