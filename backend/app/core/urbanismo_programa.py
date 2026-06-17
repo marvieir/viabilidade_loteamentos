@@ -16,12 +16,15 @@ com ``ANTHROPIC_API_KEY`` (reusa TLS/erros da 1.8; sem credencial nova).
 
 from __future__ import annotations
 
+import logging
 import math
 import os
 from dataclasses import dataclass, field
 from typing import Optional, Protocol, runtime_checkable
 
 from app.core.extrator_luos import MODELO_PADRAO, _opcoes_tls
+
+_log = logging.getLogger(__name__)
 
 TIPOS = ("aberto", "fechado", "condominio_lotes", "desmembramento", "loteamento_rural")
 PUBLICOS = ("baixa", "media", "alta")
@@ -303,9 +306,17 @@ class GeradorProgramaClaude:
                 tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
                 messages=[{"role": "user", "content": prompt}],
             )
-        except Exception:  # noqa: BLE001 — serviço fora → preset (não inventa, degrada)
+        except Exception as exc:  # noqa: BLE001 — serviço fora → preset (não inventa, degrada)
+            # NÃO engolir o motivo: loga o erro real (traceback no log do container) e expõe o
+            # TIPO + mensagem curta na justificativa, p/ o operador diagnosticar SEM adivinhar
+            # (key inválida? rede/TLS bloqueada p/ api.anthropic.com? sobrecarga?). O tipo/str da
+            # exceção da SDK não vaza a chave (ex.: "AuthenticationError: invalid x-api-key").
+            _log.warning("Programa via IA falhou no /propor — caindo no preset: %r", exc, exc_info=True)
+            detalhe = f"{type(exc).__name__}: {exc}"[:160]
             prog = programa_do_preset(publico_alvo, overrides)
-            prog.justificativa = "Serviço de IA indisponível — programa do preset. " + prog.justificativa
+            prog.justificativa = (
+                f"Serviço de IA indisponível ({detalhe}) — programa do preset. " + prog.justificativa
+            )
             return prog
 
         bruto = next(
