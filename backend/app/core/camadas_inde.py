@@ -30,6 +30,7 @@ PROVENIÊNCIA DOS ENDPOINTS (estado em 2026-06-01):
 
 from __future__ import annotations
 
+import concurrent.futures
 import gzip
 import json
 import os
@@ -87,7 +88,12 @@ URL_MASSA_DAGUA_GRANDE = os.getenv(
 COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
 COD_MASSA = "Massa d'água"
 
-_TIMEOUT = 30
+# Timeout de leitura por camada (s) — CONFIGURÁVEL por ambiente. Antes 30 fixo: como as 6
+# camadas eram consultadas EM SÉRIE, uma rede ruim somava 6×30 = 180 s (3 min) só de espera.
+# Agora as consultas rodam EM PARALELO (ver ``_prefetch_paralelo``) → a espera total ≈ UM
+# timeout, não a soma. 15 s é folgado p/ um ArcGIS responsivo e degrada rápido quando cai.
+_TIMEOUT = max(int(os.getenv("AMB_HTTP_TIMEOUT", "15")), 1)
+_MAX_WORKERS = 6
 
 
 def _get_json(url: str, params: dict) -> dict:
@@ -118,6 +124,24 @@ def _get_json(url: str, params: dict) -> dict:
 def _detalhe_erro(exc: Exception) -> str:
     """Mensagem curta e auditável do porquê a camada falhou (HTTP, parse, timeout…)."""
     return f"{type(exc).__name__}: {exc}"[:180]
+
+
+def _prefetch_paralelo(urls: list[str], params: dict) -> dict:
+    """Busca todas as camadas EM PARALELO (rede é I/O-bound). Devolve ``{url: dict | Exception}``
+    — a exceção é GUARDADA (não levantada) para a camada degradar exatamente como antes, com seu
+    próprio aviso/`indisponiveis`. A montagem em ``coletar`` segue em ordem FIXA → determinismo
+    preservado (§4): o paralelismo afeta só QUANDO a rede responde, nunca a ordem do resultado."""
+    uniq = list(dict.fromkeys(urls))
+    out: dict = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(uniq), _MAX_WORKERS)) as ex:
+        futuros = {ex.submit(_get_json, u, params): u for u in uniq}
+        for fut in concurrent.futures.as_completed(futuros):
+            u = futuros[fut]
+            try:
+                out[u] = fut.result()
+            except Exception as exc:  # noqa: BLE001 — guardado p/ a camada cair honesta
+                out[u] = exc
+    return out
 
 
 def _features(fc: dict) -> list[dict]:
@@ -153,9 +177,24 @@ class FonteCamadasINDE:
         hoje = date.today().isoformat()
         c = Camadas()
 
+        # Todas as 6 consultas EM PARALELO (mesmo envelope) — corta a espera de 6×timeout em
+        # série (3 min numa rede ruim) para ≈ 1×timeout. A leitura abaixo segue em ordem fixa.
+        env = _arcgis_envelope(bbox)
+        cache = _prefetch_paralelo(
+            [URL_MINERACAO, URL_HIDROGRAFIA, URL_UC, URL_LT, URL_MASSA_DAGUA, URL_MASSA_DAGUA_GRANDE],
+            env,
+        )
+
+        def _get(url: str) -> dict:
+            """Resultado pré-buscado da camada (re-levanta a exceção guardada → degrada igual)."""
+            r = cache.get(url)
+            if isinstance(r, BaseException):
+                raise r
+            return r if r is not None else _get_json(url, env)
+
         # Mineração (ANM/SIGMINE)
         try:
-            fc = _get_json(URL_MINERACAO, _arcgis_envelope(bbox))
+            fc = _get(URL_MINERACAO)
             for ft in _features(fc):
                 geom = shape(ft["geometry"])
                 props = ft.get("properties", {}) or {}
@@ -175,7 +214,7 @@ class FonteCamadasINDE:
 
         # Hidrografia (ANA)
         try:
-            fc = _get_json(URL_HIDROGRAFIA, _arcgis_envelope(bbox))
+            fc = _get(URL_HIDROGRAFIA)
             for ft in _features(fc):
                 geom = shape(ft["geometry"])
                 props = ft.get("properties", {}) or {}
@@ -195,7 +234,7 @@ class FonteCamadasINDE:
 
         # Unidades de conservação (ArcGIS — servido pela ANA; dispensa o ICMBio WFS)
         try:
-            fc = _get_json(URL_UC, _arcgis_envelope(bbox))
+            fc = _get(URL_UC)
             for ft in _features(fc):
                 geom = shape(ft["geometry"])
                 props = ft.get("properties", {}) or {}
@@ -215,7 +254,7 @@ class FonteCamadasINDE:
 
         # Linhas de transmissão (ANEEL/SIGEL) → faixa de servidão
         try:
-            fc = _get_json(URL_LT, _arcgis_envelope(bbox))
+            fc = _get(URL_LT)
             for ft in _features(fc):
                 geom = shape(ft["geometry"])
                 props = ft.get("properties", {}) or {}
@@ -237,7 +276,7 @@ class FonteCamadasINDE:
         md_ok, md_err = False, []
         for url in (URL_MASSA_DAGUA, URL_MASSA_DAGUA_GRANDE):
             try:
-                fc = _get_json(url, _arcgis_envelope(bbox))
+                fc = _get(url)
                 for ft in _features(fc):
                     geom = shape(ft["geometry"])
                     props = ft.get("properties", {}) or {}
