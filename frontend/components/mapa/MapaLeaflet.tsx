@@ -27,11 +27,14 @@ export default function MapaLeaflet({
   geojson,
   overlays,
   lotesFeatures,
+  quadras,
 }: {
   geojson: GeoJSON.Polygon;
   overlays?: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
   // Fase 9.5 — parcelamento legível: cada lote como Feature (borda própria, cor por score).
   lotesFeatures?: GeoJSON.FeatureCollection | null;
+  // Fase 9.7 — quadras como FACES da malha: contorno tracejado por baixo dos lotes.
+  quadras?: GeoJSON.FeatureCollection | null;
 }) {
   return (
     <MapContainer
@@ -60,6 +63,21 @@ export default function MapaLeaflet({
             <GeoJSON key={`${chave}-${JSON.stringify(g)}`} data={g as GeoJsonObject} style={estilo} />
           );
         })}
+
+      {/* Fase 9.7 — QUADRAS (faces da malha): contorno por baixo dos lotes, p/ ver os miolos
+          que as ruas cercam. Sem preenchimento (os lotes coloridos vêm por cima). */}
+      {quadras && quadras.features.length > 0 && (
+        <GeoJSON
+          key={`quadras-${quadras.features.length}`}
+          data={quadras as GeoJsonObject}
+          style={{ color: "#334155", weight: 1.5, fill: false, dashArray: "5 4" }}
+          onEachFeature={(f, layer) => {
+            const p = (f.properties ?? {}) as Record<string, unknown>;
+            const area = typeof p.area_m2 === "number" ? Math.round(p.area_m2) : "—";
+            layer.bindPopup(`Quadra ${p.quadra_id ?? "—"} · ${area} m²`);
+          }}
+        />
+      )}
 
       {/* Fase 9.5 — LOTE A LOTE: cada lote com sua borda, cor pela faixa de score (heatmap) */}
       {lotesFeatures && lotesFeatures.features.length > 0 && (

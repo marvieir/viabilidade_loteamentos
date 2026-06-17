@@ -254,6 +254,7 @@ export function CardUrbanismo({
                   geojson={glebaGeojson}
                   overlays={overlays}
                   lotesFeatures={lotesFeatures}
+                  quadras={proposta?.geometria.quadras ?? null}
                 />
               </div>
               <div className="space-y-1.5 bg-slate-50 px-3 py-2">
@@ -294,9 +295,47 @@ export function CardUrbanismo({
                     ))}
                   </div>
                 )}
+                {/* Fase 9.7 — diagnóstico da MALHA: viário conexo + institucional qualifica_legal. */}
+                {proposta?.geometria.viario_diagnostico && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-600">
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className={`inline-block h-2 w-2 rounded-full ${
+                          proposta.geometria.viario_diagnostico.conexo ? "bg-emerald-500" : "bg-amber-500"
+                        }`}
+                      />
+                      Viário{" "}
+                      {proposta.geometria.viario_diagnostico.conexo
+                        ? "conexo (malha única)"
+                        : `em ${proposta.geometria.viario_diagnostico.trechos} trechos`}
+                    </span>
+                    {proposta.geometria.institucional_diagnostico && (
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className={`inline-block h-2 w-2 rounded-full ${
+                            proposta.geometria.institucional_diagnostico.qualifica_legal
+                              ? "bg-emerald-500"
+                              : "bg-slate-400"
+                          }`}
+                        />
+                        Institucional{" "}
+                        {proposta.geometria.institucional_diagnostico.qualifica_legal
+                          ? "qualifica (frente/via, ⌀≥10 m)"
+                          : "a definir com a Prefeitura"}
+                      </span>
+                    )}
+                    {proposta.geometria.sistema_lazer?.forma === "quadra" && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-cyan-500" />
+                        Lazer formado (frente p/ via)
+                      </span>
+                    )}
+                  </div>
+                )}
                 <p className="text-[11px] text-slate-500">
-                  Traçado ESQUEMÁTICO — eixos de via aproximados; o valor é o quadro de áreas,
-                  não a precisão do desenho. Clique num lote para área/score.
+                  Traçado ESQUEMÁTICO — malha viária conexa a partir dos eixos da IA; quadras são
+                  as faces que as ruas cercam. O valor é o quadro de áreas, não a precisão do
+                  desenho. Clique num lote para área/score, ou numa quadra para sua área.
                 </p>
               </div>
             </div>

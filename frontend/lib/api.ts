@@ -367,6 +367,7 @@ export type ChaveOverlay =
   | "declividade_vedada"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
   | "urb_lotes"
+  | "urb_quadras"
   | "urb_arruamento"
   | "urb_verde"
   | "urb_verde_reservada"
@@ -1150,13 +1151,45 @@ export interface GeometriaUrb {
   // score, testada_m, profundidade_m, quadra_id, faixa_score). ``lotes`` (fundido) é fallback.
   lotes_features: GeoJSON.FeatureCollection | null;
   lotes: GeoJSON.Geometry | null;
-  arruamento: GeoJSON.Geometry | null;
+  // Fase 9.7 — quadras como FACES da malha (cada face com área); viário agora é malha conexa.
+  quadras: GeoJSON.FeatureCollection | null;
+  arruamento:
+    | (GeoJSON.Geometry & {
+        conexo?: boolean;
+        trechos?: number | null;
+        hierarquia?: { tronco_m: number; local_m: number } | null;
+      })
+    | null;
   areas_verdes: GeoJSON.Geometry | null;
   // Fase 9.6 — verde separado p/ o mapa: bloco reservado (destaque) × sobra de ponta (discreto).
   areas_verdes_reservada: GeoJSON.Geometry | null;
   areas_verdes_sobra: GeoJSON.Geometry | null;
-  sistema_lazer: GeoJSON.Geometry | null;
-  institucional: GeoJSON.Geometry | null;
+  // Fase 9.7 — clube como figura formada (forma=quadra); institucional como quadra (qualifica_legal).
+  sistema_lazer: (GeoJSON.Geometry & { forma?: string; frente_via_m?: number | null }) | null;
+  institucional:
+    | (GeoJSON.Geometry & {
+        frente_via_m?: number | null;
+        circulo_inscrito_m?: number | null;
+        declividade_pct?: number | null;
+        qualifica_legal?: boolean;
+      })
+    | null;
+  // Fase 9.7 — diagnósticos: conectividade do viário + qualificação legal do institucional.
+  viario_diagnostico?: {
+    conexo: boolean;
+    trechos: number;
+    trechos_descartados: number;
+    hierarquia: { tronco_m: number; local_m: number };
+    obs: string;
+  } | null;
+  institucional_diagnostico?: {
+    qualifica_legal: boolean;
+    checks: Record<string, boolean>;
+    frente_via_m?: number | null;
+    circulo_inscrito_m?: number | null;
+    declividade_pct?: number | null;
+    obs: string;
+  } | null;
 }
 
 export interface ItemConformidadePrograma {

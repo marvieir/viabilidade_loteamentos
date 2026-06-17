@@ -112,12 +112,16 @@ def test_sobra_de_ponta_vai_para_area_verde():
 
 def test_subdivisao_preservada_calibrada():
     """Critério 5: tamanho emerge da quadra (lotes diferentes), média na faixa, cv contido,
-    retalho ≤1,5%, viário ≤~20% — calibrado no São Roque/MUE real."""
+    retalho ≤1,5%, viário medido (malha 9.7) ≤~25% — calibrado no São Roque/MUE real.
+
+    Fase 9.7: numa gleba RETANGULAR perfeita a malha gera quadras (faces) iguais → lotes muito
+    uniformes (cv baixo, honesto); a variação cresce em gleba irregular. O cv continua > 0 (os
+    tamanhos EMERGEM da quadra, não são impostos) — a amarra é o clamp legal, não a uniformidade."""
     layout, d, _, _ = _dist(SAO_ROQUE, "alta", _perfil_mue(), "MUE")
     assert 430 <= d["media_m2"] <= 520
-    assert 0.06 <= d["cv"] <= 0.18
+    assert 0.02 <= d["cv"] <= 0.18
     assert d["retalho_perdido_pct"] <= 0.015
-    assert d["viario_pct"] <= 0.20
+    assert d["viario_pct"] <= 0.25  # 9.7 — viário agora é a MALHA medida (não a sobra)
     assert len({round(l.area) for l in layout.lotes}) > 1  # tamanhos diferentes
 
 

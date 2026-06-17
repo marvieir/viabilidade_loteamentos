@@ -21,11 +21,11 @@ import math
 from typing import Optional, Sequence
 
 from shapely.affinity import rotate
-from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry import LineString, Polygon, box
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import nearest_points, unary_union
+from shapely.ops import polygonize, unary_union
 
-from app.core.urbanismo_medida import Layout
+from app.core.urbanismo_medida import Layout, _lados_mrr
 from app.core.urbanismo_programa import PERFIL_LOTE, Programa
 
 # Convergência: |medido − alvo| ≤ tol → "atendido" (spec §4.1).
@@ -38,11 +38,24 @@ ARQUETIPO_GRELHA = "grelha_eficiente"
 # Via LOCAL (rua de quadra) — separa as quadras na grelha. A via PRINCIPAL (esqueleto) usa a
 # largura do programa; ruas locais são estreitas (~8 m), o que mantém o viário realista.
 VIA_LOCAL_M = 8.0
-# Fileira parcial na borda só vira lote se couber ≥ esta fração da profundidade (calibrado no
-# São Roque real: aproveita a borda sem criar lote raso demais).
-FRAC_FILEIRA_RASA = 0.8
 # Frente mínima legal (Lei 6.766/79 art. 4º II) — testada nunca abaixo disso.
 FRENTE_MIN_M = 5.0
+
+# ---- Fase 9.7: MALHA VIÁRIA + QUADRAS COMO FACES (a inversão da geração, §0 da spec) ----
+# Largura do TRONCO/coletora (hierarquia legal ≥21 m) — os eixos da IA viram via principal.
+VIA_TRONCO_M = 21.0
+# Nº de lotes que dá a TESTADA de uma quadra (espaça os eixos da grade local; o tamanho do lote
+# continua emergindo da subdivisão — isto é só o passo da malha).
+N_LOTES_QUADRA = 6
+# Face menor que isso (m²) não vira quadra loteável → quadra VERDE formada (sobra, não sliver).
+MIN_QUADRA_M2 = 250.0
+# Critérios legais do INSTITUCIONAL (Lei 6.766/art. municipal): frente p/ via, compacidade,
+# círculo inscrito, declividade. Frente/profundidade lido como NÃO-SLIVER (≥1/3) — ver nota no
+# código (a spec escreve "≤1/3"; a razão técnica "não retalho" é o piso de compacidade ≥1/3).
+INST_FRENTE_MIN_M = 10.0
+INST_CIRCULO_DIAM_MIN_M = 10.0
+INST_DECLIV_MAX_PCT = 15.0
+RATIO_NAO_SLIVER = 1.0 / 3.0
 
 try:  # shapely 2.x
     from shapely import make_valid as _make_valid
@@ -112,37 +125,10 @@ def _componentes(geom: BaseGeometry) -> list[Polygon]:
     return []
 
 
-# ---- Fase 9.3: SUBDIVISÃO DE QUADRAS (o lote = o que a quadra comporta; §3 da spec) ----
-# Substitui o modelo de "faixas premium/padrão/compacto" da 9.2 (origem do bug do lote uniforme).
-# O viário recorta a gleba em QUADRAS; cada quadra é subdividida inteira por uma testada-alvo
-# do perfil; o tamanho de cada lote EMERGE da interseção com a quadra (varia pela forma, sem
-# impor área). Determinístico.
-
-
-def _linhas_de_quadra(comp: Polygon, via: float, prof: float):
-    """Faixas (quadras) horizontais que formam o miolo: fileiras de profundidade ``prof``
-    COSTAS-COM-COSTAS (par sem via entre elas) e UMA via local a cada par. A última fileira
-    parcial vira fileira RASA se couber ≥60% da profundidade (aproveita a borda → menos viário
-    perdido, fiel ao real). Profundidade da quadra ≤ ``prof`` perto da borda → lote menor."""
-    minx, miny, maxx, maxy = comp.bounds
-    if (maxx - minx) <= 0 or (maxy - miny) < FRAC_FILEIRA_RASA * prof:
-        return []
-    faixas = []
-    y = miny
-    par = 0
-    guarda = 0
-    while y + FRAC_FILEIRA_RASA * prof <= maxy + 1e-6:
-        topo = min(y + prof, maxy)
-        if topo - y >= FRAC_FILEIRA_RASA * prof:
-            faixas.append((y, topo))
-        y = topo
-        par += 1
-        if par % 2 == 0:  # via local a cada DUAS fileiras (costas-com-costas)
-            y += via
-        guarda += 1
-        if guarda > 5000:
-            break
-    return faixas
+# ---- Fase 9.3/9.4: SUBDIVISÃO DE QUADRAS (o lote = o que a quadra comporta; §3 da spec) ----
+# O tamanho de cada lote EMERGE da quadra (não é imposto), dentro do clamp legal [piso,teto].
+# A partir da 9.7 a quadra é uma FACE da malha (não mais uma faixa de grade); `_subdividir_quadra`
+# segue idêntico — é agnóstico à origem da quadra (reusado por `_lotear_face`).
 
 
 def _maior_parte(geom: BaseGeometry) -> Optional[Polygon]:
@@ -213,6 +199,9 @@ def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float
     alvo = min(max(alvo_area, piso), teto)
     testada_eff = max(min(alvo / depth, teto / depth), FRENTE_MIN_M)
     n = max(int(round(L / testada_eff)), 1)
+    # Peça rasa: não dividir além do que o PISO comporta — senão (L/n)·depth < piso e o clamp
+    # descarta tudo (gleba rasa ficaria sem lote). Cap em ⌊área/piso⌋ (≥1 quando comporta um lote).
+    n = min(n, max(int(piece.area / max(piso, 1.0)), 1))
     tr = L / n  # testada real → fecha a quadra exatamente
     cols: list[Polygon] = []
     for k in range(n):
@@ -227,90 +216,227 @@ def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float
     return lotes, (residual if (residual is not None and not residual.is_empty) else None)
 
 
-def _subdividir(miolo, via, testada_alvo, prof_alvo, alvo_area, piso, teto, ang_rad):
-    """Desenha as quadras (faixas de profundidade ``prof_alvo`` entre vias) em TODAS as ilhas e
-    subdivide cada uma com CLAMP legal. Orientado por ``ang_rad`` (topografia da 9.1). Devolve
-    (lotes, residual_geom, quadra_ids) — ``residual_geom`` é a sobra de ponta (→ área verde)."""
-    if miolo is None or miolo.is_empty:
-        return [], None, []
-    ang_deg = math.degrees(ang_rad)
-    cen = miolo.centroid
-    reg = rotate(miolo, -ang_deg, origin=cen) if ang_deg else miolo
+# ============================ Fase 9.7: MALHA VIÁRIA + FACES ============================
+# A INVERSÃO (§0): as ruas vêm primeiro (malha conexa a partir do esqueleto da IA), as quadras
+# são as FACES que as ruas cercam (polygonize), e as áreas públicas viram quadras formadas. O
+# §2 não se move: a IA propõe os eixos (semente); o Python constrói a malha, deriva as faces e
+# mede — nenhuma coordenada final vem do LLM.
+
+
+def _linhas(geom: Optional[BaseGeometry]) -> list[LineString]:
+    """Extrai as LineStrings de um recorte (pode vir Multi/GeometryCollection do intersection)."""
+    if geom is None or geom.is_empty:
+        return []
+    if geom.geom_type == "LineString":
+        return [geom]
+    if geom.geom_type in ("MultiLineString", "GeometryCollection"):
+        return [g for g in geom.geoms if g.geom_type == "LineString" and g.length > 0]
+    return []
+
+
+def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
+                    block_h: float, via_local: float, via_tronco: float):
+    """MALHA VIÁRIA CONEXA (no frame já rotacionado ``reg``): uma grade LOCAL de blocos iguais
+    (sem sliver de borda — os eixos dividem a tela em N blocos exatos) somada aos EIXOS DA IA
+    como TRONCO (atravessam a grade → conectam tudo numa peça só). Devolve ``(faces, ruas,
+    eixos, troncos)``: ``faces`` = polígonos cercados pelas ruas (``polygonize``); ``ruas`` =
+    união dos buffers das centerlines ∩ ``reg`` (conexa por construção); ``eixos`` = todas as
+    centerlines (p/ medir comprimento de via); ``troncos`` = só as de tronco (hierarquia)."""
+    minx, miny, maxx, maxy = reg.bounds
+    W, H = (maxx - minx), (maxy - miny)
+    eixos: list[tuple[LineString, float]] = []  # (centerline, largura)
+    # Grade LOCAL: nº de blocos que cabe → linhas igualmente espaçadas (blocos iguais, sem ponta).
+    nbx = max(int(round(W / (block_w + via_local))), 1)
+    nby = max(int(round(H / (block_h + via_local))), 1)
+    for i in range(1, nbx):
+        x = minx + i * W / nbx
+        eixos.append((LineString([(x, miny), (x, maxy)]), via_local))
+    for j in range(1, nby):
+        y = miny + j * H / nby
+        eixos.append((LineString([(minx, y), (maxx, y)]), via_local))
+
+    # TRONCO: os eixos da IA (semente) entram como via principal; atravessam a grade → conexão.
+    troncos: list[LineString] = []
+    for e in (eixos_ia or []):
+        rec = _valido(e.intersection(reg)) if e is not None else None
+        for part in _linhas(rec):
+            eixos.append((part, via_tronco))
+            troncos.append(part)
+    # Sem eixo da IA: promove a linha central da grade a tronco (sempre há uma via principal).
+    if not troncos and eixos:
+        centrais = sorted(eixos, key=lambda gw: abs(gw[0].centroid.x - reg.centroid.x)
+                          + abs(gw[0].centroid.y - reg.centroid.y))
+        g, _ = centrais[0]
+        eixos = [(gg, via_tronco if gg is g else w) for gg, w in eixos]
+        troncos.append(g)
+
+    if not eixos:  # gleba menor que um bloco → uma quadra só, sem via interna (degrada honesto)
+        return [g for g in _componentes(reg)], None, [], []
+
+    linhas = [reg.boundary] + [g for g, _ in eixos]
+    noded = _uniao_segura(linhas)
+    faces = []
+    if noded is not None and not noded.is_empty:
+        for f in polygonize(noded):
+            if f.is_empty:
+                continue
+            try:
+                dentro = reg.contains(f.representative_point())
+            except Exception:  # noqa: BLE001 — ponto representativo degenerado
+                dentro = reg.intersects(f.centroid)
+            if dentro:
+                faces.append(f)
+    ruas = _uniao_segura([
+        _valido(g.intersection(reg)).buffer(w / 2.0, cap_style=2, join_style=2)
+        for g, w in eixos if g is not None and not g.intersection(reg).is_empty
+    ])
+    if ruas is not None and not ruas.is_empty:
+        ruas = _valido(ruas.intersection(reg))
+    else:
+        ruas = None
+    return faces, ruas, [g for g, _ in eixos], troncos
+
+
+def _miolo(face: BaseGeometry, ruas: Optional[BaseGeometry]) -> Optional[Polygon]:
+    """Quadra = face − ruas (o miolo, descontada a largura da via). Maior componente válido."""
+    q = _diferenca_segura(face, ruas) if ruas is not None else face
+    return _maior_parte(q)
+
+
+def _lotear_face(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area: float,
+                 piso: float, teto: float):
+    """Loteia UMA quadra (face da malha): divide em fileiras de profundidade ~``prof`` e REUSA
+    ``_subdividir_quadra`` em cada fileira (clamp legal da 9.4 intacto). A face já está no frame
+    rotacionado (eixos axiais), então as fileiras são horizontais. Devolve ``(lotes, residuais)``."""
     lotes: list[Polygon] = []
-    quadras: list[str] = []
-    residual_parts: list[BaseGeometry] = []
-    qid = 0
-    for comp in _componentes(reg):
-        for (y0, y1) in _linhas_de_quadra(comp, via, prof_alvo):
-            strip = comp.intersection(box(comp.bounds[0], y0, comp.bounds[2], y1))
-            for piece in _componentes(strip):
-                qid += 1
+    residuais: list[BaseGeometry] = []
+    for comp in _componentes(face):
+        minx, miny, maxx, maxy = comp.bounds
+        depth = maxy - miny
+        if depth <= 0 or comp.area < piso * 0.5:
+            residuais.append(comp)
+            continue
+        nrows = max(int(round(depth / prof)), 1)
+        rh = depth / nrows
+        for r in range(nrows):
+            y0 = miny + r * rh
+            y1 = maxy if r == nrows - 1 else miny + (r + 1) * rh
+            faixa = _valido(comp.intersection(box(minx, y0, maxx, y1)))
+            for piece in _componentes(faixa):
                 sub, res = _subdividir_quadra(piece, y0, y1, testada_alvo, alvo_area, piso, teto)
+                lotes.extend(sub)
                 if res is not None and not res.is_empty:
-                    residual_parts.append(rotate(res, ang_deg, origin=cen) if ang_deg else res)
-                for lote in sub:
-                    lotes.append(rotate(lote, ang_deg, origin=cen) if ang_deg else lote)
-                    quadras.append(f"Q{qid}")
-    residual_union = _uniao_segura(residual_parts)
-    return lotes, residual_union, quadras
-
-# ============================ reserva de áreas (área EXATA) ============================
-def _raio_max(poly: BaseGeometry, seed: Point) -> float:
-    minx, miny, maxx, maxy = poly.bounds
-    cantos = [(minx, miny), (minx, maxy), (maxx, miny), (maxx, maxy)]
-    return max(seed.distance(Point(c)) for c in cantos) or 1.0
+                    residuais.append(res)
+    return lotes, residuais
 
 
-def _crescer_para_area(poly: BaseGeometry, seed: Point, target: float) -> Optional[BaseGeometry]:
-    """Região de ``poly`` em torno de ``seed`` com área ≈ ``target`` (busca binária de raio).
-    Convergência garantida (área é monótona no raio). ``None`` se target ≤ 0."""
-    if target <= 0 or poly.is_empty:
-        return None
-    if target >= poly.area:
-        return poly
-    lo, hi = 0.0, _raio_max(poly, seed)
-    reg: Optional[BaseGeometry] = None
-    for _ in range(34):
-        r = (lo + hi) / 2
-        reg = poly.intersection(seed.buffer(r, quad_segs=24))
-        if reg.area < target:
-            lo = r
-        else:
+# --------- áreas públicas como QUADRAS FORMADAS (critérios legais; substituem os discos) ---------
+def _raio_inscrito(poly: BaseGeometry, rmax: float = 80.0) -> float:
+    """Raio do MAIOR círculo inscrito (busca binária em buffer negativo) — p/ o check de ⌀≥10 m."""
+    poly = _valido(poly)
+    if poly is None or poly.is_empty:
+        return 0.0
+    lo, hi = 0.0, rmax
+    for _ in range(20):
+        r = (lo + hi) / 2.0
+        try:
+            vazio = poly.buffer(-r).is_empty
+        except Exception:  # noqa: BLE001
+            vazio = True
+        if vazio:
             hi = r
-    return poly.intersection(seed.buffer((lo + hi) / 2, quad_segs=24))
+        else:
+            lo = r
+    return lo
 
 
-def _maior(geom: Optional[BaseGeometry]) -> Optional[Polygon]:
-    polis = _componentes(geom) if geom is not None else []
-    return max(polis, key=lambda g: g.area) if polis else None
+def _checks_quadra(q: BaseGeometry, ruas: Optional[BaseGeometry],
+                   decliv_pct: Optional[float]) -> tuple[dict, float, float, float, bool]:
+    """Os 4 checks legais do institucional + medidas. ``frente``/``profundidade`` pelos lados do
+    MRR (compacidade). Devolve ``(checks, frente, prof, circulo_diam, toca_via)``.
+
+    NOTA DE CONTRATO (frente/profundidade): a spec escreve "relação frente/profundidade ≤1/3",
+    mas a justificativa legal é "área pública NÃO retalho/sliver". Razão ≤1/3 (frente 3× menor
+    que a profundidade) é JUSTAMENTE o sliver que a regra quer evitar. Implemento o piso de
+    compacidade ``min/max ≥ 1/3`` (não-sliver). Sinalizado ao operador (volta como dúvida)."""
+    fr, pr = _lados_mrr(q)
+    ratio = (min(fr, pr) / max(fr, pr)) if max(fr, pr) > 0 else 0.0
+    circ_diam = 2.0 * _raio_inscrito(q)
+    toca = bool(ruas is not None and not ruas.is_empty and q.distance(ruas) < 0.6)
+    checks = {
+        "frente_min_10m": fr >= INST_FRENTE_MIN_M,
+        "frente_prof_1_3": ratio >= RATIO_NAO_SLIVER,
+        "circulo_10m": circ_diam >= INST_CIRCULO_DIAM_MIN_M - 1e-6,
+        "decliv_15": (decliv_pct is None) or (decliv_pct <= INST_DECLIV_MAX_PCT),
+    }
+    return checks, fr, pr, circ_diam, toca
 
 
-def _reservar_lazer(aprov: BaseGeometry, target: float, evitar: Optional[BaseGeometry]):
-    """Clube central + áreas verdes ao redor, com área TOTAL ≈ ``target`` (central na gleba)."""
-    if target <= 0:
-        return None, None
-    base = aprov.difference(evitar) if (evitar is not None and not evitar.is_empty) else aprov
-    base = _maior(base) or aprov
-    seed = base.representative_point()
-    regiao = _crescer_para_area(base, seed, target)
-    if regiao is None or regiao.is_empty:
-        return None, None
-    clube = _crescer_para_area(regiao, seed, regiao.area * LAZER_CLUBE_FRAC)
-    verde = regiao.difference(clube) if (clube is not None and not clube.is_empty) else regiao
-    return (
-        clube if (clube is not None and not clube.is_empty) else None,
-        verde if (verde is not None and not verde.is_empty) else None,
-    )
+def institucional_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeometry],
+                              reg: BaseGeometry, alvo: float, decliv_pct: Optional[float] = None):
+    """Escolhe UMA quadra com FRENTE PARA VIA que satisfaça os 4 checks legais, dimensionada ao
+    ``alvo`` da doação e na BORDA (acesso pela via principal). Devolve ``(geom, diagnostico)`` —
+    ``geom is None`` se nenhuma qualifica (degradação honesta, §1-A)."""
+    candidatos = []
+    for q in quadras:
+        checks, fr, pr, circ, toca = _checks_quadra(q, ruas, decliv_pct)
+        if toca and all(checks.values()):
+            candidatos.append((q, checks, fr, pr, circ))
+    if not candidatos:
+        return None, {
+            "qualifica_legal": False, "checks": {},
+            "obs": ("nenhuma quadra encaixa nos critérios legais (frente ≥10 m, compacidade, "
+                    "círculo ⌀≥10 m, declividade ≤15%) — institucional a definir com a Prefeitura."),
+        }
+    alvo = max(alvo, 1.0)
+    borda = reg.boundary
+
+    def _pref(c):  # perto do alvo de área E perto da borda (acesso pela via oficial)
+        return (abs(c[0].area - alvo), c[0].distance(borda))
+
+    q, checks, fr, pr, circ = min(candidatos, key=_pref)
+    diag = {
+        "qualifica_legal": True, "checks": checks,
+        "frente_via_m": round(fr, 2), "profundidade_m": round(pr, 2),
+        "circulo_inscrito_m": round(circ, 2),
+        "declividade_pct": (round(decliv_pct, 1) if decliv_pct is not None else None),
+        "obs": ("quadra com frente para via (art. 6º Lei 6.766); localização e forma finais "
+                "definidas pela Prefeitura nas Diretrizes."),
+    }
+    return q, diag
 
 
-def _reservar_institucional(aprov: BaseGeometry, target: float) -> Optional[BaseGeometry]:
-    """Doação institucional (área ≈ ``target``) encostada numa borda (canto inferior)."""
-    if target <= 0:
-        return None
-    minx, miny, _, _ = aprov.bounds
-    canto = nearest_points(aprov, Point(minx, miny))[0]
-    reg = _crescer_para_area(aprov, canto, target)
-    return reg if (reg is not None and not reg.is_empty) else None
+def clube_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeometry], alvo: float):
+    """Clube/lazer como FIGURA FORMADA com frente para via (não o disco central da v1).
+    Escolhe a face com frente ≥10 m mais próxima do ``alvo`` de área. Devolve ``(geom, diag)``."""
+    cands = []
+    for q in quadras:
+        fr, pr = _lados_mrr(q)
+        toca = bool(ruas is not None and not ruas.is_empty and q.distance(ruas) < 0.6)
+        if fr >= INST_FRENTE_MIN_M and (toca or ruas is None):
+            cands.append((q, fr, pr))
+    if not cands or alvo <= 0:
+        return None, {}
+    alvo = max(alvo, 1.0)
+    q, fr, pr = min(cands, key=lambda c: abs(c[0].area - alvo))
+    return q, {"forma": "quadra", "frente_via_m": round(fr, 2)}
+
+
+def _selecionar_verde(pool: Sequence[BaseGeometry], alvo: float):
+    """Reserva quadras VERDES formadas até somar ~``alvo`` (sem estourar muito além — preserva
+    lotes). Faces inteiras (não slivers). Devolve ``(verdes, resto)``."""
+    if alvo <= 0 or not pool:
+        return [], list(pool)
+    ordem = sorted(pool, key=lambda g: -g.area)  # blocos maiores primeiro (menos peças → limpo)
+    verdes, acc = [], 0.0
+    for f in ordem:
+        if acc >= alvo - 1e-6:
+            break
+        if acc + f.area <= alvo + f.area * 0.5:  # não estoura mais que meia face além do alvo
+            verdes.append(f)
+            acc += f.area
+    resto = [f for f in pool if not any(f is v for v in verdes)]
+    return verdes, resto
 
 
 # ============================ esqueleto da IA (intenção → eixos) ============================
@@ -389,54 +515,127 @@ def gerar_layout(
     pct_lazer0 = max(0.0, min(max(programa.pct_lazer, pct_verde_min), 0.6))
     pct_inst = max(0.0, min(max(programa.pct_institucional, pct_inst_min), 0.3))
 
-    # (b) esqueleto da IA → eixos; usado quando o arquétipo NÃO é grelha pura e há eixo válido.
+    # (b) esqueleto da IA → eixos; usado como TRONCO quando o arquétipo NÃO é grelha pura e há
+    # eixo válido. Na grelha, a malha promove a linha central a tronco (esqueleto_usado=False).
     centerlines, descartes = _eixos(programa.esqueleto, aprov)
     usar_esqueleto = programa.arquetipo_viario != ARQUETIPO_GRELHA and bool(centerlines)
-    road_skel = None
-    if usar_esqueleto:
-        road_skel = unary_union(centerlines).buffer(via / 2.0).intersection(aprov)
-        if road_skel.is_empty:
-            road_skel = None
+    eixos_ia = centerlines if usar_esqueleto else []
 
-    # (a) materializar lazer/institucional (9.1): CAP analítico — reserva lazer só até sobrar
-    # área p/ ~MIN_LOTES_RESERVA lotes; acima disso DEGRADA rotulado (nunca infla nem ignora).
+    # (a) materialização (9.1): CAP analítico — reserva lazer só até sobrar área p/ ~MIN_LOTES
+    # lotes; acima disso DEGRADA rotulado (nunca infla nem ignora).
     lote_area = max(alvo_area, 1.0)
     inst_area = pct_inst * aprov_area
     disp_lazer = max(aprov_area - inst_area - MIN_LOTES_RESERVA * lote_area, 0.0)
     alvo_lazer_area = pct_lazer0 * aprov_area
     lazer_area = min(alvo_lazer_area, disp_lazer)
     degradado = lazer_area < alvo_lazer_area - 1e-6
-    pct_usado = lazer_area / aprov_area if aprov_area else 0.0
 
-    inst = _reservar_institucional(aprov, inst_area)
-    clube, verde = _reservar_lazer(aprov, lazer_area, evitar=inst)
-    reservas = [g for g in (clube, verde, inst, road_skel) if g is not None and not g.is_empty]
-    miolo = _diferenca_segura(aprov, _uniao_segura(reservas)) if reservas else aprov
+    # ===================== Fase 9.7 — A INVERSÃO: malha → faces → áreas formadas =====================
+    # Tudo no frame ROTACIONADO ``reg`` (eixos axiais para a topografia 9.1); ao final, gira de
+    # volta por +ang. O viário deixa de ser subtração e vira a MALHA medida.
+    ang_deg = math.degrees(orientacao_rad)
+    cen = aprov.centroid
+    reg = rotate(aprov, -ang_deg, origin=cen) if ang_deg else aprov
+    eixos_ia_reg = [rotate(e, -ang_deg, origin=cen) for e in eixos_ia] if ang_deg else eixos_ia
 
-    # (9.3) SUBDIVISÃO de quadras: o viário recorta o miolo em quadras; cada uma é subdividida
-    # inteira por testada_alvo (fecha sem retalho); o tamanho de cada lote EMERGE da forma da
-    # quadra (varia naturalmente em torno do alvo do perfil — nada imposto).
-    via_local = min(via, VIA_LOCAL_M)  # rua de quadra estreita (a via principal é o esqueleto)
-    lotes, residual_geom, lote_quadra = _subdividir(
-        miolo, via_local, testada_alvo, prof, alvo_area, piso_lote, teto_lote, orientacao_rad
+    via_local = min(via, VIA_LOCAL_M)         # rua de quadra (local)
+    via_tronco = max(via, VIA_TRONCO_M)       # coletora/tronco (hierarquia ≥21 m)
+    block_w = N_LOTES_QUADRA * testada_alvo    # testada da quadra ~ N lotes
+    block_h = 2.0 * prof                        # quadra de duas fileiras (costas-com-costas)
+    faces, ruas_reg, eixos_reg, troncos_reg = construir_malha(
+        reg, eixos_ia_reg, block_w, block_h, via_local, via_tronco
     )
 
-    # §4 (9.4) — a SOBRA DE PONTA (quadra − lotes, que o clamp não deixou virar lote) é
-    # devolvida à ÁREA VERDE adjacente: vira verde no quadro/conformidade, NUNCA retalho
-    # perdido nem viário inflado. ``verde_reservado`` (a reserva original) alimenta a fidelidade
-    # do lazer; o residual entra só no quadro/doação. Operação geométrica determinística (§2).
-    verde_reservado = verde
-    if residual_geom is not None and not residual_geom.is_empty:
-        verde = _uniao_segura([verde, residual_geom])  # TOTAL (reservado ∪ sobra) p/ o quadro
+    # Quadras = miolo de cada face (face − ruas). Faces minúsculas → quadra verde formada (sobra).
+    declividade_pct = (
+        float(diretrizes.get("declividade_media_pct"))
+        if diretrizes.get("declividade_media_pct") is not None else None
+    )
+    miolos: list[Polygon] = []
+    verdes_min: list[Polygon] = []  # faces pequenas → verde formado (não sliver)
+    for f in faces:
+        q = _miolo(f, ruas_reg)
+        if q is None or q.is_empty:
+            continue
+        (verdes_min if q.area < MIN_QUADRA_M2 else miolos).append(q)
+
+    # LOTES SÃO PRIORIDADE (CLAUDE.md/§1-A): só reserva área pública enquanto sobrar quadra p/
+    # lotear (sempre ≥1 face vai para lotes). Em gleba minúscula, degrada honesto (sem público).
+    def _pode_reservar(pool):
+        return len(pool) > 1
+
+    # 4.a INSTITUCIONAL: uma quadra com frente para via que satisfaça os 4 checks legais (borda).
+    inst_reg, inst_diag = (
+        institucional_como_quadra(miolos, ruas_reg, reg, inst_area, declividade_pct)
+        if (pct_inst > 0 and _pode_reservar(miolos)) else (None, {})
+    )
+    pool = [q for q in miolos if inst_reg is None or q is not inst_reg]
+
+    # 4.b CLUBE: figura formada com frente para via (não círculo). Verde de lazer = quadras verdes.
+    clube_target = LAZER_CLUBE_FRAC * lazer_area
+    clube_reg, clube_diag = (
+        clube_como_quadra(pool, ruas_reg, clube_target) if _pode_reservar(pool) else (None, {})
+    )
+    # só materializa o clube se couber no orçamento de lazer (degradação: gleba não comporta).
+    if clube_reg is not None and clube_reg.area > lazer_area * 1.5 + 1e-6:
+        clube_reg, clube_diag = None, {}
+    pool = [q for q in pool if clube_reg is None or q is not clube_reg]
+
+    # 4.c VERDE: quadras verdes formadas até o orçamento de lazer — sempre deixando ≥1 p/ lotes.
+    verde_budget = max(lazer_area - (clube_reg.area if clube_reg is not None else 0.0), 0.0)
+    verdes_reg, pool = _selecionar_verde(pool, verde_budget) if _pode_reservar(pool) else ([], pool)
+    if not pool and verdes_reg:  # nunca consome a última face — uma quadra sempre vira lotes
+        pool = [verdes_reg.pop()]
+
+    # 4.c LOTES: cada quadra restante é loteada por _subdividir_quadra (clamp legal 9.4 intacto).
+    lotes_reg: list[Polygon] = []
+    lote_quadra: list[str] = []
+    residuais_reg: list[BaseGeometry] = []
+    for qi, q in enumerate(pool, start=1):
+        sub, res = _lotear_face(q, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
+        for lote in sub:
+            lotes_reg.append(lote)
+            lote_quadra.append(f"Q{qi}")
+        residuais_reg.extend(res)
+
+    # SOBRA → quadras verdes formadas (faces pequenas) + pontas de loteamento (mínimas).
+    verde_reservado_reg = _uniao_segura([*verdes_reg, *verdes_min])
+    sobra_reg = _uniao_segura(residuais_reg)
+    verde_total_reg = _uniao_segura([verde_reservado_reg, sobra_reg])
+
+    # Volta ao frame original (gira por +ang). Operação geométrica determinística (§2).
+    def _back(g):
+        if g is None or g.is_empty:
+            return None
+        return rotate(g, ang_deg, origin=cen) if ang_deg else g
+
+    lotes = [r for r in (_back(l) for l in lotes_reg) if r is not None]
+    quadras_geom = [r for r in (_back(q) for q in (miolos + verdes_min)) if r is not None]
+    arruamento = _back(ruas_reg)
+    clube = _back(clube_reg)
+    inst = _back(inst_reg)
+    verde_reservado = _back(verde_reservado_reg)
+    verde = _back(verde_total_reg)
+    sobra_ponta = _back(sobra_reg)
+    eixos_malha = [r for r in (_back(e) for e in eixos_reg) if r is not None]
+
+    # Conectividade do viário (critério 1): a malha é UMA peça? (ilhas da gleba → honesto False).
+    n_trechos = len(_componentes(arruamento)) if arruamento is not None else 0
+    conexo = n_trechos == 1
+    viario_diag = {
+        "conexo": conexo,
+        "trechos": n_trechos,
+        "trechos_descartados": len(descartes),
+        "hierarquia": {"tronco_m": round(via_tronco, 1), "local_m": round(via_local, 1)},
+        "obs": ("malha a partir dos eixos da IA; trechos soltos conectados ao tronco da grade"
+                if conexo else
+                "gleba partida em ilhas pela restrição — viário conexo dentro de cada ilha"),
+    }
+
     lazer_reservado_m2 = sum(
         g.area for g in (clube, verde_reservado) if g is not None and not g.is_empty
     )
     retalho_m2 = 0.0  # a sobra foi destinada à área pública (sem retalho perdido)
-
-    # Arruamento = aproveitável − lotes − reservas (verde já inclui a sobra → viário fica real).
-    consumido = _uniao_segura([_uniao_segura(lotes), clube, verde, inst])
-    sobra = _diferenca_segura(aprov, consumido)
-    arruamento = sobra if (sobra is not None and not sobra.is_empty) else None
 
     avisos: list[str] = []
     if not lotes:
@@ -447,8 +646,8 @@ def gerar_layout(
 
     meta = {
         "lazer_alvo_pct": round(pct_lazer0, 4),
-        "lazer_usado_pct": round(pct_usado, 4),
-        # fidelidade do lazer usa a RESERVA original (não a sobra de ponta anexada ao verde).
+        "lazer_usado_pct": round(lazer_reservado_m2 / aprov_area, 4) if aprov_area else 0.0,
+        # fidelidade do lazer usa a RESERVA materializada (clube + verde formado).
         "lazer_reservado_pct": round(lazer_reservado_m2 / aprov_area, 4) if aprov_area else 0.0,
         "lazer_degradado": degradado,
         "inst_alvo_pct": round(pct_inst, 4),
@@ -458,6 +657,9 @@ def gerar_layout(
         "orientacao_rad": round(orientacao_rad, 6),
         "topo_aplicada": abs(orientacao_rad) > 1e-9,
         "sobra_retalho_m2": round(retalho_m2, 2),
+        # Fase 9.7 — malha: conectividade + nº de quadras (faces).
+        "viario_conexo": conexo,
+        "n_quadras": len(quadras_geom),
         # Fase 9.3/9.4 — mira da subdivisão + CLAMP legal [piso, teto] (o tamanho emerge da quadra).
         "testada_alvo_m": round(testada_alvo, 2),
         "prof_alvo_m": round(prof, 2),
@@ -469,10 +671,10 @@ def gerar_layout(
 
     return Layout(
         lotes=lotes,
-        arruamento=arruamento,
+        arruamento=arruamento,  # 9.7 — a MALHA medida (não mais subtração)
         areas_verdes=verde,  # TOTAL (reservado ∪ sobra) — quadro/conformidade usam este
-        areas_verdes_reservada=verde_reservado,  # 9.6 — bloco limpo (só p/ o mapa)
-        sobra_ponta=(residual_geom if residual_geom is not None and not residual_geom.is_empty else None),
+        areas_verdes_reservada=verde_reservado,  # 9.6/9.7 — quadras verdes formadas (mapa)
+        sobra_ponta=sobra_ponta,
         sistema_lazer=clube,
         institucional=inst,
         centerlines=centerlines if usar_esqueleto else [],
@@ -481,6 +683,11 @@ def gerar_layout(
         avisos=avisos,
         meta=meta,
         lote_quadra=lote_quadra,
+        quadras=quadras_geom,
+        eixos_malha=eixos_malha,
+        viario_diagnostico=viario_diag,
+        institucional_diagnostico=inst_diag,
+        sistema_lazer_diagnostico=clube_diag,
     )
 
 

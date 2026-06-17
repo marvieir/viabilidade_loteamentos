@@ -15,6 +15,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5)
   // Fase 9 — estudo de massa esquemático
   urb_lotes: "#6366f1",
+  urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
   urb_arruamento: "#64748b",
   urb_verde: "#16a34a",
   urb_verde_reservada: "#16a34a", // verde escuro saturado (bloco)
@@ -32,11 +33,13 @@ export interface EstiloOverlay {
   dashArray?: string;
 }
 export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
+  // Fase 9.7 — viário como MALHA (cinza forte, sólido); quadras como contorno (sem preenchimento).
+  urb_arruamento: { color: "#1f2937", weight: 1, fillColor: "#475569", fillOpacity: 0.7 },
+  urb_quadras: { color: "#334155", weight: 1.5, fillColor: "#000000", fillOpacity: 0, dashArray: "5 4" },
   urb_verde_reservada: { color: "#14532d", weight: 2, fillColor: "#22c55e", fillOpacity: 0.55 },
   urb_verde_sobra: { color: "#16a34a", weight: 1, fillColor: "#86efac", fillOpacity: 0.22, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
-  urb_arruamento: { color: "#334155", weight: 1, fillColor: "#64748b", fillOpacity: 0.4 },
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -51,7 +54,8 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   verde_verificar: "Verde a verificar",
   declividade_vedada: "Declividade ≥30% (vedada)",
   urb_lotes: "Lotes (vendável)",
-  urb_arruamento: "Sistema viário",
+  urb_quadras: "Quadras (faces da malha)",
+  urb_arruamento: "Sistema viário (malha)",
   urb_verde: "Áreas verdes",
   urb_verde_reservada: "Área verde (reservada)",
   urb_verde_sobra: "Verde remanescente",

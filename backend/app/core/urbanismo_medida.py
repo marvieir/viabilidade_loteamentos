@@ -76,6 +76,13 @@ class Layout:
     meta: dict = field(default_factory=dict)
     # Fase 9.3 — id da quadra de cada lote (paralelo a ``lotes``); o tamanho emerge da quadra.
     lote_quadra: list[str] = field(default_factory=list)
+    # Fase 9.7 — MALHA: quadras (faces) p/ desenhar o contorno; eixos da malha p/ medir via;
+    # diagnósticos de conectividade do viário e de qualificação legal do institucional/clube.
+    quadras: list[BaseGeometry] = field(default_factory=list)
+    eixos_malha: list[BaseGeometry] = field(default_factory=list)
+    viario_diagnostico: dict = field(default_factory=dict)
+    institucional_diagnostico: dict = field(default_factory=dict)
+    sistema_lazer_diagnostico: dict = field(default_factory=dict)
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -160,9 +167,12 @@ def medir(layout: Layout) -> Medicao:
     testada_media = round(sum(t[0] for t in testadas) / n, 2) if n else None
     profundidade_media = round(sum(t[1] for t in testadas) / n, 2) if n else None
 
-    # Indicadores de via: do centerline quando há (gerador); senão estimados da área.
+    # Indicadores de via: do comprimento da MALHA (9.7 — eixos_malha) quando há; senão do
+    # centerline da IA; senão estimado da área.
     via_w = layout.via_largura_m or 12.0
-    if layout.centerlines:
+    if layout.eixos_malha:
+        comp = round(sum(c.length for c in layout.eixos_malha), 2)
+    elif layout.centerlines:
         comp = round(sum(c.length for c in layout.centerlines), 2)
     elif arru > 0:
         comp = round(arru / via_w, 2)  # estimativa: área ÷ largura
@@ -336,18 +346,51 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
             },
         })
 
+    # Fase 9.7 — QUADRAS como FeatureCollection (cada face da malha, contorno p/ o mapa).
+    quadras_feats = []
+    for i, q in enumerate(layout.quadras, start=1):
+        if q is None or q.is_empty:
+            continue
+        quadras_feats.append({
+            "type": "Feature",
+            "geometry": mapping(transform(to_wgs, q)),
+            "properties": {"quadra_id": f"Q{i}", "area_m2": round(q.area, 2)},
+        })
+
+    # Fase 9.7 — viário como MALHA (conexo/hierarquia) e áreas públicas FORMADAS (frente/forma).
+    vdiag = layout.viario_diagnostico or {}
+    viario_gj = _gj(layout.arruamento)
+    if viario_gj is not None:
+        viario_gj = {**viario_gj, "conexo": bool(vdiag.get("conexo")),
+                     "trechos": vdiag.get("trechos"), "hierarquia": vdiag.get("hierarquia")}
+    idiag = layout.institucional_diagnostico or {}
+    inst_gj = _gj(layout.institucional)
+    if inst_gj is not None:
+        inst_gj = {**inst_gj, "frente_via_m": idiag.get("frente_via_m"),
+                   "circulo_inscrito_m": idiag.get("circulo_inscrito_m"),
+                   "declividade_pct": idiag.get("declividade_pct"),
+                   "qualifica_legal": bool(idiag.get("qualifica_legal"))}
+    cdiag = layout.sistema_lazer_diagnostico or {}
+    lazer_gj = _gj(layout.sistema_lazer)
+    if lazer_gj is not None:
+        lazer_gj = {**lazer_gj, "forma": cdiag.get("forma", "quadra"),
+                    "frente_via_m": cdiag.get("frente_via_m")}
+
     return {
         "rotulo": "esquemático",
         "lotes_features": {"type": "FeatureCollection", "features": feats},  # 9.5 — lote a lote
         "lotes": _gj(_uniao(layout.lotes)) if layout.lotes else None,  # fundido (compat)
-        "arruamento": _gj(layout.arruamento),
+        "quadras": {"type": "FeatureCollection", "features": quadras_feats},  # 9.7 — faces
+        "arruamento": viario_gj,  # 9.7 — malha conexa (não mais subtração)
         # Fase 9.6 — verde separado p/ o mapa: bloco reservado (destaque) × sobra de ponta
         # (discreto); ``areas_verdes`` (total) é o que o quadro/conformidade usam (idêntico).
         "areas_verdes": _gj(layout.areas_verdes),
         "areas_verdes_reservada": _gj(layout.areas_verdes_reservada),
         "areas_verdes_sobra": _gj(layout.sobra_ponta),
-        "sistema_lazer": _gj(layout.sistema_lazer),
-        "institucional": _gj(layout.institucional),
+        "sistema_lazer": lazer_gj,  # 9.7 — figura formada (forma=quadra), não círculo
+        "institucional": inst_gj,  # 9.7 — quadra formada (qualifica_legal + checks)
+        "viario_diagnostico": vdiag,
+        "institucional_diagnostico": idiag,
     }
 
 
