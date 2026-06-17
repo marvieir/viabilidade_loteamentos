@@ -44,10 +44,65 @@ FRAC_FILEIRA_RASA = 0.8
 # Frente mínima legal (Lei 6.766/79 art. 4º II) — testada nunca abaixo disso.
 FRENTE_MIN_M = 5.0
 
+try:  # shapely 2.x
+    from shapely import make_valid as _make_valid
+except Exception:  # pragma: no cover
+    _make_valid = None
+
+
+def _valido(geom: Optional[BaseGeometry]) -> Optional[BaseGeometry]:
+    """Garante geometria VÁLIDA (a gleba real, corrigida por auto-interseção, gera diferenças
+    inválidas que fazem o GEOS estourar no union). ``make_valid`` → fallback ``buffer(0)``."""
+    if geom is None or geom.is_empty or geom.is_valid:
+        return geom
+    try:
+        g = _make_valid(geom) if _make_valid is not None else geom.buffer(0)
+        return g if (g is not None and not g.is_empty) else geom.buffer(0)
+    except Exception:  # noqa: BLE001
+        try:
+            return geom.buffer(0)
+        except Exception:  # noqa: BLE001
+            return None
+
+
+def _uniao_segura(geoms) -> Optional[BaseGeometry]:
+    """``unary_union`` robusto: valida cada parte e, se ainda assim o GEOS estourar, une
+    incrementalmente pulando o trecho problemático (degrada honesto, nunca derruba o request)."""
+    parts = [_valido(g) for g in geoms if g is not None and not g.is_empty]
+    parts = [g for g in parts if g is not None and not g.is_empty]
+    if not parts:
+        return None
+    try:
+        return unary_union(parts)
+    except Exception:  # noqa: BLE001 — TopologyException → une incremental, validando
+        acc = None
+        for g in parts:
+            try:
+                acc = g if acc is None else unary_union([_valido(acc), _valido(g)])
+            except Exception:  # noqa: BLE001 — pula o trecho que quebra
+                continue
+        return acc
+
+
+def _diferenca_segura(a: BaseGeometry, b: Optional[BaseGeometry]) -> Optional[BaseGeometry]:
+    """``a.difference(b)`` robusto a geometria inválida (valida antes; on-error devolve ``a``)."""
+    if b is None or b.is_empty:
+        return a
+    try:
+        return _valido(a).difference(_valido(b))
+    except Exception:  # noqa: BLE001
+        try:
+            return a.buffer(0).difference(b.buffer(0))
+        except Exception:  # noqa: BLE001
+            return a
+
 
 # ============================ componentes / grelha ============================
 def _componentes(geom: BaseGeometry) -> list[Polygon]:
-    """TODOS os polígonos buildáveis (a restrição pode partir a tela em várias ilhas)."""
+    """TODOS os polígonos buildáveis (a restrição pode partir a tela em várias ilhas). VALIDA a
+    entrada (a gleba real, corrigida por auto-interseção, pode chegar inválida e estourar o GEOS
+    na 1ª interseção) — choke point de robustez de toda a subdivisão."""
+    geom = _valido(geom)
     if geom is None or geom.is_empty:
         return []
     if geom.geom_type == "Polygon":
@@ -167,8 +222,9 @@ def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float
     lotes = _clamp_faixa(cols, piso, teto)
     # Sobra de ponta (§4) = tudo da quadra que não virou lote → devolvido à ÁREA VERDE adjacente
     # (NUNCA retalho perdido nem viário inflado). Operação geométrica determinística (§2).
-    residual = piece.difference(unary_union(lotes)) if lotes else piece
-    return lotes, (residual if not residual.is_empty else None)
+    residual = _diferenca_segura(piece, _uniao_segura(lotes)) if lotes else piece
+    residual = _valido(residual)
+    return lotes, (residual if (residual is not None and not residual.is_empty) else None)
 
 
 def _subdividir(miolo, via, testada_alvo, prof_alvo, alvo_area, piso, teto, ang_rad):
@@ -195,7 +251,7 @@ def _subdividir(miolo, via, testada_alvo, prof_alvo, alvo_area, piso, teto, ang_
                 for lote in sub:
                     lotes.append(rotate(lote, ang_deg, origin=cen) if ang_deg else lote)
                     quadras.append(f"Q{qid}")
-    residual_union = unary_union(residual_parts) if residual_parts else None
+    residual_union = _uniao_segura(residual_parts)
     return lotes, residual_union, quadras
 
 # ============================ reserva de áreas (área EXATA) ============================
@@ -310,11 +366,11 @@ def gerar_layout(
 
     canvas = aproveitavel
     if restricoes is not None and not restricoes.is_empty:
-        canvas = canvas.difference(restricoes)
-    comps = _componentes(canvas)
+        canvas = _diferenca_segura(canvas, restricoes)
+    comps = _componentes(canvas)  # valida a entrada (gleba real pode chegar inválida)
     if not comps:
         return Layout(avisos=["Sem área aproveitável suficiente para um estudo de massa."])
-    aprov = unary_union(comps)
+    aprov = _uniao_segura(comps)
     aprov_area = aprov.area
 
     via, _, _ = _dims(programa)
@@ -355,7 +411,7 @@ def gerar_layout(
     inst = _reservar_institucional(aprov, inst_area)
     clube, verde = _reservar_lazer(aprov, lazer_area, evitar=inst)
     reservas = [g for g in (clube, verde, inst, road_skel) if g is not None and not g.is_empty]
-    miolo = aprov.difference(unary_union(reservas)) if reservas else aprov
+    miolo = _diferenca_segura(aprov, _uniao_segura(reservas)) if reservas else aprov
 
     # (9.3) SUBDIVISÃO de quadras: o viário recorta o miolo em quadras; cada uma é subdividida
     # inteira por testada_alvo (fecha sem retalho); o tamanho de cada lote EMERGE da forma da
@@ -371,16 +427,15 @@ def gerar_layout(
     # do lazer; o residual entra só no quadro/doação. Operação geométrica determinística (§2).
     verde_reservado = verde
     if residual_geom is not None and not residual_geom.is_empty:
-        verde = unary_union([g for g in (verde, residual_geom) if g is not None and not g.is_empty])
+        verde = _uniao_segura([verde, residual_geom])
     lazer_reservado_m2 = sum(
         g.area for g in (clube, verde_reservado) if g is not None and not g.is_empty
     )
     retalho_m2 = 0.0  # a sobra foi destinada à área pública (sem retalho perdido)
 
     # Arruamento = aproveitável − lotes − reservas (verde já inclui a sobra → viário fica real).
-    consumido = [g for g in (unary_union(lotes) if lotes else None, clube, verde, inst)
-                 if g is not None and not g.is_empty]
-    sobra = aprov.difference(unary_union(consumido)) if consumido else aprov
+    consumido = _uniao_segura([_uniao_segura(lotes), clube, verde, inst])
+    sobra = _diferenca_segura(aprov, consumido)
     arruamento = sobra if (sobra is not None and not sobra.is_empty) else None
 
     avisos: list[str] = []

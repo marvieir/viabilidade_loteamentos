@@ -94,6 +94,25 @@ def _area(geom: Optional[BaseGeometry]) -> float:
     return geom.area if geom is not None and not geom.is_empty else 0.0
 
 
+def _uniao(geoms) -> Optional[BaseGeometry]:
+    """``unary_union`` robusto a geometria inválida (a gleba real gera diferenças inválidas que
+    fazem o GEOS estourar). Valida com ``buffer(0)`` e, se ainda assim falhar, une incremental."""
+    parts = [g for g in geoms if g is not None and not g.is_empty]
+    if not parts:
+        return None
+    try:
+        return unary_union(parts)
+    except Exception:  # noqa: BLE001 — TopologyException → valida e une incremental
+        acc = None
+        for g in parts:
+            try:
+                v = g if g.is_valid else g.buffer(0)
+                acc = v if acc is None else unary_union([acc, v])
+            except Exception:  # noqa: BLE001
+                continue
+        return acc
+
+
 @dataclass
 class Medicao:
     quadro: dict
@@ -115,7 +134,7 @@ def medir(layout: Layout) -> Medicao:
     for g in (layout.arruamento, layout.areas_verdes, layout.sistema_lazer, layout.institucional):
         if g is not None and not g.is_empty:
             todas.append(g)
-    area_liquida = round(_area(unary_union(todas)), 2) if todas else 0.0
+    area_liquida = round(_area(_uniao(todas)), 2) if todas else 0.0
 
     def _uso(m2: float) -> dict:
         pct = round(m2 / area_liquida, 4) if area_liquida else 0.0
@@ -199,8 +218,8 @@ def pontuar(
     if not lotes:
         return {"score_medio": None, "faixas": [], "por_lote": [], "proveniencia": _PROV_HEATMAP}
     area_max = max(g.area for g in lotes)
-    uni = unary_union(lotes)
-    centro = uni.centroid
+    uni = _uniao(lotes)
+    centro = uni.centroid if uni is not None else lotes[0].centroid
     raio_max = max(g.centroid.distance(centro) for g in lotes) or 1.0
 
     por_lote = []
@@ -316,7 +335,7 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
     return {
         "rotulo": "esquemático",
         "lotes_features": {"type": "FeatureCollection", "features": feats},  # 9.5 — lote a lote
-        "lotes": _gj(unary_union(layout.lotes)) if layout.lotes else None,  # fundido (compat)
+        "lotes": _gj(_uniao(layout.lotes)) if layout.lotes else None,  # fundido (compat)
         "arruamento": _gj(layout.arruamento),
         "areas_verdes": _gj(layout.areas_verdes),
         "sistema_lazer": _gj(layout.sistema_lazer),
