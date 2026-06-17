@@ -171,7 +171,10 @@ def test_fronteira_programa_sem_numero():
 
     prog0 = programa_do_preset("media", {"pct_lazer": 0.0, "pct_institucional": 0.0})
     lay0 = geom.gerar_layout(box(0.0, 0.0, 500.0, 500.0), prog0)
-    assert lay0.sistema_lazer is None and lay0.areas_verdes is None
+    # Não inventa default: NADA é RESERVADO como lazer/verde (clube e bloco reservado nulos).
+    # (Fase 9.8: a sobra de ponta do loteamento pode ir p/ ``areas_verdes`` TOTAL — é leftover
+    # geométrico real, não reserva inventada; o que o contrato proíbe é reservar sem pedir.)
+    assert lay0.sistema_lazer is None and lay0.areas_verdes_reservada is None
 
 
 def test_determinismo_por_snapshot():

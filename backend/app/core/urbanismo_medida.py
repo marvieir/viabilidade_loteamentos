@@ -83,6 +83,10 @@ class Layout:
     viario_diagnostico: dict = field(default_factory=dict)
     institucional_diagnostico: dict = field(default_factory=dict)
     sistema_lazer_diagnostico: dict = field(default_factory=dict)
+    # Fase 9.8 — restrição recortada (mata/declividade/APP que o motor não loteou) p/ o mapa
+    # rotular (em vez do "clarão"); ``restricao_origem`` = de onde veio (vegetacao/declividade/app).
+    restricao_recortada: Optional[BaseGeometry] = None
+    restricao_origem: list[str] = field(default_factory=list)
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -391,7 +395,24 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
         "institucional": inst_gj,  # 9.7 — quadra formada (qualifica_legal + checks)
         "viario_diagnostico": vdiag,
         "institucional_diagnostico": idiag,
+        # Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").
+        "restricao_recortada": _restricao_gj(layout, to_wgs),
     }
+
+
+def _restricao_gj(layout: "Layout", to_wgs) -> Optional[dict]:
+    """A restrição que o motor recortou (não loteou) → GeoJSON rotulado p/ o mapa. ``None`` se
+    não houve restrição (não inventa). Apresentação: o número/cálculo vive nos cards ambientais."""
+    g = layout.restricao_recortada
+    if g is None or g.is_empty:
+        return None
+    gj = mapping(transform(to_wgs, g))
+    gj = dict(gj)
+    gj["origem"] = list(layout.restricao_origem)
+    gj["rotulo"] = (
+        "Área não-edificável (mata/declividade/APP) — ver cards Ambiental/Vegetação/Declividade"
+    )
+    return gj
 
 
 # ----------------------------- fidelidade (Fase 9.1) -----------------------------

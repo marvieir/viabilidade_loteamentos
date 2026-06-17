@@ -373,7 +373,8 @@ export type ChaveOverlay =
   | "urb_verde_reservada"
   | "urb_verde_sobra"
   | "urb_lazer"
-  | "urb_institucional";
+  | "urb_institucional"
+  | "urb_restricao";
 
 export interface Ambiental {
   alertas: AlertaAmbiental[];
@@ -1174,11 +1175,20 @@ export interface GeometriaUrb {
         qualifica_legal?: boolean;
       })
     | null;
-  // Fase 9.7 — diagnósticos: conectividade do viário + qualificação legal do institucional.
+  // Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").
+  restricao_recortada?:
+    | (GeoJSON.Geometry & { origem?: string[]; rotulo?: string })
+    | null;
+  // Fase 9.7/9.8 — diagnósticos: conectividade + ilhas + stubs podados + qualificação legal.
   viario_diagnostico?: {
     conexo: boolean;
     trechos: number;
     trechos_descartados: number;
+    ilhas?: number;
+    conexo_por_ilha?: boolean;
+    stubs_podados?: number;
+    viario_pct?: number;
+    vendavel_pct?: number;
     hierarquia: { tronco_m: number; local_m: number };
     obs: string;
   } | null;

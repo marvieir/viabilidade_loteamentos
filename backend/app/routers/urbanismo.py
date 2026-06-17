@@ -94,27 +94,34 @@ def medir_layout(analise_id: str, body: schemas.MedirUrbanismoIn):
 
 # --------------------------------- /propor (IA na borda) ---------------------------------
 def _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem):
-    """Área aproveitável (WGS84) = gleba − união(restrições já computadas). Degrada honesto:
-    sem fontes → a própria gleba (o gerador ainda recorta contra a tela)."""
+    """Área aproveitável (WGS84) = gleba − união(restrições já computadas). Devolve também a
+    RESTRIÇÃO recortada (∩ gleba) e a lista de ORIGENS (Fase 9.8 — p/ o mapa rotular o que o
+    motor não loteou, em vez do 'clarão'). Degrada honesto: sem fontes → a própria gleba."""
     from app.routers.analises import _coletar_geoms  # reuso (sem duplicar a coleta)
 
     gleba = registro["poly"]
     verde_geom, overlays, decliv_geom = _coletar_geoms(
         registro, fonte_veg, fonte_camadas, fonte_dem
     )
-    partes = []
+    partes, origem = [], []
     if verde_geom is not None:
         partes.append(verde_geom)
+        origem.append("vegetacao")
     for chave in _CHAVES_RESTRITIVAS:
         if overlays.get(chave) is not None:
             partes.append(overlays[chave])
+            origem.append(chave)
     if decliv_geom is not None:
         partes.append(decliv_geom)
+        origem.append("declividade_30")
     if not partes:
-        return gleba
+        return gleba, None, []
     restr = unary_union([g.intersection(gleba) for g in partes if g is not None])
     aprov = gleba.difference(restr)
-    return aprov if not aprov.is_empty else gleba
+    if aprov.is_empty:
+        return gleba, None, []
+    restr = restr if (restr is not None and not restr.is_empty) else None
+    return aprov, restr, origem
 
 
 @router.post(
@@ -141,10 +148,14 @@ def propor(
             "Configure ANTHROPIC_API_KEY ou use o endpoint /medir com um layout pronto.",
         )
 
-    # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico.
-    aprov_wgs = _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem)
+    # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
+    # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
+    aprov_wgs, restr_wgs, restr_origem = _aproveitavel_wgs(
+        registro, fonte_veg, fonte_camadas, fonte_dem
+    )
     to_local, to_wgs = medida.transformadores([aprov_wgs])
     aprov_m = transform(to_local, aprov_wgs)
+    restr_m = transform(to_local, restr_wgs) if restr_wgs is not None else None
 
     # 1b) (c) Topografia: orienta a grelha pela curva de nível do DEM (2.5), se disponível.
     orientacao = 0.0
@@ -178,6 +189,8 @@ def propor(
     layout = geom.gerar_layout(
         aprov_m, prog, orientacao_rad=orientacao, diretrizes=diretrizes
     )
+    layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
+    layout.restricao_origem = restr_origem
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
     fidelidade = schemas.FidelidadeOut(**medida.construir_fidelidade(med, layout))

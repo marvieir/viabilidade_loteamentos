@@ -22,6 +22,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde_sobra: "#86efac", // verde claro (remanescente)
   urb_lazer: "#06b6d4", // cor de equipamento
   urb_institucional: "#f59e0b",
+  urb_restricao: "#7f1d1d", // restrição recortada (mata/declividade/APP) — não-edificável (9.8)
 };
 
 // Fase 9.6 — estilo POR camada (contraste sobre satélite, borda própria). Sem entrada → default.
@@ -40,6 +41,8 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   urb_verde_sobra: { color: "#16a34a", weight: 1, fillColor: "#86efac", fillOpacity: 0.22, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
+  // Fase 9.8 — restrição recortada: hachura escura "não-edificável" (em vez do clarão).
+  urb_restricao: { color: "#7f1d1d", weight: 1.5, fillColor: "#b91c1c", fillOpacity: 0.35, dashArray: "2 3" },
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -61,6 +64,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde_sobra: "Verde remanescente",
   urb_lazer: "Sistema de lazer / clube",
   urb_institucional: "Institucional",
+  urb_restricao: "Não-edificável (mata/declividade)",
 };
 
 // Fase 9.5 — cores das faixas de score (frio→quente) p/ colorir cada LOTE no mapa (heatmap real).

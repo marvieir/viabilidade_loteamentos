@@ -128,6 +128,8 @@ export function CardUrbanismo({
       overlays.urb_verde = g.areas_verdes; // fallback (backend antigo)
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
+    // Fase 9.8 — restrição recortada (mata/declividade/APP): demarcada e rotulada (não "clarão").
+    if (g.restricao_recortada) overlays.urb_restricao = g.restricao_recortada;
     // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback
     // para o polígono fundido (compat com versões antigas do backend).
     if (!temFeatures && g.lotes) overlays.urb_lotes = g.lotes;
@@ -298,17 +300,24 @@ export function CardUrbanismo({
                 {/* Fase 9.7 — diagnóstico da MALHA: viário conexo + institucional qualifica_legal. */}
                 {proposta?.geometria.viario_diagnostico && (
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-slate-600">
-                    <span className="inline-flex items-center gap-1">
-                      <span
-                        className={`inline-block h-2 w-2 rounded-full ${
-                          proposta.geometria.viario_diagnostico.conexo ? "bg-emerald-500" : "bg-amber-500"
-                        }`}
-                      />
-                      Viário{" "}
-                      {proposta.geometria.viario_diagnostico.conexo
+                    {(() => {
+                      const vd = proposta.geometria.viario_diagnostico!;
+                      const ilhas = vd.ilhas ?? 1;
+                      // Fase 9.8 — conexo geral, ou conexo POR ILHA quando a restrição parte a gleba.
+                      const ok = vd.conexo || (ilhas > 1 && vd.conexo_por_ilha);
+                      const txt = vd.conexo
                         ? "conexo (malha única)"
-                        : `em ${proposta.geometria.viario_diagnostico.trechos} trechos`}
-                    </span>
+                        : ilhas > 1 && vd.conexo_por_ilha
+                          ? `${ilhas} ilhas conexas (partidas pela restrição)`
+                          : `em ${vd.trechos} trechos`;
+                      return (
+                        <span className="inline-flex items-center gap-1">
+                          <span className={`inline-block h-2 w-2 rounded-full ${ok ? "bg-emerald-500" : "bg-amber-500"}`} />
+                          Viário {txt}
+                          {!!vd.stubs_podados && ` · ${vd.stubs_podados} caco(s) podado(s)`}
+                        </span>
+                      );
+                    })()}
                     {proposta.geometria.institucional_diagnostico && (
                       <span className="inline-flex items-center gap-1">
                         <span

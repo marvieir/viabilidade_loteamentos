@@ -21,7 +21,7 @@ import math
 from typing import Optional, Sequence
 
 from shapely.affinity import rotate
-from shapely.geometry import LineString, Polygon, box
+from shapely.geometry import LineString, Point, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import polygonize, unary_union
 
@@ -56,6 +56,9 @@ INST_FRENTE_MIN_M = 10.0
 INST_CIRCULO_DIAM_MIN_M = 10.0
 INST_DECLIV_MAX_PCT = 15.0
 RATIO_NAO_SLIVER = 1.0 / 3.0
+# Fase 9.8 — PODA: comprimento mínimo (m) de um eixo dentro da ilha p/ valer como via (abaixo
+# disso é cotovelo/caco). Um eixo só sobrevive se serve ≥1 quadra loteável adjacente.
+L_MIN_EIXO_M = 25.0
 
 try:  # shapely 2.x
     from shapely import make_valid as _make_valid
@@ -234,67 +237,141 @@ def _linhas(geom: Optional[BaseGeometry]) -> list[LineString]:
     return []
 
 
-def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
-                    block_h: float, via_local: float, via_tronco: float):
-    """MALHA VIÁRIA CONEXA (no frame já rotacionado ``reg``): uma grade LOCAL de blocos iguais
-    (sem sliver de borda — os eixos dividem a tela em N blocos exatos) somada aos EIXOS DA IA
-    como TRONCO (atravessam a grade → conectam tudo numa peça só). Devolve ``(faces, ruas,
-    eixos, troncos)``: ``faces`` = polígonos cercados pelas ruas (``polygonize``); ``ruas`` =
-    união dos buffers das centerlines ∩ ``reg`` (conexa por construção); ``eixos`` = todas as
-    centerlines (p/ medir comprimento de via); ``troncos`` = só as de tronco (hierarquia)."""
+def _eixos_da_ilha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
+                   block_h: float, via_local: float, via_tronco: float):
+    """Eixos (centerlines + largura) de UMA ilha, JÁ EXPLODIDOS EM SEGMENTOS dentro da ilha. Em
+    gleba irregular, uma reta da grade recortada à ilha vira VÁRIOS segmentos — o stub é um
+    SEGMENTO (não a reta inteira), então a poda precisa vê-los separados. Grade local recortada à
+    ILHA (não ao bbox) + eixos da IA como TRONCO; sem IA, promove o segmento central a tronco."""
     minx, miny, maxx, maxy = reg.bounds
     W, H = (maxx - minx), (maxy - miny)
-    eixos: list[tuple[LineString, float]] = []  # (centerline, largura)
-    # Grade LOCAL: nº de blocos que cabe → linhas igualmente espaçadas (blocos iguais, sem ponta).
+    brutos: list[tuple[LineString, float, bool]] = []  # (reta, largura, é_tronco)
     nbx = max(int(round(W / (block_w + via_local))), 1)
     nby = max(int(round(H / (block_h + via_local))), 1)
     for i in range(1, nbx):
         x = minx + i * W / nbx
-        eixos.append((LineString([(x, miny), (x, maxy)]), via_local))
+        brutos.append((LineString([(x, miny), (x, maxy)]), via_local, False))
     for j in range(1, nby):
         y = miny + j * H / nby
-        eixos.append((LineString([(minx, y), (maxx, y)]), via_local))
-
-    # TRONCO: os eixos da IA (semente) entram como via principal; atravessam a grade → conexão.
-    troncos: list[LineString] = []
+        brutos.append((LineString([(minx, y), (maxx, y)]), via_local, False))
+    tem_tronco_ia = False
     for e in (eixos_ia or []):
-        rec = _valido(e.intersection(reg)) if e is not None else None
-        for part in _linhas(rec):
-            eixos.append((part, via_tronco))
-            troncos.append(part)
-    # Sem eixo da IA: promove a linha central da grade a tronco (sempre há uma via principal).
-    if not troncos and eixos:
-        centrais = sorted(eixos, key=lambda gw: abs(gw[0].centroid.x - reg.centroid.x)
-                          + abs(gw[0].centroid.y - reg.centroid.y))
-        g, _ = centrais[0]
-        eixos = [(gg, via_tronco if gg is g else w) for gg, w in eixos]
-        troncos.append(g)
+        for part in _linhas(_valido(e.intersection(reg)) if e is not None else None):
+            brutos.append((part, via_tronco, True))
+            tem_tronco_ia = True
 
-    if not eixos:  # gleba menor que um bloco → uma quadra só, sem via interna (degrada honesto)
-        return [g for g in _componentes(reg)], None, [], []
+    # EXPLODE cada reta nos segmentos que caem DENTRO da ilha (o recorte parte a reta).
+    segs: list[list] = []  # [LineString, largura, é_tronco] (mutável p/ promover tronco)
+    for ls, w, is_t in brutos:
+        for part in _linhas(_valido(ls.intersection(reg))):
+            if part.length > 0:
+                segs.append([part, w, is_t])
 
+    # ``troncos_ia`` = só a via-tronco PROPOSTA PELA IA (a espinha) — protegida da poda. Sem IA,
+    # promove-se o segmento central a tronco (largura), mas ele NÃO é protegido (é só grade): numa
+    # gleba irregular ele pode ser um caco e deve ser podado como os ramos locais.
+    troncos_ia: list[LineString] = []
+    if tem_tronco_ia:
+        troncos_ia = [s[0] for s in segs if s[2]]
+    elif segs:  # sem IA: promove o segmento longo mais central a tronco-largura (não protegido)
+        c = reg.centroid
+        cand = [s for s in segs if s[0].length >= L_MIN_EIXO_M] or segs
+        s = min(cand, key=lambda s: s[0].centroid.distance(c))
+        s[1] = via_tronco
+    return [(s[0], s[1]) for s in segs], troncos_ia
+
+
+def _faces_de(reg: BaseGeometry, eixos) -> list[Polygon]:
+    """Faces que as ruas cercam (``polygonize`` da borda da ilha ∪ eixos), dentro da ilha."""
     linhas = [reg.boundary] + [g for g, _ in eixos]
     noded = _uniao_segura(linhas)
-    faces = []
-    if noded is not None and not noded.is_empty:
-        for f in polygonize(noded):
-            if f.is_empty:
-                continue
-            try:
-                dentro = reg.contains(f.representative_point())
-            except Exception:  # noqa: BLE001 — ponto representativo degenerado
-                dentro = reg.intersects(f.centroid)
-            if dentro:
-                faces.append(f)
+    faces: list[Polygon] = []
+    if noded is None or noded.is_empty:
+        return faces
+    for f in polygonize(noded):
+        if f.is_empty:
+            continue
+        try:
+            dentro = reg.contains(f.representative_point())
+        except Exception:  # noqa: BLE001 — ponto representativo degenerado
+            dentro = reg.intersects(f.centroid)
+        if dentro:
+            faces.append(f)
+    return faces
+
+
+def _ruas_de(reg: BaseGeometry, eixos) -> Optional[BaseGeometry]:
+    """Polígono de ruas = união dos buffers (largura/2) das centerlines ∩ ilha."""
     ruas = _uniao_segura([
         _valido(g.intersection(reg)).buffer(w / 2.0, cap_style=2, join_style=2)
         for g, w in eixos if g is not None and not g.intersection(reg).is_empty
     ])
-    if ruas is not None and not ruas.is_empty:
-        ruas = _valido(ruas.intersection(reg))
-    else:
-        ruas = None
-    return faces, ruas, [g for g, _ in eixos], troncos
+    if ruas is None or ruas.is_empty:
+        return None
+    return _valido(ruas.intersection(reg))
+
+
+def podar_stubs(reg: BaseGeometry, faces: list[Polygon], eixos, troncos_ia,
+                via_local: float, via_tronco: float):
+    """PODA DETERMINÍSTICA (§2): o viário é a REDE DE RUAS = as fronteiras INTERNAS entre faces
+    (onde dois blocos se encontram), descontado o perímetro da ilha. Isso mantém a parte ÚTIL de
+    cada eixo (que dá frente a duas quadras) e descarta só os STUBS — trechos pendurados/cacos
+    que o recorte da gleba irregular deixou (não são fronteira de bloco) e cotovelos < L_MIN. A
+    largura segue a hierarquia (tronco onde o eixo é tronco, senão local). Devolve
+    ``(ruas, eixos_uteis, n_stubs)``. Estável e sem cascata (a rede sai das faces, de uma vez)."""
+    bordas = _uniao_segura([f.boundary for f in faces])
+    if bordas is None or bordas.is_empty:
+        return None, [], len(eixos)
+    perim = reg.boundary.buffer(0.5)
+    internas = _valido(_diferenca_segura(bordas, perim))
+    if internas is None or internas.is_empty:
+        return None, [], len(eixos)
+
+    # ruas = faixa LOCAL em toda a rede interna; TRONCO (mais largo) onde a rede coincide com um
+    # eixo de tronco-largura (espinha local/IA). A via-tronco da IA é SEMPRE materializada por
+    # inteiro (protegida da poda — é a espinha proposta; a 9.9 a torna sinuosa).
+    partes = [internas.buffer(via_local / 2.0, cap_style=2, join_style=2)]
+    tron_largos = _uniao_segura([g for g, w in eixos if w >= via_tronco - 1e-6])
+    if tron_largos is not None and not tron_largos.is_empty:
+        tron_rede = _valido(internas.intersection(tron_largos.buffer(0.6)))
+        if tron_rede is not None and not tron_rede.is_empty:
+            partes.append(tron_rede.buffer(via_tronco / 2.0, cap_style=2, join_style=2))
+    ia_u = _uniao_segura([_valido(t.intersection(reg)) for t in troncos_ia]) if troncos_ia else None
+    if ia_u is not None and not ia_u.is_empty:  # espinha da IA: sempre por inteiro
+        partes.append(ia_u.buffer(via_tronco / 2.0, cap_style=2, join_style=2))
+    ruas = _uniao_segura(partes)
+    ruas = _valido(ruas.intersection(reg)) if (ruas is not None and not ruas.is_empty) else None
+
+    # classifica cada eixo: ÚTIL se é tronco da IA OU ≥50% do segmento está na rede; senão stub.
+    rede_buf = internas.buffer(0.5)
+    ia_set = {id(t) for t in troncos_ia}
+    uteis, n_stub = [], 0
+    for g, _w in eixos:
+        seg = _valido(g.intersection(reg))
+        comum = _valido(seg.intersection(rede_buf)) if (seg is not None and not seg.is_empty) else None
+        util = id(g) in ia_set or (
+            seg is not None and comum is not None and comum.length >= 0.5 * seg.length
+        )
+        if util:
+            uteis.append(g)
+        else:
+            n_stub += 1
+    return ruas, uteis, n_stub
+
+
+def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
+                    block_h: float, via_local: float, via_tronco: float, podar: bool = True):
+    """MALHA de UMA ILHA (frame rotacionado ``reg``): grade local recortada à ilha + tronco,
+    depois PODA dos stubs (Fase 9.8). Devolve ``(faces, ruas, eixos, troncos, n_stubs)`` — a
+    malha é conexa DENTRO da ilha (a gleba partida por restrição é tratada como ilhas separadas)."""
+    eixos, troncos = _eixos_da_ilha(reg, eixos_ia, block_w, block_h, via_local, via_tronco)
+    if not eixos:  # ilha menor que um bloco → uma quadra só, sem via interna (degrada honesto)
+        return [g for g in _componentes(reg)], None, [], [], 0
+    faces = _faces_de(reg, eixos)  # estável: danglers não criam face (polygonize os ignora)
+    if not podar:
+        return faces, _ruas_de(reg, eixos), [g for g, _ in eixos], troncos, 0
+    ruas, eixos_uteis, n_stubs = podar_stubs(reg, faces, eixos, troncos, via_local, via_tronco)
+    return faces, ruas, eixos_uteis, troncos, n_stubs
 
 
 def _miolo(face: BaseGeometry, ruas: Optional[BaseGeometry]) -> Optional[Polygon]:
@@ -542,9 +619,28 @@ def gerar_layout(
     via_tronco = max(via, VIA_TRONCO_M)       # coletora/tronco (hierarquia ≥21 m)
     block_w = N_LOTES_QUADRA * testada_alvo    # testada da quadra ~ N lotes
     block_h = 2.0 * prof                        # quadra de duas fileiras (costas-com-costas)
-    faces, ruas_reg, eixos_reg, troncos_reg = construir_malha(
-        reg, eixos_ia_reg, block_w, block_h, via_local, via_tronco
-    )
+
+    # Fase 9.8 — MALHA POR ILHA + PODA: a restrição (mata/declividade/APP) já partiu a aprov em
+    # componentes; cada ILHA recebe a malha 9.7 recortada A ELA (não ao bbox da gleba) e a poda
+    # de stubs. Duas massas separadas por mata são legitimamente 2 ilhas conexas (não 1 desconexa).
+    faces: list[Polygon] = []
+    ruas_parts: list[BaseGeometry] = []
+    eixos_reg: list[BaseGeometry] = []
+    stubs_podados = 0
+    trechos_por_ilha: list[int] = []
+    ilhas = _componentes(reg)
+    for ilha in ilhas:
+        eixos_ia_ilha = [e for e in eixos_ia_reg if e is not None and e.intersects(ilha)]
+        fcs, ruas_i, eix_i, _tron_i, n_stub = construir_malha(
+            ilha, eixos_ia_ilha, block_w, block_h, via_local, via_tronco, podar=True
+        )
+        faces.extend(fcs)
+        eixos_reg.extend(eix_i)
+        stubs_podados += n_stub
+        if ruas_i is not None and not ruas_i.is_empty:
+            ruas_parts.append(ruas_i)
+            trechos_por_ilha.append(len(_componentes(ruas_i)))
+    ruas_reg = _uniao_segura(ruas_parts)
 
     # Quadras = miolo de cada face (face − ruas). Faces minúsculas → quadra verde formada (sobra).
     declividade_pct = (
@@ -619,17 +715,27 @@ def gerar_layout(
     sobra_ponta = _back(sobra_reg)
     eixos_malha = [r for r in (_back(e) for e in eixos_reg) if r is not None]
 
-    # Conectividade do viário (critério 1): a malha é UMA peça? (ilhas da gleba → honesto False).
+    # Conectividade do viário: a malha é UMA peça? (ilhas da gleba → conexo geral False, mas
+    # cada ILHA pode ser conexa — é o que importa na 9.8). conexo_por_ilha = toda ilha 1 peça.
     n_trechos = len(_componentes(arruamento)) if arruamento is not None else 0
     conexo = n_trechos == 1
+    conexo_por_ilha = bool(trechos_por_ilha) and all(t == 1 for t in trechos_por_ilha)
+    viario_m2 = arruamento.area if arruamento is not None and not arruamento.is_empty else 0.0
+    vendavel_m2 = sum(l.area for l in lotes)
     viario_diag = {
         "conexo": conexo,
         "trechos": n_trechos,
         "trechos_descartados": len(descartes),
+        # Fase 9.8 — malha por ilha + poda de stubs.
+        "ilhas": len(ilhas),
+        "conexo_por_ilha": conexo_por_ilha,
+        "stubs_podados": stubs_podados,
+        "viario_pct": round(viario_m2 / aprov_area, 4) if aprov_area else 0.0,
+        "vendavel_pct": round(vendavel_m2 / aprov_area, 4) if aprov_area else 0.0,
         "hierarquia": {"tronco_m": round(via_tronco, 1), "local_m": round(via_local, 1)},
-        "obs": ("malha a partir dos eixos da IA; trechos soltos conectados ao tronco da grade"
-                if conexo else
-                "gleba partida em ilhas pela restrição — viário conexo dentro de cada ilha"),
+        "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "
+                "virou lote/verde" + ("" if conexo else " — gleba partida pela restrição em "
+                f"{len(ilhas)} ilha(s), cada uma conexa")),
     }
 
     lazer_reservado_m2 = sum(
