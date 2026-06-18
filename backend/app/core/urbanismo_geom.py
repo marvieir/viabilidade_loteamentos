@@ -60,6 +60,19 @@ RATIO_NAO_SLIVER = 1.0 / 3.0
 # disso é cotovelo/caco). Um eixo só sobrevive se serve ≥1 quadra loteável adjacente.
 L_MIN_EIXO_M = 25.0
 
+# Fase 9.11 — GRADE ADAPTATIVA POR ILHA: o lado do quarteirão deixa de ser FIXO e passa a ser
+# FUNÇÃO do tamanho da ilha. Causa provada com log real: a declividade estilhaça o aproveitável
+# em ilhas pequenas/tortas; o quarteirão fixo (~90×62 m) recortado numa ilha pequena rende 2–3
+# faces → quase nenhuma fronteira interna → viário colapsa (~5%) e os lotes ficam colados. A
+# correção afina o quarteirão na ilha pequena (mais faces → mais fronteira interna → viário real),
+# SEM nunca violar o piso legal de lote (clamp 9.4). Ilha grande mantém o teto do perfil — a caixa
+# limpa NÃO regride (escala = 1,0). Decisão GEOMÉTRICA determinística do Python (§2), não do LLM.
+AREA_ILHA_REF_M2 = 55_000.0   # ilha ≥ esta área usa o quarteirão CHEIO (teto do perfil)
+ESCALA_QUADRA_MIN = 0.45      # afina no máximo até 45% do lado do teto (piso legal ainda manda)
+# Ilha só adapta se comporta ao menos ~este nº de quarteirões no teto; abaixo disso é site único
+# pequeno (não a gleba estilhaçada) e afinar só geraria slivers — mantém o teto (sem churn).
+AREA_MIN_ADAPTA_QUADRAS = 3.0
+
 try:  # shapely 2.x
     from shapely import make_valid as _make_valid
 except Exception:  # pragma: no cover
@@ -377,6 +390,17 @@ def podar_stubs(reg: BaseGeometry, faces: list[Polygon], eixos, troncos_ia,
         else:
             n_stub += 1
     return ruas, uteis, n_stub
+
+
+def lado_quadra_adaptativo(area_ilha: float, teto_w: float, teto_h: float,
+                           piso_w: float, piso_h: float) -> tuple[float, float]:
+    """Fase 9.11 — lado do quarteirão ``(largura, altura)`` ADAPTADO ao tamanho da ilha, com
+    clamp legal. Ilha grande (≥ ``AREA_ILHA_REF_M2``) → teto do perfil (caixa limpa intacta);
+    ilha pequena/torta → AFINA o quarteirão (escala = √(área/ref)) para gerar faces adjacentes —
+    fronteira interna = viário —, mas NUNCA abaixo do piso (lote ≥ mínimo, clamp 9.4 preservado).
+    Pura geometria determinística (§2): não vem do LLM, só do tamanho da ilha + piso legal."""
+    escala = min(1.0, max(ESCALA_QUADRA_MIN, math.sqrt(max(area_ilha, 0.0) / AREA_ILHA_REF_M2)))
+    return max(piso_w, teto_w * escala), max(piso_h, teto_h * escala)
 
 
 def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
@@ -747,8 +771,13 @@ def gerar_layout(
     # a via-tronco curva usa a largura da VIA PRINCIPAL do programa (~14 m) — uma curva de 21 m de
     # largura infla o viário acima do teto; 14 m mantém a curva visível dentro de ≤18% (9.9).
     via_tronco = max(via, via_local + 2.0) if quer_curva else max(via, VIA_TRONCO_M)
-    block_w = N_LOTES_QUADRA * testada_alvo    # testada da quadra ~ N lotes
-    block_h = 2.0 * prof                        # quadra de duas fileiras (costas-com-costas)
+    block_w = N_LOTES_QUADRA * testada_alvo    # TETO: testada da quadra ~ N lotes (perfil)
+    block_h = 2.0 * prof                        # TETO: quadra de duas fileiras (costas-com-costas)
+    # Fase 9.11 — PISO LEGAL do quarteirão adaptativo: a grade pode afinar p/ gerar faces, mas o
+    # quarteirão nunca fica menor que ~2 lotes de testada (largura) nem que uma fileira de
+    # profundidade legal (altura) — assim o lote resultante segue ≥ mínimo (clamp 9.4 intacto).
+    piso_quadra_w = max(2.0 * testada_alvo, 2.0 * FRENTE_MIN_M)
+    piso_quadra_h = prof
 
     # Fase 9.8 — MALHA POR ILHA + PODA: a restrição (mata/declividade/APP) já partiu a aprov em
     # componentes; cada ILHA recebe a malha 9.7 recortada A ELA (não ao bbox da gleba) e a poda
@@ -759,8 +788,22 @@ def gerar_layout(
     curvas_ia_reg: list[BaseGeometry] = []  # 9.9 — os eixos curvos efetivamente usados (p/ medir)
     stubs_podados = 0
     trechos_por_ilha: list[int] = []
+    ilhas_detalhe: list[dict] = []      # Fase 9.11 — adaptação por ilha (área, bbox, lado, faces)
+    grade_adaptou = False               # alguma ilha afinou abaixo do teto?
     ilhas = _componentes(reg)
-    for ilha in ilhas:
+    for idx, ilha in enumerate(ilhas):
+        # Fase 9.11 — GRADE ADAPTATIVA: o lado do quarteirão é função do tamanho DESTA ilha (com
+        # piso legal). Ilha grande → teto (caixa limpa intacta); ilha pequena/torta MAS que ainda
+        # comporta vários quarteirões → afina p/ gerar faces. Ilha pequena DEMAIS (site único
+        # minúsculo, não a patologia da gleba estilhaçada) NÃO adapta — afinar ali só churna slivers
+        # sem recuperar loteamento. Não toca poda/sinuosidade/recorte — só o passo da grade.
+        if ilha.area >= AREA_MIN_ADAPTA_QUADRAS * block_w * block_h:
+            bw_i, bh_i = lado_quadra_adaptativo(
+                ilha.area, block_w, block_h, piso_quadra_w, piso_quadra_h
+            )
+        else:
+            bw_i, bh_i = block_w, block_h
+        minx, miny, maxx, maxy = ilha.bounds
         eixos_ia_ilha = [e for e in eixos_ia_reg if e is not None and e.intersects(ilha)]
         if not eixos_ia_ilha and quer_curva:
             # Fallback EXPLÍCITO (nunca grade silenciosa): espinha sinuosa ao longo da ilha.
@@ -769,7 +812,7 @@ def gerar_layout(
                 eixos_ia_ilha = [esp]
         curvas_ia_reg.extend(eixos_ia_ilha)
         fcs, ruas_i, eix_i, _tron_i, n_stub = construir_malha(
-            ilha, eixos_ia_ilha, block_w, block_h, via_local, via_tronco, podar=True
+            ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True
         )
         faces.extend(fcs)
         eixos_reg.extend(eix_i)
@@ -777,6 +820,21 @@ def gerar_layout(
         if ruas_i is not None and not ruas_i.is_empty:
             ruas_parts.append(ruas_i)
             trechos_por_ilha.append(len(_componentes(ruas_i)))
+        # diagnóstico por ilha: face loteável = ≥ MIN_QUADRA (senão a ilha é sliver → verde).
+        n_loteavel = sum(1 for f in fcs if f.area >= MIN_QUADRA_M2)
+        afinou = bw_i < block_w - 1e-6 or bh_i < block_h - 1e-6
+        grade_adaptou = grade_adaptou or afinou
+        if n_loteavel == 0:
+            motivo, lado_out = "sub-lote: vira verde/não-aproveitável", None
+        elif afinou:
+            motivo, lado_out = "adaptado: ilha pequena", round(bw_i, 1)
+        else:
+            motivo, lado_out = "teto do perfil", round(bw_i, 1)
+        ilhas_detalhe.append({
+            "ilha": idx, "area_m2": round(ilha.area, 2),
+            "bbox_m": [round(maxx - minx, 1), round(maxy - miny, 1)],
+            "lado_quadra_m": lado_out, "faces": len(fcs), "motivo": motivo,
+        })
     ruas_reg = _uniao_segura(ruas_parts)
 
     # Quadras = miolo de cada face (face − ruas). Faces minúsculas → quadra verde formada (sobra).
@@ -883,6 +941,10 @@ def gerar_layout(
         "esqueleto_origem": esqueleto_origem,
         "sinuosidade_media": sinuosidade_media,
         "eixos_curvos": eixos_curvos,
+        # Fase 9.11 — grade adaptativa por ilha: lado do quarteirão dimensionado por ilha (piso
+        # legal), recuperando faces/fronteira interna onde a declividade estilhaçou a gleba.
+        "grade_adaptativa": grade_adaptou,
+        "ilhas_detalhe": ilhas_detalhe,
         "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "
                 "virou lote/verde" + ("" if conexo else " — gleba partida pela restrição em "
                 f"{len(ilhas)} ilha(s), cada uma conexa")

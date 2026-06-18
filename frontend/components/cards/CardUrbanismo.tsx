@@ -347,6 +347,13 @@ export function CardUrbanismo({
                         {proposta.geometria.viario_diagnostico.esqueleto_origem === "llm" ? " · IA" : " · padrão"})
                       </span>
                     )}
+                    {/* Fase 9.11 — grade adaptada ao terreno (quarteirão dimensionado por ilha). */}
+                    {proposta.geometria.viario_diagnostico.grade_adaptativa && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />
+                        Grade adaptada ao terreno (quarteirão por ilha)
+                      </span>
+                    )}
                   </div>
                 )}
                 <p className="text-[11px] text-slate-500">

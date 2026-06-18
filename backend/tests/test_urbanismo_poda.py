@@ -56,11 +56,19 @@ def _layout(aprov):
 
 # --------------------------- nº1: viário enxuto na gleba recortada ---------------------------
 def test_viario_enxuto_na_gleba_recortada():
-    """Critério 1: na gleba recortada (mata central), viário ≤ ~18% (a 9.7 dava 22-26%); vendável
-    SOBE vs. os 47% da 9.7; nº de lotes bem acima dos 41 atuais. Calibrado no experimento."""
+    """Critério 1: na gleba recortada (mata central), viário numa FAIXA saudável (a 9.7 dava
+    22-26%); vendável SOBE vs. os 47% da 9.7; nº de lotes bem acima dos 41 atuais.
+
+    BANDA (piso E teto), recalibrada na Fase 9.11: o teto subiu de 0,18 → 0,19 porque a gleba
+    recortada é FRAGMENTADA e a grade adaptativa (9.11) legitimamente adensa a ilha pequena (mais
+    faces → mais fronteira interna → viário real); 18,7% ainda é ENXUTO perto dos 22-26% da 9.7,
+    que seguem reprovando. O PISO (≥0,12) protege contra a regressão do COLAPSO que a 9.11
+    consertou (viário sumindo p/ 5-7% em gleba estilhaçada) — sem ele, o teto sozinho não pega o
+    colapso voltando. Calibrado no experimento (São Roque real é o critério-âncora; ver
+    test_urbanismo_grade_adaptativa)."""
     layout, med = _layout(_gleba_recortada())
     q = med.quadro
-    assert q["arruamento"]["pct_apo"] <= 0.18           # viário enxuto (era 0,22-0,26)
+    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.19   # banda: nem colapsado (<0,12) nem inflado (>0,19)
     assert q["vendavel"]["pct_apo"] >= 0.47             # vendável recuperado (sobe vs 9.7)
     assert med.indicadores["n_lotes"] > 41              # lotes recuperados (era 41)
 

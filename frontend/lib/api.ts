@@ -1218,6 +1218,16 @@ export interface GeometriaUrb {
     esqueleto_origem?: string; // "llm" | "fallback_curva" | "grade"
     sinuosidade_media?: number; // >1.1 = curvo (1.0 = reto)
     eixos_curvos?: boolean;
+    // Fase 9.11 — grade adaptativa por ilha (lado do quarteirão dimensionado por ilha, piso legal).
+    grade_adaptativa?: boolean;
+    ilhas_detalhe?: {
+      ilha: number;
+      area_m2: number;
+      bbox_m: [number, number];
+      lado_quadra_m: number | null;
+      faces: number;
+      motivo: string;
+    }[];
     hierarquia: { tronco_m: number; local_m: number };
     obs: string;
   } | null;
