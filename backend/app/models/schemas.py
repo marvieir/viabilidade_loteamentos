@@ -150,6 +150,32 @@ class CenarioOtimistaOut(BaseModel):
     ressalva: str
 
 
+# Fase 9.10 — Ponte de reconciliação (teto teórico × estudo realista). PURO TEXTO/APRESENTAÇÃO:
+# rotula o número de cada aba e cita o da outra. Nenhuma aba usa o número da outra em CONTA —
+# a referência cruzada é só exibição (sem acoplamento de cálculo).
+class RefCruzadaOut(BaseModel):
+    fonte: str  # "urbanismo" | "aproveitamento"
+    lotes: int
+
+
+class ReconciliacaoAproveitamentoOut(BaseModel):
+    papel: Literal["teto_teorico"] = "teto_teorico"
+    lotes_teto: int
+    lote_base_m2: float
+    doacao_base_pct: float
+    ref_estudo_massa: Optional[RefCruzadaOut] = None  # null → o front mostra o convite (não inventa)
+    leitura: str
+
+
+class ReconciliacaoUrbanismoOut(BaseModel):
+    papel: Literal["estudo_geometrico"] = "estudo_geometrico"
+    lotes_estudo: int
+    lote_mediano_m2: float
+    doacao_desenhada_pct: float
+    ref_teto_regulatorio: Optional[RefCruzadaOut] = None  # null → convite (não inventa)
+    leitura: str
+
+
 class AproveitamentoOut(BaseModel):
     regime: Literal["URBANO", "RURAL"]
     premissa: str
@@ -171,6 +197,8 @@ class AproveitamentoOut(BaseModel):
     lote_min_m2: Optional[float] = None
     n_lotes_teto: Optional[int] = None  # teto: aproveitável ÷ lote mínimo (sem vias/doação)
     ressalva_urbano: Optional[str] = None
+    # Fase 9.10 — ponte de reconciliação (rotula o teto e cita o estudo de massa). Só exibição.
+    reconciliacao: Optional[ReconciliacaoAproveitamentoOut] = None
     # RURAL
     rural: Optional[RuralOut] = None
 
@@ -1271,6 +1299,8 @@ class PropostaUrbanisticaOut(BaseModel):
     diretrizes: Optional[DiretrizesOut] = None  # Fase 9.4 (LUOS→mercado→federal)
     conformidade_legal: list[ConformidadeLegalOut] = []  # Fase 9.4 (medido × mínimo legal)
     conformidade_programa: list[ItemConformidadePrograma] = []
+    # Fase 9.10 — ponte de reconciliação (rotula o estudo e cita o teto regulatório). Só exibição.
+    reconciliacao: Optional[ReconciliacaoUrbanismoOut] = None
     esqueleto_ignorado: list[str] = []
     proveniencia: str
     avisos: list[str]

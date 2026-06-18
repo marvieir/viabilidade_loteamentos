@@ -424,6 +424,22 @@ export function CardUrbanismo({
                     />
                   </div>
                 )}
+                {/* Fase 9.10 — PONTE: rotula o estudo (geométrico) e cita o teto regulatório.
+                    Texto interpolado pelo backend; o front só renderiza. */}
+                {proposta?.reconciliacao && (
+                  <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                      Estudo de massa × teto regulatório
+                    </p>
+                    <p className="mt-1 text-xs text-amber-900">{proposta.reconciliacao.leitura}</p>
+                    {proposta.reconciliacao.ref_teto_regulatorio && (
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        Faixa honesta: ~{proposta.reconciliacao.ref_teto_regulatorio.lotes} (teto
+                        legal) → ~{proposta.reconciliacao.lotes_estudo} (este estudo).
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

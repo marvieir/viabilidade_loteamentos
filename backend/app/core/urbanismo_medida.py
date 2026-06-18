@@ -580,6 +580,44 @@ def distribuicao_tamanhos(med: "Medicao", layout: "Layout") -> dict:
     }
 
 
+def reconciliacao_urbanismo(med: "Medicao", lotes_teto=None) -> dict:
+    """PONTE (Fase 9.10) — APRESENTAÇÃO, zero cálculo novo: rotula o ESTUDO geométrico e cita o
+    teto regulatório. Números JÁ medidos: n_lotes, mediana do lote, doação DESENHADA (mesma do
+    quadro/conformidade). ``lotes_teto`` vem da aba Aproveitamento (mesma fórmula/cenário) —
+    ``None`` se indisponível (convite, não inventa). §1-A: 'estudo/estimativa/verificar'."""
+    q = med.quadro
+    liq = q["area_liquida_m2"] or 1.0
+    doa = round((q["areas_verdes"]["m2"] + q["sistema_lazer"]["m2"]
+                 + q["institucional"]["m2"] + q["arruamento"]["m2"]) / liq, 4)
+    areas = sorted(p["area_m2"] for p in med.heatmap.get("por_lote", []) if p.get("area_m2"))
+    mediana = round(areas[len(areas) // 2], 2) if areas else 0.0
+    n = med.indicadores["n_lotes"]
+    base = (
+        f"Estudo de massa geométrico — lotes do perfil (~{_fmt(mediana)} m²), doação desenhada "
+        f"(~{_fmt(doa * 100, 1)}%), vias conectadas e áreas públicas formadas, contornando a área "
+        "não-edificável."
+    )
+    if lotes_teto is not None:
+        ref = {"fonte": "aproveitamento", "lotes": int(lotes_teto)}
+        leitura = base + (
+            f" Teto regulatório da zona: ~{int(lotes_teto)} lotes (aba Aproveitamento), assumindo "
+            "lote mínimo e doação mínima. Verificar com urbanista."
+        )
+    else:
+        ref = None
+        leitura = base + (
+            " Rode o Aproveitamento com a zona declarada para ver o teto regulatório."
+        )
+    return {
+        "papel": "estudo_geometrico",
+        "lotes_estudo": int(n),
+        "lote_mediano_m2": mediana,
+        "doacao_desenhada_pct": doa,
+        "ref_teto_regulatorio": ref,
+        "leitura": leitura,
+    }
+
+
 def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> list[dict]:
     """Confronta o que foi MEDIDO com os MÍNIMOS do município (LUOS/1.8) + piso federal. Mede,
     não decide (§1-A): cada item recebe atende / atende_com_folga / não_atende / não_avaliado."""

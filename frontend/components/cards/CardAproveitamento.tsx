@@ -369,6 +369,23 @@ export function CardAproveitamento({
             </>
           ))}
 
+        {/* Fase 9.10 — PONTE de reconciliação: rotula o teto e cita o estudo de massa (texto
+            interpolado pelo backend; o front só renderiza). Mata a estranheza do 120 vs 51. */}
+        {res?.regime === "URBANO" && res.reconciliacao && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+              Teto teórico × estudo de massa
+            </p>
+            <p className="mt-1 text-xs text-amber-900">{res.reconciliacao.leitura}</p>
+            {res.reconciliacao.ref_estudo_massa && (
+              <p className="mt-1 text-[11px] text-amber-700">
+                Faixa honesta: ~{res.reconciliacao.lotes_teto} (teto legal) → ~
+                {res.reconciliacao.ref_estudo_massa.lotes} (estudo realista).
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Resultado RURAL */}
         {res?.regime === "RURAL" && res.rural && (
           <>

@@ -176,8 +176,32 @@ export interface Aproveitamento {
   lote_min_m2?: number | null;
   n_lotes_teto?: number | null;
   ressalva_urbano?: string | null;
+  // Fase 9.10 — ponte de reconciliação (teto teórico × estudo realista). Só exibição.
+  reconciliacao?: ReconciliacaoAproveitamento | null;
   // RURAL
   rural?: RuralResult | null;
+}
+
+// Fase 9.10 — ponte de reconciliação (texto interpolado pelo backend; o front só renderiza).
+export interface RefCruzada {
+  fonte: string;
+  lotes: number;
+}
+export interface ReconciliacaoAproveitamento {
+  papel: "teto_teorico";
+  lotes_teto: number;
+  lote_base_m2: number;
+  doacao_base_pct: number;
+  ref_estudo_massa?: RefCruzada | null;
+  leitura: string;
+}
+export interface ReconciliacaoUrbanismo {
+  papel: "estudo_geometrico";
+  lotes_estudo: number;
+  lote_mediano_m2: number;
+  doacao_desenhada_pct: number;
+  ref_teto_regulatorio?: RefCruzada | null;
+  leitura: string;
 }
 
 async function jsonOrThrow(res: Response) {
@@ -1301,6 +1325,7 @@ export interface PropostaUrbanistica {
   diretrizes: Diretrizes | null;
   conformidade_legal: ConformidadeLegal[];
   conformidade_programa: ItemConformidadePrograma[];
+  reconciliacao?: ReconciliacaoUrbanismo | null; // Fase 9.10 — ponte (estudo × teto regulatório)
   esqueleto_ignorado: string[];
   proveniencia: string;
   avisos: string[];

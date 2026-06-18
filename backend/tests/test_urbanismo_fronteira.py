@@ -111,10 +111,21 @@ def test_propor_sem_credencial_503(client, gerador_urbanismo_indisponivel, fonte
 
 
 def test_aditivo_nao_regride_aproveitamento(client, gerador_urbanismo, fonte_urbanismo):
-    """Critério 8: a Fase 9 é aditiva — o aproveitamento é idêntico com/sem o urbanismo."""
+    """Critério 8: a Fase 9 é aditiva — o CÁLCULO do aproveitamento é idêntico com/sem o urbanismo.
+
+    Fase 9.10: a ÚNICA diferença permitida é a ponte de reconciliação (texto/ref cruzada) — que
+    passa a citar o estudo de massa quando ele existe. Os NÚMEROS não se movem (n_lotes_teto,
+    área, cenário); só a leitura/ref da ponte ganha o número do estudo (apresentação)."""
     aid = _criar_analise(client)
     payload = {"regime": "URBANO", "modalidade": "loteamento_aberto", "lote_min_m2": 250}
     antes = client.post(f"/api/analises/{aid}/aproveitamento", json=payload).json()
     client.post(f"/api/analises/{aid}/urbanismo/propor", json={"publico_alvo": "alta"})
     depois = client.post(f"/api/analises/{aid}/aproveitamento", json=payload).json()
-    assert antes == depois
+    # tudo idêntico EXCETO a ponte (que agora cita o estudo de massa — é o objetivo da 9.10).
+    assert {k: v for k, v in antes.items() if k != "reconciliacao"} == \
+           {k: v for k, v in depois.items() if k != "reconciliacao"}
+    # os NÚMEROS da ponte não mudam; só a referência cruzada + leitura ganham o estudo.
+    assert antes["reconciliacao"]["lotes_teto"] == depois["reconciliacao"]["lotes_teto"]
+    assert antes["reconciliacao"]["ref_estudo_massa"] is None
+    assert depois["reconciliacao"]["ref_estudo_massa"]["fonte"] == "urbanismo"
+    assert depois["reconciliacao"]["ref_estudo_massa"]["lotes"] > 0

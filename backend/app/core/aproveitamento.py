@@ -111,6 +111,50 @@ def cenario_diretriz(perfil, zona_codigo, modalidade, aprov_fisico_m2, area_tota
     return dados, None
 
 
+# ----------------------------- Fase 9.10: ponte de reconciliação -----------------------------
+def _num(v: float, dec: int = 0) -> str:
+    """Número em pt-BR (milhar com ponto, decimal com vírgula) p/ o texto da ponte. Não recalcula."""
+    s = f"{v:,.{dec}f}"
+    return s.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
+def reconciliacao_aproveitamento(
+    lotes_teto: int, lote_base_m2: float, doacao_base_pct: float, lotes_estudo=None
+) -> dict:
+    """PONTE (Fase 9.10) — APRESENTAÇÃO, zero cálculo novo: rotula o TETO e cita o estudo de massa,
+    interpolando os números que a aba JÁ calculou. ``lotes_estudo`` vem do snapshot de urbanismo da
+    sessão (``None`` se o estudo não foi rodado → convite, NUNCA inventa o número ausente). §1-A:
+    'teto/estimativa/estudo/verificar', sem 'cabem N'."""
+    tem_doa = doacao_base_pct and doacao_base_pct > 0
+    base = (
+        f"Teto teórico — lote mínimo legal ({_num(lote_base_m2)} m²)"
+        + (f" e doação mínima ({_num(doacao_base_pct * 100, 0)}%)." if tem_doa
+           else " (vias e doação não descontadas).")
+        + " É o LIMITE SUPERIOR da zona, não o que cabe desenhado."
+    )
+    if lotes_estudo is not None:
+        ref = {"fonte": "urbanismo", "lotes": int(lotes_estudo)}
+        leitura = base + (
+            f" O estudo de massa (aba Urbanismo) estima ~{int(lotes_estudo)} lotes com lotes do "
+            "perfil e vias/áreas reais — a diferença vem de lote maior e doação maior no desenho. "
+            "Verificar com urbanista."
+        )
+    else:
+        ref = None
+        leitura = base + (
+            " Rode o estudo de massa (aba Urbanismo) para ver a estimativa realista com lotes do "
+            "perfil e vias/áreas reais."
+        )
+    return {
+        "papel": "teto_teorico",
+        "lotes_teto": int(lotes_teto),
+        "lote_base_m2": round(float(lote_base_m2), 2),
+        "doacao_base_pct": round(float(doacao_base_pct or 0.0), 4),
+        "ref_estudo_massa": ref,
+        "leitura": leitura,
+    }
+
+
 def aproveitamento_rural(area: float, fmp_m2: float) -> dict:
     """Parcelamento RURAL: nº de parcelas = floor(área aproveitável / FMP do município).
 

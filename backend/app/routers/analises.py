@@ -45,6 +45,7 @@ from app.core.lista_municipios import FonteLista, get_fonte_lista
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
 from app.core.severidade_verde import classificar_severidade_verde
+from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
 
@@ -450,6 +451,7 @@ def calcular_aproveitamento(
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
+    fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -540,6 +542,19 @@ def calcular_aproveitamento(
     rotulo = _ROTULO_MODALIDADE.get(body.modalidade) if body.modalidade else None
     aprov_otim = round(area_aproveitavel + potencial, 2)
 
+    # Fase 9.10 — ponte: nº de lotes do estudo de massa (último snapshot de urbanismo da sessão),
+    # só p/ a referência cruzada textual (None se não rodado → o card convida, não inventa).
+    def _lotes_estudo_massa() -> int | None:
+        try:
+            snaps = fonte_urb.listar(analise_id)
+            for snap in reversed(snaps or []):
+                n = (snap.get("indicadores") or {}).get("n_lotes")
+                if n is not None:
+                    return int(n)
+        except Exception:  # noqa: BLE001 — store ausente/indisponível → sem referência
+            return None
+        return None
+
     # Cenário diretriz (Fase 1.8): só com perfil municipal CONFIRMADO para a zona declarada.
     # ADITIVO — não toca o headline físico-ambiental. Determinístico (perfil + zona fixos).
     cenario_diretriz = None
@@ -557,6 +572,22 @@ def calcular_aproveitamento(
         if dados is not None:
             cenario_diretriz = schemas.CenarioDiretrizOut(**dados)
 
+    # Fase 9.10 — PONTE: rotula o teto e cita o estudo de massa. Usa o teto da DIRETRIZ (lote
+    # legal + doação) quando há; senão o teto-base (lote declarado, sem vias/doação). Só exibição.
+    n_lotes_teto_base = motor.lotes_teto(area_aproveitavel, body.lote_min_m2)
+    if cenario_diretriz is not None:
+        teto_n, lote_base, doa_base = (
+            cenario_diretriz.n_lotes, cenario_diretriz.lote_min_m2_legal,
+            cenario_diretriz.doacao_pct,
+        )
+    else:
+        teto_n, lote_base, doa_base = n_lotes_teto_base, body.lote_min_m2, 0.0
+    reconciliacao = schemas.ReconciliacaoAproveitamentoOut(
+        **motor.reconciliacao_aproveitamento(
+            teto_n, lote_base, doa_base, lotes_estudo=_lotes_estudo_massa()
+        )
+    )
+
     return schemas.AproveitamentoOut(
         regime="URBANO",
         premissa=PREMISSA_URBANA + (f" — modalidade: {rotulo}" if rotulo else ""),
@@ -570,6 +601,7 @@ def calcular_aproveitamento(
         pct_sobre_total=pct_total,
         origem_lote=ORIGEM_LOTE_DECLARADO,
         lote_min_m2=body.lote_min_m2,
-        n_lotes_teto=motor.lotes_teto(area_aproveitavel, body.lote_min_m2),
+        n_lotes_teto=n_lotes_teto_base,
         ressalva_urbano=motor.RESSALVA_URBANO,
+        reconciliacao=reconciliacao,
     )

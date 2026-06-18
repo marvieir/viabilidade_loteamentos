@@ -193,6 +193,23 @@ def propor(
     layout.restricao_origem = restr_origem
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
+
+    # Fase 9.10 — PONTE: teto regulatório (mesma fórmula/cenário do Aproveitamento) p/ a referência
+    # cruzada. É só EXIBIÇÃO — o nº de lotes do estudo (medido acima) não usa este número.
+    from app.core import aproveitamento as aprov_motor
+
+    teto_reg = None
+    if perfil is not None and body.zona:
+        gleba_m2 = transform(to_local, registro["poly"]).area
+        dados_teto, _ = aprov_motor.cenario_diretriz(
+            perfil, body.zona, body.modalidade, aprov_m.area, gleba_m2
+        )
+        if dados_teto is not None:
+            teto_reg = dados_teto["n_lotes"]
+    reconciliacao = schemas.ReconciliacaoUrbanismoOut(
+        **medida.reconciliacao_urbanismo(med, lotes_teto=teto_reg)
+    )
+
     fidelidade = schemas.FidelidadeOut(**medida.construir_fidelidade(med, layout))
     distribuicao = schemas.DistribuicaoTamanhosOut(**medida.distribuicao_tamanhos(med, layout))
     diretrizes_out = schemas.DiretrizesOut(
@@ -237,6 +254,7 @@ def propor(
         diretrizes=diretrizes_out,
         conformidade_legal=conf_legal,
         conformidade_programa=conformidade,
+        reconciliacao=reconciliacao,  # Fase 9.10 — ponte (rotula o estudo + cita o teto)
         esqueleto_ignorado=layout.ignorados,
         proveniencia=(
             f"Programa proposto por IA ({prog.origem}, perfil '{body.publico_alvo}') + "
