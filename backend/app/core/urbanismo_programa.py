@@ -48,8 +48,10 @@ class Programa:
     testada_m: float
     profundidade_m: float
     pct_institucional: float = 0.0
-    # esqueleto grosseiro de vias principais (polilinhas, coords normalizadas 0..1) — SUGESTÃO.
-    esqueleto: list[list[list[float]]] = field(default_factory=list)
+    # esqueleto de vias principais (polilinhas/curvas, coords normalizadas 0..1). Fase 9.9: a IA
+    # propõe a via-tronco SINUOSA + ramos (≥4 vértices p/ curvar); o Python suaviza e materializa.
+    esqueleto: list = field(default_factory=list)
+    esqueleto_origem: str = "vazio"  # "llm" quando veio do modelo; senão fallback/grade (geom)
     # Fase 9.3 — CALIBRAÇÃO por perfil (o lote emerge da subdivisão da quadra, mirando estes).
     publico_alvo: str = "media"
     testada_alvo_m: float = 12.0
@@ -220,11 +222,16 @@ _INSTRUCAO = (
     "distribuição 'ótima', só propõe a estratégia; o heatmap mede a consequência.\n"
     "2. Coerência com o público-alvo: alta renda → lotes maiores, mais lazer, viário "
     "sinuoso; baixa renda → lotes menores, grelha eficiente, lazer mínimo.\n"
-    "3. O esqueleto é OPCIONAL e apenas uma SUGESTÃO de eixos de via, em coordenadas "
-    "NORMALIZADAS 0..1 relativas ao bounding box da gleba (x=0 oeste, x=1 leste; y=0 sul, "
-    "y=1 norte) — o motor mapeia para a gleba real, valida/regulariza e pode ignorar trecho "
-    "inviável. Coerência com o arquétipo: 'sinuoso_fundo_vale' → eixos curvos/diagonais; "
-    "'grelha_eficiente' → o motor usa grelha (o esqueleto pode ser omitido)."
+    "3. ESQUELETO VIÁRIO — OBRIGATÓRIO quando o arquétipo NÃO é 'grelha_eficiente' (Fase 9.9): "
+    "proponha a via-tronco como uma POLILINHA SINUOSA com PELO MENOS 4 vértices (para o motor "
+    "curvar), acompanhando o eixo maior da parte loteável, MAIS 1–3 ramos curtos. Coordenadas "
+    "NORMALIZADAS 0..1 do bounding box da gleba (x=0 oeste→1 leste; y=0 sul→1 norte). As curvas "
+    "devem CONTORNAR a área íngreme/não-edificável (o motor já a recortou) e acompanhar o "
+    "relevo. Formato: lista de polilinhas [[x,y],[x,y],...]; a via-tronco vem primeiro. O motor "
+    "mapeia para a gleba real, SUAVIZA (Bézier/Catmull-Rom), valida e recorta — você dá a forma "
+    "da curva, NÃO coordenadas finais nem larguras. Para 'grelha_eficiente' o esqueleto pode "
+    "ser omitido (o motor usa grelha ortogonal). NUNCA devolva o esqueleto vazio num arquétipo "
+    "sinuoso/misto."
 )
 
 _FERRAMENTA = {
@@ -246,8 +253,11 @@ _FERRAMENTA = {
             "esqueleto": {
                 "type": "array",
                 "description": (
-                    "polilinhas [[x,y],...] em coordenadas NORMALIZADAS 0..1 do bbox da gleba "
-                    "(x oeste→leste, y sul→norte); eixos de via principais (opcional)"
+                    "OBRIGATÓRIO p/ arquétipo sinuoso/misto (Fase 9.9): lista de polilinhas "
+                    "[[x,y],...] em coords NORMALIZADAS 0..1 do bbox (x oeste→leste, y sul→norte). "
+                    "A 1ª é a VIA-TRONCO SINUOSA com ≥4 vértices (curva acompanhando o eixo maior "
+                    "loteável, contornando o íngreme); as demais são ramos curtos. Só a forma da "
+                    "curva — o motor suaviza/mede. Omitir apenas em 'grelha_eficiente'."
                 ),
                 "items": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
             },
@@ -335,6 +345,8 @@ class GeradorProgramaClaude:
         prog.densidade = bruto.get("densidade", prog.densidade)
         prog.arquetipo_viario = bruto.get("arquetipo_viario", prog.arquetipo_viario)
         prog.origem = "proposto_llm"
+        # Fase 9.9 — marca a origem do esqueleto: "llm" se o modelo de fato propôs a(s) curva(s).
+        prog.esqueleto_origem = "llm" if prog.esqueleto else "vazio"
         prog.justificativa = bruto.get("justificativa", prog.justificativa)
         return prog
 

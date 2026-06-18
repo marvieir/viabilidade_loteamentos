@@ -105,13 +105,18 @@ def test_esqueleto_consumido():
 
 
 def test_esqueleto_invalido_descartado_e_contado():
-    """Critério 4: trecho auto-intersectado é descartado, contado, e não vira via crua."""
+    """Critério 4: trecho auto-intersectado é descartado e contado, e não vira via CRUA. Fase 9.9:
+    em arquétipo sinuoso, o esqueleto inválido NÃO cai em grade silenciosa — usa FALLBACK de curva
+    explícito (esqueleto_vazio=true, origem=fallback_curva), nunca a geometria crua do LLM."""
     bowtie = [[0.1, 0.1], [0.9, 0.9], [0.1, 0.9], [0.9, 0.1]]
     prog = programa_do_preset("alta", {"esqueleto": [bowtie]})
     layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 400.0), prog)
-    assert layout.meta["trechos_descartados"] == 1
-    assert not layout.centerlines  # nada cru entrou
-    assert layout.lotes  # a grelha ainda loteia
+    assert layout.meta["trechos_descartados"] == 1  # bowtie registrado como descartado
+    assert layout.meta["esqueleto_origem"] == "fallback_curva"  # 9.9 — fallback, não grade silenciosa
+    assert layout.meta["esqueleto_vazio"] is True
+    # a curva usada é o fallback (suave), não a polilinha crua auto-intersectada do LLM.
+    assert all(c.is_simple for c in layout.centerlines)
+    assert layout.lotes  # o motor ainda loteia
 
 
 def test_arquetipo_distingue_grelha_de_sinuoso():

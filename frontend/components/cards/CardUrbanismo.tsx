@@ -339,12 +339,22 @@ export function CardUrbanismo({
                         Lazer formado (frente p/ via)
                       </span>
                     )}
+                    {/* Fase 9.9 — traçado sinuoso (curvo, contornando o íngreme). */}
+                    {proposta.geometria.viario_diagnostico.eixos_curvos && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-violet-500" />
+                        Traçado sinuoso (curva {proposta.geometria.viario_diagnostico.sinuosidade_media?.toFixed(2)}
+                        {proposta.geometria.viario_diagnostico.esqueleto_origem === "llm" ? " · IA" : " · padrão"})
+                      </span>
+                    )}
                   </div>
                 )}
                 <p className="text-[11px] text-slate-500">
-                  Traçado ESQUEMÁTICO — malha viária conexa a partir dos eixos da IA; quadras são
-                  as faces que as ruas cercam. O valor é o quadro de áreas, não a precisão do
-                  desenho. Clique num lote para área/score, ou numa quadra para sua área.
+                  Traçado ESQUEMÁTICO — vias SINUOSAS a partir dos eixos curvos propostos pela IA,
+                  contornando a área não-edificável; quadras são as faces que as ruas cercam. As
+                  curvas são aproximadas (não o traçado executivo do urbanista); o valor é o quadro
+                  de áreas, não a precisão do desenho. Clique num lote para área/score, ou numa
+                  quadra para sua área.
                 </p>
               </div>
             </div>

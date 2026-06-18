@@ -1189,6 +1189,11 @@ export interface GeometriaUrb {
     stubs_podados?: number;
     viario_pct?: number;
     vendavel_pct?: number;
+    // Fase 9.9 — traçado sinuoso (a IA propõe eixos curvos; o Python materializa).
+    esqueleto_vazio?: boolean;
+    esqueleto_origem?: string; // "llm" | "fallback_curva" | "grade"
+    sinuosidade_media?: number; // >1.1 = curvo (1.0 = reto)
+    eixos_curvos?: boolean;
     hierarquia: { tronco_m: number; local_m: number };
     obs: string;
   } | null;

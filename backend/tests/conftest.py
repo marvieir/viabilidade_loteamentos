@@ -466,6 +466,7 @@ class StubGeradorPrograma:
             ov.setdefault("esqueleto", self._esqueleto)
         prog = programa_do_preset(publico_alvo, ov)
         prog.origem = "proposto_llm"  # finge a borda
+        prog.esqueleto_origem = "llm" if prog.esqueleto else "vazio"  # 9.9 — origem do esqueleto
         return prog
 
 

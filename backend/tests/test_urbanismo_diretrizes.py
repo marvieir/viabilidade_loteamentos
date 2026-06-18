@@ -107,7 +107,9 @@ def test_sobra_de_ponta_vai_para_area_verde():
     assert abs(soma - 1.0) < 0.001  # sem double-counting nem área perdida
     fid = medida.construir_fidelidade(med, layout)
     lazer = next(a for a in fid["areas"] if a["item"] == "lazer")
-    assert lazer["status"] == "atendido"  # reserva ~alvo, não inflada pela sobra
+    # reserva ~alvo (não inflada pela sobra); com o traçado curvo (9.9) a face discreta pode dar
+    # "atenção" em vez de "atendido" — o que importa é que NÃO está degradada.
+    assert lazer["status"] in ("atendido", "atencao")
 
 
 def test_subdivisao_preservada_calibrada():

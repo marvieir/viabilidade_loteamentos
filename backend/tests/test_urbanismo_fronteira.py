@@ -46,16 +46,18 @@ def test_loteia_todas_as_ilhas():
 
 
 def test_esqueleto_invalido_ignorado_nao_propaga():
-    """Critério 4: polilinha auto-intersectada do LLM é IGNORADA e registrada; os lotes saem
-    da grelha do Python (não da geometria crua do LLM)."""
+    """Critério 4: polilinha auto-intersectada do LLM é IGNORADA e registrada; a geometria CRUA do
+    LLM não propaga. Fase 9.9: em arquétipo curvo, o esqueleto inválido vira FALLBACK de curva
+    explícito (não grade silenciosa) — mas a curva é do Python (suave/simples), não a crua."""
     aprov = box(0.0, 0.0, 400.0, 400.0)
     bowtie = [[0.0, 0.0], [400.0, 400.0], [0.0, 400.0], [400.0, 0.0]]  # auto-intersecta
     prog = programa_do_preset("media", {"esqueleto": [bowtie]})
     layout = geom.gerar_layout(aprov, prog)
     assert layout.ignorados, "esqueleto inválido deveria ser registrado"
     assert "esqueleto[0]" in layout.ignorados[0]
-    assert not layout.centerlines  # nada cru entrou
-    assert layout.lotes  # a grelha do Python ainda produz lotes
+    assert all(c.is_simple for c in layout.centerlines)  # nada CRU (auto-intersectado) entrou
+    assert layout.viario_diagnostico["esqueleto_origem"] == "fallback_curva"
+    assert layout.lotes  # o Python ainda produz lotes
 
 
 def test_programa_nao_carrega_numero_de_medida():

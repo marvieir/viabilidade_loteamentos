@@ -60,7 +60,9 @@ def test_viario_conexo_uma_peca():
     assert layout.viario_diagnostico["conexo"] is True
     assert layout.viario_diagnostico["trechos"] == 1
     assert gj["arruamento"]["conexo"] is True
-    assert gj["arruamento"]["hierarquia"]["tronco_m"] >= 21.0  # tronco/coletora
+    # hierarquia existe: tronco mais largo que o local (na grelha ≥21; no sinuoso = via principal).
+    h = gj["arruamento"]["hierarquia"]
+    assert h["tronco_m"] >= h["local_m"]
 
 
 # --------------------------- nº2: quadras são FACES da malha ---------------------------

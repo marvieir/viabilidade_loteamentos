@@ -21,7 +21,7 @@ import math
 from typing import Optional, Sequence
 
 from shapely.affinity import rotate
-from shapely.geometry import LineString, Point, Polygon, box
+from shapely.geometry import LineString, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import polygonize, unary_union
 
@@ -248,17 +248,37 @@ def _eixos_da_ilha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w:
     brutos: list[tuple[LineString, float, bool]] = []  # (reta, largura, é_tronco)
     nbx = max(int(round(W / (block_w + via_local))), 1)
     nby = max(int(round(H / (block_h + via_local))), 1)
-    for i in range(1, nbx):
-        x = minx + i * W / nbx
-        brutos.append((LineString([(x, miny), (x, maxy)]), via_local, False))
-    for j in range(1, nby):
-        y = miny + j * H / nby
-        brutos.append((LineString([(minx, y), (maxx, y)]), via_local, False))
-    tem_tronco_ia = False
+
+    # IA tronco (curva) ∩ ilha → segmentos. Fase 9.9: a via-tronco curva é o eixo principal; a
+    # grade local segue ORTOGONAL (mantém o lote/viário da 9.8). Para não SOMAR via, a grade NÃO
+    # gera a linha da família PARALELA à tronco mais próxima dela (a curva a substitui).
+    tron_partes: list[LineString] = []
     for e in (eixos_ia or []):
         for part in _linhas(_valido(e.intersection(reg)) if e is not None else None):
-            brutos.append((part, via_tronco, True))
-            tem_tronco_ia = True
+            if part.length > 0:
+                tron_partes.append(part)
+    tem_tronco_ia = bool(tron_partes)
+    tron_horizontal = False
+    if tem_tronco_ia:
+        dx = sum(abs(p.coords[-1][0] - p.coords[0][0]) for p in tron_partes)
+        dy = sum(abs(p.coords[-1][1] - p.coords[0][1]) for p in tron_partes)
+        tron_horizontal = dx >= dy
+    tron_c = unary_union(tron_partes).centroid if tron_partes else None
+
+    verts = [minx + i * W / nbx for i in range(1, nbx)]
+    horiz = [miny + j * H / nby for j in range(1, nby)]
+    # a curva substitui a linha paralela mais próxima (evita via dupla, sem dropar a família toda).
+    if tem_tronco_ia and tron_c is not None:
+        if tron_horizontal and horiz:
+            horiz.remove(min(horiz, key=lambda y: abs(y - tron_c.y)))
+        elif not tron_horizontal and verts:
+            verts.remove(min(verts, key=lambda x: abs(x - tron_c.x)))
+    for x in verts:
+        brutos.append((LineString([(x, miny), (x, maxy)]), via_local, False))
+    for y in horiz:
+        brutos.append((LineString([(minx, y), (maxx, y)]), via_local, False))
+    for part in tron_partes:
+        brutos.append((part, via_tronco, True))
 
     # EXPLODE cada reta nos segmentos que caem DENTRO da ilha (o recorte parte a reta).
     segs: list[list] = []  # [LineString, largura, é_tronco] (mutável p/ promover tronco)
@@ -372,12 +392,6 @@ def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w
         return faces, _ruas_de(reg, eixos), [g for g, _ in eixos], troncos, 0
     ruas, eixos_uteis, n_stubs = podar_stubs(reg, faces, eixos, troncos, via_local, via_tronco)
     return faces, ruas, eixos_uteis, troncos, n_stubs
-
-
-def _miolo(face: BaseGeometry, ruas: Optional[BaseGeometry]) -> Optional[Polygon]:
-    """Quadra = face − ruas (o miolo, descontada a largura da via). Maior componente válido."""
-    q = _diferenca_segura(face, ruas) if ruas is not None else face
-    return _maior_parte(q)
 
 
 def _lotear_face(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area: float,
@@ -516,25 +530,125 @@ def _selecionar_verde(pool: Sequence[BaseGeometry], alvo: float):
     return verdes, resto
 
 
-# ============================ esqueleto da IA (intenção → eixos) ============================
+# ============================ esqueleto da IA (intenção → eixos CURVOS) ============================
+# Fase 9.9 — a IA propõe a GEOMETRIA dos eixos (polilinha de intenção); o Python a SUAVIZA numa
+# curva real (Catmull-Rom), recorta à ilha e mede. Nenhum número vem do LLM (§2): a curva orienta
+# ONDE a via passa; o motor mede QUANTO de área ela ocupa.
+_AMOSTRAS_CURVA = 14  # pontos amostrados por segmento da spline (densidade da curva)
+
+
+def _catmull_rom(pts: list[tuple[float, float]], n: int = _AMOSTRAS_CURVA) -> list[tuple[float, float]]:
+    """Spline de Catmull-Rom passando POR todos os vértices (curva suave, sem ultrapassar muito).
+    < 3 pontos → reta (nada a curvar). Determinístico (§2)."""
+    if len(pts) < 3:
+        return list(pts)
+    P = [pts[0], *pts, pts[-1]]  # duplica as pontas (tangentes nas extremidades)
+    out: list[tuple[float, float]] = []
+    for i in range(1, len(P) - 2):
+        p0, p1, p2, p3 = P[i - 1], P[i], P[i + 1], P[i + 2]
+        for k in range(n):
+            t = k / n
+            t2, t3 = t * t, t * t * t
+            x = 0.5 * (2 * p1[0] + (-p0[0] + p2[0]) * t
+                       + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+                       + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3)
+            y = 0.5 * (2 * p1[1] + (-p0[1] + p2[1]) * t
+                       + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+                       + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3)
+            out.append((x, y))
+    out.append(tuple(P[-2]))
+    return out
+
+
+def _curva_suave(pts: list[tuple[float, float]]) -> Optional[LineString]:
+    """Polilinha de vértices → LineString CURVA (Catmull-Rom amostrado). ``None`` se degenerada."""
+    try:
+        suave = _catmull_rom([(float(x), float(y)) for x, y in pts])
+        ls = LineString(suave)
+        return ls if ls.length > 0 else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _sinuosidade(line: BaseGeometry) -> float:
+    """Razão comprimento-da-curva / distância-reta entre as pontas. 1,0 = reta; >1,1 = curva.
+    Indicador de APRESENTAÇÃO (§2) — não entra em nenhuma área/contagem."""
+    try:
+        cs = list(line.coords)
+    except Exception:  # noqa: BLE001 — MultiLineString → usa o maior trecho
+        partes = _linhas(line)
+        if not partes:
+            return 1.0
+        line = max(partes, key=lambda g: g.length)
+        cs = list(line.coords)
+    if len(cs) < 2:
+        return 1.0
+    reta = math.hypot(cs[-1][0] - cs[0][0], cs[-1][1] - cs[0][1])
+    return round(line.length / reta, 3) if reta > 1e-9 else 1.0
+
+
+def _espinha_sinuosa(ilha: BaseGeometry, amp_frac: float = 0.50, ondas: float = 2.0,
+                     k: int = 9) -> Optional[LineString]:
+    """FALLBACK explícito (nunca grade silenciosa): via-tronco SINUOSA ao longo do eixo maior da
+    ilha, com ondulação senoidal de amplitude proporcional à largura. Curva por construção
+    (sinuosidade > 1,1); o ``∩ ilha`` em ``construir_malha`` a mantém fora do íngreme."""
+    mrr = _valido(ilha).minimum_rotated_rectangle
+    c = list(mrr.exterior.coords)[:-1]
+    if len(c) < 4:
+        return None
+    d = lambda a, b: math.hypot(a[0] - b[0], a[1] - b[1])  # noqa: E731
+    e0, e1 = d(c[0], c[1]), d(c[1], c[2])
+    if e0 >= e1:
+        L, S = e0, e1
+        ldir = ((c[1][0] - c[0][0]) / e0, (c[1][1] - c[0][1]) / e0) if e0 else (1.0, 0.0)
+    else:
+        L, S = e1, e0
+        ldir = ((c[2][0] - c[1][0]) / e1, (c[2][1] - c[1][1]) / e1) if e1 else (1.0, 0.0)
+    if L <= 0 or S <= 0:
+        return None
+    perp = (-ldir[1], ldir[0])
+    cen = mrr.centroid
+    amp = amp_frac * S / 2.0
+    pts = []
+    for i in range(k):
+        t = i / (k - 1)
+        s = (t - 0.5) * L * 0.92
+        off = amp * math.sin(t * math.pi * ondas)
+        pts.append((cen.x + ldir[0] * s + perp[0] * off, cen.y + ldir[1] * s + perp[1] * off))
+    return _curva_suave(pts)
+
+
+def _coords_de(item) -> Optional[list]:
+    """Aceita o item de esqueleto nos DOIS formatos: ``[[x,y],...]`` (polilinha crua, 9.1) ou
+    ``{"pontos": [[x,y],...], "tipo": ...}`` (9.9, por ilha). Devolve a lista de pontos 0..1."""
+    if isinstance(item, dict):
+        return item.get("pontos") or item.get("coords")
+    return item
+
+
 def _eixos(esqueleto: Sequence, canvas: Polygon) -> tuple[list[BaseGeometry], list[str]]:
-    """Denormaliza o esqueleto da IA (coords 0..1 do bbox da gleba) → eixos métricos, snapados
-    à tela. Trecho inválido (auto-interseção, fora) é DESCARTADO e registrado (nunca cru)."""
+    """Denormaliza o esqueleto da IA (coords 0..1 do bbox) → eixos métricos CURVOS (9.9: suaviza
+    a polilinha em curva). Aceita polilinha crua ou ``{"pontos":[...]}``. Trecho inválido
+    (auto-interseção, fora, <2 vértices) é DESCARTADO e registrado (nunca cru)."""
     minx, miny, maxx, maxy = canvas.bounds
     w, h = (maxx - minx), (maxy - miny)
     validos: list[BaseGeometry] = []
     descartes: list[str] = []
-    for i, coords in enumerate(esqueleto or []):
+    for i, item in enumerate(esqueleto or []):
+        coords = _coords_de(item)
         try:
             pts = [(minx + float(x) * w, miny + float(y) * h) for x, y in coords]
-            ls = LineString(pts)
         except Exception:  # noqa: BLE001 — coords malformadas do LLM
             descartes.append(f"esqueleto[{i}] descartado: coordenadas inválidas")
             continue
-        if len(ls.coords) < 2 or not ls.is_valid or not ls.is_simple:
+        if len(pts) < 2:
+            descartes.append(f"esqueleto[{i}] descartado: <2 vértices (degenera em ponto)")
+            continue
+        curva = _curva_suave(pts)  # 9.9 — vira curva (Catmull-Rom); 2 pts seguem reta
+        if curva is None or not curva.is_valid or not curva.is_simple:
             descartes.append(f"esqueleto[{i}] descartado: polilinha auto-intersectada/degenerada")
             continue
-        rec = ls.intersection(canvas)
+        rec = curva.intersection(canvas)
         if rec.is_empty or rec.length == 0:
             descartes.append(f"esqueleto[{i}] descartado: fora da área aproveitável")
             continue
@@ -592,11 +706,24 @@ def gerar_layout(
     pct_lazer0 = max(0.0, min(max(programa.pct_lazer, pct_verde_min), 0.6))
     pct_inst = max(0.0, min(max(programa.pct_institucional, pct_inst_min), 0.3))
 
-    # (b) esqueleto da IA → eixos; usado como TRONCO quando o arquétipo NÃO é grelha pura e há
-    # eixo válido. Na grelha, a malha promove a linha central a tronco (esqueleto_usado=False).
+    # (b) Fase 9.9 — EIXOS CURVOS: a IA propõe a geometria dos eixos (polilinha → curva suave);
+    # usados como TRONCO quando o arquétipo NÃO é grelha. Se o esqueleto vier VAZIO (a falha que o
+    # diagnóstico 9.8 achou), NÃO cair na grade silenciosa: gerar uma ESPINHA SINUOSA por ilha
+    # (fallback explícito, rotulado). Na grelha (baixa), mantém a linha central reta (intencional).
     centerlines, descartes = _eixos(programa.esqueleto, aprov)
     usar_esqueleto = programa.arquetipo_viario != ARQUETIPO_GRELHA and bool(centerlines)
     eixos_ia = centerlines if usar_esqueleto else []
+    quer_curva = programa.arquetipo_viario != ARQUETIPO_GRELHA  # arquétipo sinuoso/misto → curva
+    if usar_esqueleto:
+        orig = getattr(programa, "esqueleto_origem", "vazio")
+        esqueleto_origem = orig if orig == "llm" else "llm"  # esqueleto presente e usado = da IA
+        esqueleto_vazio = False
+    elif quer_curva:
+        esqueleto_origem = "fallback_curva"  # IA não propôs → curva-padrão por ilha (não grade!)
+        esqueleto_vazio = True
+    else:
+        esqueleto_origem = "grade"  # grelha eficiente: ortogonal por intenção do arquétipo
+        esqueleto_vazio = True
 
     # (a) materialização (9.1): CAP analítico — reserva lazer só até sobrar área p/ ~MIN_LOTES
     # lotes; acima disso DEGRADA rotulado (nunca infla nem ignora).
@@ -616,7 +743,10 @@ def gerar_layout(
     eixos_ia_reg = [rotate(e, -ang_deg, origin=cen) for e in eixos_ia] if ang_deg else eixos_ia
 
     via_local = min(via, VIA_LOCAL_M)         # rua de quadra (local)
-    via_tronco = max(via, VIA_TRONCO_M)       # coletora/tronco (hierarquia ≥21 m)
+    # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO,
+    # a via-tronco curva usa a largura da VIA PRINCIPAL do programa (~14 m) — uma curva de 21 m de
+    # largura infla o viário acima do teto; 14 m mantém a curva visível dentro de ≤18% (9.9).
+    via_tronco = max(via, via_local + 2.0) if quer_curva else max(via, VIA_TRONCO_M)
     block_w = N_LOTES_QUADRA * testada_alvo    # testada da quadra ~ N lotes
     block_h = 2.0 * prof                        # quadra de duas fileiras (costas-com-costas)
 
@@ -626,11 +756,18 @@ def gerar_layout(
     faces: list[Polygon] = []
     ruas_parts: list[BaseGeometry] = []
     eixos_reg: list[BaseGeometry] = []
+    curvas_ia_reg: list[BaseGeometry] = []  # 9.9 — os eixos curvos efetivamente usados (p/ medir)
     stubs_podados = 0
     trechos_por_ilha: list[int] = []
     ilhas = _componentes(reg)
     for ilha in ilhas:
         eixos_ia_ilha = [e for e in eixos_ia_reg if e is not None and e.intersects(ilha)]
+        if not eixos_ia_ilha and quer_curva:
+            # Fallback EXPLÍCITO (nunca grade silenciosa): espinha sinuosa ao longo da ilha.
+            esp = _espinha_sinuosa(ilha)
+            if esp is not None and esp.intersects(ilha):
+                eixos_ia_ilha = [esp]
+        curvas_ia_reg.extend(eixos_ia_ilha)
         fcs, ruas_i, eix_i, _tron_i, n_stub = construir_malha(
             ilha, eixos_ia_ilha, block_w, block_h, via_local, via_tronco, podar=True
         )
@@ -650,10 +787,12 @@ def gerar_layout(
     miolos: list[Polygon] = []
     verdes_min: list[Polygon] = []  # faces pequenas → verde formado (não sliver)
     for f in faces:
-        q = _miolo(f, ruas_reg)
-        if q is None or q.is_empty:
-            continue
-        (verdes_min if q.area < MIN_QUADRA_M2 else miolos).append(q)
+        # 9.9: a via-tronco CURVA pode partir uma face em VÁRIOS pedaços — capturar TODOS (não só
+        # o maior, senão a área dos demais some e quebra a invariância). Cada pedaço é uma quadra.
+        for q in _componentes(_diferenca_segura(f, ruas_reg)):
+            if q is None or q.is_empty:
+                continue
+            (verdes_min if q.area < MIN_QUADRA_M2 else miolos).append(q)
 
     # LOTES SÃO PRIORIDADE (CLAUDE.md/§1-A): só reserva área pública enquanto sobrar quadra p/
     # lotear (sempre ≥1 face vai para lotes). Em gleba minúscula, degrada honesto (sem público).
@@ -714,6 +853,8 @@ def gerar_layout(
     verde = _back(verde_total_reg)
     sobra_ponta = _back(sobra_reg)
     eixos_malha = [r for r in (_back(e) for e in eixos_reg) if r is not None]
+    # 9.9 — curvas (IA/fallback) efetivamente usadas, no frame original (p/ desenho + sinuosidade).
+    curvas_ia = [r for r in (_back(e) for e in curvas_ia_reg) if r is not None]
 
     # Conectividade do viário: a malha é UMA peça? (ilhas da gleba → conexo geral False, mas
     # cada ILHA pode ser conexa — é o que importa na 9.8). conexo_por_ilha = toda ilha 1 peça.
@@ -722,6 +863,10 @@ def gerar_layout(
     conexo_por_ilha = bool(trechos_por_ilha) and all(t == 1 for t in trechos_por_ilha)
     viario_m2 = arruamento.area if arruamento is not None and not arruamento.is_empty else 0.0
     vendavel_m2 = sum(l.area for l in lotes)
+    # 9.9 — sinuosidade: média da razão curva/reta dos eixos usados; >1,1 = curvo (1,0 = reto).
+    sinus = [_sinuosidade(c) for c in curvas_ia if c is not None and not c.is_empty]
+    sinuosidade_media = round(sum(sinus) / len(sinus), 3) if sinus else 1.0
+    eixos_curvos = sinuosidade_media > 1.1
     viario_diag = {
         "conexo": conexo,
         "trechos": n_trechos,
@@ -733,9 +878,17 @@ def gerar_layout(
         "viario_pct": round(viario_m2 / aprov_area, 4) if aprov_area else 0.0,
         "vendavel_pct": round(vendavel_m2 / aprov_area, 4) if aprov_area else 0.0,
         "hierarquia": {"tronco_m": round(via_tronco, 1), "local_m": round(via_local, 1)},
+        # Fase 9.9 — traçado sinuoso: estado do esqueleto + métrica de curvatura (apresentação).
+        "esqueleto_vazio": esqueleto_vazio,
+        "esqueleto_origem": esqueleto_origem,
+        "sinuosidade_media": sinuosidade_media,
+        "eixos_curvos": eixos_curvos,
         "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "
                 "virou lote/verde" + ("" if conexo else " — gleba partida pela restrição em "
-                f"{len(ilhas)} ilha(s), cada uma conexa")),
+                f"{len(ilhas)} ilha(s), cada uma conexa")
+                + ("; eixos sinuosos (IA)" if esqueleto_origem == "llm" and eixos_curvos
+                   else "; eixos sinuosos (fallback)" if esqueleto_origem == "fallback_curva"
+                   and eixos_curvos else "")),
     }
 
     lazer_reservado_m2 = sum(
@@ -759,6 +912,11 @@ def gerar_layout(
         "inst_alvo_pct": round(pct_inst, 4),
         "arquetipo": programa.arquetipo_viario,
         "esqueleto_usado": usar_esqueleto,
+        # Fase 9.9 — estado do esqueleto + curvatura (espelha o viario_diagnostico).
+        "esqueleto_origem": esqueleto_origem,
+        "esqueleto_vazio": esqueleto_vazio,
+        "sinuosidade_media": sinuosidade_media,
+        "eixos_curvos": eixos_curvos,
         "trechos_descartados": len(descartes),
         "orientacao_rad": round(orientacao_rad, 6),
         "topo_aplicada": abs(orientacao_rad) > 1e-9,
@@ -783,7 +941,7 @@ def gerar_layout(
         sobra_ponta=sobra_ponta,
         sistema_lazer=clube,
         institucional=inst,
-        centerlines=centerlines if usar_esqueleto else [],
+        centerlines=curvas_ia,  # 9.9 — curvas (IA ou fallback) usadas; [] na grelha
         via_largura_m=via,
         ignorados=descartes,
         avisos=avisos,
