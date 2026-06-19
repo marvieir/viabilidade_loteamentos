@@ -101,31 +101,46 @@ def test_gleba_grande_escala_sem_travar():
     assert lay.viario_diagnostico["todos_lotes_com_frente_via"] is True
 
 
-# ====================== nº6: fusão LATERAL (não frente-fundo) — unidade ======================
-def test_fusao_lateral_nao_frente_fundo():
-    """Critério 3 da spec: o encravado é fundido a vizinho LATERAL com via (soma testada, mantém
-    profundidade); um vizinho frente-FUNDO (divisa horizontal) NUNCA absorve (geraria lote
-    comprido-estreito). Testa a regra geométrica direta de `garantir_frente_via`."""
+# ====================== nº6: fusão LATERAL é a regra; fundo órfão é a exceção (9.13) ===========
+def test_fusao_lateral_regra_fundo_excecao():
+    """Critério 4 da spec 9.13: a fusão LATERAL é a regra (soma testada); o FUNDO ÓRFÃO (atrás de
+    um lote com via, sem lateral com via) é a EXCEÇÃO — funde com a FRENTE (soma profundidade).
+    Frente-fundo só p/ o órfão (como regra geral geraria lote comprido-estreito). Unidade direta."""
     via = box(-1.0, -1.0, 41.0, 0.0)  # rua ao SUL (y≈0), ao longo de x
     # fileira da frente (toca a via): 2 lotes lado a lado [0..20]×[0..30] e [20..40]×[0..30]
     com_via_a = box(0, 0, 20, 30)
     com_via_b = box(20, 0, 40, 30)
-    # encravado LATERAL ao com_via_b (divisa vertical x=40) — sem via
+    # encravado LATERAL ao com_via_b (divisa vertical x=40) — sem via → fusão LATERAL
     enc_lateral = box(40, 0, 55, 30)
-    # encravado FRENTE-FUNDO sobre com_via_a (divisa horizontal y=30) — sem via
+    # FUNDO ÓRFÃO sobre com_via_a (divisa horizontal y=30) — sem via, sem lateral → fusão de FUNDO
     enc_fundo = box(0, 30, 20, 55)
     lotes = [com_via_a, com_via_b, enc_lateral, enc_fundo]
     tags = ["Q1"] * 4
-    # teto folgado p/ a união lateral caber (600+450=1050); o frente-fundo é barrado pela GEOMETRIA
+    # teto folgado p/ ambas as uniões caberem (lateral 1050; fundo 600+500=1100)
     ok, _, verde, stats = geom.garantir_frente_via(lotes, tags, via, piso=300.0, teto=1200.0, testada_min=5.0)
-    # o lateral foi FUNDIDO (soma testada → vizinho com via vira mais largo); o frente-fundo NÃO
-    assert stats["lotes_fundidos_lateral"] == 1
-    assert stats["lotes_viraram_verde"] == 1          # o frente-fundo virou verde (não fundiu)
+    assert stats["lotes_fundidos_lateral"] == 1       # regra geral (soma testada)
+    assert stats["lotes_fundidos_fundo"] == 1         # exceção (fundo órfão soma profundidade)
+    assert stats["lotes_viraram_verde"] == 0          # nada sobrou sem destino
+    assert stats["lotes_sem_via_final"] == 0          # invariante 9.13: zero encravados contados
     assert all(_frente(l, via) >= 5.0 for l in ok)    # todo lote resultante tem frente para via
-    # nenhum lote fundido comprido-estreito (razão lado maior/menor contida)
-    for l in ok:
-        fr, pr = geom._lados_mrr(l)
-        assert max(fr, pr) / min(fr, pr) <= 3.0
+
+
+def test_fundo_orfao_excedente_vira_verde_respeita_teto():
+    """Critério 2/3 da spec 9.13: a fusão de fundo absorve profundidade ATÉ o teto; o excedente
+    vira VERDE (nunca lote acima do teto). Frente 30m + fundo 30m = 720 m² estouraria 640 → a
+    frente cresce só até 640 e o resto (~80 m² de profundidade) volta como verde."""
+    via = box(-1.0, -1.0, 25.0, 0.0)
+    frente = box(0, 0, 24, 30)          # 720 m² (já no teto folgado)... ajustado p/ caber:
+    frente = box(0, 0, 15, 30)          # 450 m² com via ao sul
+    fundo = box(0, 30, 15, 60)          # 450 m² atrás, sem via → união 900 > teto 640
+    ok, _, verde, stats = geom.garantir_frente_via([frente, fundo], ["Q1", "Q1"], via,
+                                                   piso=300.0, teto=640.0, testada_min=5.0)
+    assert stats["lotes_fundidos_fundo"] == 1
+    assert stats["lotes_sem_via_final"] == 0
+    assert len(ok) == 1
+    assert ok[0].area <= 640.0 + 1e-6              # clamp 9.4: nunca acima do teto
+    assert ok[0].area >= 450.0 - 1e-6              # absorveu profundidade (cresceu vs a frente)
+    assert sum(p.area for p in verde) > 200.0      # excedente de profundidade virou verde
 
 
 # ====================== nº7: PARSER aceita achatado E aninhado (Algoritmo B) ======================

@@ -1201,7 +1201,7 @@ export interface GeometriaUrb {
     | null;
   // Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").
   restricao_recortada?:
-    | (GeoJSON.Geometry & { origem?: string[]; rotulo?: string })
+    | (GeoJSON.Geometry & { origem?: string[]; rotulo?: string; estilo_sugerido?: string })
     | null;
   // Fase 9.7/9.8 — diagnósticos: conectividade + ilhas + stubs podados + qualificação legal.
   viario_diagnostico?: {
@@ -1231,6 +1231,9 @@ export interface GeometriaUrb {
     // Fase 9.12 — todo lote com frente para via + parser dos eixos da IA.
     lotes_sem_via_tratados?: number;
     lotes_fundidos_lateral?: number;
+    // Fase 9.13 — fundo órfão fundido com a frente (exceção) + invariante de zero encravados.
+    lotes_fundidos_fundo?: number;
+    lotes_sem_via_final?: number;
     lotes_viraram_verde?: number;
     testada_media_m?: number;
     todos_lotes_com_frente_via?: boolean;

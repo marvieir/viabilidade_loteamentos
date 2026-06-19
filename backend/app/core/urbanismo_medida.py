@@ -412,6 +412,9 @@ def _restricao_gj(layout: "Layout", to_wgs) -> Optional[dict]:
     gj["rotulo"] = (
         "Área não-edificável (mata/declividade/APP) — ver cards Ambiental/Vegetação/Declividade"
     )
+    # Fase 9.13 — dica de APRESENTAÇÃO p/ o front: a restrição é mostrada DISCRETA (hachura/contorno
+    # esmaecido, ao fundo), não bloco sólido que compete com o parcelamento. O dado não muda.
+    gj["estilo_sugerido"] = "hachura_discreta"
     return gj
 
 

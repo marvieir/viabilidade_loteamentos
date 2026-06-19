@@ -48,10 +48,26 @@ export default function MapaLeaflet({
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       />
 
+      {/* Fase 9.13 — restrição recortada (≥30%/mata/APP) ao FUNDO e DISCRETA: desenhada ANTES do
+          parcelamento (fica por baixo), com fill esmaecido + contorno tracejado dessaturado. O dado
+          não muda; só para de competir com o projeto. Rótulo segue na legenda. */}
+      {overlays?.urb_restricao &&
+        (() => {
+          const e = ESTILO_OVERLAY.urb_restricao!;
+          return (
+            <GeoJSON
+              key={`urb_restricao-${JSON.stringify(overlays.urb_restricao)}`}
+              data={overlays.urb_restricao as GeoJsonObject}
+              style={{ color: e.color, weight: e.weight, fillColor: e.fillColor, fillOpacity: e.fillOpacity, dashArray: e.dashArray }}
+            />
+          );
+        })()}
+
       {/* Camadas de área (via/verde reservado/remanescente/lazer/institucional) — estilo próprio
           com contraste sobre satélite (Fase 9.6) */}
       {overlays &&
         (Object.keys(overlays) as ChaveOverlay[]).map((chave) => {
+          if (chave === "urb_restricao") return null; // já desenhada ao fundo (acima)
           const g = overlays[chave];
           if (!g) return null;
           const cor = CORES_OVERLAY[chave];

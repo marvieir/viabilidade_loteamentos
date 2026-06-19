@@ -497,14 +497,57 @@ def _frente_via(lote: BaseGeometry, ruas_buf: Optional[BaseGeometry]) -> float:
     return comum.length if comum is not None and not comum.is_empty else 0.0
 
 
+def _fundir_fundo(frente: BaseGeometry, fundo: BaseGeometry, ruas_buf, teto: float):
+    """Fase 9.13 — EXCEÇÃO de fundo órfão: funde o lote de FUNDO de quadra com a FRENTE (mesma
+    coluna), somando PROFUNDIDADE ATÉ o teto da faixa. O excedente de profundidade (além do teto)
+    vira VERDE — o clamp legal 9.4 é preservado (``fora_da_faixa==0``: nunca um lote acima do teto).
+    Frame ROTACIONADO (eixos axiais): a via toca a frente por um lado em y; a fusão cresce A PARTIR
+    desse lado (mantém a testada da frente). Devolve ``(lote_fundido, excedente_verde_ou_None)``."""
+    uni = _maior_parte(_uniao_segura([frente, fundo]))
+    if uni is None or uni.is_empty:
+        return frente, None
+    if uni.area <= teto + 1e-6:
+        return uni, None  # cabe no teto → frente fica mais profunda, sem excedente
+    ux0, uy0, ux1, uy1 = uni.bounds
+    # lado da via = lado de y onde a FRENTE encosta na rua; a faixa mantida começa nesse lado.
+    via_no_topo = False
+    if ruas_buf is not None and not ruas_buf.is_empty:
+        toca = frente.exterior.intersection(ruas_buf)
+        if toca is not None and not toca.is_empty:
+            via_no_topo = toca.centroid.y > frente.centroid.y
+    lo, hi = uy0, uy1
+    for _ in range(28):  # bisseção do corte horizontal que dá área == teto a partir do lado da via
+        mid = (lo + hi) / 2.0
+        faixa = box(ux0, mid, ux1, uy1) if via_no_topo else box(ux0, uy0, ux1, mid)
+        parte = _maior_parte(uni.intersection(faixa))
+        area = parte.area if (parte is not None and not parte.is_empty) else 0.0
+        if area > teto:  # faixa grande demais → encolhe na direção da via
+            lo = mid if via_no_topo else lo
+            hi = hi if via_no_topo else mid
+        else:            # faixa pequena demais → cresce p/ o fundo
+            hi = mid if via_no_topo else hi
+            lo = lo if via_no_topo else mid
+    corte = (lo + hi) / 2.0
+    faixa = box(ux0, corte, ux1, uy1) if via_no_topo else box(ux0, uy0, ux1, corte)
+    fundido = _maior_parte(uni.intersection(faixa))
+    if fundido is None or fundido.is_empty:
+        return frente, None
+    excedente = _maior_parte(uni.difference(faixa))
+    excedente = excedente if (excedente is not None and not excedente.is_empty) else None
+    return fundido, excedente
+
+
 def garantir_frente_via(lotes: list[BaseGeometry], tags: list[str], ruas: Optional[BaseGeometry],
                         piso: float, teto: float, testada_min: float):
     """Fase 9.12 — todo lote contado tem FRENTE PARA VIA (definição legal: lote = parcela com ≥1
     divisa lindeira a via oficial). No frame ROTACIONADO (eixos axiais): classifica cada lote pela
     testada; o encravado é FUNDIDO LATERALMENTE (vizinho lado a lado COM via absorve — soma
-    testada, mantém profundidade) se a união couber em [piso, teto]; senão vira VERDE/não-
-    aproveitável (nunca lote fantasma). NUNCA frente-fundo (geraria lote comprido-estreito), NUNCA
-    abre via nova. Devolve ``(lotes_ok, tags_ok, encravados_verde, stats)``. Determinístico (§2)."""
+    testada, mantém profundidade) se a união couber em [piso, teto]. Fase 9.13 — HIERARQUIA: (1)
+    lateral é a regra; (2) o que sobra é FUNDO ÓRFÃO de quadra (atrás de um lote com via, sem
+    lateral com via) → EXCEÇÃO: funde com a FRENTE (mesma coluna) somando profundidade até o teto,
+    excedente vira verde; (3) sem frente nenhuma → VERDE honesto. Frente-fundo SÓ p/ fundo órfão
+    (como regra geral geraria lote comprido-estreito). NUNCA abre via nova. Devolve
+    ``(lotes_ok, tags_ok, encravados_verde, stats)``. Determinístico (§2)."""
     from shapely.strtree import STRtree
 
     n = len(lotes)
@@ -544,6 +587,38 @@ def garantir_frente_via(lotes: list[BaseGeometry], tags: list[str], ruas: Option
             geom_l[j] = uni        # vizinho lateral com via absorve o encravado (soma testada)
             vivo[i] = False
             fundidos += 1
+    # Fase 9.13 — PASSO 2 (exceção de fundo órfão): o que sobrou sem via depois da fusão lateral é
+    # um lote de FUNDO de quadra (atrás de um lote com via, divisa HORIZONTAL, sem lateral com via —
+    # garantido por ter sobrevivido ao passo 1). Funde com a FRENTE somando profundidade até o teto;
+    # o excedente vira verde. Frente-fundo SÓ aqui (regra geral segue lateral). Determinístico (§2).
+    fundidos_fundo = 0
+    excedentes_verde: list[BaseGeometry] = []
+    ordem_fundo = sorted((i for i in range(n) if vivo[i] and not com_via[i]), key=lambda i: -lotes[i].area)
+    for i in ordem_fundo:
+        if not vivo[i]:
+            continue
+        melhor_j = None
+        for j in arvore.query(geom_l[i].buffer(0.5)):
+            j = int(j)
+            if j == i or not vivo[j] or not com_via[j]:
+                continue  # a FRENTE tem de estar viva e ter via (absorve mantendo a testada)
+            shared = _valido(geom_l[i].intersection(geom_l[j]))
+            if shared is None or shared.is_empty or shared.length < 0.5:
+                continue
+            sx0, sy0, sx1, sy1 = shared.bounds
+            if (sy1 - sy0) > (sx1 - sx0):
+                continue  # divisa VERTICAL = lateral (já tratado no passo 1) → não é fundo órfão
+            # frente-fundo com a frente tendo via: candidata. Escolhe a frente de MENOR área (mais
+            # folga até o teto → absorve mais profundidade), determinístico por área e índice.
+            if melhor_j is None or geom_l[j].area < geom_l[melhor_j].area:
+                melhor_j = j
+        if melhor_j is not None:
+            fundido, excedente = _fundir_fundo(geom_l[melhor_j], geom_l[i], ruas_buf, teto)
+            geom_l[melhor_j] = fundido      # a frente fica mais profunda (até o teto)
+            if excedente is not None:
+                excedentes_verde.append(excedente)  # profundidade além do teto → verde (clamp 9.4)
+            vivo[i] = False
+            fundidos_fundo += 1
     lotes_ok: list[BaseGeometry] = []
     tags_ok: list[str] = []
     verde: list[BaseGeometry] = []
@@ -554,20 +629,23 @@ def garantir_frente_via(lotes: list[BaseGeometry], tags: list[str], ruas: Option
             lotes_ok.append(geom_l[i])
             tags_ok.append(tags[i])
         else:
-            verde.append(geom_l[i])     # encravado que ninguém absorveu → verde honesto
+            verde.append(geom_l[i])     # encravado que ninguém absorveu (sem frente) → verde honesto
     # testada do lote = lado CURTO do MRR (frente típica p/ a rua); evita a inflação de lote de
     # esquina/curva, que tocaria via em vários lados. Métrica p/ comparar com a faixa do perfil.
     frentes_ok = [_frente_via(l, ruas_buf) for l in lotes_ok]
     testadas = [_lados_mrr(l)[0] for l in lotes_ok]
     testada_media = round(sum(testadas) / len(testadas), 1) if testadas else 0.0
+    sem_via_final = sum(1 for f in frentes_ok if f < testada_min)  # lotes CONTADOS sem via (deve=0)
     stats = {
         "lotes_sem_via_tratados": n_sem,
         "lotes_fundidos_lateral": fundidos,
+        "lotes_fundidos_fundo": fundidos_fundo,
         "lotes_viraram_verde": len(verde),
+        "lotes_sem_via_final": sem_via_final,
         "testada_media_m": testada_media,
-        "todos_lotes_com_frente_via": all(f >= testada_min for f in frentes_ok),
+        "todos_lotes_com_frente_via": sem_via_final == 0,
     }
-    return lotes_ok, tags_ok, verde, stats
+    return lotes_ok, tags_ok, verde + excedentes_verde, stats
 
 
 # --------- áreas públicas como QUADRAS FORMADAS (critérios legais; substituem os discos) ---------
@@ -1103,7 +1181,10 @@ def gerar_layout(
         # parser dos eixos da IA (aceita o formato achatado; antes 100% descartado).
         "lotes_sem_via_tratados": frente_stats["lotes_sem_via_tratados"],
         "lotes_fundidos_lateral": frente_stats["lotes_fundidos_lateral"],
+        # Fase 9.13 — fundo órfão fundido com a frente (exceção) + invariante de zero encravados.
+        "lotes_fundidos_fundo": frente_stats["lotes_fundidos_fundo"],
         "lotes_viraram_verde": frente_stats["lotes_viraram_verde"],
+        "lotes_sem_via_final": frente_stats["lotes_sem_via_final"],
         "testada_media_m": frente_stats["testada_media_m"],
         "todos_lotes_com_frente_via": frente_stats["todos_lotes_com_frente_via"],
         "eixos_ia_aceitos": len(centerlines),
