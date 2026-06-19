@@ -138,13 +138,13 @@ def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog):
         return None, None
     a, b = porcoes[0], porcoes[1]
     cota = _cota_sampler(fonte_dem, registro["poly"], to_wgs) or (lambda x, y: 0.0)
-    ponto, proposta = None, "auto"
     tv_norm = getattr(prog, "travessia", None)
     if tv_norm and len(tv_norm) >= 2:
         minx, miny, maxx, maxy = aprov_m.bounds
         ponto = (minx + float(tv_norm[0]) * (maxx - minx), miny + float(tv_norm[1]) * (maxy - miny))
-        proposta = "llm"
-    tv = conexao_mod.avaliar_travessia(a, b, cota, ponto, proposta)
+        tv = conexao_mod.avaliar_travessia(a, b, cota, ponto, "llm")  # IA propôs o ponto
+    else:
+        tv = conexao_mod.travessia_otima(a, b, cota)  # sem ponto: Python acha a sela mais suave
     diag = {
         "proposta_por": tv.proposta_por, "ponto": list(tv.ponto),
         "greide_medido_pct": tv.greide_pct, "extensao_m": tv.extensao_m,

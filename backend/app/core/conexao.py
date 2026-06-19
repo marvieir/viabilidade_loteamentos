@@ -127,6 +127,41 @@ def construir_eixo_travessia(porcao_a: BaseGeometry, porcao_b: BaseGeometry,
     return eixo, pa, pb
 
 
+MAX_TRAVESSIA_M = 80.0  # travessia não pode ser arbitrariamente longa (catálogo: via, não viaduto)
+
+
+def travessia_otima(porcao_a: BaseGeometry, porcao_b: BaseGeometry,
+                    amostrar_cota: Callable[[float, float], float], n: int = 36) -> "Travessia":
+    """Fase 10.1 — sem ponto da IA, busca a SELA MAIS SUAVE: varre pares (ponto em A × ponto em B)
+    na frente de contato (até ``MAX_TRAVESSIA_M``) e escolhe o de MENOR greide medido sobre o DEM —
+    NÃO o vão mais estreito (que costuma ser o mais íngreme). Um cruzamento um pouco mais longo, mas
+    plano, é via normal; o estreito e íngreme é escadaria. Entre greides ~iguais, prefere o mais
+    curto. Determinístico: a IA não entra; o Python mede e escolhe (§2)."""
+    La, Lb = porcao_a.exterior.length, porcao_b.exterior.length
+    pts_a = [porcao_a.exterior.interpolate(i / n * La) for i in range(n)]
+    pts_b = [porcao_b.exterior.interpolate(j / n * Lb) for j in range(n)]
+    cands: list = []
+    for pa in pts_a:
+        if pa.distance(porcao_b) > MAX_TRAVESSIA_M:
+            continue
+        for pb in pts_b:
+            d = pa.distance(pb)
+            if d < 1.0 or d > MAX_TRAVESSIA_M:
+                continue
+            g, ext, dz = greide_travessia(pa, pb, amostrar_cota)
+            cands.append((round(g, 1), d, pa, pb, ext, dz))
+    if not cands:
+        eixo, pa, pb = construir_eixo_travessia(porcao_a, porcao_b, None)
+        g, ext, dz = greide_travessia(pa, pb, amostrar_cota)
+        return Travessia(eixo, (round((pa.x + pb.x) / 2, 1), round((pa.y + pb.y) / 2, 1)),
+                         g, ext, dz, classificar_greide(g), "auto")
+    cands.sort(key=lambda c: (c[0], c[1]))  # menor greide; empate → mais curto
+    g, _d, pa, pb, ext, dz = cands[0]
+    return Travessia(LineString([(pa.x, pa.y), (pb.x, pb.y)]),
+                     (round((pa.x + pb.x) / 2, 1), round((pa.y + pb.y) / 2, 1)),
+                     g, ext, dz, classificar_greide(g), "auto")
+
+
 def avaliar_travessia(porcao_a: BaseGeometry, porcao_b: BaseGeometry,
                       amostrar_cota: Callable[[float, float], float],
                       ponto: Optional[tuple[float, float]] = None,
