@@ -1264,6 +1264,13 @@ export interface GeometriaUrb {
     lotes_recuperados_de_sobra?: number;
     verde_reserva_m2?: number;
     verde_sobra_m2?: number;
+    // Fase 10 (Parte 4) — alto padrão (tags do estudo).
+    alto_padrao?: {
+      porticos: number;
+      institucional_na_entrada: boolean;
+      arborizacao_viaria: boolean;
+      portico_ponto?: number[] | null;
+    };
     // Fase 10 (Parte 3) — loteamento único (travessia liga as porções).
     loteamento_conexo?: boolean;
     conexao?: {

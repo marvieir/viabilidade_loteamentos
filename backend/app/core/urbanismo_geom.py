@@ -1288,6 +1288,19 @@ def gerar_layout(
         ) if ruas_reg is not None else False
     viario_m2 = arruamento.area if arruamento is not None and not arruamento.is_empty else 0.0
     vendavel_m2 = sum(l.area for l in lotes)
+    # Fase 10 (Parte 4) — ALTO PADRÃO (catálogo §8): UMA portaria/pórtico na entrada ÚNICA do
+    # loteamento conectado; institucional perto da entrada (setorização: serviço concentra na
+    # entrada); arborização viária (tag — na faixa de serviço da calçada, NÃO muda área de lote).
+    portico_pt = None
+    inst_na_entrada = False
+    if arruamento is not None and not arruamento.is_empty:
+        gminx, gminy, gmaxx, gmaxy = aprov.bounds
+        # entrada = ponto do arruamento mais próximo do acesso pela via pública (borda sul da gleba)
+        portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
+        if inst is not None and not inst.is_empty:
+            diag_gleba = math.hypot(gmaxx - gminx, gmaxy - gminy)
+            inst_na_entrada = inst.distance(portico_pt) <= 0.35 * max(diag_gleba, 1.0)
+    porticos = 1 if portico_pt is not None else 0
     # 9.9 — sinuosidade: média da razão curva/reta dos eixos usados; >1,1 = curvo (1,0 = reto).
     sinus = [_sinuosidade(c) for c in curvas_ia if c is not None and not c.is_empty]
     sinuosidade_media = round(sum(sinus) / len(sinus), 3) if sinus else 1.0
@@ -1349,6 +1362,14 @@ def gerar_layout(
             "barreira_reavaliada_contra_relevo": travessia_diag is not None,
             "travessia": travessia_diag,
             "alerta_topografia": True,
+        },
+        # Fase 10 (Parte 4) — alto padrão (tags do estudo; §1-A: ilustração não define número).
+        "alto_padrao": {
+            "porticos": porticos,                       # UMA entrada no loteamento conectado
+            "institucional_na_entrada": inst_na_entrada,
+            "arborizacao_viaria": True,                 # tag: árvores na faixa de serviço (≥0,70 m)
+            "portico_ponto": ([round(portico_pt.x, 1), round(portico_pt.y, 1)]
+                              if portico_pt is not None else None),
         },
         "tracado_hierarquia": ["tronco_coletora", "locais", "culdesacs"],
         "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "

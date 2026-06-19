@@ -375,6 +375,19 @@ export function CardUrbanismo({
                             })`}
                         </span>
                       )}
+                    {/* Fase 10 (Parte 4) — alto padrão: uma portaria, institucional na entrada. */}
+                    {(proposta.geometria.viario_diagnostico.alto_padrao?.porticos ?? 0) > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-700" />
+                        {proposta.geometria.viario_diagnostico.alto_padrao?.porticos === 1
+                          ? "Uma portaria/pórtico na entrada"
+                          : `${proposta.geometria.viario_diagnostico.alto_padrao?.porticos} pórticos`}
+                        {proposta.geometria.viario_diagnostico.alto_padrao?.institucional_na_entrada &&
+                          " · institucional na entrada"}
+                        {proposta.geometria.viario_diagnostico.alto_padrao?.arborizacao_viaria &&
+                          " · arborização viária"}
+                      </span>
+                    )}
                     {/* Fase 9.14 — traçado inteligente: contorno da restrição + cul-de-sacs. */}
                     {((proposta.geometria.viario_diagnostico.trechos_contornando_restricao ?? 0) > 0 ||
                       (proposta.geometria.viario_diagnostico.culdesacs_bulbo ?? 0) > 0) && (
