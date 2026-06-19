@@ -178,6 +178,8 @@ export interface Aproveitamento {
   ressalva_urbano?: string | null;
   // Fase 9.10 — ponte de reconciliação (teto teórico × estudo realista). Só exibição.
   reconciliacao?: ReconciliacaoAproveitamento | null;
+  // Fase 10 (Parte 1) — líquida canônica (mesma das abas Ambiental/Urbanismo).
+  areas_canonicas?: AreasCanonicas | null;
   // RURAL
   rural?: RuralResult | null;
 }
@@ -422,12 +424,25 @@ export interface ProvenienciaVegetacao {
   ressalva: string | null;
 }
 
+// Fase 10 (Parte 1) — números canônicos de área (fonte única; mesmo número em todas as abas).
+export interface AreasCanonicas {
+  gleba_bruta_m2: number;
+  vegetacao_m2: number;
+  declividade_30_m2: number;
+  app_m2: number;
+  restricoes_fisicas_m2: number;
+  sobreposicao_m2?: number;
+  area_liquida_aproveitavel_m2: number;
+}
+
 export interface Vegetacao {
   area_total_m2: number;
   area_verde_m2: number | null;
-  area_liquida_m2: number | null;
+  // Fase 10 (Parte 1): RENOMEADO de area_liquida_m2 — é PARCIAL (só vegetação), não a líquida.
+  area_parcial_veg_m2: number | null;
   percentual_verde: number | null;
   geojson_verde: GeoJSON.Geometry | Record<string, never>;
+  areas_canonicas?: AreasCanonicas | null; // a líquida CANÔNICA (mesma das outras abas)
   proveniencia: ProvenienciaVegetacao | null;
   avisos: string[];
   consultada: boolean;
@@ -1360,6 +1375,7 @@ export interface PropostaUrbanistica {
   conformidade_programa: ItemConformidadePrograma[];
   reconciliacao?: ReconciliacaoUrbanismo | null; // Fase 9.10 — ponte (estudo × teto regulatório)
   esqueleto_ignorado: string[];
+  areas_canonicas?: AreasCanonicas | null; // Fase 10 (Parte 1) — líquida canônica (mesma das abas)
   proveniencia: string;
   avisos: string[];
 }

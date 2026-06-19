@@ -93,11 +93,17 @@ def medir_layout(analise_id: str, body: schemas.MedirUrbanismoIn):
 
 
 # --------------------------------- /propor (IA na borda) ---------------------------------
+def _garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem):
+    """Fase 10 (Parte 1) — números canônicos de área (delegado ao helper único de analises)."""
+    from app.routers.analises import garantir_areas_canonicas
+    return garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem)
+
+
 def _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem):
     """Área aproveitável (WGS84) = gleba − união(restrições já computadas). Devolve também a
     RESTRIÇÃO recortada (∩ gleba) e a lista de ORIGENS (Fase 9.8 — p/ o mapa rotular o que o
     motor não loteou, em vez do 'clarão'). Degrada honesto: sem fontes → a própria gleba."""
-    from app.routers.analises import _coletar_geoms  # reuso (sem duplicar a coleta)
+    from app.routers.analises import _coletar_geoms  # reuso (sem duplicar a coleta)  # noqa: F401
 
     gleba = registro["poly"]
     verde_geom, overlays, decliv_geom = _coletar_geoms(
@@ -256,6 +262,10 @@ def propor(
         conformidade_programa=conformidade,
         reconciliacao=reconciliacao,  # Fase 9.10 — ponte (rotula o estudo + cita o teto)
         esqueleto_ignorado=layout.ignorados,
+        # Fase 10 (Parte 1) — a líquida CANÔNICA (mesma das abas Ambiental/Aproveitamento).
+        areas_canonicas=schemas.AreasCanonicasOut(
+            **_garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem).__dict__
+        ),
         proveniencia=(
             f"Programa proposto por IA ({prog.origem}, perfil '{body.publico_alvo}') + "
             "geometria e medidas GERADAS/MEDIDAS em Python sobre a área aproveitável "

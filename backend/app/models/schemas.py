@@ -176,6 +176,19 @@ class ReconciliacaoUrbanismoOut(BaseModel):
     leitura: str
 
 
+class AreasCanonicasOut(BaseModel):
+    """Fase 10 (Parte 1) — números canônicos de área (fonte ÚNICA). Toda aba que exibir gleba/
+    vegetação/declividade/líquida usa ESTES — mesmo número em qualquer aba (catálogo §10)."""
+
+    gleba_bruta_m2: float
+    vegetacao_m2: float
+    declividade_30_m2: float
+    app_m2: float
+    restricoes_fisicas_m2: float
+    sobreposicao_m2: float = 0.0
+    area_liquida_aproveitavel_m2: float
+
+
 class AproveitamentoOut(BaseModel):
     regime: Literal["URBANO", "RURAL"]
     premissa: str
@@ -192,6 +205,8 @@ class AproveitamentoOut(BaseModel):
     # regimes. Vias e doação NÃO descontadas (entram no projeto/diretriz municipal).
     area_aproveitavel_m2: Optional[float] = None
     pct_sobre_total: Optional[float] = None
+    # Fase 10 (Parte 1) — fonte canônica de área (a líquida que TODAS as abas leem).
+    areas_canonicas: Optional[AreasCanonicasOut] = None
     # URBANO
     origem_lote: Optional[str] = None
     lote_min_m2: Optional[float] = None
@@ -249,8 +264,12 @@ class ProvenienciaVegetacaoOut(BaseModel):
 class VegetacaoOut(BaseModel):
     area_total_m2: float
     area_verde_m2: Optional[float] = None      # None = não consultada (sem desconto)
-    area_liquida_m2: Optional[float] = None    # area_total - area_verde
+    # Fase 10 (Parte 1): RENOMEADO de "líquida" → "parcial". Isto é gleba − SÓ vegetação; NÃO é a
+    # área líquida aproveitável (essa é canônica, abaixo, e desconta também declividade + APP).
+    area_parcial_veg_m2: Optional[float] = None  # area_total - area_verde (só vegetação)
     percentual_verde: Optional[float] = None
+    # Fase 10 (Parte 1) — a líquida CANÔNICA (mesma das outras abas); a aba Ambiental a exibe.
+    areas_canonicas: Optional[AreasCanonicasOut] = None
     geojson_verde: dict = {}
     proveniencia: Optional[ProvenienciaVegetacaoOut] = None
     avisos: list[str] = []
@@ -1302,5 +1321,7 @@ class PropostaUrbanisticaOut(BaseModel):
     # Fase 9.10 — ponte de reconciliação (rotula o estudo e cita o teto regulatório). Só exibição.
     reconciliacao: Optional[ReconciliacaoUrbanismoOut] = None
     esqueleto_ignorado: list[str] = []
+    # Fase 10 (Parte 1) — a líquida CANÔNICA (mesma das abas Ambiental/Aproveitamento).
+    areas_canonicas: Optional[AreasCanonicasOut] = None
     proveniencia: str
     avisos: list[str]

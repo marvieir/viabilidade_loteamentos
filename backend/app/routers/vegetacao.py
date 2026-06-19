@@ -13,6 +13,8 @@ from shapely.geometry import shape
 from app.core import ambiental as ambiental_motor
 from app.core import vegetacao as motor
 from app.core.camadas import FonteCamadas, get_fonte_camadas
+from app.core.declividade import FonteDEM, get_fonte_dem
+from app.routers.analises import garantir_areas_canonicas
 from app.core.severidade_verde import RESSALVA, classificar_severidade_verde
 from app.core.store import STORE
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
@@ -29,6 +31,7 @@ def analisar_vegetacao(
     analise_id: str,
     fonte: FonteVegetacao | None = Depends(get_fonte_vegetacao),
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
+    fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -37,6 +40,8 @@ def analisar_vegetacao(
     gleba = registro["poly"]
     cobertura = fonte.cobertura_verde(gleba) if fonte is not None else None
     res = motor.analisar_vegetacao(gleba, cobertura)
+    # Fase 10 (Parte 1): a líquida CANÔNICA (mesma das outras abas) — não recalcula aqui.
+    ac = garantir_areas_canonicas(registro, fonte, fonte_camadas, fonte_dem)
 
     # Severidade (2.3): exige verde detectado E camadas ambientais consultadas.
     severidade = None
@@ -81,9 +86,10 @@ def analisar_vegetacao(
     return schemas.VegetacaoOut(
         area_total_m2=res.area_total_m2,
         area_verde_m2=res.area_verde_m2,
-        area_liquida_m2=res.area_liquida_m2,
+        area_parcial_veg_m2=res.area_liquida_m2,  # Fase 10: RENOMEADO (é parcial, só vegetação)
         percentual_verde=res.percentual_verde,
         geojson_verde=res.geojson_verde,
+        areas_canonicas=schemas.AreasCanonicasOut(**ac.__dict__),
         proveniencia=prov,
         avisos=avisos,
         consultada=res.consultada,

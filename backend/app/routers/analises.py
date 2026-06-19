@@ -19,6 +19,7 @@ from shapely.ops import unary_union
 from app.core import agrupamento as agrupamento_mod
 from app.core import ambiental as ambiental_motor
 from app.core import aproveitamento as motor
+from app.core import areas_canonicas
 from app.core import aproveitavel
 from app.core import geometria
 from app.core import ingestao as ingestao_mod
@@ -75,6 +76,24 @@ def _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem=None):
         if res.geojson_vedacao:
             decliv_geom = shape(res.geojson_vedacao)
     return verde_geom, overlays, decliv_geom
+
+
+def garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem):
+    """Fase 10 (Parte 1) — calcula (e CACHEIA em ``registro``) os números canônicos de área para a
+    gleba: a fonte ÚNICA de "área líquida aproveitável" que as 3 abas leem (nenhuma recalcula). É
+    determinística (mesma gleba + fontes → mesmo número), então as abas convergem por construção.
+    ``app`` = união das faixas não-edificáveis (APP curso/massa d'água, faixa, linha de transmissão;
+    catálogo §1: APP não conta p/ verde/viário, sai como restrição física)."""
+    cache = registro.get("areas_canonicas")
+    if cache is not None:
+        return cache
+    gleba = registro["poly"]
+    verde_geom, overlays, decliv_geom = _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem)
+    partes_app = [overlays[k] for k in _CHAVES_RESTRITIVAS if overlays.get(k) is not None]
+    app_geom = unary_union(partes_app) if partes_app else None
+    ac = areas_canonicas.computar_areas_canonicas(gleba, verde_geom, decliv_geom, app_geom)
+    registro["areas_canonicas"] = ac
+    return ac
 
 
 def _consolidar_descontos(gleba, total, verde_geom, overlays, decliv_geom=None):
@@ -481,6 +500,14 @@ def calcular_aproveitamento(
         gleba, total, verde_geom, overlays, decliv_geom
     )
     area_aproveitavel = max(round(total - area_restritiva, 2), 0.0)
+    # Fase 10 (Parte 1) — números CANÔNICOS (fonte única), reaproveitando os geoms já buscados;
+    # cacheia p/ as outras abas lerem o MESMO número (área líquida idêntica em todo lugar).
+    _partes_app = [overlays[k] for k in _CHAVES_RESTRITIVAS if overlays.get(k) is not None]
+    ac = areas_canonicas.computar_areas_canonicas(
+        gleba, verde_geom, decliv_geom, unary_union(_partes_app) if _partes_app else None
+    )
+    registro["areas_canonicas"] = ac
+    ac_out = schemas.AreasCanonicasOut(**ac.__dict__)
     pct_total = round(area_aproveitavel / total, 4) if total else None
 
     # Cenário otimista (Fase 2.3): aproveitável + potencial desbloqueável (verde a verificar
@@ -526,6 +553,7 @@ def calcular_aproveitamento(
             cenario_otimista=_cenario(n_lotes_teto=None),  # rural conta parcelas, não lotes
             area_aproveitavel_m2=area_aproveitavel,
             pct_sobre_total=pct_total,
+            areas_canonicas=ac_out,
             rural=schemas.RuralOut(**rural, fmp_origem=fmp_origem),
         )
 
@@ -599,6 +627,7 @@ def calcular_aproveitamento(
         aviso_diretriz=aviso_diretriz,
         area_aproveitavel_m2=area_aproveitavel,
         pct_sobre_total=pct_total,
+        areas_canonicas=ac_out,
         origem_lote=ORIGEM_LOTE_DECLARADO,
         lote_min_m2=body.lote_min_m2,
         n_lotes_teto=n_lotes_teto_base,

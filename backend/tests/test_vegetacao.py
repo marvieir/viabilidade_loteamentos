@@ -40,7 +40,7 @@ def test_verde_descontado_do_aproveitavel(client, fonte_vegetacao):
     assert data["area_verde_m2"] > 0
     # área líquida = total − verde (coerência aritmética determinística)
     assert abs(
-        data["area_liquida_m2"] - (data["area_total_m2"] - data["area_verde_m2"])
+        data["area_parcial_veg_m2"] - (data["area_total_m2"] - data["area_verde_m2"])
     ) < 0.5
     # metade da gleba é verde → ~50%
     assert 45 <= data["percentual_verde"] <= 55, data
@@ -54,7 +54,7 @@ def test_sem_fonte_nao_desconta(client):
     data = client.get(f"/api/analises/{aid}/vegetacao").json()
     assert data["consultada"] is False
     assert data["area_verde_m2"] is None
-    assert data["area_liquida_m2"] is None
+    assert data["area_parcial_veg_m2"] is None
     assert data["area_total_m2"] > 0  # total sempre medido
     assert any("não consultad" in a.lower() for a in data["avisos"]), data["avisos"]
 
@@ -68,7 +68,7 @@ def test_gleba_sem_verde(client, fonte_vegetacao):
     data = client.get(f"/api/analises/{aid}/vegetacao").json()
     assert data["consultada"] is True
     assert data["area_verde_m2"] == 0.0
-    assert abs(data["area_liquida_m2"] - data["area_total_m2"]) < 0.5
+    assert abs(data["area_parcial_veg_m2"] - data["area_total_m2"]) < 0.5
 
 
 # 4 — determinismo -------------------------------------------------------------

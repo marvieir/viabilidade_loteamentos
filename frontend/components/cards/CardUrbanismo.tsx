@@ -391,7 +391,13 @@ export function CardUrbanismo({
               {/* Quadro de áreas */}
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Quadro de áreas (sobre a área líquida {q?.area_liquida_fmt} m²)
+                  {/* Fase 10 (Parte 1): a área líquida aproveitável é a CANÔNICA (mesma das abas
+                      Ambiental/Aproveitamento); cai para o quadro interno se ausente. */}
+                  Quadro de áreas (sobre a área líquida{" "}
+                  {proposta?.areas_canonicas
+                    ? Math.round(proposta.areas_canonicas.area_liquida_aproveitavel_m2).toLocaleString("pt-BR")
+                    : q?.area_liquida_fmt}{" "}
+                  m²)
                 </p>
                 {q && (
                   <div className="divide-y divide-slate-100">

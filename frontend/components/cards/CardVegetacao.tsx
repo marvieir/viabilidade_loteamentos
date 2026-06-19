@@ -108,11 +108,23 @@ export function CardVegetacao({
                 valor={data.area_verde_m2 != null ? ha(data.area_verde_m2) : "—"}
                 destaque="verde"
               />
+              {/* Fase 10 (Parte 1): "Parcial" = gleba − só vegetação (NÃO é a líquida). A LÍQUIDA
+                  aproveitável é a canônica (gleba − veg − declividade − APP), igual nas outras abas. */}
               <Metrica
-                titulo="Líquida (aproveitável base)"
-                valor={data.area_liquida_m2 != null ? ha(data.area_liquida_m2) : "—"}
+                titulo="Parcial (só vegetação)"
+                valor={data.area_parcial_veg_m2 != null ? ha(data.area_parcial_veg_m2) : "—"}
               />
             </div>
+
+            {data.areas_canonicas != null && (
+              <p className="text-sm text-slate-700">
+                Área líquida aproveitável (canônica, gleba − vegetação − declividade − APP):{" "}
+                <span className="font-semibold text-slate-900">
+                  {ha(data.areas_canonicas.area_liquida_aproveitavel_m2)}
+                </span>{" "}
+                — o mesmo número nas abas Aproveitamento e Urbanismo.
+              </p>
+            )}
 
             {data.percentual_verde != null && (
               <p className="text-sm text-slate-700">
