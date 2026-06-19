@@ -51,6 +51,10 @@ class Programa:
     # esqueleto de vias principais (polilinhas/curvas, coords normalizadas 0..1). Fase 9.9: a IA
     # propõe a via-tronco SINUOSA + ramos (≥4 vértices p/ curvar); o Python suaviza e materializa.
     esqueleto: list = field(default_factory=list)
+    # Fase 10 (Parte 3) — PONTO de travessia entre porções partidas (normalizado 0..1 do bbox da
+    # área aproveitável). A IA propõe POR ONDE conectar (julgamento espacial); o Python mede o
+    # greide real sobre o DEM e materializa a via. ``[]`` = motor escolhe o vão mais favorável.
+    travessia: list = field(default_factory=list)
     esqueleto_origem: str = "vazio"  # "llm" quando veio do modelo; senão fallback/grade (geom)
     # Fase 9.3 — CALIBRAÇÃO por perfil (o lote emerge da subdivisão da quadra, mirando estes).
     publico_alvo: str = "media"
@@ -190,6 +194,7 @@ def programa_do_preset(publico_alvo: str, overrides: Optional[dict] = None) -> P
         profundidade_m=profundidade,
         pct_institucional=float(ov.get("pct_institucional", 0.0)),
         esqueleto=list(ov.get("esqueleto", [])),
+        travessia=list(ov.get("travessia", [])),
         publico_alvo=publico_alvo,
         testada_alvo_m=float(ov.get("testada_alvo_m", cal["testada"])),
         faixa_lote_m2=cal["faixa"],
@@ -268,6 +273,18 @@ _FERRAMENTA = {
                     "curva — o motor suaviza/mede. Omitir apenas em 'grelha_eficiente'."
                 ),
                 "items": {"type": "array", "items": {"type": "array", "items": {"type": "number"}}},
+            },
+            "travessia": {
+                "type": "array",
+                "description": (
+                    "Fase 10 — SE a área aproveitável vier PARTIDA em porções (uma declividade/mata "
+                    "separa dois lados), proponha o PONTO [x,y] (coords NORMALIZADAS 0..1 do bbox) por "
+                    "onde a via-tronco deve CRUZAR p/ ligar as porções: o vão mais estreito / a sela "
+                    "mais suave, evitando a encosta íngreme. Só o PONTO (julgamento espacial) — o "
+                    "motor mede o greide real sobre o relevo e materializa a via. Omitir se não há "
+                    "porções separadas."
+                ),
+                "items": {"type": "number"},
             },
             "estrategia_mix": {
                 "type": "array",

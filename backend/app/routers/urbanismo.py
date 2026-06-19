@@ -19,6 +19,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException
 from shapely.ops import transform, unary_union
 
+from app.core import conexao as conexao_mod
 from app.core import urbanismo_geom as geom
 from app.core import urbanismo_medida as medida
 from app.core.camadas import FonteCamadas, get_fonte_camadas
@@ -93,6 +94,65 @@ def medir_layout(analise_id: str, body: schemas.MedirUrbanismoIn):
 
 
 # --------------------------------- /propor (IA na borda) ---------------------------------
+def _cota_sampler(fonte_dem, gleba_wgs, to_wgs):
+    """Fase 10 (Parte 3) — amostra a cota (m) do DEM num ponto do frame métrico ``aprov_m``: métrico
+    → WGS (``to_wgs``) → AEQD do DEM → bilinear. ``None`` se não há DEM (degradação honesta)."""
+    if fonte_dem is None:
+        return None
+    try:
+        dem = fonte_dem.amostrar(gleba_wgs)
+    except Exception:  # noqa: BLE001 — DEM indisponível
+        return None
+    if dem is None or getattr(dem, "elevacao", None) is None:
+        return None
+    import numpy as np
+    from pyproj import Transformer
+
+    Z = np.asarray(dem.elevacao, dtype="float64")
+    h, w = Z.shape
+    px, x0, y0 = dem.px_m, dem.x0_m, dem.y0_m
+    to_dem = Transformer.from_crs("EPSG:4326", dem.crs_proj4, always_xy=True).transform
+
+    def cota(mx: float, my: float) -> float:
+        lon, lat = to_wgs(mx, my)
+        dx, dy = to_dem(lon, lat)
+        c = min(max((dx - x0) / px - 0.5, 0.0), w - 1.001)
+        r = min(max((y0 - dy) / px - 0.5, 0.0), h - 1.001)
+        c0, r0 = int(c), int(r)
+        fc, fr = c - c0, r - r0
+        return float(Z[r0, c0] * (1 - fc) * (1 - fr) + Z[r0, c0 + 1] * fc * (1 - fr)
+                     + Z[r0 + 1, c0] * (1 - fc) * fr + Z[r0 + 1, c0 + 1] * fc * fr)
+
+    return cota
+
+
+def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog):
+    """Fase 10 (Parte 3) — se a área aproveitável vem PARTIDA em porções, a IA propõe POR ONDE
+    cruzar (ponto normalizado) e o Python MEDE o greide real sobre o DEM (§2 refinado). Devolve
+    ``(eixo, diag)`` p/ a ``gerar_layout`` materializar a via-tronco de conexão; ``(None, None)`` se
+    há só uma porção (já conexo). Nenhum número vem da IA — só o ponto (julgamento espacial)."""
+    porcoes = sorted((c for c in geom._componentes(aprov_m) if c.area >= 1000.0), key=lambda p: -p.area)
+    if len(porcoes) <= 1:
+        return None, None
+    a, b = porcoes[0], porcoes[1]
+    cota = _cota_sampler(fonte_dem, registro["poly"], to_wgs) or (lambda x, y: 0.0)
+    ponto, proposta = None, "auto"
+    tv_norm = getattr(prog, "travessia", None)
+    if tv_norm and len(tv_norm) >= 2:
+        minx, miny, maxx, maxy = aprov_m.bounds
+        ponto = (minx + float(tv_norm[0]) * (maxx - minx), miny + float(tv_norm[1]) * (maxy - miny))
+        proposta = "llm"
+    tv = conexao_mod.avaliar_travessia(a, b, cota, ponto, proposta)
+    diag = {
+        "proposta_por": tv.proposta_por, "ponto": list(tv.ponto),
+        "greide_medido_pct": tv.greide_pct, "extensao_m": tv.extensao_m,
+        "desnivel_m": tv.desnivel_m, "veredicto": tv.veredicto,
+        "caixa_via_m": conexao_mod.CAIXA_TRONCO_M, "alerta_topografia": True,
+        "greide_indeterminado": cota is None or fonte_dem is None,
+    }
+    return tv.eixo, diag
+
+
 def _garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem):
     """Fase 10 (Parte 1) — números canônicos de área (delegado ao helper único de analises)."""
     from app.routers.analises import garantir_areas_canonicas
@@ -192,8 +252,12 @@ def propor(
     diretrizes = resolver_diretrizes(perfil, body.zona, body.modalidade, body.publico_alvo)
 
     # 3) NÚCLEO: Python materializa (reserva conforme diretriz → subdivide → CLAMP legal) e MEDE.
+    # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: se partido, a IA propôs o ponto de travessia e o Python
+    # mediu o greide real (acima); passa o eixo p/ a via de conexão ligar as porções (§2 refinado).
+    travessia_eixo, travessia_diag = _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog)
     layout = geom.gerar_layout(
-        aprov_m, prog, orientacao_rad=orientacao, diretrizes=diretrizes
+        aprov_m, prog, orientacao_rad=orientacao, diretrizes=diretrizes,
+        travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
     )
     layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
     layout.restricao_origem = restr_origem

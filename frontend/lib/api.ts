@@ -1264,6 +1264,25 @@ export interface GeometriaUrb {
     lotes_recuperados_de_sobra?: number;
     verde_reserva_m2?: number;
     verde_sobra_m2?: number;
+    // Fase 10 (Parte 3) — loteamento único (travessia liga as porções).
+    loteamento_conexo?: boolean;
+    conexao?: {
+      loteamento_conexo: boolean;
+      porcoes_detectadas: number;
+      porcoes_conectadas: number;
+      barreira_reavaliada_contra_relevo: boolean;
+      alerta_topografia: boolean;
+      travessia?: {
+        proposta_por?: string;
+        ponto?: number[];
+        greide_medido_pct?: number;
+        extensao_m?: number;
+        veredicto?: string;
+        caixa_via_m?: number;
+        alerta_topografia?: boolean;
+        greide_indeterminado?: boolean;
+      } | null;
+    };
     tracado_hierarquia?: string[];
     testada_media_m?: number;
     todos_lotes_com_frente_via?: boolean;

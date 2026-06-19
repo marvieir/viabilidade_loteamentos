@@ -21,10 +21,11 @@ import math
 from typing import Optional, Sequence
 
 from shapely.affinity import rotate
-from shapely.geometry import LineString, Polygon, box
+from shapely.geometry import LineString, Point, Polygon, box
 from shapely.geometry.base import BaseGeometry
-from shapely.ops import polygonize, unary_union
+from shapely.ops import nearest_points, polygonize, unary_union
 
+from app.core import conexao as conexao_mod
 from app.core import urbanismo_tracado as trac
 from app.core.urbanismo_medida import Layout, _lados_mrr
 from app.core.urbanismo_programa import PERFIL_LOTE, Programa
@@ -917,6 +918,8 @@ def gerar_layout(
     restricoes: Optional[BaseGeometry] = None,
     orientacao_rad: float = 0.0,
     diretrizes: Optional[dict] = None,
+    travessia_eixo: Optional[BaseGeometry] = None,
+    travessia_diag: Optional[dict] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1111,6 +1114,25 @@ def gerar_layout(
     culdesacs_bulbo = len(bulbos_reg)
     if bulbos_reg:
         ruas_reg = _uniao_segura([ruas_reg, *bulbos_reg])
+    # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: a via-tronco de CONEXÃO (eixo proposto pela IA, greide
+    # já MEDIDO pelo Python sobre o DEM no router) atravessa o vão e LIGA as porções. Materializada
+    # com caixa de coletora (~14 m) e SEM clipar ao aproveitável (a ponte cruza o vão). Une A+B →
+    # arruamento vira UMA peça. Só entra se o veredicto do greide não for "inviável".
+    if travessia_eixo is not None and (travessia_diag or {}).get("veredicto") != "inviavel":
+        tr_reg = rotate(travessia_eixo, -ang_deg, origin=cen) if ang_deg else travessia_eixo
+        linhas_ponte = [tr_reg]
+        # liga cada PONTA do eixo à malha de ruas mais próxima de cada lado — senão a ponte fica
+        # solta (não conecta as DUAS malhas). Assim o arruamento vira UMA peça (loteamento conexo).
+        if ruas_reg is not None and not ruas_reg.is_empty:
+            for c in (tr_reg.coords[0], tr_reg.coords[-1]):
+                end = Point(c)
+                alvo = nearest_points(end, ruas_reg)[1]
+                if 0.0 < end.distance(alvo) <= 60.0:
+                    linhas_ponte.append(LineString([(end.x, end.y), (alvo.x, alvo.y)]))
+        ponte = _valido(_uniao_segura(linhas_ponte).buffer(
+            conexao_mod.CAIXA_TRONCO_M / 2.0, cap_style=2, join_style=2))
+        if ponte is not None and not ponte.is_empty:
+            ruas_reg = _uniao_segura([ruas_reg, ponte])
     # REGRA B — porção ISOLADA (sem borda livre): suas faces não viram lote, viram verde (honesto).
     isoladas_reg = _uniao_segura([p["geom"] for p in porcoes_info if not p["conectada"]])
 
@@ -1253,6 +1275,17 @@ def gerar_layout(
     n_trechos = len(_componentes(arruamento)) if arruamento is not None else 0
     conexo = n_trechos == 1
     conexo_por_ilha = bool(trechos_por_ilha) and all(t == 1 for t in trechos_por_ilha)
+    # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO ("não dois núcleos"): existe UM componente de via que
+    # toca TODAS as porções loteáveis (ligadas pela travessia), em vez de núcleos separados. A
+    # fragmentação INTERNA de cada porção (n_trechos) é outra métrica; aqui importa não haver ilhas
+    # de loteamento desconexas entre si. 0/1 porção → trivialmente único.
+    if len(porcoes_info) <= 1:
+        loteamento_conexo = True
+    else:
+        loteamento_conexo = any(
+            sum(1 for p in porcoes_info if comp.buffer(1.0).intersects(p["geom"])) == len(porcoes_info)
+            for comp in _componentes(ruas_reg)
+        ) if ruas_reg is not None else False
     viario_m2 = arruamento.area if arruamento is not None and not arruamento.is_empty else 0.0
     vendavel_m2 = sum(l.area for l in lotes)
     # 9.9 — sinuosidade: média da razão curva/reta dos eixos usados; >1,1 = curvo (1,0 = reto).
@@ -1306,6 +1339,17 @@ def gerar_layout(
         # regra D). A reserva NÃO é loteada (§1-A); só a sobra acessível vira lote.
         "verde_reserva_m2": round(verde_reserva_m2, 1),
         "verde_sobra_m2": round(verde_sobra_m2, 1),
+        # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: as porções ligadas por via (não dois núcleos).
+        "loteamento_conexo": loteamento_conexo,
+        "conexao": {
+            "loteamento_conexo": loteamento_conexo,
+            "porcoes_detectadas": len(porcoes_info),
+            "porcoes_conectadas": (len(porcoes_info) if loteamento_conexo
+                                   else sum(1 for p in porcoes_info if p["conectada"])),
+            "barreira_reavaliada_contra_relevo": travessia_diag is not None,
+            "travessia": travessia_diag,
+            "alerta_topografia": True,
+        },
         "tracado_hierarquia": ["tronco_coletora", "locais", "culdesacs"],
         "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "
                 "virou lote/verde" + ("" if conexo else " — gleba partida pela restrição em "

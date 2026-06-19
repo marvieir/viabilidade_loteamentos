@@ -363,6 +363,18 @@ export function CardUrbanismo({
                           ` (testada média ${proposta.geometria.viario_diagnostico.testada_media_m.toFixed(1)} m)`}
                       </span>
                     )}
+                    {/* Fase 10 (Parte 3) — loteamento único: a travessia ligou as porções. */}
+                    {proposta.geometria.viario_diagnostico.conexao?.loteamento_conexo &&
+                      (proposta.geometria.viario_diagnostico.conexao?.porcoes_detectadas ?? 0) > 1 && (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="inline-block h-2 w-2 rounded-full bg-indigo-600" />
+                          Loteamento único — porções ligadas pela travessia
+                          {typeof proposta.geometria.viario_diagnostico.conexao?.travessia?.greide_medido_pct === "number" &&
+                            ` (greide ~${proposta.geometria.viario_diagnostico.conexao.travessia.greide_medido_pct}%${
+                              proposta.geometria.viario_diagnostico.conexao.travessia.greide_indeterminado ? ", confirmar com topografia" : ""
+                            })`}
+                        </span>
+                      )}
                     {/* Fase 9.14 — traçado inteligente: contorno da restrição + cul-de-sacs. */}
                     {((proposta.geometria.viario_diagnostico.trechos_contornando_restricao ?? 0) > 0 ||
                       (proposta.geometria.viario_diagnostico.culdesacs_bulbo ?? 0) > 0) && (
