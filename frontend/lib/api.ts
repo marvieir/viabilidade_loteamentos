@@ -1228,6 +1228,14 @@ export interface GeometriaUrb {
       faces: number;
       motivo: string;
     }[];
+    // Fase 9.12 — todo lote com frente para via + parser dos eixos da IA.
+    lotes_sem_via_tratados?: number;
+    lotes_fundidos_lateral?: number;
+    lotes_viraram_verde?: number;
+    testada_media_m?: number;
+    todos_lotes_com_frente_via?: boolean;
+    eixos_ia_aceitos?: number;
+    eixos_ia_descartados?: number;
     hierarquia: { tronco_m: number; local_m: number };
     obs: string;
   } | null;

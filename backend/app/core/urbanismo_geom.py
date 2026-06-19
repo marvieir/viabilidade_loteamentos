@@ -72,6 +72,12 @@ ESCALA_QUADRA_MIN = 0.45      # afina no máximo até 45% do lado do teto (piso 
 # Ilha só adapta se comporta ao menos ~este nº de quarteirões no teto; abaixo disso é site único
 # pequeno (não a gleba estilhaçada) e afinar só geraria slivers — mantém o teto (sem churn).
 AREA_MIN_ADAPTA_QUADRAS = 3.0
+# Fase 9.12 — CROSS-STREETS suficientes (correção da causa-raiz dos lotes encravados): profundidade
+# máxima de face em múltiplos do quarteirão. 1,25 → face ≤ ~2 fileiras costas-com-costas, ambas
+# lindeiras a uma via; assim TODA fileira nasce com frente para via (a geração resolve, o filtro
+# 9.12 vira só rede de segurança). É o valor onde lotes_viraram_verde≈0 na caixa limpa.
+FACE_BOUND_FACTOR = 1.25
+COMPENSAR_REMOCAO = True       # +1 transversal antes da remoção da espinha (evita gap profundo)
 
 try:  # shapely 2.x
     from shapely import make_valid as _make_valid
@@ -213,11 +219,21 @@ def _subdividir_quadra(piece: Polygon, y0: float, y1: float, testada_alvo: float
         return [], piece  # quadra menor que meio lote → toda residual (vira área verde)
     depth = piece.area / L  # profundidade média da quadra
     alvo = min(max(alvo_area, piso), teto)
-    testada_eff = max(min(alvo / depth, teto / depth), FRENTE_MIN_M)
+    # Fase 9.12 — PREFERÊNCIA SUAVE de testada por faixa (alto ≥15 / médio ≥10 / popular ≥5 m, via
+    # ``testada_alvo`` das diretrizes): orienta o corte p/ a frente típica do padrão, sem rejeitar
+    # lote (o clamp de área manda; testada é tendência). Evita "alto padrão" com 9 m de frente.
+    # A preferência NUNCA empurra a área acima do teto: cap em ``teto/depth`` (numa quadra funda, a
+    # testada típica cederia ao teto legal — caso contrário o lote estoura [piso,teto]).
+    teto_testada = max(teto / depth, FRENTE_MIN_M)
+    testada_eff = min(max(min(alvo / depth, teto / depth), FRENTE_MIN_M, testada_alvo), teto_testada)
     n = max(int(round(L / testada_eff)), 1)
-    # Peça rasa: não dividir além do que o PISO comporta — senão (L/n)·depth < piso e o clamp
-    # descarta tudo (gleba rasa ficaria sem lote). Cap em ⌊área/piso⌋ (≥1 quando comporta um lote).
-    n = min(n, max(int(piece.area / max(piso, 1.0)), 1))
+    # Fase 9.4/9.12 — clamp de área POR CONSTRUÇÃO: n tem de manter o lote em [piso, teto].
+    #   n ≥ ⌈área/teto⌉ (senão (L/n)·depth > teto — lote gigante) e n ≤ ⌊área/piso⌋ (senão < piso,
+    #   e o clamp descarta tudo). Se conflitam (face funda), o TETO manda (n maior) e a sobra que
+    #   ficaria < piso vira verde no _clamp_faixa — nunca um lote fora da faixa (fora_da_faixa==0).
+    n_teto_min = max(math.ceil(piece.area / max(teto, 1.0)), 1)
+    n_piso_max = max(int(piece.area / max(piso, 1.0)), 1)
+    n = min(max(n, n_teto_min), max(n_piso_max, n_teto_min))
     tr = L / n  # testada real → fecha a quadra exatamente
     cols: list[Polygon] = []
     for k in range(n):
@@ -261,6 +277,12 @@ def _eixos_da_ilha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w:
     brutos: list[tuple[LineString, float, bool]] = []  # (reta, largura, é_tronco)
     nbx = max(int(round(W / (block_w + via_local))), 1)
     nby = max(int(round(H / (block_h + via_local))), 1)
+    # Fase 9.12 — CROSS-STREETS suficientes (correção da causa-raiz): o arredondamento podia ESTICAR
+    # a face muito além do quarteirão (ex.: 172 m = 6 fileiras), e as fileiras do MEIO não tocam via
+    # nenhuma → lote encravado por construção. Garante linhas o bastante p/ a face não passar de ~2
+    # fileiras costas-com-costas (≤ block·1,25); assim TODA fileira nasce lindeira a uma via.
+    nbx = max(nbx, math.ceil(W / max(block_w * FACE_BOUND_FACTOR, 1.0)))
+    nby = max(nby, math.ceil(H / max(block_h * FACE_BOUND_FACTOR, 1.0)))
 
     # IA tronco (curva) ∩ ilha → segmentos. Fase 9.9: a via-tronco curva é o eixo principal; a
     # grade local segue ORTOGONAL (mantém o lote/viário da 9.8). Para não SOMAR via, a grade NÃO
@@ -278,9 +300,22 @@ def _eixos_da_ilha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w:
         tron_horizontal = dx >= dy
     tron_c = unary_union(tron_partes).centroid if tron_partes else None
 
+    # Fase 9.12 — COMPENSA a remoção: a espinha vai tirar 1 linha da família paralela a ela; some 1
+    # antes de gerar, p/ que DEPOIS da remoção a malha ainda tenha transversais o bastante (a face
+    # não passa de ~2 fileiras nem nas pontas onde a curva não alcança). Sem isso, remover a única
+    # transversal deixava a face com 4-6 fileiras (meio encravado) — a causa-raiz do bug.
+    if tem_tronco_ia and COMPENSAR_REMOCAO:
+        if tron_horizontal:
+            nby += 1
+        else:
+            nbx += 1
+
     verts = [minx + i * W / nbx for i in range(1, nbx)]
     horiz = [miny + j * H / nby for j in range(1, nby)]
-    # a curva substitui a linha paralela mais próxima (evita via dupla, sem dropar a família toda).
+    # Fase 9.9: a curva (espinha) SUBSTITUI a linha de grade paralela mais próxima (a curva é a via
+    # ali; evita via dupla). Fase 9.12: a grade já vem com transversais o bastante (bound acima) e
+    # o _lotear_face capa em 2 fileiras costas-com-costas — então, mesmo onde a curva não cobre toda
+    # a largura, a face funda vira 2 fileiras que tocam a via de cada lado (a do meio nunca existe).
     if tem_tronco_ia and tron_c is not None:
         if tron_horizontal and horiz:
             horiz.remove(min(horiz, key=lambda y: abs(y - tron_c.y)))
@@ -431,7 +466,11 @@ def _lotear_face(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area
         if depth <= 0 or comp.area < piso * 0.5:
             residuais.append(comp)
             continue
-        nrows = max(int(round(depth / prof)), 1)
+        # Fase 9.12 — CAP em 2 fileiras (costas-com-costas): uma quadra entre duas vias tem no
+        # máximo 2 fileiras de lote, que dividem a face e tocam cada uma a via de um lado (frente);
+        # nunca 3+ (a do meio ficaria encravada). Com a grade já bound (≤~2 fileiras), o cap é a
+        # rede de segurança que garante, POR CONSTRUÇÃO, que toda fileira é lindeira a uma via.
+        nrows = min(max(int(round(depth / prof)), 1), 2)
         rh = depth / nrows
         for r in range(nrows):
             y0 = miny + r * rh
@@ -443,6 +482,92 @@ def _lotear_face(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area
                 if res is not None and not res.is_empty:
                     residuais.append(res)
     return lotes, residuais
+
+
+def _frente_via(lote: BaseGeometry, ruas_buf: Optional[BaseGeometry]) -> float:
+    """Fase 9.12 — comprimento da TESTADA do lote lindeira a via: parte da borda do lote dentro de
+    ``ruas_buf`` (= arruamento já bufferizado 0,5 m UMA vez pelo chamador, p/ escalar). 0 → lote
+    encravado (sem frente para via). Determinístico (§2)."""
+    if ruas_buf is None or ruas_buf.is_empty:
+        return 0.0
+    try:
+        comum = lote.exterior.intersection(ruas_buf)
+    except Exception:  # noqa: BLE001 — geometria degenerada
+        return 0.0
+    return comum.length if comum is not None and not comum.is_empty else 0.0
+
+
+def garantir_frente_via(lotes: list[BaseGeometry], tags: list[str], ruas: Optional[BaseGeometry],
+                        piso: float, teto: float, testada_min: float):
+    """Fase 9.12 — todo lote contado tem FRENTE PARA VIA (definição legal: lote = parcela com ≥1
+    divisa lindeira a via oficial). No frame ROTACIONADO (eixos axiais): classifica cada lote pela
+    testada; o encravado é FUNDIDO LATERALMENTE (vizinho lado a lado COM via absorve — soma
+    testada, mantém profundidade) se a união couber em [piso, teto]; senão vira VERDE/não-
+    aproveitável (nunca lote fantasma). NUNCA frente-fundo (geraria lote comprido-estreito), NUNCA
+    abre via nova. Devolve ``(lotes_ok, tags_ok, encravados_verde, stats)``. Determinístico (§2)."""
+    from shapely.strtree import STRtree
+
+    n = len(lotes)
+    ruas_buf = ruas.buffer(0.5) if (ruas is not None and not ruas.is_empty) else None
+    frentes = [_frente_via(l, ruas_buf) for l in lotes]
+    com_via = [frentes[i] >= testada_min for i in range(n)]
+    geom_l = list(lotes)
+    vivo = [True] * n
+    n_sem = sum(1 for v in com_via if not v)
+    fundidos = 0
+    # índice espacial p/ ESCALAR (gleba grande → milhares de lotes): em vez de varrer TODOS os
+    # lotes por encravado (O(n²)), consulta só os vizinhos geométricos (O(n·log n)).
+    arvore = STRtree(geom_l)
+    # processa encravados em ordem estável (determinismo §2): maior primeiro (mais área a recuperar)
+    ordem = sorted((i for i in range(n) if not com_via[i]), key=lambda i: -lotes[i].area)
+    for i in ordem:
+        if not vivo[i]:
+            continue
+        melhor = None
+        for j in arvore.query(geom_l[i].buffer(0.5)):  # só candidatos que tocam o encravado
+            j = int(j)
+            if j == i or not vivo[j] or not com_via[j]:
+                continue  # vizinho precisa estar vivo E ter via (absorve mantendo frente)
+            shared = _valido(geom_l[i].intersection(geom_l[j]))
+            if shared is None or shared.is_empty or shared.length < 0.5:
+                continue  # não são adjacentes
+            sx0, sy0, sx1, sy1 = shared.bounds
+            if (sy1 - sy0) <= (sx1 - sx0):
+                continue  # divisa horizontal = frente-fundo → PROIBIDO (só lateral, divisa em y)
+            uni = _maior_parte(_uniao_segura([geom_l[i], geom_l[j]]))
+            if uni is None or uni.area > teto + 1e-6:
+                continue  # estouraria o teto legal → não funde (cai p/ verde se ninguém absorver)
+            if melhor is None or uni.area < melhor[1].area:
+                melhor = (j, uni)
+        if melhor is not None:
+            j, uni = melhor
+            geom_l[j] = uni        # vizinho lateral com via absorve o encravado (soma testada)
+            vivo[i] = False
+            fundidos += 1
+    lotes_ok: list[BaseGeometry] = []
+    tags_ok: list[str] = []
+    verde: list[BaseGeometry] = []
+    for i in range(n):
+        if not vivo[i]:
+            continue
+        if com_via[i]:
+            lotes_ok.append(geom_l[i])
+            tags_ok.append(tags[i])
+        else:
+            verde.append(geom_l[i])     # encravado que ninguém absorveu → verde honesto
+    # testada do lote = lado CURTO do MRR (frente típica p/ a rua); evita a inflação de lote de
+    # esquina/curva, que tocaria via em vários lados. Métrica p/ comparar com a faixa do perfil.
+    frentes_ok = [_frente_via(l, ruas_buf) for l in lotes_ok]
+    testadas = [_lados_mrr(l)[0] for l in lotes_ok]
+    testada_media = round(sum(testadas) / len(testadas), 1) if testadas else 0.0
+    stats = {
+        "lotes_sem_via_tratados": n_sem,
+        "lotes_fundidos_lateral": fundidos,
+        "lotes_viraram_verde": len(verde),
+        "testada_media_m": testada_media,
+        "todos_lotes_com_frente_via": all(f >= testada_min for f in frentes_ok),
+    }
+    return lotes_ok, tags_ok, verde, stats
 
 
 # --------- áreas públicas como QUADRAS FORMADAS (critérios legais; substituem os discos) ---------
@@ -650,15 +775,33 @@ def _coords_de(item) -> Optional[list]:
     return item
 
 
+def _desaninhar_esqueleto(esqueleto: Sequence) -> list:
+    """Fase 9.12 — robustez do parser: a IA (Opus 4.8) às vezes devolve o esqueleto ACHATADO como
+    UMA polilinha ``[[x,y],[x,y],...]`` em vez de uma LISTA de polilinhas ``[[[x,y],...],...]``
+    (o que fazia os 134 vértices serem descartados como 'coordenadas inválidas'). Aceita os dois:
+    se o 1º item já é um PONTO ``[x,y]`` (1º elemento numérico), envolve o todo numa polilinha."""
+    if not esqueleto:
+        return []
+    primeiro = esqueleto[0]
+    if isinstance(primeiro, dict):
+        return list(esqueleto)                 # lista de {"pontos":...} por ilha (9.9) — já ok
+    try:
+        if isinstance(primeiro[0], (int, float)):
+            return [list(esqueleto)]           # achatado: é UMA polilinha → envolve
+    except (TypeError, IndexError, KeyError):
+        pass
+    return list(esqueleto)                      # já é lista de polilinhas
+
+
 def _eixos(esqueleto: Sequence, canvas: Polygon) -> tuple[list[BaseGeometry], list[str]]:
     """Denormaliza o esqueleto da IA (coords 0..1 do bbox) → eixos métricos CURVOS (9.9: suaviza
-    a polilinha em curva). Aceita polilinha crua ou ``{"pontos":[...]}``. Trecho inválido
-    (auto-interseção, fora, <2 vértices) é DESCARTADO e registrado (nunca cru)."""
+    a polilinha em curva). Aceita polilinha crua, achatada (9.12) ou ``{"pontos":[...]}``. Trecho
+    inválido (auto-interseção, fora, <2 vértices) é DESCARTADO e registrado (nunca cru)."""
     minx, miny, maxx, maxy = canvas.bounds
     w, h = (maxx - minx), (maxy - miny)
     validos: list[BaseGeometry] = []
     descartes: list[str] = []
-    for i, item in enumerate(esqueleto or []):
+    for i, item in enumerate(_desaninhar_esqueleto(esqueleto)):
         coords = _coords_de(item)
         try:
             pts = [(minx + float(x) * w, miny + float(y) * h) for x, y in coords]
@@ -891,9 +1034,20 @@ def gerar_layout(
             lote_quadra.append(f"Q{qi}")
         residuais_reg.extend(res)
 
+    # Fase 9.12 — TODO LOTE COM FRENTE PARA VIA (definição legal): valida a testada de cada lote;
+    # encravado é fundido LATERALMENTE a vizinho com via (soma testada, mantém prof) ou vira VERDE.
+    # Roda no frame ROTACIONADO (lotes_reg/ruas_reg axiais) — antes do _back. Clamp 9.4 preservado.
+    lotes_reg, lote_quadra, encravados_verde, frente_stats = garantir_frente_via(
+        lotes_reg, lote_quadra, ruas_reg, piso_lote, teto_lote, FRENTE_MIN_M
+    )
+    residuais_reg.extend(encravados_verde)  # encravado sem via vira verde (não lote fantasma)
+
     # SOBRA → quadras verdes formadas (faces pequenas) + pontas de loteamento (mínimas).
-    verde_reservado_reg = _uniao_segura([*verdes_reg, *verdes_min])
-    sobra_reg = _uniao_segura(residuais_reg)
+    # RESERVADA = só o que foi PEDIDO (lazer/verde de programa); faces pequenas (verdes_min) e as
+    # pontas de loteamento são LEFTOVER geométrico → sobra_ponta (não "reserva inventada"). Mantém
+    # ``areas_verdes_reservada is None`` quando nada foi pedido (Fase 9.6/9.12).
+    verde_reservado_reg = _uniao_segura(verdes_reg)
+    sobra_reg = _uniao_segura([*residuais_reg, *verdes_min])
     verde_total_reg = _uniao_segura([verde_reservado_reg, sobra_reg])
 
     # Volta ao frame original (gira por +ang). Operação geométrica determinística (§2).
@@ -945,6 +1099,15 @@ def gerar_layout(
         # legal), recuperando faces/fronteira interna onde a declividade estilhaçou a gleba.
         "grade_adaptativa": grade_adaptou,
         "ilhas_detalhe": ilhas_detalhe,
+        # Fase 9.12 — todo lote com frente para via (encravados fundidos lateral ou viram verde) +
+        # parser dos eixos da IA (aceita o formato achatado; antes 100% descartado).
+        "lotes_sem_via_tratados": frente_stats["lotes_sem_via_tratados"],
+        "lotes_fundidos_lateral": frente_stats["lotes_fundidos_lateral"],
+        "lotes_viraram_verde": frente_stats["lotes_viraram_verde"],
+        "testada_media_m": frente_stats["testada_media_m"],
+        "todos_lotes_com_frente_via": frente_stats["todos_lotes_com_frente_via"],
+        "eixos_ia_aceitos": len(centerlines),
+        "eixos_ia_descartados": len(descartes),
         "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "
                 "virou lote/verde" + ("" if conexo else " — gleba partida pela restrição em "
                 f"{len(ilhas)} ilha(s), cada uma conexa")

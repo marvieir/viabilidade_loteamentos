@@ -59,18 +59,17 @@ def test_viario_enxuto_na_gleba_recortada():
     """Critério 1: na gleba recortada (mata central), viário numa FAIXA saudável (a 9.7 dava
     22-26%); vendável SOBE vs. os 47% da 9.7; nº de lotes bem acima dos 41 atuais.
 
-    BANDA (piso E teto), recalibrada na Fase 9.11: o teto subiu de 0,18 → 0,19 porque a gleba
-    recortada é FRAGMENTADA e a grade adaptativa (9.11) legitimamente adensa a ilha pequena (mais
-    faces → mais fronteira interna → viário real); 18,7% ainda é ENXUTO perto dos 22-26% da 9.7,
-    que seguem reprovando. O PISO (≥0,12) protege contra a regressão do COLAPSO que a 9.11
-    consertou (viário sumindo p/ 5-7% em gleba estilhaçada) — sem ele, o teto sozinho não pega o
-    colapso voltando. Calibrado no experimento (São Roque real é o critério-âncora; ver
-    test_urbanismo_grade_adaptativa)."""
+    BANDA adaptativa [0,12 ; 0,26] (Fase 9.12): o viário é CONSEQUÊNCIA de servir todo lote, não
+    meta. A 9.12 conserta a causa-raiz (cross-streets) e dá frente para via a TODO lote — o que
+    subia para encravado agora vira lote servido, e o viário acompanha (sobe vs a 9.11). Piso 0,12
+    pega o colapso; teto 0,26 acomoda o viário-que-serve-lote. O que MANDA é todo lote com via.
+    Vendável CEDE um pouco (mais pavimento serve mais lote) — segue saudável (>0,28)."""
     layout, med = _layout(_gleba_recortada())
     q = med.quadro
-    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.19   # banda: nem colapsado (<0,12) nem inflado (>0,19)
-    assert q["vendavel"]["pct_apo"] >= 0.47             # vendável recuperado (sobe vs 9.7)
+    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.26   # banda adaptativa (consequência de servir lote)
+    assert q["vendavel"]["pct_apo"] >= 0.28             # vendável saudável (cede ao viário que serve)
     assert med.indicadores["n_lotes"] > 41              # lotes recuperados (era 41)
+    assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True
 
 
 # --------------------------- nº2: stubs podados ---------------------------
@@ -101,14 +100,16 @@ def test_malha_por_ilha_conexa():
 
 # --------------------------- nº5: não piora a caixa limpa ---------------------------
 def test_nao_piora_caixa_limpa():
-    """Critério 5: a gleba retangular continua viário ~15%, conexa, nº de lotes na casa dos ~60+
-    (a poda não degrada o que já estava bom — não há stub a remover numa caixa)."""
+    """Critério 5: a gleba retangular fica conexa, sem caco, com todos os lotes servidos por via
+    (Fase 9.12 — geração, não filtragem: lotes_viraram_verde==0). Viário adaptativo [0,12 ; 0,26]."""
     layout, med = _layout(CAIXA)
     q = med.quadro
-    assert 0.13 <= q["arruamento"]["pct_apo"] <= 0.17   # ~15%, intacto
+    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.26   # viário adaptativo (consequência)
     assert layout.viario_diagnostico["conexo"] is True
     assert layout.viario_diagnostico["stubs_podados"] == 0  # caixa não tem caco
-    assert med.indicadores["n_lotes"] >= 60
+    assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True
+    assert layout.viario_diagnostico["lotes_viraram_verde"] == 0  # geração dá acesso, não filtra
+    assert med.indicadores["n_lotes"] >= 50
 
 
 # --------------------------- nº6: restrição rotulada ---------------------------

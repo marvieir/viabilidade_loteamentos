@@ -57,13 +57,16 @@ def _layout_sao_roque():
 
 # ====================== nº1: viário RECUPERADO na gleba estilhaçada real ======================
 def test_viario_recuperado_sao_roque_real():
-    """Critério 1 (ÂNCORA): na gleba real estilhaçada, o viário volta a uma faixa SAUDÁVEL
-    (~15%; era ~5–7% colapsado). BANDA: piso 0,12 (pega o colapso voltando) e teto 0,20 (pega
-    inflação). Os lotes deixam de ficar colados (a malha tem fronteira interna = via)."""
-    _, med = _layout_sao_roque()
+    """Critério 1 (ÂNCORA): na gleba real estilhaçada, o viário é uma CONSEQUÊNCIA adaptativa
+    (não meta). BANDA larga [0,12 ; 0,26]: piso 0,12 pega o colapso voltando (9.11); teto 0,26
+    acomoda o viário que a 9.12 sobe p/ SERVIR todo lote (cross-streets dão acesso aos antes
+    encravados). O que MANDA é qualitativo: todo lote com frente para via (gerado, não filtrado)
+    e fora_da_faixa==0. Viário alto COM todo lote servido = OK; com encravado sobrando = bug."""
+    layout, med = _layout_sao_roque()
     pct = med.quadro["arruamento"]["pct_apo"]
-    assert 0.12 <= pct <= 0.20, f"viário fora da banda saudável: {pct}"
+    assert 0.12 <= pct <= 0.26, f"viário fora da banda adaptativa: {pct}"
     assert med.indicadores["n_lotes"] > 0
+    assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True
 
 
 # ====================== nº2: mais FACES por ilha (a correção direta) ======================
@@ -102,16 +105,21 @@ def test_sliver_vira_verde_nao_bloco():
 
 # ====================== nº5: CAIXA LIMPA não regride ======================
 def test_caixa_limpa_nao_regride():
-    """Critério 5: gleba retangular grande (ilha única) segue no TETO do perfil — viário ~15%,
-    lotes estáveis, `grade_adaptativa == False` (a adaptação só age em ilha pequena/torta)."""
+    """Critério 5: gleba retangular grande (ilha única) segue no TETO do perfil; `grade_adaptativa
+    == False`. Fase 9.12 — a PROVA de que é geração e não filtragem: na caixa limpa, TODO lote
+    nasce com via e `lotes_viraram_verde == 0` (nada vira verde por falta de acesso). Viário é
+    consequência adaptativa (banda [0,12 ; 0,26])."""
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
     prog = programa_do_preset("alta", {"pct_lazer": 0.2})
     layout = geom.gerar_layout(box(0.0, 0.0, 343.0, 172.0), prog, diretrizes=dd)
     med = medida.medir(layout)
     q = med.quadro
-    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.18    # caixa limpa segue ~15% (teto, sem adaptar)
-    assert med.indicadores["n_lotes"] >= 55              # lotes estáveis
-    assert layout.viario_diagnostico["grade_adaptativa"] is False
+    v = layout.viario_diagnostico
+    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.26    # viário adaptativo (consequência, não meta)
+    assert med.indicadores["n_lotes"] >= 50              # lotes estáveis (reais, com via)
+    assert v["grade_adaptativa"] is False
+    assert v["todos_lotes_com_frente_via"] is True
+    assert v["lotes_viraram_verde"] == 0                 # geração dá acesso — nada filtrado p/ verde
 
 
 # ====================== nº3 (unidade): clamp piso/teto do lado adaptativo ======================

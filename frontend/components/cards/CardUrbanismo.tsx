@@ -354,6 +354,15 @@ export function CardUrbanismo({
                         Grade adaptada ao terreno (quarteirão por ilha)
                       </span>
                     )}
+                    {/* Fase 9.12 — todo lote com frente para via (definição legal de lote). */}
+                    {proposta.geometria.viario_diagnostico.todos_lotes_com_frente_via && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-600" />
+                        Todo lote com frente para via
+                        {typeof proposta.geometria.viario_diagnostico.testada_media_m === "number" &&
+                          ` (testada média ${proposta.geometria.viario_diagnostico.testada_media_m.toFixed(1)} m)`}
+                      </span>
+                    )}
                   </div>
                 )}
                 <p className="text-[11px] text-slate-500">

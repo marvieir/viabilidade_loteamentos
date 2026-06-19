@@ -120,10 +120,10 @@ def test_subdivisao_preservada_calibrada():
     uniformes (cv baixo, honesto); a variação cresce em gleba irregular. O cv continua > 0 (os
     tamanhos EMERGEM da quadra, não são impostos) — a amarra é o clamp legal, não a uniformidade."""
     layout, d, _, _ = _dist(SAO_ROQUE, "alta", _perfil_mue(), "MUE")
-    assert 430 <= d["media_m2"] <= 520
+    assert 430 <= d["media_m2"] <= 560  # 9.12 — testada por faixa (preferência) → lote um pouco maior
     assert 0.02 <= d["cv"] <= 0.18
     assert d["retalho_perdido_pct"] <= 0.015
-    assert d["viario_pct"] <= 0.25  # 9.7 — viário agora é a MALHA medida (não a sobra)
+    assert d["viario_pct"] <= 0.27  # 9.12 — viário é a MALHA que SERVE todo lote (consequência adaptativa)
     assert len({round(l.area) for l in layout.lotes}) > 1  # tamanhos diferentes
 
 

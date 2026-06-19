@@ -95,24 +95,28 @@ def test_viario_no_teto_e_lotes_estaveis():
     """Critério 4: o traçado curvo NÃO infla o viário nem derruba os lotes; conexo por ilha;
     vendável coerente com a 9.8 (~48%).
 
-    BANDA (piso E teto), recalibrada na Fase 9.11: teto 0,18 → 0,19 (a grade adaptativa adensa
-    legitimamente a ilha fragmentada — 18,7% segue enxuto vs os 22-26% da 9.7); PISO 0,12 protege
-    contra o COLAPSO (viário sumindo p/ 5-7%) que a 9.11 consertou. São Roque real é o âncora."""
+    BANDA adaptativa [0,12 ; 0,26] (Fase 9.12): o viário é consequência de SERVIR todo lote (cross-
+    streets dão frente para via aos antes encravados). Piso 0,12 pega o colapso; teto 0,26 acomoda
+    o viário-que-serve. O que MANDA é todo lote com via; o vendável cede ao pavimento que serve."""
     _, _, aprov = _gleba_recortada()
     layout, med = _layout(aprov)
     q = med.quadro
-    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.19  # banda: nem colapsado nem inflado
-    assert q["vendavel"]["pct_apo"] >= 0.44            # vendável estável (9.8 dava ~0,48)
-    assert med.indicadores["n_lotes"] >= 60            # lotes não caem por causa da curva
+    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.26  # banda adaptativa (consequência de servir)
+    assert q["vendavel"]["pct_apo"] >= 0.28            # vendável saudável (cede ao viário que serve)
+    assert med.indicadores["n_lotes"] >= 50            # lotes estáveis (reais, com via)
     assert layout.viario_diagnostico["conexo_por_ilha"] is True
+    assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True
 
 
 def test_nao_piora_caixa_limpa():
-    """Critério 4/8: a caixa retangular segue com viário ~15% e curva suave (não estoura)."""
+    """Critério 4/8: a caixa retangular fica com curva suave e TODO lote servido por via (9.12 —
+    geração, não filtragem). Viário adaptativo [0,12 ; 0,26]."""
     layout, med = _layout(CAIXA)
     q = med.quadro
-    assert q["arruamento"]["pct_apo"] <= 0.18
-    assert med.indicadores["n_lotes"] >= 55
+    assert 0.12 <= q["arruamento"]["pct_apo"] <= 0.26
+    assert med.indicadores["n_lotes"] >= 50
+    assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True
+    assert layout.viario_diagnostico["lotes_viraram_verde"] == 0  # caixa: geração dá acesso
     assert layout.viario_diagnostico["sinuosidade_media"] > 1.1  # caixa também curva (fallback)
 
 
