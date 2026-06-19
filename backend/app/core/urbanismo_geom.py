@@ -1148,31 +1148,28 @@ def gerar_layout(
     # medida por ALCANCE DE RUAS (não por contagem de polígono). lobos_reg é a base do flag honesto.
     lobos_reg = conexao_mod.detectar_porcoes(reg)
     reach_sem_ponte = conexao_mod.lobos_alcancados(lobos_reg, ruas_reg)
-    # Fase 10 (Parte 3/10.1) — LOTEAMENTO ÚNICO: a via-tronco de CONEXÃO atravessa o vão/pescoço e
-    # LIGA as porções. Caixa de coletora (~14 m), SEM clipar ao aproveitável (sobrevive ao recorte).
-    # Só materializa quando as ruas NÃO se alcançam (senão é redundante) e o greide não é inviável.
-    if (travessia_eixo is not None and not reach_sem_ponte
-            and (travessia_diag or {}).get("veredicto") != "inviavel"):
+    # Fase 10 (Parte 3/10.1/10.4) — LOTEAMENTO ÚNICO: a via-tronco de CONEXÃO atravessa o vão e LIGA
+    # as porções. Materializa SEMPRE que há travessia com greide VIÁVEL (não mais condicionado ao
+    # `reach_sem_ponte`, que dá FALSO-POSITIVO — uma rua a 26 m "alcança" sem ligar de fato → a ponte
+    # era pulada e o loteamento ficava partido). Sem travessia ou greide inviável → NÃO força (honesto).
+    travessia_viavel = (travessia_eixo is not None
+                        and (travessia_diag or {}).get("veredicto") != "inviavel")
+    if travessia_viavel:
         tr_reg = rotate(travessia_eixo, -ang_deg, origin=cen) if ang_deg else travessia_eixo
         linhas_ponte = [tr_reg]
-        # liga cada PONTA do eixo à malha de ruas mais próxima de cada lado — senão a ponte fica
-        # solta (não conecta as DUAS malhas). Assim o arruamento vira UMA peça (loteamento conexo).
+        # liga cada PONTA do eixo à malha de ruas mais próxima de cada lado (até 120 m — a malha da
+        # outra porção pode estar recuada do vão); senão a ponte fica solta e não junta as DUAS malhas.
         if ruas_reg is not None and not ruas_reg.is_empty:
             for c in (tr_reg.coords[0], tr_reg.coords[-1]):
                 end = Point(c)
                 alvo = nearest_points(end, ruas_reg)[1]
-                if 0.0 < end.distance(alvo) <= 60.0:
+                if 0.0 < end.distance(alvo) <= 120.0:
                     linhas_ponte.append(LineString([(end.x, end.y), (alvo.x, alvo.y)]))
         ponte = _valido(_uniao_segura(linhas_ponte).buffer(
             conexao_mod.CAIXA_TRONCO_M / 2.0, cap_style=2, join_style=2))
         if ponte is not None and not ponte.is_empty:
             ruas_reg = _uniao_segura([ruas_reg, ponte])
-        # Fase 10.4 — com a ponte SANCIONADA (greide viável), GARANTE a malha ÚNICA: solda as grelhas
-        # das porções + a ponte que não alcançou a outra malha (toque pontual, ou vão > 60 m do laço
-        # acima). Sem isto o loteamento PARECE PARTIDO (buraco entre as malhas). Fica DENTRO do bloco
-        # da ponte de propósito: sem travessia ou com greide inviável, NÃO força conexão (degradação
-        # honesta — segue partido, com alerta de engenharia, em vez de inventar via).
-        ruas_reg = _conectar_malha(ruas_reg, conexao_mod.CAIXA_TRONCO_M) or ruas_reg
+        # (a SOLDA final da malha — _conectar_malha — roda como ÚLTIMO passo, após o contorno, abaixo)
     # REGRA B — porção ISOLADA (sem borda livre): suas faces não viram lote, viram verde (honesto).
     isoladas_reg = _uniao_segura([p["geom"] for p in porcoes_info if not p["conectada"]])
 
@@ -1269,6 +1266,10 @@ def gerar_layout(
             ruas_reg = _uniao_segura([ruas_reg, *contorno_mat_reg])
             lotes_recuperados = len(lotes_rec_reg)
 
+    # Fase 10.4 — SOLDA FINAL: com travessia VIÁVEL, garante a malha viária ÚNICA (um só grafo
+    # contínuo), DEPOIS de TODAS as adições de via (grelhas das porções, ponte, bulbos, contorno da
+    # restrição). Solda toque pontual (disco da caixa) e liga vãos remanescentes — é o que fecha o
+    # "buraco" entre as duas porções. Só com travessia viável; sem ela/greide inviável → segue partido.
     # Fase 9.12 — TODO LOTE COM FRENTE PARA VIA (definição legal): valida a testada de cada lote;
     # encravado é fundido LATERALMENTE a vizinho com via (soma testada, mantém prof) ou vira VERDE.
     # Roda no frame ROTACIONADO (lotes_reg/ruas_reg axiais) — antes do _back. Clamp 9.4 preservado.
@@ -1301,6 +1302,12 @@ def gerar_layout(
     lotes = [r for r in (_back(l) for l in lotes_reg) if r is not None]
     quadras_geom = [r for r in (_back(q) for q in (miolos + verdes_min)) if r is not None]
     arruamento = _back(ruas_reg)
+    # Fase 10.4 — SOLDA FINAL da malha (no frame ORIGINAL já validado, onde a união é ESTÁVEL — no
+    # frame rotacionado a solda é frágil e o buffer(0) do _back a quebra): com travessia VIÁVEL,
+    # garante UMA malha viária contínua (fecha o "buraco" entre as porções). Sem travessia/greide
+    # inviável → não roda (degradação honesta: segue partido com alerta de engenharia).
+    if travessia_viavel and arruamento is not None and not arruamento.is_empty:
+        arruamento = _conectar_malha(arruamento, conexao_mod.CAIXA_TRONCO_M) or arruamento
     clube = _back(clube_reg)
     inst = _back(inst_reg)
     verde_reservado = _back(verde_reservado_reg)
@@ -1312,13 +1319,17 @@ def gerar_layout(
 
     # Conectividade do viário: a malha é UMA peça? (ilhas da gleba → conexo geral False, mas
     # cada ILHA pode ser conexa — é o que importa na 9.8). conexo_por_ilha = toda ilha 1 peça.
-    n_trechos = len(_componentes(arruamento)) if arruamento is not None else 0
+    # Fase 10.4 — conta só componentes SIGNIFICATIVOS (ignora sliver de buffer < 80 m²): um caquinho
+    # de 4 m² não pode fazer a malha parecer "partida" depois da solda.
+    _comps_arr = _componentes(arruamento) if arruamento is not None else []
+    _comps_signif = [c for c in _comps_arr if c.area >= 80.0]
+    n_trechos = len(_comps_signif) if _comps_signif else len(_comps_arr)
     conexo = n_trechos == 1
     conexo_por_ilha = bool(trechos_por_ilha) and all(t == 1 for t in trechos_por_ilha)
-    # Fase 10.1 — LOTEAMENTO ÚNICO por ALCANCE DE RUAS (não por contagem de polígono): as porções
-    # morfológicas (lobos_reg — peças OU lobas de um pescoço) são alcançadas por UM componente de
-    # via? Acaba com o falso-positivo do "1 polígono → True": um pescoço sem via cruzando dá False.
-    loteamento_conexo = conexao_mod.lobos_alcancados(lobos_reg, ruas_reg)
+    # Fase 10.4 — LOTEAMENTO ÚNICO = a malha viária é UMA peça contínua (não fragmentos). Substitui o
+    # `lobos_alcancados` (que dava falso-positivo: uma rua a 26 m de cada porção "alcançava" sem ligar
+    # de fato). Agora é topológico e honesto: conectado ⇔ um único componente significativo de via.
+    loteamento_conexo = n_trechos == 1
     viario_m2 = arruamento.area if arruamento is not None and not arruamento.is_empty else 0.0
     vendavel_m2 = sum(l.area for l in lotes)
     # Fase 10 (Parte 4) — ALTO PADRÃO (catálogo §8): UMA portaria/pórtico na entrada ÚNICA do
