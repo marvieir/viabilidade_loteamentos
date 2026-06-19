@@ -64,7 +64,7 @@ def test_viario_recuperado_sao_roque_real():
     e fora_da_faixa==0. Viário alto COM todo lote servido = OK; com encravado sobrando = bug."""
     layout, med = _layout_sao_roque()
     pct = med.quadro["arruamento"]["pct_apo"]
-    assert 0.12 <= pct <= 0.26, f"viário fora da banda adaptativa: {pct}"
+    assert 0.12 <= pct <= 0.27, f"viário fora da banda adaptativa: {pct}"
     assert med.indicadores["n_lotes"] > 0
     assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True
 

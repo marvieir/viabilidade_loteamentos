@@ -1235,6 +1235,18 @@ export interface GeometriaUrb {
     lotes_fundidos_fundo?: number;
     lotes_sem_via_final?: number;
     lotes_viraram_verde?: number;
+    // Fase 9.14 — traçado inteligente: contorno + conectividade + bulbo + recuperação.
+    trechos_contornando_restricao?: number;
+    vias_mortas?: number;
+    culdesacs_bulbo?: number;
+    indice_conectividade?: number;
+    porcoes_loteaveis?: number;
+    porcoes_conectadas?: number;
+    porcoes_isoladas_viraram_verde?: number;
+    lotes_recuperados_de_sobra?: number;
+    verde_reserva_m2?: number;
+    verde_sobra_m2?: number;
+    tracado_hierarquia?: string[];
     testada_media_m?: number;
     todos_lotes_com_frente_via?: boolean;
     eixos_ia_aceitos?: number;

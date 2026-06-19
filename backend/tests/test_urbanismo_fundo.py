@@ -136,8 +136,8 @@ def test_determinismo_e_selo_esquematico():
 def test_nao_regride_geracao_9_12():
     """Critério 7: a 9.13 só muda o DESTINO dos poucos fundos órfãos (verde → lote) e a cor da
     restrição. A geração 9.7-9.12 fica intacta — São Roque segue ~50 lotes, viário na banda
-    adaptativa [0,12 ; 0,26], todo lote com via."""
+    adaptativa [0,12 ; 0,27], todo lote com via (teto 0,27 acomoda o giro do bulbo da 9.14)."""
     layout, med = _layout_sao_roque()
     assert med.indicadores["n_lotes"] >= 45
-    assert 0.12 <= med.quadro["arruamento"]["pct_apo"] <= 0.26
+    assert 0.12 <= med.quadro["arruamento"]["pct_apo"] <= 0.27
     assert layout.viario_diagnostico["todos_lotes_com_frente_via"] is True

@@ -363,6 +363,18 @@ export function CardUrbanismo({
                           ` (testada média ${proposta.geometria.viario_diagnostico.testada_media_m.toFixed(1)} m)`}
                       </span>
                     )}
+                    {/* Fase 9.14 — traçado inteligente: contorno da restrição + cul-de-sacs. */}
+                    {((proposta.geometria.viario_diagnostico.trechos_contornando_restricao ?? 0) > 0 ||
+                      (proposta.geometria.viario_diagnostico.culdesacs_bulbo ?? 0) > 0) && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="inline-block h-2 w-2 rounded-full bg-sky-600" />
+                        Traçado: via contorna a restrição
+                        {(proposta.geometria.viario_diagnostico.culdesacs_bulbo ?? 0) > 0 &&
+                          `, ${proposta.geometria.viario_diagnostico.culdesacs_bulbo} cul-de-sac(s)`}
+                        {(proposta.geometria.viario_diagnostico.lotes_recuperados_de_sobra ?? 0) > 0 &&
+                          `, ${proposta.geometria.viario_diagnostico.lotes_recuperados_de_sobra} lote(s) recuperado(s)`}
+                      </span>
+                    )}
                   </div>
                 )}
                 <p className="text-[11px] text-slate-500">

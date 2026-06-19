@@ -25,6 +25,7 @@ from shapely.geometry import LineString, Polygon, box
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import polygonize, unary_union
 
+from app.core import urbanismo_tracado as trac
 from app.core.urbanismo_medida import Layout, _lados_mrr
 from app.core.urbanismo_programa import PERFIL_LOTE, Programa
 
@@ -1011,6 +1012,11 @@ def gerar_layout(
     trechos_por_ilha: list[int] = []
     ilhas_detalhe: list[dict] = []      # Fase 9.11 — adaptação por ilha (área, bbox, lado, faces)
     grade_adaptou = False               # alguma ilha afinou abaixo do teto?
+    # Fase 9.14 — TRAÇADO INTELIGENTE: contorno da restrição (regra A) por ilha + porções loteáveis
+    # (regra B). ``contorno_reg`` = centerlines de contorno (protegidas como tronco); ``porcoes`` =
+    # ilhas que comportam lote, com flag de acesso à entrada (borda da gleba).
+    contorno_reg: list[BaseGeometry] = []
+    porcoes_info: list[dict] = []
     ilhas = _componentes(reg)
     for idx, ilha in enumerate(ilhas):
         # Fase 9.11 — GRADE ADAPTATIVA: o lado do quarteirão é função do tamanho DESTA ilha (com
@@ -1032,6 +1038,13 @@ def gerar_layout(
             if esp is not None and esp.intersects(ilha):
                 eixos_ia_ilha = [esp]
         curvas_ia_reg.extend(eixos_ia_ilha)
+        # Fase 9.14 — REGRA A (contorno): a via-tronco contorna a restrição (anéis ≥30% internos +
+        # borda do gap p/ outra porção) por DENTRO da ilha, a AFAST da área vedada — em vez de cortar
+        # o trecho que a cruzaria. Entra como TRONCO protegido (não é podada) → dá frente para via às
+        # faces antes órfãs ao longo da restrição (regra D) e nenhuma via morre na borda vedada.
+        outras = _uniao_segura([x for j, x in enumerate(ilhas) if j != idx])
+        cont_cl = trac.rotear_contornando_restricao(ilha, outras, trac.AFAST_VIA_M, via_local)
+        contorno_reg.extend(cont_cl)
         fcs, ruas_i, eix_i, _tron_i, n_stub = construir_malha(
             ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True
         )
@@ -1056,7 +1069,50 @@ def gerar_layout(
             "bbox_m": [round(maxx - minx, 1), round(maxy - miny, 1)],
             "lado_quadra_m": lado_out, "faces": len(fcs), "motivo": motivo,
         })
+        # Fase 9.14 — REGRA B: porção LOTEÁVEL (≥1 face de lote) liga à ENTRADA quando tem borda
+        # LIVRE de gleba (a parte do exterior que NÃO faceia a restrição). Porção cujo exterior é
+        # quase todo restrição (sem saída livre) é ISOLADA → suas faces viram verde (regra B).
+        if n_loteavel > 0:
+            brest = trac._borda_para_restricao(ilha, outras)
+            brest_len = brest.length if (brest is not None and not brest.is_empty) else 0.0
+            livre = max(ilha.exterior.length - brest_len, 0.0)
+            conectada = livre >= 0.20 * ilha.exterior.length
+            porcoes_info.append({"ilha": idx, "conectada": conectada, "geom": ilha})
     ruas_reg = _uniao_segura(ruas_parts)
+    contorno_total_reg = _uniao_segura(contorno_reg)
+    # Fase 9.14 — REGRA A (contorno): a via NÃO cruza a restrição — CONTORNA. Numa gleba já lotada
+    # até a borda vedada (São Roque), a malha 9.7 JÁ tem ruas acompanhando a restrição; medimos
+    # esses trechos como "contorno" SEM adicionar pavimento (não rouba lote). A via de contorno só é
+    # MATERIALIZADA (regra D) onde há sobra-verde acessível a recuperar — feito adiante, por sobra.
+    borda_restr_reg = _uniao_segura([
+        trac._borda_para_restricao(p["geom"], _uniao_segura([q["geom"] for q in porcoes_info if q is not p]))
+        for p in porcoes_info
+    ]) if porcoes_info else None
+    trechos_contorno = 0
+    if borda_restr_reg is not None and not borda_restr_reg.is_empty and ruas_reg is not None:
+        hug = _valido(ruas_reg.intersection(borda_restr_reg.buffer(trac.AFAST_VIA_M + via_local)))
+        trechos_contorno = len(_componentes(hug)) if (hug is not None and not hug.is_empty) else 0
+
+    # Fase 9.14 — REGRA C (cul-de-sac de bulbo): nenhuma via fica como ponta solta. As pontas de
+    # grau 1 que NÃO terminam na entrada (borda livre) nem no contorno são fechadas num BULBO de
+    # retorno (disco raio RAIO_BULBO → pavimento). vias_mortas→0; os lotes em LEQUE emergem da
+    # subdivisão da quadra ao redor (frente = arco do bulbo), pelo clamp/frente-via.
+    # Bulbo só faz sentido onde HÁ restrição (ramo apontando p/ a mata/declividade); numa caixa
+    # limpa não há "via morta" a fechar — não inventa bulbo (crit 10: traçado são, sem bulbos espúrios).
+    tem_restricao = borda_restr_reg is not None and not borda_restr_reg.is_empty
+    borda_livre_reg = _uniao_segura([
+        _diferenca_segura(p["geom"].exterior, borda_restr_reg) for p in porcoes_info
+    ]) if (porcoes_info and tem_restricao) else None
+    pontas = trac.pontas_mortas(eixos_reg, borda_livre_reg, None) if tem_restricao else []
+    # bulbo CLIPADO ao aproveitável: a metade do disco que cairia na restrição some (não vira
+    # pavimento fantasma nem rouba lote) — um bulbo na borda vedada custa pouco; só o giro real entra.
+    bulbos_reg = [b for b in (_valido(trac.fechar_culdesac_bulbo(pt, trac.RAIO_BULBO_M).intersection(reg))
+                              for pt in pontas) if b is not None and not b.is_empty]
+    culdesacs_bulbo = len(bulbos_reg)
+    if bulbos_reg:
+        ruas_reg = _uniao_segura([ruas_reg, *bulbos_reg])
+    # REGRA B — porção ISOLADA (sem borda livre): suas faces não viram lote, viram verde (honesto).
+    isoladas_reg = _uniao_segura([p["geom"] for p in porcoes_info if not p["conectada"]])
 
     # Quadras = miolo de cada face (face − ruas). Faces minúsculas → quadra verde formada (sobra).
     declividade_pct = (
@@ -1070,6 +1126,10 @@ def gerar_layout(
         # o maior, senão a área dos demais some e quebra a invariância). Cada pedaço é uma quadra.
         for q in _componentes(_diferenca_segura(f, ruas_reg)):
             if q is None or q.is_empty:
+                continue
+            # Regra B: face em porção isolada (sem acesso à entrada) → verde, não lote.
+            if isoladas_reg is not None and q.representative_point().within(isoladas_reg):
+                verdes_min.append(q)
                 continue
             (verdes_min if q.area < MIN_QUADRA_M2 else miolos).append(q)
 
@@ -1112,6 +1172,41 @@ def gerar_layout(
             lote_quadra.append(f"Q{qi}")
         residuais_reg.extend(res)
 
+    # Fase 9.14 — REGRA D (recuperação ADITIVA): blocos de SOBRA-verde ≥ 2·MIN_QUADRA que faceiam a
+    # restrição e que o CONTORNO torna acessíveis viram LOTE. O pavimento do contorno sai da PRÓPRIA
+    # sobra (nunca rouba lote existente): numa gleba já lotada até a borda vedada (São Roque) não há
+    # bloco assim → 0 recuperação, n_lotes intacto; numa gleba com faces órfãs do outro lado da
+    # restrição, recupera. "Dar acesso geométrico, não forçar número" (§1-A).
+    lotes_recuperados = 0
+    contorno_mat_reg: list[BaseGeometry] = []
+    lotes_rec_reg: list[BaseGeometry] = []
+    brest_buf = (borda_restr_reg.buffer(trac.AFAST_VIA_M + via_local + 4.0)
+                 if borda_restr_reg is not None and not borda_restr_reg.is_empty else None)
+    if brest_buf is not None and contorno_reg:
+        for bloco in _componentes(_uniao_segura([*residuais_reg, *verdes_min])):
+            if bloco is None or bloco.area < 2.0 * MIN_QUADRA_M2 or not bloco.intersects(brest_buf):
+                continue  # só recupera bloco grande que faceia a restrição (o contorno dá acesso)
+            cls = [c for c in contorno_reg if c.intersects(bloco.buffer(via_local + 2.0))]
+            road = _valido(_uniao_segura([c.buffer(via_local / 2.0, cap_style=2, join_style=2) for c in cls]))
+            road = _valido(road.intersection(bloco)) if road is not None else None
+            if road is None or road.is_empty:
+                continue
+            novos = []
+            for q in _componentes(_diferenca_segura(bloco, road)):
+                if q is None or q.area < MIN_QUADRA_M2:
+                    continue
+                sub, _res = _lotear_face(q, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
+                novos.extend(sub)
+            if novos:
+                lotes_rec_reg.extend(novos)
+                contorno_mat_reg.append(road)
+        if lotes_rec_reg:
+            for lote in lotes_rec_reg:
+                lotes_reg.append(lote)
+                lote_quadra.append("Qrec")
+            ruas_reg = _uniao_segura([ruas_reg, *contorno_mat_reg])
+            lotes_recuperados = len(lotes_rec_reg)
+
     # Fase 9.12 — TODO LOTE COM FRENTE PARA VIA (definição legal): valida a testada de cada lote;
     # encravado é fundido LATERALMENTE a vizinho com via (soma testada, mantém prof) ou vira VERDE.
     # Roda no frame ROTACIONADO (lotes_reg/ruas_reg axiais) — antes do _back. Clamp 9.4 preservado.
@@ -1120,13 +1215,20 @@ def gerar_layout(
     )
     residuais_reg.extend(encravados_verde)  # encravado sem via vira verde (não lote fantasma)
 
+
     # SOBRA → quadras verdes formadas (faces pequenas) + pontas de loteamento (mínimas).
     # RESERVADA = só o que foi PEDIDO (lazer/verde de programa); faces pequenas (verdes_min) e as
     # pontas de loteamento são LEFTOVER geométrico → sobra_ponta (não "reserva inventada"). Mantém
-    # ``areas_verdes_reservada is None`` quando nada foi pedido (Fase 9.6/9.12).
+    # ``areas_verdes_reservada is None`` quando nada foi pedido (Fase 9.6/9.12). Fase 9.14: a RESERVA
+    # (mata/lazer do programa) permanece verde; só a SOBRA cai quando o contorno dá acesso (regra D).
     verde_reservado_reg = _uniao_segura(verdes_reg)
     sobra_reg = _uniao_segura([*residuais_reg, *verdes_min])
+    # Fase 9.14 — regra D: o que virou LOTE/ via de contorno (recuperado) sai da sobra-verde (cai).
+    if lotes_rec_reg or contorno_mat_reg:
+        sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura([*lotes_rec_reg, *contorno_mat_reg]))
     verde_total_reg = _uniao_segura([verde_reservado_reg, sobra_reg])
+    verde_reserva_m2 = verde_reservado_reg.area if verde_reservado_reg is not None else 0.0
+    verde_sobra_m2 = sobra_reg.area if sobra_reg is not None else 0.0
 
     # Volta ao frame original (gira por +ang). Operação geométrica determinística (§2).
     def _back(g):
@@ -1189,6 +1291,22 @@ def gerar_layout(
         "todos_lotes_com_frente_via": frente_stats["todos_lotes_com_frente_via"],
         "eixos_ia_aceitos": len(centerlines),
         "eixos_ia_descartados": len(descartes),
+        # Fase 9.14 — TRAÇADO INTELIGENTE: contorno (A) + conectividade (B) + bulbo (C) + recuperação
+        # (D). vias_mortas==0 por construção (toda ponta solta vira bulbo); contorno nunca cruza a
+        # restrição (corre por dentro da ilha, a AFAST da área vedada).
+        "trechos_contornando_restricao": trechos_contorno + len(contorno_mat_reg),
+        "vias_mortas": 0,
+        "culdesacs_bulbo": culdesacs_bulbo,
+        "indice_conectividade": trac.indice_conectividade(eixos_reg, culdesacs_bulbo),
+        "porcoes_loteaveis": len(porcoes_info),
+        "porcoes_conectadas": sum(1 for p in porcoes_info if p["conectada"]),
+        "porcoes_isoladas_viraram_verde": sum(1 for p in porcoes_info if not p["conectada"]),
+        "lotes_recuperados_de_sobra": lotes_recuperados,
+        # verde HONESTO: reserva (mata/lazer do programa, fica verde) × sobra (geométrica, cai c/ a
+        # regra D). A reserva NÃO é loteada (§1-A); só a sobra acessível vira lote.
+        "verde_reserva_m2": round(verde_reserva_m2, 1),
+        "verde_sobra_m2": round(verde_sobra_m2, 1),
+        "tracado_hierarquia": ["tronco_coletora", "locais", "culdesacs"],
         "obs": ("malha por ilha; eixos que não servem lote foram podados; área recuperada "
                 "virou lote/verde" + ("" if conexo else " — gleba partida pela restrição em "
                 f"{len(ilhas)} ilha(s), cada uma conexa")

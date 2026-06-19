@@ -231,7 +231,15 @@ _INSTRUCAO = (
     "mapeia para a gleba real, SUAVIZA (Bézier/Catmull-Rom), valida e recorta — você dá a forma "
     "da curva, NÃO coordenadas finais nem larguras. Para 'grelha_eficiente' o esqueleto pode "
     "ser omitido (o motor usa grelha ortogonal). NUNCA devolva o esqueleto vazio num arquétipo "
-    "sinuoso/misto."
+    "sinuoso/misto.\n"
+    "4. PROGRAMA DE TRAÇADO — HIERARQUIA (Fase 9.14): organize as vias em (a) UMA via-TRONCO "
+    "coletora que costura a gleba da entrada às porções (é o que impede o loteamento partido), "
+    "(b) vias LOCAIS que servem as quadras, (c) CUL-DE-SACS (ramos sem saída) nos fundos de "
+    "exclusividade — fundo de mata, cota alta, frente para verde — onde cabe lote premium em "
+    "leque. Indique no esqueleto a via-tronco PRIMEIRO e os ramos curtos depois; sinalize na "
+    "justificativa ONDE fazer cul-de-sac e a INTENÇÃO de CONTORNAR a restrição (nunca cruzá-la). "
+    "O motor materializa o contorno, a conectividade, os bulbos e a recuperação — você dá a "
+    "ESTRATÉGIA do traçado, NUNCA o número, a largura, o raio ou a medida (§2)."
 )
 
 _FERRAMENTA = {
