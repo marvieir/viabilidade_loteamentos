@@ -100,18 +100,20 @@ def test_fundo_e_fracao_pequena_do_total():
     assert fundo < 0.1 * med.indicadores["n_lotes"]   # exceção, não regra (<10% dos lotes)
 
 
-# ====================== nº5: declividade discreta (apresentação) ======================
-def test_restricao_estilo_discreto():
-    """Critério 5: a restrição recortada (≥30%) carrega `estilo_sugerido="hachura_discreta"` p/ o
-    front mostrá-la DISCRETA (não bloco sólido); rótulo e origem permanecem. O dado NÃO muda."""
+# ============== nº5: não-edificável = bosque/área verde preservada (apresentação) ==============
+def test_restricao_estilo_bosque_preservado():
+    """Critério 5 (Fase 10.2): a restrição recortada (≥30%/mata/APP) carrega
+    `estilo_sugerido="bosque_preservado"` p/ o front mostrá-la como ÁREA VERDE PRESERVADA (bosque
+    visível), não um vazio/"buraco"; rótulo e origem permanecem. O dado NÃO muda."""
     lay = medida.Layout()
     lay.restricao_recortada = box(40, 40, 60, 60)
     lay.restricao_origem = ["declividade>=30%"]
     gj = medida._restricao_gj(lay, lambda x, y: (x, y))
     assert gj is not None
-    assert gj["estilo_sugerido"] == "hachura_discreta"
+    assert gj["estilo_sugerido"] == "bosque_preservado"
     assert gj["origem"] == ["declividade>=30%"]   # origem preservada (dado explícito)
     assert "não-edificável" in gj["rotulo"].lower()
+    assert "preservada" in gj["rotulo"].lower()   # lê como amenidade, não como restrição-buraco
 
 
 def test_sem_restricao_nao_inventa_estilo():

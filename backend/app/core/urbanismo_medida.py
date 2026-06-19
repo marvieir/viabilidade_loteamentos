@@ -418,11 +418,13 @@ def _restricao_gj(layout: "Layout", to_wgs) -> Optional[dict]:
     gj = dict(gj)
     gj["origem"] = list(layout.restricao_origem)
     gj["rotulo"] = (
-        "Área não-edificável (mata/declividade/APP) — ver cards Ambiental/Vegetação/Declividade"
+        "Bosque/área verde preservada — não-edificável (mata/declividade/APP); "
+        "amenidade do empreendimento — ver cards Ambiental/Vegetação/Declividade"
     )
-    # Fase 9.13 — dica de APRESENTAÇÃO p/ o front: a restrição é mostrada DISCRETA (hachura/contorno
-    # esmaecido, ao fundo), não bloco sólido que compete com o parcelamento. O dado não muda.
-    gj["estilo_sugerido"] = "hachura_discreta"
+    # Fase 10.2 — dica de APRESENTAÇÃO p/ o front: a restrição não-edificável é a ÁREA VERDE
+    # PRESERVADA (bosque) do empreendimento, desenhada em verde-mata visível ao fundo — não um vazio
+    # ("buraco") nem bloco que compete com os lotes. O dado/geometria não muda; só a representação.
+    gj["estilo_sugerido"] = "bosque_preservado"
     return gj
 
 

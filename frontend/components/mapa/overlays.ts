@@ -22,7 +22,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde_sobra: "#86efac", // verde claro (remanescente)
   urb_lazer: "#06b6d4", // cor de equipamento
   urb_institucional: "#f59e0b",
-  urb_restricao: "#8a7b70", // Fase 9.13 — restrição recortada DESSATURADA (terracota-cinza, discreta)
+  urb_restricao: "#2e7d32", // Fase 10.2 — não-edificável = BOSQUE/área verde preservada (verde mata)
 };
 
 // Fase 9.6 — estilo POR camada (contraste sobre satélite, borda própria). Sem entrada → default.
@@ -41,10 +41,11 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   urb_verde_sobra: { color: "#16a34a", weight: 1, fillColor: "#86efac", fillOpacity: 0.22, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
-  // Fase 9.13 — restrição recortada DISCRETA (apresentação): fill esmaecido + contorno tracejado
-  // dessaturado (terracota-cinza), ao FUNDO — não mais o bloco vermelho-tijolo que competia com o
-  // parcelamento. O dado/geometria não muda; só a representação visual. Rótulo permanece na legenda.
-  urb_restricao: { color: "#8a7b70", weight: 1, fillColor: "#b9a99c", fillOpacity: 0.14, dashArray: "3 4" },
+  // Fase 10.2 — não-edificável (mata/≥30%/APP) = BOSQUE/ÁREA VERDE PRESERVADA, não um buraco. Verde
+  // mata visível (textura pontilhada = natural/preservado), distinto do verde-parque reservado
+  // (#22c55e, manicured) e do verde-sobra (pálido). Não compete com os lotes (fica ao fundo), mas
+  // LÊ como amenidade preservada — não como vazio com satélite vazando. O dado/geometria não muda.
+  urb_restricao: { color: "#1b4d27", weight: 1.5, fillColor: "#2e7d32", fillOpacity: 0.42, dashArray: "1 6" },
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -66,7 +67,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde_sobra: "Verde remanescente",
   urb_lazer: "Sistema de lazer / clube",
   urb_institucional: "Institucional",
-  urb_restricao: "Não-edificável (mata/declividade)",
+  urb_restricao: "Bosque/área verde preservada (não-edif.: mata/≥30%/APP)",
 };
 
 // Fase 9.5 — cores das faixas de score (frio→quente) p/ colorir cada LOTE no mapa (heatmap real).

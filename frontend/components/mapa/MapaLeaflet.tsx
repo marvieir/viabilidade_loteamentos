@@ -48,9 +48,9 @@ export default function MapaLeaflet({
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       />
 
-      {/* Fase 9.13 — restrição recortada (≥30%/mata/APP) ao FUNDO e DISCRETA: desenhada ANTES do
-          parcelamento (fica por baixo), com fill esmaecido + contorno tracejado dessaturado. O dado
-          não muda; só para de competir com o projeto. Rótulo segue na legenda. */}
+      {/* Fase 10.2 — não-edificável (≥30%/mata/APP) = BOSQUE/área verde PRESERVADA: desenhada ANTES
+          do parcelamento (fica ao fundo), em verde-mata visível com textura pontilhada. Não é mais um
+          vazio com satélite vazando ("buraco"); lê como amenidade preservada. Rótulo na legenda. */}
       {overlays?.urb_restricao &&
         (() => {
           const e = ESTILO_OVERLAY.urb_restricao!;
