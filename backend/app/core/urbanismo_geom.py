@@ -912,6 +912,36 @@ def _dims(programa: Programa) -> tuple[float, float, float]:
     )
 
 
+def _conectar_malha(ruas: Optional[BaseGeometry], caixa: float,
+                    min_area: float = 80.0) -> Optional[BaseGeometry]:
+    """Fase 10.4 — GARANTE uma malha viária ÚNICA (sem buraco). Enquanto houver >1 componente
+    SIGNIFICATIVO de rua, liga o mais próximo ao tronco principal por um conector reto (caixa de
+    coletora), do par de pontos mais próximos. Sem isto a malha sai em pedaços (as grelhas das
+    porções + a ponte que não alcançou a outra malha por ficar fora do limite de 60 m) e o
+    loteamento PARECE PARTIDO. O conector pode cruzar a faixa ≥30% (veda lote, não via — Fase 10.3).
+    Slivers (< ``min_area``) são ignorados (ruído de buffer, não pedaço de rua real)."""
+    if ruas is None or ruas.is_empty:
+        return ruas
+    comps = sorted(_componentes(ruas), key=lambda c: -c.area)
+    signif = [c for c in comps if c.area >= min_area]
+    if len(signif) <= 1:
+        return ruas
+    main = signif[0]
+    pecas: list[BaseGeometry] = [ruas]
+    for c in signif[1:]:
+        p1, p2 = nearest_points(main, c)
+        d = p1.distance(p2)
+        if d <= 1e-6:
+            # toque PONTUAL (carro não passa) → solda com um disco da caixa de via, criando largura
+            conn = Point(p1.x, p1.y).buffer(caixa / 2.0)
+        else:
+            # vão real → conector reto com cabeça redonda (sobrepõe DENTRO das duas malhas, soldando)
+            conn = LineString([(p1.x, p1.y), (p2.x, p2.y)]).buffer(caixa / 2.0, cap_style=1)
+        pecas.append(conn)
+        main = _uniao_segura([main, c, conn])
+    return _valido(_uniao_segura(pecas)) or ruas
+
+
 def gerar_layout(
     aproveitavel: BaseGeometry,
     programa: Programa,
@@ -1137,6 +1167,12 @@ def gerar_layout(
             conexao_mod.CAIXA_TRONCO_M / 2.0, cap_style=2, join_style=2))
         if ponte is not None and not ponte.is_empty:
             ruas_reg = _uniao_segura([ruas_reg, ponte])
+        # Fase 10.4 — com a ponte SANCIONADA (greide viável), GARANTE a malha ÚNICA: solda as grelhas
+        # das porções + a ponte que não alcançou a outra malha (toque pontual, ou vão > 60 m do laço
+        # acima). Sem isto o loteamento PARECE PARTIDO (buraco entre as malhas). Fica DENTRO do bloco
+        # da ponte de propósito: sem travessia ou com greide inviável, NÃO força conexão (degradação
+        # honesta — segue partido, com alerta de engenharia, em vez de inventar via).
+        ruas_reg = _conectar_malha(ruas_reg, conexao_mod.CAIXA_TRONCO_M) or ruas_reg
     # REGRA B — porção ISOLADA (sem borda livre): suas faces não viram lote, viram verde (honesto).
     isoladas_reg = _uniao_segura([p["geom"] for p in porcoes_info if not p["conectada"]])
 
