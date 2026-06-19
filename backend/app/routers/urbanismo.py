@@ -286,6 +286,26 @@ def propor(
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
 
+    # === DIAGNÓSTICO TEMPORÁRIO (conexão da malha) — imprime os FATOS reais no console do uvicorn.
+    # Cole as linhas "DIAG-CONEXAO" aqui no chat. Removido depois de diagnosticar. ===
+    try:
+        _ar = getattr(layout, "arruamento", None)
+        _comps = sorted(geom._componentes(_ar), key=lambda p: -p.area) if _ar is not None else []
+        _sig = [round(c.area) for c in _comps if c.area >= 80.0]
+        _vd = layout.viario_diagnostico or {}
+        _porc = conexao_mod.detectar_porcoes(aprov_m)
+        print(f"DIAG-CONEXAO 1/4 travessia_eixo={'SIM' if travessia_eixo is not None else 'NAO'} "
+              f"veredicto={(travessia_diag or {}).get('veredicto')} "
+              f"greide={(travessia_diag or {}).get('greide_pct')} porcoes={len(_porc)}", flush=True)
+        print(f"DIAG-CONEXAO 2/4 arruamento_componentes_signif_m2={_sig} (1 item = CONECTADO)", flush=True)
+        print(f"DIAG-CONEXAO 3/4 loteamento_conexo={_vd.get('loteamento_conexo')} "
+              f"conexao={_vd.get('conexao')}", flush=True)
+        print(f"DIAG-CONEXAO 4/4 n_lotes={indicadores.get('n_lotes') if isinstance(indicadores, dict) else '?'} "
+              f"arruamento_total_componentes={len(_comps)}", flush=True)
+    except Exception as _e:  # diagnóstico nunca derruba a request
+        print(f"DIAG-CONEXAO ERRO: {type(_e).__name__}: {_e}", flush=True)
+    # === fim diagnóstico ===
+
     # Fase 9.10 — PONTE: teto regulatório (mesma fórmula/cenário do Aproveitamento) p/ a referência
     # cruzada. É só EXIBIÇÃO — o nº de lotes do estudo (medido acima) não usa este número.
     from app.core import aproveitamento as aprov_motor
