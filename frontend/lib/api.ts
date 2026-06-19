@@ -1288,6 +1288,11 @@ export interface GeometriaUrb {
         caixa_via_m?: number;
         alerta_topografia?: boolean;
         greide_indeterminado?: boolean;
+        // Fase 10.3 — via de conexão por traçado DIAGONAL que cruza a faixa ≥30% (veda lote, não via).
+        modelo?: string;            // "diagonal_minimax" | "reto"
+        cruza_restricao?: boolean;
+        exigencia_geotecnica?: boolean;
+        nota_geotecnica?: string | null;
       } | null;
     };
     tracado_hierarquia?: string[];

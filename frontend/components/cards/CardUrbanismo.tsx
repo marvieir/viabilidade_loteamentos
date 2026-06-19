@@ -369,12 +369,25 @@ export function CardUrbanismo({
                         <span className="inline-flex items-center gap-1">
                           <span className="inline-block h-2 w-2 rounded-full bg-indigo-600" />
                           Loteamento único — porções ligadas pela travessia
+                          {proposta.geometria.viario_diagnostico.conexao?.travessia?.modelo === "diagonal_minimax" &&
+                            " (via diagonal)"}
                           {typeof proposta.geometria.viario_diagnostico.conexao?.travessia?.greide_medido_pct === "number" &&
                             ` (greide ~${proposta.geometria.viario_diagnostico.conexao.travessia.greide_medido_pct}%${
                               proposta.geometria.viario_diagnostico.conexao.travessia.greide_indeterminado ? ", confirmar com topografia" : ""
                             })`}
                         </span>
                       )}
+                    {/* Fase 10.3 — a via de conexão cruza a faixa ≥30% (veda LOTE, não via): exige laudo. */}
+                    {proposta.geometria.viario_diagnostico.conexao?.travessia?.exigencia_geotecnica && (
+                      <span className="inline-flex items-start gap-1 text-amber-700">
+                        <span className="mt-1 inline-block h-2 w-2 shrink-0 rounded-full bg-amber-600" />
+                        <span>
+                          Via de conexão cruza declividade ≥30% em corte/aterro — exige projeto
+                          geométrico e laudo geotécnico (art. 3º Lei 6.766). Nenhum lote na faixa
+                          ≥30%; só a via a atravessa.
+                        </span>
+                      </span>
+                    )}
                     {/* Fase 10 (Parte 4) — alto padrão: uma portaria, institucional na entrada. */}
                     {(proposta.geometria.viario_diagnostico.alto_padrao?.porticos ?? 0) > 0 && (
                       <span className="inline-flex items-center gap-1">

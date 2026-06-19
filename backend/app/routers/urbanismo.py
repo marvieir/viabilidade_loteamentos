@@ -126,31 +126,50 @@ def _cota_sampler(fonte_dem, gleba_wgs, to_wgs):
     return cota
 
 
-def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog):
-    """Fase 10 (Parte 3) — se a área aproveitável vem PARTIDA em porções, a IA propõe POR ONDE
-    cruzar (ponto normalizado) e o Python MEDE o greide real sobre o DEM (§2 refinado). Devolve
-    ``(eixo, diag)`` p/ a ``gerar_layout`` materializar a via-tronco de conexão; ``(None, None)`` se
-    há só uma porção (já conexo). Nenhum número vem da IA — só o ponto (julgamento espacial)."""
-    # Fase 10.1 — porções por MORFOLOGIA (não só ≥2 componentes): pega também o caso de 1 peça com
-    # PESCOÇO (estreitamento) que separa duas concentrações — o mesmo fluxo de travessia.
+_NOTA_GEOTECNICA = (
+    "via em corte/aterro sobre declividade ≥30% — exige projeto geométrico e laudo geotécnico "
+    "(art. 3º, parág. único, III, Lei 6.766: exigências das autoridades competentes). "
+    "Nenhum LOTE na faixa ≥30%; só a via de conexão a atravessa."
+)
+
+
+def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog, restr_m=None):
+    """Fase 10.3 — se a área aproveitável vem PARTIDA em porções, o Python acha o traçado DIAGONAL de
+    menor greide que LIGA as porções, podendo CRUZAR a faixa ≥30%/mata (Lei 6.766 art. 3º veda LOTE,
+    não via; a via cruza em corte/aterro com greide controlado) e MEDE o greide da via sobre o DEM
+    (§1/§2 — nenhum número vem da IA). Devolve ``(eixo, diag)`` p/ a ``gerar_layout`` materializar a
+    via-tronco; ``(None, None)`` se há só uma porção (já conexo). Sem DEM → modelo reto (honesto)."""
+    # Fase 10.1 — porções por MORFOLOGIA (não só ≥2 componentes): pega também 1 peça com PESCOÇO.
     porcoes = conexao_mod.detectar_porcoes(aprov_m)
     if len(porcoes) <= 1:
         return None, None
     a, b = porcoes[0], porcoes[1]
-    cota = _cota_sampler(fonte_dem, registro["poly"], to_wgs) or (lambda x, y: 0.0)
-    tv_norm = getattr(prog, "travessia", None)
-    if tv_norm and len(tv_norm) >= 2:
-        minx, miny, maxx, maxy = aprov_m.bounds
-        ponto = (minx + float(tv_norm[0]) * (maxx - minx), miny + float(tv_norm[1]) * (maxy - miny))
-        tv = conexao_mod.avaliar_travessia(a, b, cota, ponto, "llm")  # IA propôs o ponto
+    cota = _cota_sampler(fonte_dem, registro["poly"], to_wgs)
+    if cota is None:
+        # Sem DEM: greide indeterminado → NÃO inventa diagonal sobre relevo que não temos; modelo reto.
+        flat = (lambda x, y: 0.0)
+        tv_norm = getattr(prog, "travessia", None)
+        if tv_norm and len(tv_norm) >= 2:
+            minx, miny, maxx, maxy = aprov_m.bounds
+            ponto = (minx + float(tv_norm[0]) * (maxx - minx), miny + float(tv_norm[1]) * (maxy - miny))
+            tv = conexao_mod.avaliar_travessia(a, b, flat, ponto, "llm")
+        else:
+            tv = conexao_mod.travessia_otima(a, b, flat)
     else:
-        tv = conexao_mod.travessia_otima(a, b, cota)  # sem ponto: Python acha a sela mais suave
+        # 10.3 — domínio da via = a gleba inteira (aproveitável + restrição); a via pode pisar no ≥30%.
+        dominio = aprov_m if restr_m is None else unary_union([aprov_m, restr_m])
+        tv = conexao_mod.travessia_diagonal(a, b, cota, dominio, restr_m)
+    cruza = bool(getattr(tv, "cruza_restricao", False))
     diag = {
         "proposta_por": tv.proposta_por, "ponto": list(tv.ponto),
         "greide_medido_pct": tv.greide_pct, "extensao_m": tv.extensao_m,
         "desnivel_m": tv.desnivel_m, "veredicto": tv.veredicto,
         "caixa_via_m": conexao_mod.CAIXA_TRONCO_M, "alerta_topografia": True,
         "greide_indeterminado": cota is None or fonte_dem is None,
+        "modelo": "diagonal_minimax" if tv.proposta_por == "diagonal" else "reto",
+        "cruza_restricao": cruza,
+        "exigencia_geotecnica": cruza,
+        "nota_geotecnica": _NOTA_GEOTECNICA if cruza else None,
     }
     return tv.eixo, diag
 
@@ -256,7 +275,8 @@ def propor(
     # 3) NÚCLEO: Python materializa (reserva conforme diretriz → subdivide → CLAMP legal) e MEDE.
     # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: se partido, a IA propôs o ponto de travessia e o Python
     # mediu o greide real (acima); passa o eixo p/ a via de conexão ligar as porções (§2 refinado).
-    travessia_eixo, travessia_diag = _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog)
+    travessia_eixo, travessia_diag = _travessia_conexao(
+        aprov_m, registro, to_wgs, fonte_dem, prog, restr_m)
     layout = geom.gerar_layout(
         aprov_m, prog, orientacao_rad=orientacao, diretrizes=diretrizes,
         travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
