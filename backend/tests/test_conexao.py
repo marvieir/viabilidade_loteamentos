@@ -9,7 +9,8 @@ import math
 from pathlib import Path
 
 from shapely import wkb
-from shapely.geometry import Point
+from shapely.geometry import Point, box
+from shapely.ops import unary_union
 
 from app.core import conexao as cx
 from app.core import urbanismo_geom as geom
@@ -87,6 +88,60 @@ def test_greide_inviavel_nao_vira_via():
                             travessia_eixo=tv.eixo, travessia_diag={"veredicto": "inviavel"})
     # ponte inviável não entra → segue partido (sem inventar conexão forçada)
     assert lay.viario_diagnostico["loteamento_conexo"] is False
+
+
+# ====================== Fase 10.1 — PESCOÇO (1 peça com estreitamento) conecta ======================
+def _gleba_pescoco():
+    """Aproveitável em 1 PEÇA, mas com um pescoço fino (16 m) separando duas lobas — o caso que o
+    recorte binário via como 'conexo' (1 componente) e deixava partido."""
+    return unary_union([box(0, 0, 150, 120), box(220, 0, 370, 120), box(150, 52, 220, 68)])
+
+
+def test_detecta_lobas_dentro_de_um_componente():
+    """Fase 10.1 ajuste 2: morfologia detecta as 2 lobas mesmo sendo 1 polígono (o pescoço fino é
+    erodido). `_componentes` daria 1; `detectar_porcoes` dá 2."""
+    g = _gleba_pescoco()
+    assert len(geom._componentes(g)) == 1               # binário: 1 peça
+    assert len(cx.detectar_porcoes(g)) == 2             # morfológico: 2 lobas a conectar
+
+
+def test_conexo_por_alcance_de_ruas_nao_por_topologia():
+    """Fase 10.1 ajuste 1: `loteamento_conexo` = ALCANCE de ruas, não contagem de polígono. Acaba o
+    falso-positivo: 2 lobas SEM via cruzando → False; COM via cruzando → True."""
+    g = _gleba_pescoco()
+    lobos = cx.detectar_porcoes(g)
+    via_so_de_um_lado = box(10, 50, 140, 70)            # rua só na loba esquerda
+    assert cx.lobos_alcancados(lobos, via_so_de_um_lado) is False   # não alcança a outra
+    via_cruzando = box(10, 50, 360, 70)                 # rua atravessa o pescoço
+    assert cx.lobos_alcancados(lobos, via_cruzando) is True
+
+
+def test_pescoco_vira_loteamento_unico_com_via_cruzando():
+    """Validação do operador: o caso 'pescoço fino' — HOJE dava via cruzando=False; DEPOIS tem que
+    dar True. A travessia dispara por 'ruas não se alcançam' (não por ≥2 componentes), cruza o
+    pescoço e liga as duas malhas; `loteamento_conexo` é True VERDADEIRO (via real cruzando)."""
+    g = _gleba_pescoco()
+    dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
+    prog = programa_do_preset("alta", {"pct_lazer": 0.2})
+    porc = cx.detectar_porcoes(g)
+    tv = cx.avaliar_travessia(porc[0], porc[1], lambda x, y: 1000.0)  # greide plano → via_normal
+    lay = geom.gerar_layout(g, prog, diretrizes=dd, travessia_eixo=tv.eixo,
+                            travessia_diag={"veredicto": tv.veredicto})
+    v = lay.viario_diagnostico
+    assert v["loteamento_conexo"] is True                # conexo VERDADEIRO
+    assert v["conexao"]["porcoes_detectadas"] == 2       # badge "Loteamento único" aparece (>1)
+    # a via REALMENTE cruza o pescoço (um componente de via alcança as 2 lobas)
+    assert cx.lobos_alcancados(porc, lay.arruamento) is True
+
+
+def test_caixa_limpa_nao_inventa_travessia():
+    """Não-regressão: caixa retangular (1 loba, sem pescoço) → 1 porção, conexo trivial, sem
+    travessia espúria."""
+    dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
+    lay = geom.gerar_layout(box(0, 0, 343, 172), programa_do_preset("alta", {"pct_lazer": 0.2}), diretrizes=dd)
+    v = lay.viario_diagnostico
+    assert v["conexao"]["porcoes_detectadas"] == 1
+    assert v["loteamento_conexo"] is True
 
 
 # ====================== §2 refinado — IA propõe o ponto, Python mede ======================

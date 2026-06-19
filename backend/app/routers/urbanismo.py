@@ -131,7 +131,9 @@ def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog):
     cruzar (ponto normalizado) e o Python MEDE o greide real sobre o DEM (§2 refinado). Devolve
     ``(eixo, diag)`` p/ a ``gerar_layout`` materializar a via-tronco de conexão; ``(None, None)`` se
     há só uma porção (já conexo). Nenhum número vem da IA — só o ponto (julgamento espacial)."""
-    porcoes = sorted((c for c in geom._componentes(aprov_m) if c.area >= 1000.0), key=lambda p: -p.area)
+    # Fase 10.1 — porções por MORFOLOGIA (não só ≥2 componentes): pega também o caso de 1 peça com
+    # PESCOÇO (estreitamento) que separa duas concentrações — o mesmo fluxo de travessia.
+    porcoes = conexao_mod.detectar_porcoes(aprov_m)
     if len(porcoes) <= 1:
         return None, None
     a, b = porcoes[0], porcoes[1]

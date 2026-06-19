@@ -21,6 +21,18 @@ GREIDE_VIA_NORMAL_PCT = 12.0   # ≤ isto = via pavimentada normal
 GREIDE_ALERTA_PCT = 15.0       # 12–15% = via com greide acentuado (alerta); > isto = escadaria
 DECLIV_SEPARA_PCT = 30.0       # contato genuinamente ≥ isto por toda a frente = separadas de fato
 CAIXA_TRONCO_M = 14.0          # coletora-tronco pista única (catálogo §2.2)
+LARG_PESCOCO_M = 26.0          # estreitamento ≤ isto (1 peça) separa duas concentrações → 2 porções
+MIN_PORCAO_M2 = 4000.0         # uma porção/loba precisa ser substancial (não sliver)
+
+
+def _polys(g) -> list:
+    if g is None or g.is_empty:
+        return []
+    if g.geom_type == "Polygon":
+        return [g]
+    if g.geom_type in ("MultiPolygon", "GeometryCollection"):
+        return [x for x in g.geoms if x.geom_type == "Polygon" and not x.is_empty]
+    return []
 
 
 @dataclass
@@ -47,6 +59,36 @@ class Conexao:
     travessia: Optional[Travessia] = None
     alerta_topografia: bool = True
     avisos: list[str] = field(default_factory=list)
+
+
+def detectar_porcoes(aprov, larg_pescoco: float = LARG_PESCOCO_M,
+                     min_area: float = MIN_PORCAO_M2) -> list:
+    """Fase 10.1 — porções a CONECTAR, por MORFOLOGIA, não por topologia binária. (a) Se o
+    aproveitável já vem em ≥2 peças (vão real) → essas peças. (b) Se vem em 1 peça mas tem um
+    ESTREITAMENTO (pescoço) mais fino que ``larg_pescoco`` separando duas concentrações de área, a
+    erosão (`buffer(-larg/2)`) parte o miolo em ≥2 núcleos → trata como 2 porções (o mesmo fluxo da
+    travessia). Devolve os NÚCLEOS (não se sobrepõem) — base p/ o eixo de travessia e p/ o alcance.
+    1 núcleo (sem pescoço, ex. caixa limpa) → 1 porção (não inventa conexão)."""
+    comps = [c for c in _polys(aprov) if c.area >= min_area]
+    if len(comps) >= 2:
+        return sorted(comps, key=lambda p: -p.area)
+    if not comps:
+        return _polys(aprov)
+    nucleo = comps[0].buffer(-larg_pescoco / 2.0)
+    nucs = [c for c in _polys(nucleo) if c.area >= min_area]
+    return sorted(nucs, key=lambda p: -p.area) if len(nucs) >= 2 else comps
+
+
+def lobos_alcancados(porcoes: list, ruas, tol: float = LARG_PESCOCO_M) -> bool:
+    """Fase 10.1 — CONEXÃO POR ALCANCE DE RUAS (não por contagem de polígono): há UM componente de
+    via que toca TODAS as porções? (transita-se de um lado ao outro pela via). ``tol`` folga p/ a
+    rua alcançar o núcleo erodido. 0/1 porção → trivialmente alcançado. SEM via → não alcança."""
+    if len(porcoes) <= 1:
+        return True
+    if ruas is None or ruas.is_empty:
+        return False
+    comps = _polys(ruas)
+    return any(all(comp.intersects(p.buffer(tol)) for p in porcoes) for comp in comps)
 
 
 def classificar_greide(greide_pct: float) -> str:

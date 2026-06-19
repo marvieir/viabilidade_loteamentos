@@ -1114,11 +1114,15 @@ def gerar_layout(
     culdesacs_bulbo = len(bulbos_reg)
     if bulbos_reg:
         ruas_reg = _uniao_segura([ruas_reg, *bulbos_reg])
-    # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: a via-tronco de CONEXÃO (eixo proposto pela IA, greide
-    # já MEDIDO pelo Python sobre o DEM no router) atravessa o vão e LIGA as porções. Materializada
-    # com caixa de coletora (~14 m) e SEM clipar ao aproveitável (a ponte cruza o vão). Une A+B →
-    # arruamento vira UMA peça. Só entra se o veredicto do greide não for "inviável".
-    if travessia_eixo is not None and (travessia_diag or {}).get("veredicto") != "inviavel":
+    # Fase 10.1 — porções a conectar por MORFOLOGIA (≥2 peças OU 1 peça com pescoço); a CONEXÃO é
+    # medida por ALCANCE DE RUAS (não por contagem de polígono). lobos_reg é a base do flag honesto.
+    lobos_reg = conexao_mod.detectar_porcoes(reg)
+    reach_sem_ponte = conexao_mod.lobos_alcancados(lobos_reg, ruas_reg)
+    # Fase 10 (Parte 3/10.1) — LOTEAMENTO ÚNICO: a via-tronco de CONEXÃO atravessa o vão/pescoço e
+    # LIGA as porções. Caixa de coletora (~14 m), SEM clipar ao aproveitável (sobrevive ao recorte).
+    # Só materializa quando as ruas NÃO se alcançam (senão é redundante) e o greide não é inviável.
+    if (travessia_eixo is not None and not reach_sem_ponte
+            and (travessia_diag or {}).get("veredicto") != "inviavel"):
         tr_reg = rotate(travessia_eixo, -ang_deg, origin=cen) if ang_deg else travessia_eixo
         linhas_ponte = [tr_reg]
         # liga cada PONTA do eixo à malha de ruas mais próxima de cada lado — senão a ponte fica
@@ -1275,17 +1279,10 @@ def gerar_layout(
     n_trechos = len(_componentes(arruamento)) if arruamento is not None else 0
     conexo = n_trechos == 1
     conexo_por_ilha = bool(trechos_por_ilha) and all(t == 1 for t in trechos_por_ilha)
-    # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO ("não dois núcleos"): existe UM componente de via que
-    # toca TODAS as porções loteáveis (ligadas pela travessia), em vez de núcleos separados. A
-    # fragmentação INTERNA de cada porção (n_trechos) é outra métrica; aqui importa não haver ilhas
-    # de loteamento desconexas entre si. 0/1 porção → trivialmente único.
-    if len(porcoes_info) <= 1:
-        loteamento_conexo = True
-    else:
-        loteamento_conexo = any(
-            sum(1 for p in porcoes_info if comp.buffer(1.0).intersects(p["geom"])) == len(porcoes_info)
-            for comp in _componentes(ruas_reg)
-        ) if ruas_reg is not None else False
+    # Fase 10.1 — LOTEAMENTO ÚNICO por ALCANCE DE RUAS (não por contagem de polígono): as porções
+    # morfológicas (lobos_reg — peças OU lobas de um pescoço) são alcançadas por UM componente de
+    # via? Acaba com o falso-positivo do "1 polígono → True": um pescoço sem via cruzando dá False.
+    loteamento_conexo = conexao_mod.lobos_alcancados(lobos_reg, ruas_reg)
     viario_m2 = arruamento.area if arruamento is not None and not arruamento.is_empty else 0.0
     vendavel_m2 = sum(l.area for l in lotes)
     # Fase 10 (Parte 4) — ALTO PADRÃO (catálogo §8): UMA portaria/pórtico na entrada ÚNICA do
@@ -1356,9 +1353,9 @@ def gerar_layout(
         "loteamento_conexo": loteamento_conexo,
         "conexao": {
             "loteamento_conexo": loteamento_conexo,
-            "porcoes_detectadas": len(porcoes_info),
-            "porcoes_conectadas": (len(porcoes_info) if loteamento_conexo
-                                   else sum(1 for p in porcoes_info if p["conectada"])),
+            # Fase 10.1 — porções MORFOLÓGICAS (peças OU lobas de um pescoço), não só ilhas do recorte.
+            "porcoes_detectadas": len(lobos_reg),
+            "porcoes_conectadas": len(lobos_reg) if loteamento_conexo else 1,
             "barreira_reavaliada_contra_relevo": travessia_diag is not None,
             "travessia": travessia_diag,
             "alerta_topografia": True,
