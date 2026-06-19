@@ -1220,7 +1220,10 @@ class QuadroAreasOut(BaseModel):
     area_liquida_m2: float
     area_liquida_fmt: str
     vendavel: UsoAreaOut
-    areas_verdes: UsoAreaOut
+    areas_verdes: UsoAreaOut  # TOTAL (compat); o front usa as linhas separadas abaixo
+    # Fase 10 (Parte 2) — verde desmembrado: reserva (verde legítimo) × sobra geométrica (a reduzir).
+    area_verde_reserva: Optional[UsoAreaOut] = None
+    sobra_geometrica: Optional[UsoAreaOut] = None
     sistema_lazer: UsoAreaOut
     institucional: UsoAreaOut
     arruamento: UsoAreaOut

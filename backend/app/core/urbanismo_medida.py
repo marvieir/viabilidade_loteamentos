@@ -140,6 +140,11 @@ def medir(layout: Layout) -> Medicao:
     lotes = [g for g in layout.lotes if g is not None and not g.is_empty]
     vendavel = round(sum(_area(g) for g in lotes), 2)
     verdes = round(_area(layout.areas_verdes), 2)
+    # Fase 10 (Parte 2) — VERDE DESMEMBRADO (catálogo §5/§10): a "área verde" honesta é só a RESERVA
+    # (doação/programa); a SOBRA geométrica (faces sem aproveitamento) é sobra a MINIMIZAR, NUNCA
+    # "área verde". O cálculo já existia (areas_verdes_reservada × sobra_ponta); aqui expõe separado.
+    verde_reserva = round(_area(layout.areas_verdes_reservada), 2)
+    sobra_geom = round(_area(layout.sobra_ponta), 2)
     lazer = round(_area(layout.sistema_lazer), 2)
     inst = round(_area(layout.institucional), 2)
     arru = round(_area(layout.arruamento), 2)
@@ -159,7 +164,10 @@ def medir(layout: Layout) -> Medicao:
         "area_liquida_m2": area_liquida,
         "area_liquida_fmt": _fmt(area_liquida),
         "vendavel": _uso(vendavel),
-        "areas_verdes": _uso(verdes),
+        "areas_verdes": _uso(verdes),  # TOTAL (compat) — o front usa as linhas separadas abaixo
+        # Fase 10 (Parte 2) — linhas SEPARADAS: verde de verdade × sobra geométrica.
+        "area_verde_reserva": _uso(verde_reserva),  # doação/programa (verde legítimo)
+        "sobra_geometrica": _uso(sobra_geom),        # ⚠️ NÃO é área verde — sobra a minimizar
         "sistema_lazer": _uso(lazer),
         "institucional": _uso(inst),
         "arruamento": _uso(arru),

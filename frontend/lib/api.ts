@@ -1152,6 +1152,9 @@ export interface QuadroAreas {
   area_liquida_fmt: string;
   vendavel: UsoArea;
   areas_verdes: UsoArea;
+  // Fase 10 (Parte 2) — verde desmembrado: reserva (legítimo) × sobra geométrica (a reduzir).
+  area_verde_reserva?: UsoArea | null;
+  sobra_geometrica?: UsoArea | null;
   sistema_lazer: UsoArea;
   institucional: UsoArea;
   arruamento: UsoArea;

@@ -407,11 +407,24 @@ export function CardUrbanismo({
                       pct={q.vendavel.pct_fmt}
                       forte
                     />
-                    <LinhaArea
-                      rotulo="Áreas verdes"
-                      m2={q.areas_verdes.m2_fmt}
-                      pct={q.areas_verdes.pct_fmt}
-                    />
+                    {/* Fase 10 (Parte 2) — verde HONESTO: reserva (verde legítimo) e sobra
+                        geométrica em LINHAS SEPARADAS; a sobra nunca é chamada de "área verde". */}
+                    {q.area_verde_reserva ? (
+                      <LinhaArea
+                        rotulo="Área verde de doação/reserva"
+                        m2={q.area_verde_reserva.m2_fmt}
+                        pct={q.area_verde_reserva.pct_fmt}
+                      />
+                    ) : (
+                      <LinhaArea rotulo="Áreas verdes" m2={q.areas_verdes.m2_fmt} pct={q.areas_verdes.pct_fmt} />
+                    )}
+                    {q.sobra_geometrica && q.sobra_geometrica.m2 > 0 && (
+                      <LinhaArea
+                        rotulo="Sobra geométrica ⚠️ (meta: reduzir)"
+                        m2={q.sobra_geometrica.m2_fmt}
+                        pct={q.sobra_geometrica.pct_fmt}
+                      />
+                    )}
                     {q.sistema_lazer.m2 > 0 && (
                       <LinhaArea
                         rotulo="Sistema de lazer"
