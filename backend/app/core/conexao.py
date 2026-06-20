@@ -22,7 +22,7 @@ from shapely.prepared import prep
 GREIDE_VIA_NORMAL_PCT = 12.0   # ≤ isto = via pavimentada normal
 GREIDE_ALERTA_PCT = 15.0       # 12–15% = via com greide acentuado (alerta); > isto = escadaria
 DECLIV_SEPARA_PCT = 30.0       # contato genuinamente ≥ isto por toda a frente = separadas de fato
-CAIXA_TRONCO_M = 14.0          # coletora-tronco pista única (catálogo §2.2)
+CAIXA_TRONCO_M = 11.0          # coletora-tronco pista única, condomínio privado (catálogo §2.2)
 LARG_PESCOCO_M = 26.0          # estreitamento ≤ isto (1 peça) separa duas concentrações → 2 porções
 MIN_PORCAO_M2 = 4000.0         # uma porção/loba precisa ser substancial (não sliver)
 

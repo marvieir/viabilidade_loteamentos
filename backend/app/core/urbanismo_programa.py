@@ -175,7 +175,11 @@ def programa_do_preset(publico_alvo: str, overrides: Optional[dict] = None) -> P
     ov = overrides or {}
     lote_alvo = float(ov.get("lote_alvo_m2", base["lote_alvo_m2"]))
     pct_lazer = float(ov.get("pct_lazer", base["pct_lazer"]))
-    largura_via = float(ov.get("largura_via_m", base["largura_via_m"]))
+    # CAP de largura (engine é dono da medida, §2): condomínio de lotes tem vias PRIVADAS — a
+    # coletora-tronco de pista única vive bem com ≤11 m. Largura maior (a IA às vezes propõe 14 m de
+    # "boulevard") só infla o viário (gargalo do aproveitamento) sem ganho. Caímos road e medição
+    # juntos, então o contrato "tronco = largura_via_m" segue intacto.
+    largura_via = min(float(ov.get("largura_via_m", base["largura_via_m"])), 11.0)
     amenidades = list(ov.get("amenidades", base["amenidades"]))
     testada, profundidade = _dims_lote(lote_alvo)
     if "testada_m" in ov:

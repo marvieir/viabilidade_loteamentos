@@ -1062,9 +1062,8 @@ def gerar_layout(
     eixos_ia_reg = [rotate(e, -ang_deg, origin=cen) for e in eixos_ia] if ang_deg else eixos_ia
 
     via_local = min(via, VIA_LOCAL_M)         # rua de quadra (local)
-    # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO,
-    # a via-tronco curva usa a largura da VIA PRINCIPAL do programa (~14 m) — uma curva de 21 m de
-    # largura infla o viário acima do teto; 14 m mantém a curva visível dentro de ≤18% (9.9).
+    # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO usa a
+    # largura da via principal (já capada p/ ~11 m em condomínio privado na fronteira do programa).
     via_tronco = max(via, via_local + 2.0) if quer_curva else max(via, VIA_TRONCO_M)
     block_w = N_LOTES_QUADRA * testada_alvo    # TETO: testada da quadra ~ N lotes (perfil)
     block_h = 2.0 * prof                        # TETO: quadra de duas fileiras (costas-com-costas)
