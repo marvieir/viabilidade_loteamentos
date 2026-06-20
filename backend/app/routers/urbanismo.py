@@ -40,10 +40,6 @@ router = APIRouter()
 
 # Faixas não-edificáveis que viram restrição (espelha o aproveitamento — Fase 2.2).
 _CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")
-# Fase 10.7 — frente externa mínima (m, na borda da gleba) p/ uma porção ser ACESSÍVEL por conta
-# própria. Acima disto, não se força travessia interna cruzando o ≥30% (cada núcleo entra pela rua
-# externa). Folga p/ uma entrada + boca de quadra; porções encravadas ficam abaixo e ganham travessia.
-ACESSO_EXTERNO_MIN_M = 30.0
 
 
 def _programa_out(prog) -> schemas.ProgramaOut:
@@ -146,17 +142,6 @@ def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog, restr_m=None)
     # Fase 10.1 — porções por MORFOLOGIA (não só ≥2 componentes): pega também 1 peça com PESCOÇO.
     porcoes = conexao_mod.detectar_porcoes(aprov_m)
     if len(porcoes) <= 1:
-        return None, None
-    # Fase 10.7 — NÃO forçar travessia interna quando o relevo separa de fato as porções. Se CADA
-    # porção tem acesso PRÓPRIO à borda da gleba (estrada externa), uma diagonal cruzando o ≥30% é
-    # desnecessária: ela só infla o viário (medido: −3,7 pt sem ela) e exige laudo geotécnico por
-    # cortar a faixa vedada. Sem travessia, cada núcleo se loteia pela própria frente externa e a
-    # banda íngreme fica VERDE preservada. Só uma porção REALMENTE encravada (frente externa abaixo
-    # de ACESSO_EXTERNO_MIN_M, atrás da restrição) justifica a travessia diagonal (greide controlado).
-    gleba_m = aprov_m if restr_m is None else unary_union([aprov_m, restr_m])
-    folga = conexao_mod.LARG_PESCOCO_M  # desfaz a erosão do núcleo (10.1) ao medir a frente externa
-    if all(p.buffer(folga).intersection(gleba_m.boundary).length >= ACESSO_EXTERNO_MIN_M
-           for p in porcoes):
         return None, None
     a, b = porcoes[0], porcoes[1]
     cota = _cota_sampler(fonte_dem, registro["poly"], to_wgs)
