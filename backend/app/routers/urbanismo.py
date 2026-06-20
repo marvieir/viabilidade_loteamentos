@@ -190,25 +190,32 @@ def _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem):
     verde_geom, overlays, decliv_geom = _coletar_geoms(
         registro, fonte_veg, fonte_camadas, fonte_dem
     )
-    partes, origem = [], []
+    # Fase 10.8 — DOIS regimes: mata/APP bloqueiam VIA e lote (saem do aproveitável); a declividade
+    # ≥30% veda só LOTE, não via (Lei 6.766 art. 3º — parcelamento, não estrada). Então o ≥30% NÃO
+    # sai do aproveitável (a malha viária o atravessa e junta a gleba); ele volta separado p/ o motor
+    # tirar só dos LOTES (vira verde). Isso desfaz o "loteamento partido por uma diagonal".
+    partes_via, origem = [], []
     if verde_geom is not None:
-        partes.append(verde_geom)
+        partes_via.append(verde_geom)
         origem.append("vegetacao")
     for chave in _CHAVES_RESTRITIVAS:
         if overlays.get(chave) is not None:
-            partes.append(overlays[chave])
+            partes_via.append(overlays[chave])
             origem.append(chave)
-    if decliv_geom is not None:
-        partes.append(decliv_geom)
+    decliv_lote = decliv_geom.intersection(gleba) if decliv_geom is not None else None
+    if decliv_lote is not None and not decliv_lote.is_empty:
         origem.append("declividade_30")
-    if not partes:
-        return gleba, None, []
-    restr = unary_union([g.intersection(gleba) for g in partes if g is not None])
-    aprov = gleba.difference(restr)
+    else:
+        decliv_lote = None
+    restr_via = (unary_union([g.intersection(gleba) for g in partes_via if g is not None])
+                 if partes_via else None)
+    aprov = gleba.difference(restr_via) if (restr_via is not None and not restr_via.is_empty) else gleba
     if aprov.is_empty:
-        return gleba, None, []
-    restr = restr if (restr is not None and not restr.is_empty) else None
-    return aprov, restr, origem
+        return gleba, None, [], None
+    # restrição COMPLETA (mata/APP ∪ ≥30%) p/ o mapa rotular a faixa não-edificável (Fase 9.8).
+    full = [g for g in (restr_via, decliv_lote) if g is not None and not g.is_empty]
+    restr_full = unary_union(full) if full else None
+    return aprov, restr_full, origem, decliv_lote
 
 
 @router.post(
@@ -237,12 +244,14 @@ def propor(
 
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
     # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
-    aprov_wgs, restr_wgs, restr_origem = _aproveitavel_wgs(
+    aprov_wgs, restr_wgs, restr_origem, decliv_wgs = _aproveitavel_wgs(
         registro, fonte_veg, fonte_camadas, fonte_dem
     )
     to_local, to_wgs = medida.transformadores([aprov_wgs])
     aprov_m = transform(to_local, aprov_wgs)
     restr_m = transform(to_local, restr_wgs) if restr_wgs is not None else None
+    # Fase 10.8 — ≥30% (veta só LOTE) no frame métrico; o motor o desconta das quadras, não das vias.
+    decliv_lote_m = transform(to_local, decliv_wgs) if decliv_wgs is not None else None
 
     # 1b) (c) Topografia: orienta a grelha pela curva de nível do DEM (2.5), se disponível.
     orientacao = 0.0
@@ -278,7 +287,7 @@ def propor(
     travessia_eixo, travessia_diag = _travessia_conexao(
         aprov_m, registro, to_wgs, fonte_dem, prog, restr_m)
     layout = geom.gerar_layout(
-        aprov_m, prog, orientacao_rad=orientacao, diretrizes=diretrizes,
+        aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao, diretrizes=diretrizes,
         travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
     )
     layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)

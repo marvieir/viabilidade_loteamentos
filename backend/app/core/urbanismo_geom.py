@@ -1001,8 +1001,12 @@ def gerar_layout(
         diretrizes = resolver_diretrizes(None, None, None, programa.publico_alvo)
 
     canvas = aproveitavel
-    if restricoes is not None and not restricoes.is_empty:
-        canvas = _diferenca_segura(canvas, restricoes)
+    # Fase 10.8 — ≥30% veda LOTE, não VIA (Lei 6.766 art. 3º: parcelamento, não estrada). A malha
+    # viária ATRAVESSA a restrição (junta as porções num loteamento só); só os LOTES a evitam. Por
+    # isso NÃO descontamos `restricoes` do canvas das ruas — ela é descontada das QUADRAS (faces→
+    # lotes) lá embaixo, e o ≥30% que sobra vira VERDE preservado. (Antes recortávamos via+lote → a
+    # gleba ficava partida e só uma diagonal a cruzava.)
+    restr_lote = restricoes if (restricoes is not None and not restricoes.is_empty) else None
     comps = _componentes(canvas)  # valida a entrada (gleba real pode chegar inválida)
     if not comps:
         return Layout(avisos=["Sem área aproveitável suficiente para um estudo de massa."])
@@ -1060,6 +1064,9 @@ def gerar_layout(
     cen = aprov.centroid
     reg = rotate(aprov, -ang_deg, origin=cen) if ang_deg else aprov
     eixos_ia_reg = [rotate(e, -ang_deg, origin=cen) for e in eixos_ia] if ang_deg else eixos_ia
+    # Fase 10.8 — ≥30% (lote vetado) no frame da grelha; usado só p/ tirar lote das quadras, não via.
+    restr_lote_reg = (rotate(restr_lote, -ang_deg, origin=cen)
+                      if (restr_lote is not None and ang_deg) else restr_lote)
 
     via_local = min(via, VIA_LOCAL_M)         # rua de quadra (local)
     # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO usa a
@@ -1220,6 +1227,18 @@ def gerar_layout(
     miolos: list[Polygon] = []
     verdes_min: list[Polygon] = []  # faces pequenas → verde formado (não sliver)
     for f in faces:
+        # Fase 10.8 — a parte ≥30% da face vira VERDE preservado (lote a evita); só o <30% é loteável.
+        # A via já passou por cima (canvas não foi recortado), então a malha continua conexa.
+        if restr_lote_reg is not None:
+            f_sem30 = _diferenca_segura(f, restr_lote_reg)
+            f_30 = _diferenca_segura(f, f_sem30)  # = f ∩ ≥30%
+            if f_30 is not None and not f_30.is_empty:
+                for g in _componentes(_diferenca_segura(f_30, ruas_reg) or f_30):
+                    if g is not None and not g.is_empty and g.area > 1.0:
+                        verdes_min.append(g)
+            f = f_sem30
+        if f is None or f.is_empty:
+            continue
         # 9.9: a via-tronco CURVA pode partir uma face em VÁRIOS pedaços — capturar TODOS (não só
         # o maior, senão a área dos demais some e quebra a invariância). Cada pedaço é uma quadra.
         for q in _componentes(_diferenca_segura(f, ruas_reg)):
