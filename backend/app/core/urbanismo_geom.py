@@ -1226,6 +1226,7 @@ def gerar_layout(
     )
     miolos: list[Polygon] = []
     verdes_min: list[Polygon] = []  # faces pequenas → verde formado (não sliver)
+    nao_edif_reg: list[Polygon] = []  # Fase 10.8 — ≥30% preservado (não é sobra nem lote: verde legal)
     for f in faces:
         # Fase 10.8 — a parte ≥30% da face vira VERDE preservado (lote a evita); só o <30% é loteável.
         # A via já passou por cima (canvas não foi recortado), então a malha continua conexa.
@@ -1235,7 +1236,7 @@ def gerar_layout(
             if f_30 is not None and not f_30.is_empty:
                 for g in _componentes(_diferenca_segura(f_30, ruas_reg) or f_30):
                     if g is not None and not g.is_empty and g.area > 1.0:
-                        verdes_min.append(g)
+                        nao_edif_reg.append(g)  # ≥30% preservado: NÃO entra na sobra nem é loteado
             f = f_sem30
         if f is None or f.is_empty:
             continue
@@ -1352,7 +1353,10 @@ def gerar_layout(
     # pontas de loteamento são LEFTOVER geométrico → sobra_ponta (não "reserva inventada"). Mantém
     # ``areas_verdes_reservada is None`` quando nada foi pedido (Fase 9.6/9.12). Fase 9.14: a RESERVA
     # (mata/lazer do programa) permanece verde; só a SOBRA cai quando o contorno dá acesso (regra D).
-    verde_reservado_reg = _uniao_segura(verdes_reg)
+    # Fase 10.8 — o ≥30% preservado é verde LEGÍTIMO (não-edificável por lei), não "sobra a reduzir":
+    # entra no verde RESERVADO, fora da sobra. (Idealmente ganha linha própria "não-edificável" no
+    # quadro; por ora soma ao verde de reserva/doação, que é o destino honesto.)
+    verde_reservado_reg = _uniao_segura([*verdes_reg, *nao_edif_reg])
     sobra_reg = _uniao_segura([*residuais_reg, *verdes_min])
     # Fase 9.14 — regra D: o que virou LOTE/ via de contorno (recuperado) sai da sobra-verde (cai).
     if lotes_rec_reg or contorno_mat_reg:
