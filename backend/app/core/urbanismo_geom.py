@@ -486,6 +486,46 @@ def _lotear_face(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area
     return lotes, residuais
 
 
+def _adensar_face(face: BaseGeometry, prof: float, via_local: float):
+    """Fase 10.5 — BACKSTOP de densidade. Uma face FUNDA DEMAIS (profundidade > ~3·prof) só loteia 2
+    fileiras na frente (cap costas-com-costas do `_lotear_face`) e o MIOLO vira SOBRA — é a origem
+    da ~20% de sobra geométrica (faces grandes sem via interna). Aqui injetamos VIAS LOCAIS internas
+    (escada de coletoras a cada ~2·prof) que cortam a face em bandas rasas: o miolo ganha frente e
+    vira lote. Devolve ``(sub_faces, vias_internas)`` no MESMO frame rotacionado. Faces já rasas
+    voltam intactas (sem via). É o lever determinístico que mata a sobra e adensa (rumo URBIA)."""
+    banda = 2.0 * prof  # banda = 2 fileiras de lote costas-com-costas
+    faces_out: list[BaseGeometry] = []
+    vias: list[BaseGeometry] = []
+    for c in _componentes(face):
+        minx, miny, maxx, maxy = c.bounds
+        depth = maxy - miny
+        # Só faces CLARAMENTE desperdiçadas (≥ 4·prof de fundo): aí as 2 fileiras deixam um miolo
+        # grande. Faces medianas ficam intactas (injetar via nelas só comeria 1 lote — regressão).
+        if depth < 2.0 * banda:
+            faces_out.append(c)
+            continue
+        n = max(int(round(depth / banda)), 2)  # nº de bandas (cada uma ~2·prof de fundo)
+        linhas = []
+        for k in range(1, n):
+            yk = miny + k * depth / n
+            seg = LineString([(minx - 1.0, yk), (maxx + 1.0, yk)]).intersection(c)
+            if seg is not None and not seg.is_empty:
+                linhas.append(seg)
+        if not linhas:
+            faces_out.append(c)
+            continue
+        # CLIPA a via à face (⊂ aprov): o buffer não pode vazar p/ a restrição (via não cruza ≥30%).
+        via = _valido(_uniao_segura(
+            [l.buffer(via_local / 2.0, cap_style=2, join_style=2) for l in linhas]))
+        via = _valido(via.intersection(c)) if via is not None else None
+        if via is not None and not via.is_empty:
+            vias.append(via)
+        for sf in _componentes(_diferenca_segura(c, via)):
+            if sf is not None and not sf.is_empty:
+                faces_out.append(sf)
+    return faces_out, vias
+
+
 def _frente_via(lote: BaseGeometry, ruas_buf: Optional[BaseGeometry]) -> float:
     """Fase 9.12 — comprimento da TESTADA do lote lindeira a via: parte da borda do lote dentro de
     ``ruas_buf`` (= arruamento já bufferizado 0,5 m UMA vez pelo chamador, p/ escalar). 0 → lote
@@ -1224,12 +1264,22 @@ def gerar_layout(
     lotes_reg: list[Polygon] = []
     lote_quadra: list[str] = []
     residuais_reg: list[BaseGeometry] = []
+    vias_internas_reg: list[BaseGeometry] = []
     for qi, q in enumerate(pool, start=1):
-        sub, res = _lotear_face(q, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
-        for lote in sub:
-            lotes_reg.append(lote)
-            lote_quadra.append(f"Q{qi}")
-        residuais_reg.extend(res)
+        # Fase 10.5 — face funda demais → injeta acesso interno e loteia as bandas rasas (mata sobra
+        # de miolo). Faces normais voltam intactas de `_adensar_face`.
+        subfaces, vias_int = _adensar_face(q, prof, via_local)
+        vias_internas_reg.extend(vias_int)
+        for sf in subfaces:
+            sub, res = _lotear_face(sf, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
+            for lote in sub:
+                lotes_reg.append(lote)
+                lote_quadra.append(f"Q{qi}")
+            residuais_reg.extend(res)
+    # as vias internas injetadas entram na malha ANTES do frente-via (p/ os lotes do miolo contarem
+    # como lindeiros) e no arruamento medido.
+    if vias_internas_reg:
+        ruas_reg = _uniao_segura([ruas_reg, *vias_internas_reg]) or ruas_reg
 
     # Fase 9.14 — REGRA D (recuperação ADITIVA): blocos de SOBRA-verde ≥ 2·MIN_QUADRA que faceiam a
     # restrição e que o CONTORNO torna acessíveis viram LOTE. O pavimento do contorno sai da PRÓPRIA
