@@ -22,7 +22,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Optional, Protocol, runtime_checkable
 
-from app.core.extrator_luos import MODELO_PADRAO, _opcoes_tls
+from app.core.extrator_luos import MODELO_PADRAO, cadeia_de_modelos, _opcoes_tls
 
 _log = logging.getLogger(__name__)
 
@@ -315,7 +315,8 @@ class GeradorProgramaClaude:
 
     def __init__(self, api_key: Optional[str] = None, modelo: str = MODELO_PADRAO):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        self.modelo = os.getenv("URBANISMO_MODELO", modelo)
+        # Cadeia de modelos: env URBANISMO_MODELO fixa um modelo; senão Fable 5 → Opus 4.8.
+        self.modelos = cadeia_de_modelos(os.getenv("URBANISMO_MODELO"))
 
     def propor(self, contexto, tipo_loteamento, publico_alvo, overrides=None) -> Programa:
         try:
@@ -332,22 +333,32 @@ class GeradorProgramaClaude:
             f"Contexto medido pelo motor (NÃO recalcule): {contexto}. "
             "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
         )
-        try:
-            resp = client.messages.create(
-                model=self.modelo,
-                max_tokens=4000,
-                system=_INSTRUCAO,
-                tools=[_FERRAMENTA],
-                tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
-                messages=[{"role": "user", "content": prompt}],
-            )
-        except Exception as exc:  # noqa: BLE001 — serviço fora → preset (não inventa, degrada)
-            # NÃO engolir o motivo: loga o erro real (traceback no log do container) e expõe o
-            # TIPO + mensagem curta na justificativa, p/ o operador diagnosticar SEM adivinhar
-            # (key inválida? rede/TLS bloqueada p/ api.anthropic.com? sobrecarga?). O tipo/str da
-            # exceção da SDK não vaza a chave (ex.: "AuthenticationError: invalid x-api-key").
-            _log.warning("Programa via IA falhou no /propor — caindo no preset: %r", exc, exc_info=True)
-            detalhe = f"{type(exc).__name__}: {exc}"[:160]
+        # Tenta a cadeia de modelos (Fable 5 → Opus 4.8): o 1º que responder vence. Um modelo
+        # indisponível (org sem acesso/ZDR → 400/404) cai p/ o próximo; só se TODOS falharem é que
+        # degrada p/ o preset determinístico (não inventa).
+        resp = None
+        ultimo_erro: Optional[Exception] = None
+        for modelo in self.modelos:
+            try:
+                resp = client.messages.create(
+                    model=modelo,
+                    max_tokens=4000,
+                    system=_INSTRUCAO,
+                    tools=[_FERRAMENTA],
+                    tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                self.modelo_usado = modelo  # proveniência: qual modelo de fato serviu
+                break
+            except Exception as exc:  # noqa: BLE001 — tenta o próximo modelo; se acabar, preset
+                ultimo_erro = exc
+                _log.warning("Programa via IA: modelo %s falhou — tentando próximo: %r", modelo, exc)
+        if resp is None:
+            # NÃO engolir o motivo: loga o erro real (traceback) e expõe TIPO + msg curta na
+            # justificativa, p/ o operador diagnosticar (key inválida? rede/TLS? sobrecarga?).
+            _log.warning("Programa via IA falhou em todos os modelos — caindo no preset: %r",
+                         ultimo_erro, exc_info=ultimo_erro is not None)
+            detalhe = f"{type(ultimo_erro).__name__}: {ultimo_erro}"[:160] if ultimo_erro else "sem modelo"
             prog = programa_do_preset(publico_alvo, overrides)
             prog.justificativa = (
                 f"Serviço de IA indisponível ({detalhe}) — programa do preset. " + prog.justificativa

@@ -19,6 +19,22 @@ from typing import Optional, Protocol, runtime_checkable
 from app.models.schemas import PerfilMunicipal
 
 MODELO_PADRAO = "claude-opus-4-8"
+# Modelo MAIS capaz (preferido "quando disponível"); cai p/ MODELO_PADRAO se a org não tiver acesso.
+MODELO_PREFERIDO = "claude-fable-5"
+
+
+def cadeia_de_modelos(override: Optional[str] = None) -> list[str]:
+    """Ordem de tentativa da IA. HOJE o Fable 5 ainda NÃO está disponível (chega no futuro), então
+    o padrão é só Opus 4.8 — tentar Fable agora só geraria 400 a cada request. Quando a org tiver
+    acesso, ligue ``IA_PREFERIR_FABLE5=1``: aí tenta Fable 5 (mais capaz) e, se indisponível, cai
+    p/ Opus 4.8. ``override`` (env URBANISMO_MODELO) fixa um único modelo, sem cadeia."""
+    if override:
+        return [override]
+    flag = str(os.getenv("IA_PREFERIR_FABLE5", "")).strip().lower()
+    if flag in ("1", "true", "yes", "sim", "on"):
+        return [MODELO_PREFERIDO, MODELO_PADRAO]  # futuro: Fable 5 → Opus 4.8
+    return [MODELO_PADRAO]  # hoje: só Opus 4.8 (Fable ainda não disponível)
+
 
 
 class ExtratorIndisponivel(RuntimeError):
