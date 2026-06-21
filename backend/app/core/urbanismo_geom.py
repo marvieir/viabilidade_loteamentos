@@ -486,6 +486,40 @@ def _lotear_face(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area
     return lotes, residuais
 
 
+def _eixo_proprio_deg(poly: BaseGeometry) -> float:
+    """Ângulo (graus) do lado mais longo do menor retângulo rotacionado = eixo NATURAL da parcela
+    (Lynch/Hack: a quadra se orienta à forma do sítio). ``0`` se degenerada."""
+    mrr = poly.minimum_rotated_rectangle
+    if mrr.geom_type != "Polygon":
+        return 0.0
+    xs, ys = mrr.exterior.coords.xy
+    lados = [((xs[i + 1] - xs[i]), (ys[i + 1] - ys[i])) for i in range(4)]
+    lx, ly = max(lados, key=lambda v: v[0] ** 2 + v[1] ** 2)
+    return math.degrees(math.atan2(ly, lx))
+
+
+def _lotear_melhor_eixo(face: BaseGeometry, testada_alvo: float, prof: float, alvo_area: float,
+                        piso: float, teto: float):
+    """Boas práticas (Lynch/Hack §3.1): a quadra se loteia no EIXO PRÓPRIO da parcela, não no eixo
+    global — senão a grelha cai torta sobre parcela oblíqua/irregular e vira sobra (o platô). Loteia
+    nos DOIS frames (global = curva de nível; e o eixo próprio) e fica com o que rende mais ÁREA de
+    lote. NUNCA pior que hoje (compara e escolhe). Invariante: lotes ⊂ face nos dois casos."""
+    sub_g, res_g = _lotear_face(face, testada_alvo, prof, alvo_area, piso, teto)
+    ang = _eixo_proprio_deg(face)
+    if abs(ang) < 1.0 or abs(abs(ang) - 90.0) < 1.0:
+        return sub_g, res_g  # já alinhada ao frame (curva de nível) → não reorienta
+    cen = face.centroid
+    sub_o, res_o = _lotear_face(rotate(face, -ang, origin=cen), testada_alvo, prof,
+                                alvo_area, piso, teto)
+    if sum(l.area for l in sub_o) <= sum(l.area for l in sub_g) + 1e-6:
+        return sub_g, res_g
+    sub = [g for g in (_valido(rotate(l, ang, origin=cen)) for l in sub_o)
+           if g is not None and not g.is_empty]
+    res = [g for g in (_valido(rotate(r, ang, origin=cen)) for r in res_o)
+           if g is not None and not g.is_empty]
+    return sub, res
+
+
 def _adensar_face(face: BaseGeometry, prof: float, via_local: float):
     """Fase 10.5 — BACKSTOP de densidade. Uma face FUNDA DEMAIS (profundidade > ~3·prof) só loteia 2
     fileiras na frente (cap costas-com-costas do `_lotear_face`) e o MIOLO vira SOBRA — é a origem
@@ -1295,7 +1329,7 @@ def gerar_layout(
         subfaces, vias_int = _adensar_face(q, prof, via_local)
         vias_internas_reg.extend(vias_int)
         for sf in subfaces:
-            sub, res = _lotear_face(sf, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
+            sub, res = _lotear_melhor_eixo(sf, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
             for lote in sub:
                 lotes_reg.append(lote)
                 lote_quadra.append(f"Q{qi}")
