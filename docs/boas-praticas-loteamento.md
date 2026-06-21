@@ -1,137 +1,150 @@
 # Boas práticas de urbanismo de loteamento — fonte de verdade do método
 
-> Consolidação de **referências externas reais** (entidades, urbanistas e normas) para o desenho
-> de loteamentos. Enquanto o `CLAUDE.md`/`ARCHITECTURE.md` fixam o **piso legal e técnico** (≥30%
-> veda lote, frente para via, doação mínima, área geodésica), **este documento fixa o MÉTODO de
-> DESENHO**: como dimensionar quadra/lote, hierarquizar o viário, posicionar áreas públicas, adaptar
-> à topografia e **valorizar** — para o motor parar de decidir por heurística solta e passar a
-> seguir um critério defensável.
+> Consolidação das **referências canônicas de desenho urbano e site planning** (os urbanistas que
+> ensinam o ofício) para fundamentar como o motor desenha um loteamento. O `CLAUDE.md`/`ARCHITECTURE.md`
+> fixam o **piso legal/técnico** (≥30% veda lote, frente para via, doação mínima, área geodésica);
+> **este documento fixa o MÉTODO de DESENHO** — para o motor seguir critério de autor, não heurística
+> solta.
 >
-> Status: v1 (2026-06-21). Pesquisa externa consolidada; pendente de validação do operador.
+> Status: v2 (2026-06-21). Ancorado em autores de referência; padrões numéricos marcados como
+> "corrente" devem ser conferidos nas obras (ver §6 — algumas são livres/baixáveis).
 
 ---
 
-## 1. Quem são as referências (a quem ancorar)
+## 1. As referências (os urbanistas do ofício)
 
-- **ADIT Brasil** — Associação para o Desenvolvimento Imobiliário e Turístico. Entidade que orienta
-  e capacita o setor de **comunidades planejadas e loteamentos** dentro das melhores práticas
-  nacionais e internacionais. Promove o **COMPLAN** (principal evento nacional do tema) e publicou o
-  livro **"Comunidades Planejadas"** (Conselho Editorial ADIT) — referência institucional do setor.
-- **Alphaville Urbanismo** — **maior e mais reconhecida** desenvolvedora de loteamentos/bairros
-  planejados de alto padrão do Brasil. Fundada em 1973 por **Renato Albuquerque** e **Yojiro
-  Takaoka**; desenho urbano original dos arquitetos **José de Almeida Pinto** e **Reinaldo Pestana**.
-  Mantém **time próprio de urbanistas** (padrão entre projetos) + consultores regionais para clube e
-  paisagismo. É o benchmark prático de loteamento de alta renda no país.
-- **New Urbanism (Novo Urbanismo)** — corrente de desenho urbano que estrutura grande parte das
-  comunidades planejadas brasileiras (caminhabilidade, conectividade, diversidade). Exemplos
-  nacionais: **Pedra Branca** (Palhoça/SC) e **Sete Sóis** (MRV, Hortolândia/SP).
-- **Normas e manuais** — **Lei Federal 6.766/79** (parcelamento, base legal); **Lei 16.402/16-SP**
-  e **GRAPROHAB-SP** (percentuais e aprovação); **Manual de Desenho Urbano e Obras Viárias da PMSP**
-  (hierarquia/seções viárias); normas municipais de parcelamento (ex.: Aracaju) com dimensões.
+### Canônicas — desenho de sítio / loteamento / bairro
+- **Kevin Lynch & Gary Hack — _Site Planning_ (MIT Press).** A obra de referência sobre **arranjar o
+  ambiente físico externo**: lote, quadra, via, drenagem, **adaptação ao relevo**, com apêndices de
+  **padrões numéricos**. É exatamente o que o motor faz. Lynch também: _A Imagem da Cidade_ —
+  legibilidade por **caminhos, bordas, bairros, nós e marcos** (base de orientação e valor).
+- **Christopher Alexander — _A Pattern Language_.** 253 padrões acionáveis. Os diretamente
+  aplicáveis ao loteamento:
+  - **#49 Looped Local Roads** — vias locais em **laço**, sem tráfego de passagem.
+  - **#51 Green Streets** — via local majoritariamente **verde** (faixa de rodagem mínima).
+  - **#52 Network of Paths and Cars** — rede de **pedestres** entrelaçada com a de carros.
+  - (correlatos: #30 Activity Nodes, #60 Accessible Green, #106 Positive Outdoor Space.)
+- **Raymond Unwin — _Town Planning in Practice_ (1909).** Pai do *garden suburb* (Letchworth,
+  Hampstead): **fileiras curtas com jardins fundos**, **cul-de-sac com verde central** e permeabilidade
+  de pedestre, **_vista-stoppers_** (vistas terminadas), **junções oblíquas**, densidade
+  **10–20 casas/acre líquido** (≈ 25–50 lotes/ha, excluindo vias). Domínio público.
+- **Andrés Duany & Elizabeth Plater-Zyberk (DPZ) — _SmartCode_ / o Transect.** Código baseado em
+  forma que une zoneamento + parcelamento + desenho urbano. **Transect** em 6 zonas (T1 natural →
+  T6 urbano); o loteamento residencial vive em **T3 (sub-urbano)/T4**. Bairro caminhável, quadras
+  curtas, padrões de via/lote por zona. Open-source.
+- **José Lamas — _Morfologia Urbana e Desenho da Cidade_.** Referência luso-brasileira sobre os
+  **elementos morfológicos** (traçado, quarteirão, lote, praça) e sua composição.
+
+### Setoriais brasileiras (mercado e regulação)
+- **ADIT Brasil** — entidade do setor; evento **COMPLAN** e livro **"Comunidades Planejadas"**.
+- **Alphaville Urbanismo** — maior referência prática de loteamento de alto padrão no Brasil
+  (Renato Albuquerque / Yojiro Takaoka; desenho de José de Almeida Pinto e Reinaldo Pestana).
+- **Lei 6.766/79** (parcelamento federal); **Lei 16.402/16-SP** e **GRAPROHAB-SP** (percentuais e
+  aprovação); **Manual de Desenho Urbano e Obras Viárias da PMSP** (seções viárias).
 
 ---
 
-## 2. Princípios gerais (o "porquê" do desenho)
+## 2. Princípios gerais (de onde sai o "porquê")
 
-1. **Caminhabilidade** — serviços/amenidades a ~10 min a pé; ruas amigáveis ao pedestre. *(New Urb.)*
-2. **Conectividade** — malha viária **interligada** que distribui o tráfego e facilita o caminhar;
-   evitar a gleba "partida". *(New Urb.; é o que a Fase 10.8 resolveu.)*
-3. **Diversidade de lotes** — mix de **tamanhos e faixas de preço** próximos, não monocultura.
-4. **Qualidade do desenho e do espaço público** — beleza, conforto humano, paisagismo, redes
-   enterradas, drenagem; o espaço público bem-cuidado é o que **valoriza** o produto.
-5. **Adaptação ao sítio** — o relevo, a drenagem e a mata **comandam** o traçado; não se força grelha
-   sobre encosta. A topografia é fator decisivo do sucesso **antes da primeira máquina**.
+1. **Adaptação ao sítio (Lynch/Hack).** O **relevo, a drenagem e a mata comandam** o traçado; ler as
+   curvas de nível **antes** de desenhar. ≥30% não loteia (vira via/verde).
+2. **Conectividade + laço (Alexander #49, DPZ).** Malha **interligada**, vias locais em **loop**;
+   nada de loteamento partido nem de espinha de peixe que só gera fundo de saco mal resolvido.
+3. **Caminhabilidade e quadra curta (DPZ/Transect, New Urbanism).** Quarteirões curtos, percursos
+   de pedestre, amenidades a ~10 min a pé.
+4. **Legibilidade (Lynch, _Imagem da Cidade_).** Hierarquia clara (marcos, nós, vistas terminadas);
+   o **clube/portaria/praça** como marco que organiza e valoriza.
+5. **Diversidade (New Urbanism/DPZ).** Mix de tamanhos e faixas de lote, não monocultura.
+6. **Espaço aberto positivo (Unwin, Alexander #106).** Verde **desenhado e útil** (jardim fundo,
+   verde central de cul-de-sac, parque), não retalho/sobra.
 
 ---
 
 ## 3. Regras concretas de desenho (o que o motor deve seguir)
 
-### 3.1 Quadra (quarteirão)
-- **Forma retangular** e **duas fileiras de lotes costas-com-costas** (eficiência clássica).
-- **Comprimento ≤ ~400 m** (norma municipal típica; acima disso, abrir via). 
-- **Profundidade da quadra ≈ 2 × profundidade do lote** (as duas fileiras).
-- **Orientada ao eixo PRÓPRIO da parcela e à curva de nível** — não ao eixo global. *(É a falha
-  atual: `_lotear_face` lota no eixo global e desperdiça parcelas oblíquas/irregulares.)*
+> Números marcados "(corrente)" são prática usual de site planning a confirmar nas obras.
 
-### 3.2 Lote
-- **Frente para via** (testada), **perpendicular à rua**.
-- **Profundidade mínima ~25 m** para testada > 8 m (norma); **profundidade > testada** (lote mais
-  fundo que largo).
-- **Mix de tamanhos** por posição (premium/padrão), não tamanho único.
+### 3.1 Quadra (quarteirão) — Lynch/Hack, DPZ
+- Retangular, **duas fileiras de lotes costas-com-costas**; profundidade ≈ **2 × prof. do lote**.
+- **Comprimento curto** para conectividade/caminhabilidade: **~80–250 m** (corrente; DPZ prefere o
+  extremo curto), **nunca > 400 m** (norma BR).
+- **Orientada ao eixo PRÓPRIO da parcela e à curva de nível** — não ao eixo global. *(Falha atual:
+  `_lotear_face` lota no eixo global e desperdiça parcela oblíqua/irregular → vira sobra.)*
 
-### 3.3 Sistema viário
-- **Hierarquia**: via-tronco/coletora (costura a gleba) → vias locais (servem as quadras) →
-  **cul-de-sacs** nos fundos de exclusividade.
-- **Malha conectada** (um grafo só) — não loteamento partido.
-- **Acompanha a curva de nível**; greide controlado. **≥30% veda LOTE, não VIA** (a via cruza em
-  corte/aterro com laudo; Lei 6.766 art. 3º).
-- Caixa de via dimensionada ao papel (coletora > local); em condomínio, vias privadas mais estreitas.
+### 3.2 Lote — Unwin, Lynch/Hack, norma BR
+- **Frente para via**, **perpendicular à rua**; **profundidade > testada** (lote mais fundo que largo).
+- Profundidade **~25–40 m** (corrente; mín. legal ~25 m p/ testada > 8 m); testada conforme o padrão.
+- **Mix de tamanhos** por posição (premium/padrão).
 
-### 3.4 Áreas públicas / verdes / institucional
-- **Percentuais de referência (SP, Lei 16.402/16):** **área verde ≥ 15%**, **institucional ≥ 5%**
-  da gleba (o mínimo legal varia por município; é PISO, não meta).
-- **Localização (regra de ouro):** verde e institucional vão para a **terra marginal** (encosta,
-  fundo, faixa ≥30%, APP) **ou viram amenidade DEFINIDA** (clube/parque que ancora valor). **Nunca**
-  tomar a parcela nobre/plana para verde genérico. *(É a falha que reservava o platô como verde.)*
-- O **≥30%/APP/mata** já contam como verde preservado — frequentemente suprem boa parte da doação.
+### 3.3 Sistema viário — Alexander #49/#51, DPZ, Lynch/Hack
+- **Hierarquia:** coletora/tronco que costura a gleba → **locais em laço** que servem as quadras →
+  **cul-de-sac** curto nos fundos de exclusividade (com verde central e permeabilidade de pedestre).
+- **Malha conectada** (um grafo só); **segue a curva de nível**, greide controlado.
+- **≥30% veda LOTE, não VIA** (a via cruza em corte/aterro + laudo; Lei 6.766 art. 3º).
+- Caixa por papel (coletora > local); condomínio = vias privadas mais estreitas.
 
-### 3.5 Topografia e drenagem
-- Levantamento planialtimétrico; traçado segue curvas de nível; **≥30% = via/verde, não lote**.
-- Drenagem orientada pela declividade (a água manda no arruamento).
+### 3.4 Áreas públicas / verde / institucional — Unwin, Alexander, Lei 16.402/16
+- **Percentuais-piso (SP):** verde **≥15%**, institucional **≥5%** da gleba (varia por município).
+- **Localização (regra de ouro):** verde/institucional vão para a **terra marginal** (encosta, fundo,
+  ≥30%, APP) **ou viram amenidade DEFINIDA** (clube/parque/verde central de cul-de-sac que ancora
+  valor). **Nunca tomar a parcela nobre/plana para verde genérico.** *(Falha que reservava o platô.)*
+- ≥30%/APP/mata já contam como verde preservado — costumam suprir parte da doação.
 
-### 3.6 Valorização (o "melhor aproveitamento" = VALOR, não só nº de lotes — esp. alta renda)
-- **Lotes premium** onde há **vista panorâmica / cota alta**, **fundo de mata** (privacidade) e
-  **frente para verde/lazer/clube**. *(Drivers reais de valorização em alto padrão.)*
-- **Penalizar** lotes na via principal e junto à **entrada/portaria** (ruído/passagem).
-- **Cul-de-sac** cria endereços de exclusividade (lote grande em leque, baixo tráfego).
-- O **clube/lazer** é âncora de valor: lotes voltados a ele ganham preço.
+### 3.5 Topografia e drenagem — Lynch/Hack
+- Levantamento planialtimétrico; traçado segue curvas; ≥30% = via/verde, não lote; a água (declividade)
+  orienta o arruamento.
+
+### 3.6 Valorização ("melhor aproveitamento" = VALOR, sobretudo alta renda) — Unwin, Lynch
+- **Lotes premium** em **cota alta/vista panorâmica**, **fundo de mata** (privacidade) e **frente para
+  verde/lazer/clube**; **_vista-stoppers_** (a rua termina num marco/verde).
+- **Penalizar** lote na via principal e junto à **entrada/portaria**.
+- **Cul-de-sac** = endereço de exclusividade (lote grande em leque, baixo tráfego).
+- O **clube** é marco âncora: lotes voltados a ele valem mais.
 
 ---
 
-## 4. Benchmarks de aproveitamento (parâmetro de comparação)
+## 4. Benchmarks de aproveitamento (alvo de eficiência)
 
-Distribuição típica de uma gleba **plana e bem resolvida** (referência URBIA, sobre a área líquida):
+Gleba **plana e bem resolvida** (referência URBIA, sobre a área líquida):
 
 | Uso | Faixa de referência |
 |---|---|
-| Vendável (lotes) | **~55–58%** |
-| Sistema viário | **~15%** |
-| Áreas verdes (verde + lazer + institucional) | **~28%** |
-| Sobra geométrica | **~0%** (meta) |
+| Vendável (lotes) | ~55–58% |
+| Sistema viário | ~15% |
+| Áreas verdes (verde + lazer + institucional) | ~28% |
+| Sobra geométrica | ~0% (meta) |
 
-> Atenção: a **gleba real comanda**. Terreno de serra com faixa ≥30% relevante tem teto de vendável
-> menor (o ≥30% não vira lote). O benchmark é **alvo de eficiência** (viário enxuto, sobra ~0), não
-> promessa — a proveniência e a honestidade do quadro (§3 da spec) continuam valendo.
+Densidade (Unwin, garden suburb): **~25–50 lotes/ha líquido**. **A gleba real comanda** — serra com
+≥30% relevante tem teto de vendável menor. Benchmark é alvo de eficiência, não promessa (vale a
+honestidade do quadro, §3 da spec).
 
 ---
 
 ## 5. Ponte para o motor (o que já atende × o que falta)
 
 **Já segue a boa prática:**
-- Malha conectada / gleba única; ≥30% veda lote, não via (Fase 10.8).
-- ≥30% como verde preservado, não "sobra" (Fase 10.8b).
-- Frente para via em todo lote; clamp legal de lote; doação medida vs mínimo.
-- Orçamento de áreas públicas sobre a área **lotável** (Fase 10.8c).
+- Malha conectada / gleba única; ≥30% veda lote, não via (10.8); ≥30% = verde preservado (10.8b).
+- Frente para via em todo lote; clamp legal; doação medida vs mínimo; orçamento de áreas sobre a área
+  lotável (10.8c).
 
-**Falta ancorar (próximas fases):**
-1. **Subdivisão adaptada (3.1/3.2):** quadra/lote no **eixo próprio da parcela + curva de nível**,
-   com **acesso interno** quando a quadra é grande/funda — para o platô e os blocos irregulares
-   virarem lote, não sobra. *(Maior alavanca de aproveitamento hoje.)*
-2. **Localização de verde/institucional (3.4):** escolher a **terra marginal**, nunca a parcela
-   nobre; clube como amenidade definida.
-3. **Valorização por perfil (3.6):** alta renda = **posicionar valor** (premium em cota alta/fundo de
-   mata/frente verde; penalizar entrada/via principal; cul-de-sac); baixa/média = **densidade**.
+**Falta ancorar (próximas fases), por prioridade:**
+1. **Subdivisão adaptada (§3.1/3.2 — Lynch/Hack):** quadra/lote no **eixo próprio + curva de nível**,
+   com **acesso interno** em quadra grande/funda → o platô e os blocos irregulares viram lote, não
+   sobra. *(Maior alavanca de aproveitamento hoje.)*
+2. **Vias locais em laço (§3.3 — Alexander #49):** trocar fundos de saco mal resolvidos por loops.
+3. **Localização de verde/institucional (§3.4):** terra marginal/amenidade definida, nunca a nobre.
+4. **Valorização por perfil (§3.6):** alta = posicionar valor (premium em cota alta/fundo de mata/
+   frente verde; *vista-stoppers*; cul-de-sac; penalizar entrada); baixa/média = densidade.
 
 ---
 
-## 6. Fontes
-- ADIT Brasil — Comunidades Planejadas e Loteamentos: <https://adit.com.br/comunidades-planejadas-solucoes-urbanas-eficientes-para-a-qualidade-de-vida/> · publicação "Comunidades Planejadas": <https://adit.com.br/conselho-editorial-adit-brasil-realiza-sua-primeira-publicacao-intitulada-comunidades-planejadas/>
-- Alphaville Urbanismo (histórico/projeto): <https://pt.wikipedia.org/wiki/AlphaVille_Urbanismo>
-- 10 pilares do Novo Urbanismo (loteamentos): <https://halonotoriedade.com.br/conheca-os-10-pilares-do-novo-urbanismo-que-estao-impactando-diretamente-na-construcao-de-loteamentos/>
-- Manual de Desenho Urbano e Obras Viárias — PMSP (princípios viários): <https://manualurbano.prefeitura.sp.gov.br/manual/3-parametros-de-desenho-viario/3-1-principios-de-projeto-para-o-espaco-viario>
+## 6. Fontes (★ = livre/baixável)
+- Kevin Lynch & Gary Hack, *Site Planning*, MIT Press: <https://mitpress.mit.edu/9780262121064/site-planning/>
+- Christopher Alexander, *A Pattern Language* — padrões online ★: <https://patternlanguage.cc/> (ex.: <https://patternlanguage.cc/Patterns/Looped-Local-Roads-(49)>)
+- Raymond Unwin, *Town Planning in Practice* (1909) — domínio público ★: <https://archive.org/details/townplanninginpr00unwiuoft>
+- DPZ — *SmartCode* (open-source) ★ e Transect (CNU): <https://www.cnu.org/publicsquare/transect> · <https://transect.org/transect.html>
+- José Lamas, *Morfologia Urbana e Desenho da Cidade* ★ (PDF acadêmico): <https://www.academia.edu/30879301/Morfologia_Urbana_e_Desenho_da_Cidade_Jos%C3%A9_Lamas>
+- ADIT Brasil — Comunidades Planejadas: <https://adit.com.br/comunidades-planejadas-solucoes-urbanas-eficientes-para-a-qualidade-de-vida/>
+- Alphaville Urbanismo (histórico): <https://pt.wikipedia.org/wiki/AlphaVille_Urbanismo>
+- Lei 6.766/79 ★: <https://www.planalto.gov.br/ccivil_03/leis/l6766.htm>
 - Percentuais de áreas públicas (Lei 16.402/16-SP): <https://www.migalhas.com.br/depeso/383550/percentual-de-areas-publicas-nos-loteamentos>
-- Manual GRAPROHAB-SP — Projeto Urbanístico: <https://app.habitacao.sp.gov.br/ManualGraprohab/10ProjetoUrbanistico.html>
-- Normas de parcelamento (dimensões de quadra/lote) — Aracaju: <https://www.aracaju.se.gov.br/userfiles/emurb/2011/02/DPS_Normas_ParcelamentoSolo.pdf>
-- Topografia e valorização do loteamento — Ferrucci: <https://ferrucciempreendimentos.com/2025/08/27/topografia-do-terreno-potencial-loteamento/>
-- Projeto urbanístico de loteamento — Ávila Urbanismo: <https://www.avilaurbanismo.com.br/projeto-urbanistico/>
-- Lei Federal 6.766/79: <https://www.planalto.gov.br/ccivil_03/leis/l6766.htm>
