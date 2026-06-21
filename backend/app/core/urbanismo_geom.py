@@ -792,8 +792,8 @@ def _selecionar_verde(pool: Sequence[BaseGeometry], alvo: float):
     for f in ordem:
         if acc >= alvo - 1e-6:
             break
-        if acc + f.area <= alvo + f.area * 0.5:  # não estoura mais que meia face além do alvo
-            verdes.append(f)
+        if acc + f.area <= alvo * 1.15:  # Fase 10.8c — não engole face que estoura >15% o alvo (não
+            verdes.append(f)            # toma o platô nobre p/ caber num orçamento pequeno)
             acc += f.area
     resto = [f for f in pool if not any(f is v for v in verdes)]
     return verdes, resto
@@ -1051,9 +1051,14 @@ def gerar_layout(
     # (a) materialização (9.1): CAP analítico — reserva lazer só até sobrar área p/ ~MIN_LOTES
     # lotes; acima disso DEGRADA rotulado (nunca infla nem ignora).
     lote_area = max(alvo_area, 1.0)
-    inst_area = pct_inst * aprov_area
+    # Fase 10.8c — orçamentos de lazer/institucional são % da área LOTÁVEL (aprov − ≥30%), não do
+    # aprov inflado pelo ≥30% (que não vira lote nem amenidade). Sem isto, reserva-se verde DEMAIS e
+    # o platô lotável é tomado como área verde (o motor "comia" terra boa por causa do ≥30%).
+    lotavel = _diferenca_segura(aprov, restr_lote) if restr_lote is not None else aprov
+    lotavel_area = max(lotavel.area if lotavel is not None else aprov_area, 1.0)
+    inst_area = pct_inst * lotavel_area
     disp_lazer = max(aprov_area - inst_area - MIN_LOTES_RESERVA * lote_area, 0.0)
-    alvo_lazer_area = pct_lazer0 * aprov_area
+    alvo_lazer_area = pct_lazer0 * lotavel_area
     lazer_area = min(alvo_lazer_area, disp_lazer)
     degradado = lazer_area < alvo_lazer_area - 1e-6
 
