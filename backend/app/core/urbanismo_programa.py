@@ -354,10 +354,10 @@ class GeradorProgramaClaude:
                 resp = client.messages.create(
                     model=modelo,
                     max_tokens=4000,
-                    temperature=0.0,  # CONSISTÊNCIA (§4 determinismo): mesma gleba → ~mesmo programa
-                    # toda regeneração. Sem isto (default 1.0) a IA sorteava lazer/esqueleto diferentes
-                    # a cada clique e o nº de lotes pulava (51↔36). Pré-análise quer estabilidade, não
-                    # criatividade. O motor já é determinístico; aqui fechamos a borda da IA também.
+                    # NÃO passar `temperature`: alguns modelos novos (Opus 4.8/Fable 5) a depreciaram
+                    # e devolvem 400 → a chamada caía no preset. A CONSISTÊNCIA (§4) vem do CAP de
+                    # lazer/largura (motor é dono da medida) + da regra 5 da instrução (use o padrão
+                    # do perfil, não varie). Sem isto a IA quebrava e nunca propunha de fato.
                     system=_INSTRUCAO,
                     tools=[_FERRAMENTA],
                     tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},

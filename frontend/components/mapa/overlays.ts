@@ -18,12 +18,12 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
   urb_arruamento: "#64748b",
   urb_verde: "#16a34a",
-  urb_verde_reservada: "#16a34a", // verde escuro saturado (bloco)
-  urb_verde_sobra: "#86efac", // verde claro (remanescente)
+  urb_verde_reservada: "#22c55e", // park manicurado — verde médio (Fase 11.6 cores distintas)
+  urb_verde_sobra: "#a3e635", // verde remanescente — LIMA claro (amarelado), distinto do park
   urb_lazer: "#06b6d4", // cor de equipamento
   urb_institucional: "#f59e0b",
   urb_portico: "#db2777", // Fase 11.3 — pórtico/entrada: rosa/magenta (cor ÚNICA, não clasha c/ lote)
-  urb_restricao: "#2e7d32", // Fase 10.2 — não-edificável = BOSQUE/área verde preservada (verde mata)
+  urb_restricao: "#14532d", // Fase 11.6 — bosque preservado: verde-FLORESTA bem escuro (o mais escuro)
 };
 
 // Fase 9.6 — estilo POR camada (contraste sobre satélite, borda própria). Sem entrada → default.
@@ -38,8 +38,10 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // Fase 9.7 — viário como MALHA (cinza forte, sólido); quadras como contorno (sem preenchimento).
   urb_arruamento: { color: "#1f2937", weight: 1, fillColor: "#475569", fillOpacity: 0.7 },
   urb_quadras: { color: "#334155", weight: 1.5, fillColor: "#000000", fillOpacity: 0, dashArray: "5 4" },
-  urb_verde_reservada: { color: "#14532d", weight: 2, fillColor: "#22c55e", fillOpacity: 0.55 },
-  urb_verde_sobra: { color: "#16a34a", weight: 1, fillColor: "#86efac", fillOpacity: 0.22, dashArray: "4 3" },
+  // Fase 11.6 — 3 verdes DISTINTOS (o operador via tudo igual): park = verde médio sólido;
+  // remanescente = lima claro amarelado pontilhado; bosque = floresta bem escuro texturizado.
+  urb_verde_reservada: { color: "#15803d", weight: 2, fillColor: "#22c55e", fillOpacity: 0.55 },
+  urb_verde_sobra: { color: "#65a30d", weight: 1.5, fillColor: "#bef264", fillOpacity: 0.5, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
   // Fase 11.3 — PÓRTICO/ENTRADA: marcador ROSA/MAGENTA forte (cor única no mapa, borda grossa) —
@@ -49,7 +51,7 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // mata visível (textura pontilhada = natural/preservado), distinto do verde-parque reservado
   // (#22c55e, manicured) e do verde-sobra (pálido). Não compete com os lotes (fica ao fundo), mas
   // LÊ como amenidade preservada — não como vazio com satélite vazando. O dado/geometria não muda.
-  urb_restricao: { color: "#1b4d27", weight: 1.5, fillColor: "#2e7d32", fillOpacity: 0.42, dashArray: "1 6" },
+  urb_restricao: { color: "#052e16", weight: 1.5, fillColor: "#14532d", fillOpacity: 0.5, dashArray: "1 6" },
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {

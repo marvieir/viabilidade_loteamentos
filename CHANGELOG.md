@@ -7,6 +7,15 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.6 — corrige `temperature` (quebrava a IA) + 3 verdes distintos no mapa
+- **Bug crítico (regressão da 11.5):** `temperature=0.0` causava **400 "temperature is deprecated for
+  this model"** (Opus 4.8/Fable 5) → a chamada à IA falhava e caía sempre no preset. Removido o
+  parâmetro; a consistência fica com o CAP de lazer/largura (motor é dono da medida) + a regra 5 da
+  instrução. A IA volta a propor de fato.
+- **Cores (operador):** as áreas verde reservada / verde remanescente / bosque preservado usavam
+  tons quase iguais (confundia). Agora 3 cores DISTINTAS: park = verde médio sólido (#22c55e);
+  remanescente = lima claro amarelado (#bef264); bosque = floresta bem escuro (#14532d).
+
 ### Fase 11.5 — CONSISTÊNCIA: domar a variância da IA (mesma gleba → mesmo resultado)
 - **Problema:** regenerar a mesma gleba dava resultados muito diferentes (51 lotes numa rodada, 36
   noutra) e o operador achava que o motor piorava a cada clique. Causa: a chamada ao LLM usava
