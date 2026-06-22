@@ -400,6 +400,7 @@ export type ChaveOverlay =
   | "urb_verde_sobra"
   | "urb_lazer"
   | "urb_institucional"
+  | "urb_portico"
   | "urb_restricao";
 
 export interface Ambiental {
@@ -1217,6 +1218,8 @@ export interface GeometriaUrb {
         qualifica_legal?: boolean;
       })
     | null;
+  // Fase 11.3 — pórtico/entrada: marcador do acesso único (alto padrão) p/ o mapa.
+  portico?: GeoJSON.Geometry | null;
   // Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").
   restricao_recortada?:
     | (GeoJSON.Geometry & { origem?: string[]; rotulo?: string; estilo_sugerido?: string })

@@ -87,6 +87,9 @@ class Layout:
     # rotular (em vez do "clarão"); ``restricao_origem`` = de onde veio (vegetacao/declividade/app).
     restricao_recortada: Optional[BaseGeometry] = None
     restricao_origem: list[str] = field(default_factory=list)
+    # Fase 11.3 — PÓRTICO/ENTRADA: marcador do acesso único do loteamento (alto padrão) p/ o mapa
+    # desenhar o componente, não só contar no diagnóstico. Ponto/disco no arruamento junto à borda.
+    portico: Optional[BaseGeometry] = None
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -401,6 +404,7 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
         "areas_verdes_sobra": _gj(layout.sobra_ponta),
         "sistema_lazer": lazer_gj,  # 9.7 — figura formada (forma=quadra), não círculo
         "institucional": inst_gj,  # 9.7 — quadra formada (qualifica_legal + checks)
+        "portico": _gj(layout.portico),  # 11.3 — marcador da entrada/portaria
         "viario_diagnostico": vdiag,
         "institucional_diagnostico": idiag,
         # Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").

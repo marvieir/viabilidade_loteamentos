@@ -7,6 +7,14 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.3 — PÓRTICO/entrada visível no mapa
+- **Problema:** o motor já calculava a entrada única (ponto do arruamento junto à borda de acesso) e
+  contava `pórtico=1`, mas era só diagnóstico — **não aparecia** como componente no mapa.
+- **Correção:** `Layout.portico` (disco no acesso, sobre a via-tronco) emitido no GeoJSON; frontend
+  renderiza o overlay `urb_portico` (marcador laranja forte) + legenda "Pórtico / entrada".
+- Pendente (componentes nomeados — mirante/quiosque/lago): amenidades ainda agrupadas como
+  lazer/verde; nomeá-las é evolução futura.
+
 ### Fase 11.2 — verde na TERRA MARGINAL (boas práticas §3.4)
 - **Problema:** `_selecionar_verde` reservava as MAIORES faces como verde → tomava a parcela nobre
   (o platô), que então virava sobra; as faces irregulares (que lotam mal) viravam lote ruim.

@@ -128,6 +128,7 @@ export function CardUrbanismo({
       overlays.urb_verde = g.areas_verdes; // fallback (backend antigo)
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
+    if (g.portico) overlays.urb_portico = g.portico; // Fase 11.3 — marcador da entrada/portaria
     // Fase 9.8 — restrição recortada (mata/declividade/APP): demarcada e rotulada (não "clarão").
     if (g.restricao_recortada) overlays.urb_restricao = g.restricao_recortada;
     // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback

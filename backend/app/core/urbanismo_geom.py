@@ -1466,6 +1466,10 @@ def gerar_layout(
             diag_gleba = math.hypot(gmaxx - gminx, gmaxy - gminy)
             inst_na_entrada = inst.distance(portico_pt) <= 0.35 * max(diag_gleba, 1.0)
     porticos = 1 if portico_pt is not None else 0
+    # Fase 11.3 — marcador do PÓRTICO p/ o mapa (disco no acesso, sobre a via-tronco): elemento
+    # visível do componente "portaria/entrada", não só o contador. Clipa ao aproveitável.
+    portico_geom = (_valido(portico_pt.buffer(max(via_tronco, 8.0) * 0.7).intersection(aprov))
+                    if portico_pt is not None else None)
     # 9.9 — sinuosidade: média da razão curva/reta dos eixos usados; >1,1 = curvo (1,0 = reto).
     sinus = [_sinuosidade(c) for c in curvas_ia if c is not None and not c.is_empty]
     sinuosidade_media = round(sum(sinus) / len(sinus), 3) if sinus else 1.0
@@ -1606,6 +1610,7 @@ def gerar_layout(
         viario_diagnostico=viario_diag,
         institucional_diagnostico=inst_diag,
         sistema_lazer_diagnostico=clube_diag,
+        portico=portico_geom,  # 11.3 — marcador da entrada/portaria p/ o mapa
     )
 
 
