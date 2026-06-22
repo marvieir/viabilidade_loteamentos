@@ -7,6 +7,15 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.7 — teto de lote premium (alta renda): +area loteavel, -sobra
+- **Descoberta (cobrança do operador):** o teto de 640 m² NÃO é legal (a LUOS São Roque/MUE só fixa
+  o PISO de 360 m²; não há teto na diretriz). O 640 era a `faixa` de **referência de MERCADO** do
+  perfil 'alta' no código (`PERFIL_LOTE`), uma convenção — não a prefeitura.
+- **Correção:** teto de mercado do perfil **alta** 640 → **1.000 m²** (premium). Os lotes maiores
+  ABSORVEM o fundo de quadra que virava sobra. Baixa/média mantêm tetos baixos (densidade).
+- **Efeito (fixture real):** vendável **34,0% → 41,9%**, sobra **11,6% → 3,9%**, nº de lotes
+  praticamente igual (46→45, lotes maiores em vez de sobra), área média 524 → 661 m². Suíte verde.
+
 ### Fase 11.6 — corrige `temperature` (quebrava a IA) + 3 verdes distintos no mapa
 - **Bug crítico (regressão da 11.5):** `temperature=0.0` causava **400 "temperature is deprecated for
   this model"** (Opus 4.8/Fable 5) → a chamada à IA falhava e caía sempre no preset. Removido o

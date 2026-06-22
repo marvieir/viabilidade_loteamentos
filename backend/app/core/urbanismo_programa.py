@@ -74,7 +74,7 @@ class Programa:
 PERFIL_LOTE: dict[str, dict] = {
     "baixa": {"testada": 9.0, "prof": 20.0, "faixa": (125.0, 250.0)},   # ~180 m²
     "media": {"testada": 12.0, "prof": 28.0, "faixa": (300.0, 450.0)},  # ~336 m²
-    "alta": {"testada": 15.0, "prof": 31.0, "faixa": (450.0, 640.0)},   # ~465 m²
+    "alta": {"testada": 15.0, "prof": 31.0, "faixa": (450.0, 1000.0)},  # premium: teto de MERCADO
 }
 
 
