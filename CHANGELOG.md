@@ -7,6 +7,15 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.10 — folga mínima de janela de lote (mata a sobra da baixa renda)
+- **Causa raiz:** quando a ZONA força o piso acima do teto de mercado (baixa renda em zona de mín.
+  360 vs mercado 250), `[piso, teto]` COLAPSA para ≈ [360, 360] — quase nenhuma faixa cabe num lote
+  de área exata → **sobra de 40-49%** (um retângulo limpo de 2.974 m² dava 1 lote só).
+- **Correção:** sem `lote_max` do operador, garante `teto ≥ 1,5× piso` de janela p/ a subdivisão
+  respirar (operador que fixa `lote_max` assume o aperto).
+- **Efeito (baixa, São Roque):** vendável **11% → 38,1%**, lotes **21 → 58**, sobra **40% → 13,4%**.
+  Suíte verde.
+
 ### Fase 11.8 — campo "lote máx." no menu (#1) + feedback do "Analisar tudo" (#3)
 - **#1 — teto de lote pelo operador:** novo campo "Lote máx. (m²)" no menu de urbanismo (4º, ao lado
   de tipo/público/zona). Sobrepõe o teto de MERCADO do perfil (`resolver_diretrizes(..., lote_max_m2)`),

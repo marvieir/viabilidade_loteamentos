@@ -67,7 +67,14 @@ def resolver_diretrizes(
     else:
         piso_lote = max(PISO_FEDERAL_M2, piso_mercado)
     # teto de MERCADO do perfil — ou o recomendado pelo operador (Fase 11.8), nunca abaixo do piso.
-    teto_lote = max(float(lote_max_m2), piso_lote) if lote_max_m2 else max(teto_mercado, piso_lote)
+    if lote_max_m2:
+        teto_lote = max(float(lote_max_m2), piso_lote)
+    else:
+        # Fase 11.10 — FOLGA MÍNIMA de janela: quando a zona força o piso acima do teto de mercado
+        # (ex.: baixa renda em zona de mín. 360 vs mercado 250), [piso, teto] COLAPSA (≈ [360, 360])
+        # e quase nenhuma faixa cabe num lote de área exata → sobra enorme. Garante ~1,5× o piso de
+        # janela p/ a subdivisão respirar. (Operador que fixa lote_max assume o aperto.)
+        teto_lote = max(teto_mercado, round(piso_lote * 1.5))
     # alvo = mira geométrica de mercado (testada × profundidade), clampada à faixa legal.
     alvo_lote = max(min(perf["testada"] * perf["prof"], teto_lote), piso_lote)
 
