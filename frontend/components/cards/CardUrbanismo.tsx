@@ -220,6 +220,23 @@ export function CardUrbanismo({
           </Button>
         </div>
 
+        {/* Fase 11.11 — VALIDAÇÃO: o app corrige o usuário. Lote máx. perto do piso da zona =
+            janela apertada → sobra. Avisa (não bloqueia). O piso vem do estudo já gerado. */}
+        {(() => {
+          const piso = proposta?.diretrizes?.piso_lote_efetivo_m2;
+          const lm = Number(loteMax);
+          if (!loteMax.trim() || !piso || !(lm > 0) || lm >= piso * 1.4) return null;
+          const rec = Math.ceil((piso * 1.5) / 50) * 50;
+          return (
+            <p className="rounded-lg bg-amber-50 p-2.5 text-sm text-amber-800">
+              ⚠️ Faixa de lote apertada [{piso.toLocaleString("pt-BR")}–
+              {lm.toLocaleString("pt-BR")} m²] — perto do piso legal da zona, tende a gerar muita{" "}
+              <strong>sobra geométrica</strong>. Recomendado: lote máx. ≥{" "}
+              <strong>{rec.toLocaleString("pt-BR")} m²</strong> (ou deixe vazio para o padrão seguro).
+            </p>
+          );
+        })()}
+
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
         )}

@@ -7,6 +7,15 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.11 — validação de tamanho de lote na interface (o app corrige o usuário)
+- **Princípio (operador):** o cliente pode errar ao sugerir tamanhos; o papel da app é corrigi-lo —
+  (a) corrigir sozinha o que é seguro (já feito no 11.10: janela mínima no default), (b) AVISAR
+  quando o usuário força algo ruim (sem bloquear).
+- **Correção:** no campo "Lote máx.", quando o valor está perto demais do piso legal da zona (janela
+  apertada → sobra), a interface mostra um aviso na hora com o tamanho recomendado (≥ 1,5× piso) ou
+  sugere deixar vazio (padrão seguro). Frontend-only; usa o piso que o estudo já devolve.
+- Pendente (próximo): alerta de VOCAÇÃO do terreno (topografia/localização → perfil sugerido).
+
 ### Fase 11.10 — folga mínima de janela de lote (mata a sobra da baixa renda)
 - **Causa raiz:** quando a ZONA força o piso acima do teto de mercado (baixa renda em zona de mín.
   360 vs mercado 250), `[piso, teto]` COLAPSA para ≈ [360, 360] — quase nenhuma faixa cabe num lote
