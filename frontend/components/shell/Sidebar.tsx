@@ -7,11 +7,14 @@ export function Sidebar({
   onSecao,
   alertas,
   perfilConfirmado,
+  statusSec,
 }: {
   secao: Secao;
   onSecao: (s: Secao) => void;
   alertas?: number; // badge no item Ambiental
   perfilConfirmado?: boolean;
+  // #3 — progresso do "Analisar tudo": âmbar pulsando (analisando) → verde (concluído).
+  statusSec?: Record<string, "analisando" | "ok" | "erro">;
 }) {
   return (
     <aside className="sticky top-16 hidden h-[calc(100vh-4rem)] w-60 shrink-0 border-r border-slate-200 bg-white p-3 md:block">
@@ -38,6 +41,14 @@ export function Sidebar({
                 <span className="ml-auto rounded-full bg-rose-100 px-1.5 text-[11px] font-semibold text-rose-700">
                   {alertas}
                 </span>
+              ) : null}
+              {/* #3 — ponto de progresso: âmbar pulsando = analisando; verde = concluído. */}
+              {statusSec?.[id] === "analisando" ? (
+                <span className="ml-auto h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-400" />
+              ) : statusSec?.[id] === "ok" ? (
+                <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
+              ) : statusSec?.[id] === "erro" ? (
+                <span className="ml-auto h-2 w-2 shrink-0 rounded-full bg-rose-500" />
               ) : null}
             </button>
           );

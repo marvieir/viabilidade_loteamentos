@@ -7,6 +7,17 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.8 — campo "lote máx." no menu (#1) + feedback do "Analisar tudo" (#3)
+- **#1 — teto de lote pelo operador:** novo campo "Lote máx. (m²)" no menu de urbanismo (4º, ao lado
+  de tipo/público/zona). Sobrepõe o teto de MERCADO do perfil (`resolver_diretrizes(..., lote_max_m2)`),
+  nunca abaixo do piso legal. Vazio = padrão do perfil. Permite controlar o tamanho máximo de lote por
+  estudo sem mexer no código (a generalização do 11.7).
+- **#3 — "Analisar tudo" com progresso:** o botão não dava feedback (a prop `analisando` nem era
+  passada → parecia que nada acontecia). Agora: botão vira "Analisando…", e cada item do menu lateral
+  ganha um ponto âmbar pulsando (analisando) → verde (concluído). Implementado reaproveitando o
+  `onData` que cada card já dispara ao concluir (sem editar os cards); timeout de segurança limpa
+  estados presos. Suíte backend verde, tsc limpo.
+
 ### Fase 11.7 — teto de lote premium (alta renda): +area loteavel, -sobra
 - **Descoberta (cobrança do operador):** o teto de 640 m² NÃO é legal (a LUOS São Roque/MUE só fixa
   o PISO de 360 m²; não há teto na diretriz). O 640 era a `faixa` de **referência de MERCADO** do

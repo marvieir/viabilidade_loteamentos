@@ -1118,6 +1118,9 @@ class ProporUrbanismoIn(BaseModel):
     zona: Optional[str] = None  # Fase 9.4 — zona da LUOS (1.8) p/ o lote legal e a doação
     modalidade: Optional[str] = None
     overrides: Optional[dict] = None  # lote_alvo_m2, pct_lazer, largura_via_m, amenidades…
+    # Fase 11.8 — teto de lote recomendado pelo operador (m²): sobrepõe o teto de mercado do perfil
+    # (nunca abaixo do piso legal). Vazio = padrão do perfil.
+    lote_max_m2: Optional[float] = None
 
 
 class MedirUrbanismoIn(BaseModel):

@@ -24,10 +24,13 @@ FRENTE_FEDERAL_M = 5.0
 
 
 def resolver_diretrizes(
-    perfil, zona_codigo: Optional[str], modalidade: Optional[str], publico_alvo: str
+    perfil, zona_codigo: Optional[str], modalidade: Optional[str], publico_alvo: str,
+    lote_max_m2: Optional[float] = None,
 ) -> dict:
     """Resolve os limites de dimensionamento e doação pela hierarquia de fontes. Nunca chuta:
-    o que a LUOS não fixa cai no mercado (rotulado) e no piso federal."""
+    o que a LUOS não fixa cai no mercado (rotulado) e no piso federal. ``lote_max_m2`` (Fase 11.8):
+    teto de lote recomendado pelo OPERADOR — sobrepõe o teto de mercado do perfil (nunca abaixo do
+    piso legal). Permite controlar o tamanho máximo de lote por estudo, sem mexer no código."""
     perf = PERFIL_LOTE.get(publico_alvo, PERFIL_LOTE["media"])
     piso_mercado, teto_mercado = perf["faixa"]
 
@@ -63,7 +66,8 @@ def resolver_diretrizes(
         piso_lote = max(PISO_FEDERAL_M2, lote_zona or PISO_FEDERAL_M2)
     else:
         piso_lote = max(PISO_FEDERAL_M2, piso_mercado)
-    teto_lote = max(teto_mercado, piso_lote)  # teto nunca abaixo do piso
+    # teto de MERCADO do perfil — ou o recomendado pelo operador (Fase 11.8), nunca abaixo do piso.
+    teto_lote = max(float(lote_max_m2), piso_lote) if lote_max_m2 else max(teto_mercado, piso_lote)
     # alvo = mira geométrica de mercado (testada × profundidade), clampada à faixa legal.
     alvo_lote = max(min(perf["testada"] * perf["prof"], teto_lote), piso_lote)
 

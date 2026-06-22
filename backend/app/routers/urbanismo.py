@@ -279,7 +279,9 @@ def propor(
         if (fonte_perfil is not None and getattr(jur, "cod_ibge", None) and body.zona)
         else None
     )
-    diretrizes = resolver_diretrizes(perfil, body.zona, body.modalidade, body.publico_alvo)
+    diretrizes = resolver_diretrizes(
+        perfil, body.zona, body.modalidade, body.publico_alvo, body.lote_max_m2
+    )
 
     # 3) NÚCLEO: Python materializa (reserva conforme diretriz → subdivide → CLAMP legal) e MEDE.
     # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: se partido, a IA propôs o ponto de travessia e o Python

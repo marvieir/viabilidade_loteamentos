@@ -90,6 +90,7 @@ export function CardUrbanismo({
   const [tipo, setTipo] = useState<TipoLoteamento>("aberto");
   const [publico, setPublico] = useState<PublicoAlvo>("media");
   const [zona, setZona] = useState<string>("");
+  const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
   const [proposta, setProposta] = useState<PropostaUrbanistica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -104,7 +105,11 @@ export function CardUrbanismo({
     setCarregando(true);
     setErro(null);
     try {
-      const p = await proporUrbanismo(analiseId, tipo, publico, zona || null);
+      const loteMaxNum = loteMax.trim() ? Number(loteMax) : null;
+      const p = await proporUrbanismo(
+        analiseId, tipo, publico, zona || null, undefined,
+        loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null
+      );
       setProposta(p);
       onData?.(p);
     } catch (e) {
@@ -199,6 +204,17 @@ export function CardUrbanismo({
               </select>
             </>
           )}
+          <label className="text-sm text-slate-600">Lote máx. (m²)</label>
+          <input
+            type="number"
+            min={0}
+            step={50}
+            value={loteMax}
+            onChange={(e) => setLoteMax(e.target.value)}
+            placeholder="perfil"
+            title="Tamanho máximo de lote recomendado (m²). Vazio = padrão do perfil. Nunca abaixo do piso legal."
+            className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+          />
           <Button onClick={gerar} disabled={carregando}>
             {carregando ? "Gerando…" : "Gerar estudo de massa (IA)"}
           </Button>

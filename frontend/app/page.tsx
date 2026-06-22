@@ -62,6 +62,21 @@ export default function Home() {
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
   const [sinal, setSinal] = useState(0);
   const [gerandoLaudo, setGerandoLaudo] = useState(false);
+  // #3 — progresso por seção: cada card reporta "analisando"/"ok"/"erro"; o botão e a sidebar leem.
+  const [statusSec, setStatusSec] = useState<Record<string, "analisando" | "ok" | "erro">>({});
+  const SECOES_ANALISE = [
+    "ambiental", "verde", "declividade", "aproveitamento",
+    "juridico", "financeira", "localizacao",
+  ] as const;
+  const marcar = (sec: string) => (st: "analisando" | "ok" | "erro") =>
+    setStatusSec((m) => ({ ...m, [sec]: st }));
+  const analisandoTudo = Object.values(statusSec).some((s) => s === "analisando");
+  function analisarTudo() {
+    setStatusSec(Object.fromEntries(SECOES_ANALISE.map((s) => [s, "analisando"])));
+    setSinal((s) => s + 1);
+    setTimeout(() => setStatusSec((m) => Object.fromEntries(
+      Object.entries(m).map(([k, v]) => [k, v === "analisando" ? "ok" : v]))), 60000);
+  }
 
   const overlays: Overlays = { ...overlaysAmb, ...overlaysVerde, ...overlaysDecliv };
 
@@ -113,6 +128,7 @@ export default function Home() {
     setDadosEconomica(null);
     setDadosLocalizacao(null);
     setSinal(0);
+    setStatusSec({});
   }
 
   function toggleOculto(k: ChaveOverlay) {
@@ -131,7 +147,8 @@ export default function Home() {
       <TopBar
         analise={analise}
         onNova={() => onAnalise(null)}
-        onAnalisarTudo={() => setSinal((s) => s + 1)}
+        onAnalisarTudo={analisarTudo}
+        analisando={analisandoTudo}
         onLaudo={onLaudo}
         gerandoLaudo={gerandoLaudo}
       />
@@ -145,6 +162,7 @@ export default function Home() {
             onSecao={setSecao}
             alertas={nAlertas}
             perfilConfirmado={perfil?.status === "confirmado"}
+            statusSec={statusSec}
           />
 
           <main className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-5">
@@ -218,7 +236,7 @@ export default function Home() {
               <CardAmbiental
                 analiseId={analise.analise_id}
                 onOverlays={setOverlaysAmb}
-                onData={setDadosAmb}
+                onData={(d) => { setDadosAmb(d); marcar("ambiental")("ok"); }}
                 sinal={sinal}
               />
             </div>
@@ -226,7 +244,7 @@ export default function Home() {
               <CardVegetacao
                 analiseId={analise.analise_id}
                 onOverlaysVerde={setOverlaysVerde}
-                onData={setDadosVerde}
+                onData={(d) => { setDadosVerde(d); marcar("verde")("ok"); }}
                 sinal={sinal}
               />
             </div>
@@ -234,7 +252,7 @@ export default function Home() {
               <CardDeclividade
                 analiseId={analise.analise_id}
                 onOverlaysDecliv={setOverlaysDecliv}
-                onData={setDadosDecliv}
+                onData={(d) => { setDadosDecliv(d); marcar("declividade")("ok"); }}
                 sinal={sinal}
               />
             </div>
@@ -242,7 +260,7 @@ export default function Home() {
               <CardAproveitamento
                 analiseId={analise.analise_id}
                 perfil={perfil}
-                onData={setDadosAprov}
+                onData={(d) => { setDadosAprov(d); marcar("aproveitamento")("ok"); }}
                 sinal={sinal}
               />
             </div>
@@ -263,7 +281,7 @@ export default function Home() {
             <div className={secao === "juridico" ? "" : "hidden"}>
               <CardJuridico
                 analiseId={analise.analise_id}
-                onData={setDadosJuridico}
+                onData={(d) => { setDadosJuridico(d); marcar("juridico")("ok"); }}
                 sinal={sinal}
               />
             </div>
@@ -271,7 +289,7 @@ export default function Home() {
               <CardFinanceira
                 analiseId={analise.analise_id}
                 aprov={dadosAprov}
-                onData={setDadosFinanceira}
+                onData={(d) => { setDadosFinanceira(d); marcar("financeira")("ok"); }}
                 sinal={sinal}
                 econ={dadosEconomica}
               />
@@ -285,7 +303,7 @@ export default function Home() {
             <div className={secao === "localizacao" ? "" : "hidden"}>
               <CardLocalizacao
                 analiseId={analise.analise_id}
-                onData={setDadosLocalizacao}
+                onData={(d) => { setDadosLocalizacao(d); marcar("localizacao")("ok"); }}
                 sinal={sinal}
               />
             </div>

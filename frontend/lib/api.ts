@@ -1424,7 +1424,8 @@ export async function proporUrbanismo(
   tipoLoteamento: TipoLoteamento,
   publicoAlvo: PublicoAlvo,
   zona?: string | null,
-  overrides?: Record<string, unknown>
+  overrides?: Record<string, unknown>,
+  loteMaxM2?: number | null // Fase 11.8 — teto de lote recomendado pelo operador (m²)
 ): Promise<PropostaUrbanistica> {
   const res = await fetch(
     `${API_BASE}/api/analises/${analiseId}/urbanismo/propor`,
@@ -1436,6 +1437,7 @@ export async function proporUrbanismo(
         publico_alvo: publicoAlvo,
         ...(zona ? { zona } : {}),
         ...(overrides ? { overrides } : {}),
+        ...(loteMaxM2 ? { lote_max_m2: loteMaxM2 } : {}),
       }),
     }
   );
