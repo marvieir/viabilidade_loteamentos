@@ -7,6 +7,17 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.4 — vias locais CURVAS para ALTA RENDA (beleza por perfil)
+- **Princípio (operador):** alta renda → beleza é fundamental (traçado curvo, estilo URBIA);
+  média/baixa → prioridade é densidade (grade reta). Encoda o §3.6 do `boas-praticas-loteamento.md`.
+- **Correção:** `_via_ondulada` transforma a via local reta numa CURVA suave (onda perpendicular
+  tapered nas pontas, amplitude ≤18% do bloco p/ não cruzar a paralela). Gated em `quer_curva`
+  (arquétipo sinuoso = alta renda); na grelha (baixa/média) as vias seguem RETAS (densidade intacta).
+- **Medido:** o protótipo provou que LOOP reduz lote (pior); a curva SUAVE (mantém a grade, só
+  ondula) **preservou** o lote (n 46→47) e não mexeu na grelha — beleza sem custo de densidade.
+
+### Fase 11.3b — pórtico na ENTRADA real (onde a via toca a borda) + marcador magenta achável.
+
 ### Fase 11.3 — PÓRTICO/entrada visível no mapa
 - **Problema:** o motor já calculava a entrada única (ponto do arruamento junto à borda de acesso) e
   contava `pórtico=1`, mas era só diagnóstico — **não aparecia** como componente no mapa.

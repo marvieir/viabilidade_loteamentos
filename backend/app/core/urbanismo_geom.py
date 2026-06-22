@@ -268,8 +268,27 @@ def _linhas(geom: Optional[BaseGeometry]) -> list[LineString]:
     return []
 
 
+def _via_ondulada(p0: tuple[float, float], p1: tuple[float, float], amp: float,
+                  phase: float) -> LineString:
+    """Fase 11.4 — linha reta p0→p1 vira uma CURVA suave (uma onda perpendicular, tapered nas pontas
+    p/ encostar limpo nas vizinhas). Amplitude pequena (não cruza a via paralela). Determinístico."""
+    import math as _m
+    x0, y0 = p0
+    x1, y1 = p1
+    dx, dy = x1 - x0, y1 - y0
+    comp = _m.hypot(dx, dy) or 1.0
+    nx, ny = -dy / comp, dx / comp  # normal unitária
+    n = max(int(comp / 5.0) + 2, 8)
+    pts = []
+    for i in range(n + 1):
+        t = i / n
+        off = amp * _m.sin(_m.pi * t) * _m.sin(1.5 * _m.pi * t + phase)  # bow tapered (0 nas pontas)
+        pts.append((x0 + dx * t + nx * off, y0 + dy * t + ny * off))
+    return LineString(pts)
+
+
 def _eixos_da_ilha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
-                   block_h: float, via_local: float, via_tronco: float):
+                   block_h: float, via_local: float, via_tronco: float, curvar: bool = False):
     """Eixos (centerlines + largura) de UMA ilha, JÁ EXPLODIDOS EM SEGMENTOS dentro da ilha. Em
     gleba irregular, uma reta da grade recortada à ilha vira VÁRIOS segmentos — o stub é um
     SEGMENTO (não a reta inteira), então a poda precisa vê-los separados. Grade local recortada à
@@ -323,10 +342,17 @@ def _eixos_da_ilha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w:
             horiz.remove(min(horiz, key=lambda y: abs(y - tron_c.y)))
         elif not tron_horizontal and verts:
             verts.remove(min(verts, key=lambda x: abs(x - tron_c.x)))
-    for x in verts:
-        brutos.append((LineString([(x, miny), (x, maxy)]), via_local, False))
-    for y in horiz:
-        brutos.append((LineString([(minx, y), (maxx, y)]), via_local, False))
+    # Fase 11.4 — ALTA RENDA: vias locais ONDULADAS (curva suave) em vez de retas (beleza > densidade).
+    # Amplitude ≤ ~18% do bloco p/ não cruzar a via paralela; fase varia por índice (orgânico).
+    amp = min(block_w, block_h) * 0.18 if curvar else 0.0
+    for i, x in enumerate(verts):
+        ln = (_via_ondulada((x, miny), (x, maxy), amp, i * 1.3) if curvar
+              else LineString([(x, miny), (x, maxy)]))
+        brutos.append((ln, via_local, False))
+    for j, y in enumerate(horiz):
+        ln = (_via_ondulada((minx, y), (maxx, y), amp, j * 1.3 + 0.7) if curvar
+              else LineString([(minx, y), (maxx, y)]))
+        brutos.append((ln, via_local, False))
     for part in tron_partes:
         brutos.append((part, via_tronco, True))
 
@@ -441,11 +467,13 @@ def lado_quadra_adaptativo(area_ilha: float, teto_w: float, teto_h: float,
 
 
 def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
-                    block_h: float, via_local: float, via_tronco: float, podar: bool = True):
+                    block_h: float, via_local: float, via_tronco: float, podar: bool = True,
+                    curvar: bool = False):
     """MALHA de UMA ILHA (frame rotacionado ``reg``): grade local recortada à ilha + tronco,
     depois PODA dos stubs (Fase 9.8). Devolve ``(faces, ruas, eixos, troncos, n_stubs)`` — a
-    malha é conexa DENTRO da ilha (a gleba partida por restrição é tratada como ilhas separadas)."""
-    eixos, troncos = _eixos_da_ilha(reg, eixos_ia, block_w, block_h, via_local, via_tronco)
+    malha é conexa DENTRO da ilha (a gleba partida por restrição é tratada como ilhas separadas).
+    ``curvar`` (Fase 11.4, ALTA RENDA): ondula as vias LOCAIS p/ traçado curvo (beleza > densidade)."""
+    eixos, troncos = _eixos_da_ilha(reg, eixos_ia, block_w, block_h, via_local, via_tronco, curvar)
     if not eixos:  # ilha menor que um bloco → uma quadra só, sem via interna (degrada honesto)
         return [g for g in _componentes(reg)], None, [], [], 0
     faces = _faces_de(reg, eixos)  # estável: danglers não criam face (polygonize os ignora)
@@ -1174,7 +1202,7 @@ def gerar_layout(
         cont_cl = trac.rotear_contornando_restricao(ilha, outras, trac.AFAST_VIA_M, via_local)
         contorno_reg.extend(cont_cl)
         fcs, ruas_i, eix_i, _tron_i, n_stub = construir_malha(
-            ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True
+            ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True, curvar=quer_curva
         )
         faces.extend(fcs)
         eixos_reg.extend(eix_i)
