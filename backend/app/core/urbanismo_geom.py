@@ -1558,9 +1558,13 @@ def gerar_layout(
                    and eixos_curvos else "")),
     }
 
-    lazer_reservado_m2 = sum(
+    # Fase 11.9 — a fidelidade de LAZER mede só o lazer REAL (clube + verde de programa), NÃO a
+    # faixa ≥30% preservada que o 10.8b dobrou no verde_reservado (senão "lazer 17%" quando o
+    # programa pediu 5% — assustando: o ≥30% é vedação legal, não amenidade de lazer).
+    nao_edif_m2 = sum(g.area for g in nao_edif_reg if g is not None and not g.is_empty)
+    lazer_reservado_m2 = max(sum(
         g.area for g in (clube, verde_reservado) if g is not None and not g.is_empty
-    )
+    ) - nao_edif_m2, 0.0)
     retalho_m2 = 0.0  # a sobra foi destinada à área pública (sem retalho perdido)
 
     avisos: list[str] = []
