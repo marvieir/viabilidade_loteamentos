@@ -22,7 +22,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde_sobra: "#86efac", // verde claro (remanescente)
   urb_lazer: "#06b6d4", // cor de equipamento
   urb_institucional: "#f59e0b",
-  urb_portico: "#ea580c", // Fase 11.3 — pórtico/entrada (marcador do acesso único)
+  urb_portico: "#db2777", // Fase 11.3 — pórtico/entrada: rosa/magenta (cor ÚNICA, não clasha c/ lote)
   urb_restricao: "#2e7d32", // Fase 10.2 — não-edificável = BOSQUE/área verde preservada (verde mata)
 };
 
@@ -42,9 +42,9 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   urb_verde_sobra: { color: "#16a34a", weight: 1, fillColor: "#86efac", fillOpacity: 0.22, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
-  // Fase 11.3 — PÓRTICO/ENTRADA: marcador forte (laranja sólido, borda grossa) — lê como o
-  // componente "portaria" no acesso único, destacado sobre o satélite.
-  urb_portico: { color: "#7c2d12", weight: 3, fillColor: "#f97316", fillOpacity: 0.9 },
+  // Fase 11.3 — PÓRTICO/ENTRADA: marcador ROSA/MAGENTA forte (cor única no mapa, borda grossa) —
+  // lê como o componente "portaria" no acesso único, achável sobre o satélite e os lotes.
+  urb_portico: { color: "#831843", weight: 3, fillColor: "#ec4899", fillOpacity: 0.95 },
   // Fase 10.2 — não-edificável (mata/≥30%/APP) = BOSQUE/ÁREA VERDE PRESERVADA, não um buraco. Verde
   // mata visível (textura pontilhada = natural/preservado), distinto do verde-parque reservado
   // (#22c55e, manicured) e do verde-sobra (pálido). Não compete com os lotes (fica ao fundo), mas

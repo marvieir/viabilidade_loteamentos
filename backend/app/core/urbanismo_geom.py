@@ -1460,16 +1460,25 @@ def gerar_layout(
     inst_na_entrada = False
     if arruamento is not None and not arruamento.is_empty:
         gminx, gminy, gmaxx, gmaxy = aprov.bounds
-        # entrada = ponto do arruamento mais próximo do acesso pela via pública (borda sul da gleba)
-        portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
+        # Fase 11.3 — ENTRADA = onde a VIA toca a BORDA da gleba (a via sai p/ a estrada externa ali).
+        # Pega o MAIOR trecho de borda coberto por via (a boca principal); fallback = meio-sul do bbox.
+        borda_via = _valido(aprov.boundary.intersection(arruamento.buffer(1.0)))
+        segs = []
+        if borda_via is not None and not borda_via.is_empty:
+            segs = list(borda_via.geoms) if hasattr(borda_via, "geoms") else [borda_via]
+            segs = [s for s in segs if getattr(s, "length", 0) > 0]
+        if segs:
+            portico_pt = max(segs, key=lambda s: s.length).interpolate(0.5, normalized=True)
+        else:
+            portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
         if inst is not None and not inst.is_empty:
             diag_gleba = math.hypot(gmaxx - gminx, gmaxy - gminy)
             inst_na_entrada = inst.distance(portico_pt) <= 0.35 * max(diag_gleba, 1.0)
     porticos = 1 if portico_pt is not None else 0
-    # Fase 11.3 — marcador do PÓRTICO p/ o mapa (disco no acesso, sobre a via-tronco): elemento
-    # visível do componente "portaria/entrada", não só o contador. Clipa ao aproveitável.
-    portico_geom = (_valido(portico_pt.buffer(max(via_tronco, 8.0) * 0.7).intersection(aprov))
-                    if portico_pt is not None else None)
+    # Fase 11.3 — marcador do PÓRTICO p/ o mapa (disco no acesso): elemento visível da "portaria",
+    # não só o contador. Disco cheio (~12 m de raio) na entrada — NÃO clipa ao aproveitável (a
+    # portaria fica na boca do acesso, meio na borda), senão num acesso estreito o marcador some.
+    portico_geom = (_valido(portico_pt.buffer(12.0)) if portico_pt is not None else None)
     # 9.9 — sinuosidade: média da razão curva/reta dos eixos usados; >1,1 = curvo (1,0 = reto).
     sinus = [_sinuosidade(c) for c in curvas_ia if c is not None and not c.is_empty]
     sinuosidade_media = round(sum(sinus) / len(sinus), 3) if sinus else 1.0
