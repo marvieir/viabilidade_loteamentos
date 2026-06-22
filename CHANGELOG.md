@@ -7,6 +7,21 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.2 — verde na TERRA MARGINAL (boas práticas §3.4)
+- **Problema:** `_selecionar_verde` reservava as MAIORES faces como verde → tomava a parcela nobre
+  (o platô), que então virava sobra; as faces irregulares (que lotam mal) viravam lote ruim.
+- **Correção (Unwin/Alexander, `boas-praticas-loteamento.md` §3.4):** reserva primeiro as faces
+  MENOS aptas a lote (mais irregulares/côncavas), deixando as REGULARES e cheias para virar lote.
+- **Efeito (fixture real):** vendável **29,9% → 34,0%**, **n 40 → 46 (+6 lotes)**, sobra cai. Suíte
+  verde (2 valores-ouro de recuperação recalibrados: a recuperação/fusão viraram OPCIONAIS porque o
+  layout §3.4 reduz a necessidade — os invariantes reais seguem: zero órfão p/ verde, clamp, n_lotes
+  não regride).
+
+### Fase 11.1 — subdivisão no EIXO PRÓPRIO da parcela (Lynch/Hack)
+- A quadra se orienta à FORMA do sítio (menor retângulo rotacionado), não ao eixo global — recupera
+  parcela oblíqua/irregular que a grelha global desperdiçava. Never-worse (compara e escolhe). +3
+  lotes, invariância preservada.
+
 ### Fase 10.8b — ≥30% é verde preservado, não "sobra"
 - **Problema:** o quadro contabilizava a faixa de declividade ≥30% (não-edificável por lei) como
   "sobra geométrica a reduzir", inflando a sobra para ~39% e assustando a leitura.

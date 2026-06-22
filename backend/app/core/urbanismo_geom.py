@@ -531,32 +531,36 @@ def _adensar_face(face: BaseGeometry, prof: float, via_local: float):
     faces_out: list[BaseGeometry] = []
     vias: list[BaseGeometry] = []
     for c in _componentes(face):
-        minx, miny, maxx, maxy = c.bounds
-        depth = maxy - miny
-        # Só faces CLARAMENTE desperdiçadas (≥ 4·prof de fundo): aí as 2 fileiras deixam um miolo
-        # grande. Faces medianas ficam intactas (injetar via nelas só comeria 1 lote — regressão).
-        if depth < 2.0 * banda:
+        try:
+            minx, miny, maxx, maxy = c.bounds
+            depth = maxy - miny
+            # Só faces CLARAMENTE desperdiçadas (≥ 4·prof): as 2 fileiras deixam um miolo grande.
+            # (Limiar 3·prof gerava lote sem frente no fundo — invariante quebrava; mantém 4·prof.)
+            if depth < 2.0 * banda:
+                faces_out.append(c)
+                continue
+            n = max(int(round(depth / banda)), 2)  # nº de bandas (cada uma ~2·prof de fundo)
+            linhas = []
+            for k in range(1, n):
+                yk = miny + k * depth / n
+                seg = _valido(LineString([(minx - 1.0, yk), (maxx + 1.0, yk)]).intersection(c))
+                if seg is not None and not seg.is_empty:
+                    linhas.append(seg)
+            if not linhas:
+                faces_out.append(c)
+                continue
+            # CLIPA a via à face (⊂ aprov): o buffer não pode vazar p/ a restrição (via não cruza ≥30%).
+            via = _valido(_uniao_segura(
+                [l.buffer(via_local / 2.0, cap_style=2, join_style=2) for l in linhas]))
+            via = _valido(via.intersection(c)) if via is not None else None
+            if via is not None and not via.is_empty:
+                vias.append(via)
+            sub = _componentes(_diferenca_segura(c, via)) if via is not None else [c]
+            for sf in sub:
+                if sf is not None and not sf.is_empty:
+                    faces_out.append(sf)
+        except Exception:  # noqa: BLE001 — geometria degenerada → face intacta, sem via (robustez §2)
             faces_out.append(c)
-            continue
-        n = max(int(round(depth / banda)), 2)  # nº de bandas (cada uma ~2·prof de fundo)
-        linhas = []
-        for k in range(1, n):
-            yk = miny + k * depth / n
-            seg = LineString([(minx - 1.0, yk), (maxx + 1.0, yk)]).intersection(c)
-            if seg is not None and not seg.is_empty:
-                linhas.append(seg)
-        if not linhas:
-            faces_out.append(c)
-            continue
-        # CLIPA a via à face (⊂ aprov): o buffer não pode vazar p/ a restrição (via não cruza ≥30%).
-        via = _valido(_uniao_segura(
-            [l.buffer(via_local / 2.0, cap_style=2, join_style=2) for l in linhas]))
-        via = _valido(via.intersection(c)) if via is not None else None
-        if via is not None and not via.is_empty:
-            vias.append(via)
-        for sf in _componentes(_diferenca_segura(c, via)):
-            if sf is not None and not sf.is_empty:
-                faces_out.append(sf)
     return faces_out, vias
 
 
@@ -817,17 +821,23 @@ def clube_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeomet
 
 
 def _selecionar_verde(pool: Sequence[BaseGeometry], alvo: float):
-    """Reserva quadras VERDES formadas até somar ~``alvo`` (sem estourar muito além — preserva
-    lotes). Faces inteiras (não slivers). Devolve ``(verdes, resto)``."""
+    """Reserva quadras VERDES formadas até somar ~``alvo`` (sem estourar muito além — preserva lotes).
+
+    Fase 11.2 — boas práticas §3.4 (Unwin/Alexander): o verde vai para a TERRA MARGINAL, não para a
+    parcela nobre. Reserva primeiro as faces MENOS aptas a lote (mais irregulares/côncavas — que
+    virariam sobra de qualquer jeito), deixando as REGULARES e cheias p/ virar lote. Entre faces de
+    mesma aptidão, a maior primeiro (menos peças). Antes pegava "as maiores" → tomava o platô."""
     if alvo <= 0 or not pool:
         return [], list(pool)
-    ordem = sorted(pool, key=lambda g: -g.area)  # blocos maiores primeiro (menos peças → limpo)
+
+    def _ordem(g):  # aptidão p/ lote ASC (irregular = verde primeiro); entre iguais, maior primeiro
+        return (round(g.area / max(g.convex_hull.area, 1e-9), 3), -g.area)
     verdes, acc = [], 0.0
-    for f in ordem:
+    for f in sorted(pool, key=_ordem):
         if acc >= alvo - 1e-6:
             break
-        if acc + f.area <= alvo * 1.15:  # Fase 10.8c — não engole face que estoura >15% o alvo (não
-            verdes.append(f)            # toma o platô nobre p/ caber num orçamento pequeno)
+        if acc + f.area <= alvo * 1.15:  # Fase 10.8c — não engole face que estoura >15% o alvo
+            verdes.append(f)
             acc += f.area
     resto = [f for f in pool if not any(f is v for v in verdes)]
     return verdes, resto
