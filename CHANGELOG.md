@@ -7,6 +7,25 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.5 — CONSISTÊNCIA: domar a variância da IA (mesma gleba → mesmo resultado)
+- **Problema:** regenerar a mesma gleba dava resultados muito diferentes (51 lotes numa rodada, 36
+  noutra) e o operador achava que o motor piorava a cada clique. Causa: a chamada ao LLM usava
+  `temperature` default (**1.0 = máxima aleatoriedade**) → a IA sorteava lazer/esqueleto diferentes
+  toda vez. O motor é determinístico; a borda da IA não era.
+- **Correções:** (1) `temperature=0.0` na chamada ao LLM → mesma gleba propõe ~o mesmo programa
+  sempre. (2) CAP de lazer no caminho do LLM: a IA pode REDUZIR o lazer (mais lote) mas não exceder
+  o padrão do perfil (alta 20%, média 12%, baixa 5%) — não toca override EXPLÍCITO do usuário.
+  (3) Regra 5 no `_INSTRUCAO`: consistência + qualidade (use valores-padrão do perfil, esqueleto
+  limpo, prefira bons lotes a desenho rebuscado).
+- **Efeito:** o resultado para de "pular" entre regenerações; o nº de lotes fica estável (~46) em vez
+  de depender de sorte. Suíte verde.
+
+### Fase 11.4 (revertida) — vias locais curvas p/ alta renda: funcionou no São Roque mas crashava em
+  glebas sintéticas + conflitava com 2 valores-ouro (grade orientada, convergência lazer). Estética
+  pura (não adiciona lote); fica para um esforço dedicado.
+
+### Fase 11.3b — pórtico na ENTRADA real (onde a via toca a borda) + marcador magenta achável.
+
 ### Fase 11.3 — PÓRTICO/entrada visível no mapa
 - **Problema:** o motor já calculava a entrada única (ponto do arruamento junto à borda de acesso) e
   contava `pórtico=1`, mas era só diagnóstico — **não aparecia** como componente no mapa.

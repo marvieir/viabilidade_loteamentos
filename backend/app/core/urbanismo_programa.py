@@ -248,7 +248,14 @@ _INSTRUCAO = (
     "leque. Indique no esqueleto a via-tronco PRIMEIRO e os ramos curtos depois; sinalize na "
     "justificativa ONDE fazer cul-de-sac e a INTENÇÃO de CONTORNAR a restrição (nunca cruzá-la). "
     "O motor materializa o contorno, a conectividade, os bulbos e a recuperação — você dá a "
-    "ESTRATÉGIA do traçado, NUNCA o número, a largura, o raio ou a medida (§2)."
+    "ESTRATÉGIA do traçado, NUNCA o número, a largura, o raio ou a medida (§2).\n"
+    "5. CONSISTÊNCIA E QUALIDADE (CRÍTICO): a MESMA gleba deve receber SEMPRE o MESMO programa — "
+    "não varie a cada chamada. Use os VALORES-PADRÃO do perfil, não invente: lazer = alta ~20%, "
+    "média ~12%, baixa ~5% (NÃO proponha 22%, 18% etc. — fique no padrão); lote-alvo e mix do "
+    "perfil. O ESQUELETO deve ser UM traçado LIMPO e SUAVE acompanhando o eixo maior loteável e "
+    "contornando a restrição — sem ziguezague, sem ramos soltos, 4–6 vértices bem distribuídos. "
+    "Prefira o traçado que GERA BONS LOTES (quadra cheia, todo lote com frente para via) ao desenho "
+    "rebuscado: na pré-análise, ESTABILIDADE e aproveitamento valem mais que criatividade."
 )
 
 _FERRAMENTA = {
@@ -347,6 +354,10 @@ class GeradorProgramaClaude:
                 resp = client.messages.create(
                     model=modelo,
                     max_tokens=4000,
+                    temperature=0.0,  # CONSISTÊNCIA (§4 determinismo): mesma gleba → ~mesmo programa
+                    # toda regeneração. Sem isto (default 1.0) a IA sorteava lazer/esqueleto diferentes
+                    # a cada clique e o nº de lotes pulava (51↔36). Pré-análise quer estabilidade, não
+                    # criatividade. O motor já é determinístico; aqui fechamos a borda da IA também.
                     system=_INSTRUCAO,
                     tools=[_FERRAMENTA],
                     tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
@@ -381,6 +392,12 @@ class GeradorProgramaClaude:
                   "pct_institucional", "esqueleto", "estrategia_mix", "heuristicas"):
             if k in bruto and k not in merged:
                 merged[k] = bruto[k]
+        # CAP de lazer da IA (consistência §4 + §2): a IA pode reduzir o lazer (mais lote), mas NÃO
+        # exceder o padrão do perfil — um sorteio de 22% (vs 20%) reserva verde demais e derruba o nº
+        # de lotes entre regenerações. NÃO toca override EXPLÍCITO do usuário (esse vale como pedido).
+        if "pct_lazer" in merged and "pct_lazer" not in (overrides or {}):
+            base_lazer = float(PRESETS.get(publico_alvo, PRESETS["media"])["pct_lazer"])
+            merged["pct_lazer"] = min(float(merged["pct_lazer"]), base_lazer)
         prog = programa_do_preset(publico_alvo, merged)
         prog.densidade = bruto.get("densidade", prog.densidade)
         prog.arquetipo_viario = bruto.get("arquetipo_viario", prog.arquetipo_viario)
