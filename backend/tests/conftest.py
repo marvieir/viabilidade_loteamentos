@@ -1,7 +1,15 @@
 """Fixtures determinísticas: KMZ sintéticos e clientes com/sem de-para municipal."""
 
 import io
+import os
+import tempfile
 import zipfile
+
+# Fase 12 — o banco multi-tenant usa DATABASE_URL. Nos testes aponta para um SQLite
+# temporário (fora do repo), criado antes de importar `app` (db.py lê a env no import).
+os.environ.setdefault(
+    "DATABASE_URL", "sqlite:///" + os.path.join(tempfile.gettempdir(), "viab_test.db")
+)
 
 import pytest
 from fastapi.testclient import TestClient
@@ -197,6 +205,19 @@ def _limpa_store():
     STORE.clear()
     yield
     STORE.clear()
+
+
+@pytest.fixture(autouse=True)
+def _limpa_banco():
+    # Fase 12 — garante o schema e zera usuarios/analises entre testes (isolamento).
+    from app.core.db import criar_tabelas, engine
+    from app.models.db_models import Analise, Usuario
+
+    criar_tabelas()
+    with engine.begin() as conn:
+        conn.execute(Analise.__table__.delete())
+        conn.execute(Usuario.__table__.delete())
+    yield
 
 
 @pytest.fixture(autouse=True)

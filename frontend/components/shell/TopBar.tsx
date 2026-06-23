@@ -1,6 +1,7 @@
 "use client";
 
 import { IconDownload, IconMap, IconPlay, IconPlus } from "@/components/Icons";
+import { useAuth } from "@/components/auth/AuthProvider";
 import type { Analise } from "@/lib/api";
 
 const ROTULO_COBERTURA: Record<string, string> = {
@@ -24,6 +25,7 @@ export function TopBar({
   onLaudo?: () => void;
   gerandoLaudo?: boolean;
 }) {
+  const { usuario, sair } = useAuth();
   const jur = analise?.jurisdicao;
   const local =
     jur?.municipio && jur?.uf
@@ -88,6 +90,23 @@ export function TopBar({
           <IconPlus width={15} height={15} />
           Nova análise
         </button>
+        {usuario && (
+          <div className="ml-1 flex items-center gap-2 border-l border-slate-200 pl-2">
+            <span
+              className="hidden max-w-[14rem] truncate text-sm text-slate-600 sm:block"
+              title={usuario.email}
+            >
+              {usuario.email}
+            </span>
+            <button
+              type="button"
+              onClick={sair}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Sair
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

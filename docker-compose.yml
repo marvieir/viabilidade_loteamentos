@@ -9,8 +9,20 @@ services:
     # o arquivo é gitignored e NÃO vai na imagem. Sem isto, a extração da LUOS responde 503.
     env_file:
       - ./backend/.env
+    depends_on:
+      db:
+        condition: service_healthy
     environment:
       CORS_ORIGINS: "http://localhost:3700"
+      # Fase 12 — banco multi-tenant (Postgres no serviço `db` abaixo). O motor é agnóstico
+      # ao banco; só esta URL muda (SQLite no dev local, Postgres no Compose/produção).
+      DATABASE_URL: "postgresql+psycopg://viabilidade:${POSTGRES_PASSWORD:-viabilidade}@db:5432/viabilidade"
+      # Segredos JWT — DEFINA por env/.env em produção (rotacionáveis). Sem isto, cai num
+      # default inseguro só p/ dev. Diferencie os dois (access ≠ refresh).
+      JWT_SECRET: "${JWT_SECRET:-dev-inseguro-troque-em-producao}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:-dev-inseguro-refresh-troque}"
+      # Em produção (HTTPS) ligue COOKIE_SECURE=1 para o refresh viajar só por TLS.
+      COOKIE_SECURE: "${COOKIE_SECURE:-0}"
       # Liga a detecção de município por malha real (Fase 1.7). O arquivo entra por volume
       # (abaixo) — é grande e gitignored, não vai na imagem.
       MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
@@ -49,6 +61,23 @@ services:
       - ./backend/certs:/certs:ro
     restart: unless-stopped
 
+  # Fase 12 — Postgres (fonte de verdade dos usuários/análises). Volume `pgdata`
+  # persiste entre rebuilds; healthcheck garante que o `api` só sobe com o banco pronto.
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: "viabilidade"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-viabilidade}"
+      POSTGRES_DB: "viabilidade"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viabilidade -d viabilidade"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   web:
     build:
       context: ./frontend
@@ -59,3 +88,6 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+
+volumes:
+  pgdata:

@@ -134,8 +134,11 @@ contexto de um usuário e de uma análise salva**.
 ---
 
 ## 7. Fases de entrega (cada uma testável e commitada)
-1. **Fundação** — Compose com Postgres; SQLAlchemy+Alembic; modelos `usuarios`/`analises`; auth
-   (registrar/login/refresh/me); guardas; frontend `/login` e `/registrar` + app protegido.
+1. **Fundação** — ✅ **FEITA (Fase 12.1).** Compose com Postgres (serviço `db` + volume + healthcheck);
+   SQLAlchemy 2.x (Alembic listado, `create_all` no MVP); modelos `usuarios`/`analises`; auth
+   (registrar/login/refresh/logout/me) + guardas `usuario_atual`/`requer_admin`; frontend `/login`,
+   `/registrar`, `AuthProvider` (token em memória + refresh httpOnly), `RequireAuth` + Sair na TopBar.
+   10 testes de auth; suíte verde (415 passed).
 2. **Área do cliente (#2)** — salvar/listar/carregar/editar/excluir análises do usuário; tela
    "Minhas análises".
 3. **Painel admin (#3)** — papel admin + seed do 1º admin; `/admin/metricas` e `/admin/clientes`;

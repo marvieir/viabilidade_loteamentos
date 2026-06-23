@@ -11,6 +11,14 @@ python-dotenv==1.0.1  # carrega backend/.env via `uvicorn --env-file .env`
 anthropic==0.69.0  # Fase 1.8 — extrator real da LUOS (import TARDIO, gated por ANTHROPIC_API_KEY; testes não usam)
 fpdf2==2.8.7  # Fase 7 — laudo de triagem em PDF (Python puro, offline, sem fonte externa nem rede)
 
+# Fase 12 — multi-tenant (banco + autenticação)
+SQLAlchemy==2.0.36        # ORM (modelos usuarios/analises)
+alembic==1.14.0           # migrações versionadas (schema estável)
+psycopg[binary]==3.2.3    # driver Postgres (produção); SQLite no dev/teste é nativo
+PyJWT==2.10.1             # tokens de sessão (access/refresh)
+passlib[bcrypt]==1.7.4    # hash de senha (bcrypt)
+bcrypt==4.2.1             # backend do passlib (pin explícito p/ compat)
+
 # dev / testes
 pytest==8.3.4
 httpx==0.28.1

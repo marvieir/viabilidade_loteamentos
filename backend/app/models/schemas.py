@@ -1331,3 +1331,81 @@ class PropostaUrbanisticaOut(BaseModel):
     areas_canonicas: Optional[AreasCanonicasOut] = None
     proveniencia: str
     avisos: list[str]
+
+
+# ----- Fase 12 — autenticação / multi-tenant -----
+
+class RegistrarIn(BaseModel):
+    email: str = Field(..., description="e-mail de login")
+    senha: str = Field(..., min_length=8, description="mínimo 8 caracteres")
+    nome: Optional[str] = None
+
+
+class LoginIn(BaseModel):
+    email: str
+    senha: str
+
+
+class TokenOut(BaseModel):
+    """O access token vai no corpo (front guarda em memória); o refresh vai em cookie httpOnly."""
+
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UsuarioOut(BaseModel):
+    id: str
+    email: str
+    nome: Optional[str] = None
+    papel: str
+    criado_em: str
+
+
+# ----- Fase 12 — análises salvas (área do cliente) -----
+
+class AnaliseSalvarIn(BaseModel):
+    titulo: str
+    kmz_nome: Optional[str] = None
+    gleba_geojson: Optional[dict] = None
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    area_ha: Optional[float] = None
+    resultados: Optional[dict] = None
+
+
+class AnaliseResumoOut(BaseModel):
+    id: str
+    titulo: str
+    kmz_nome: Optional[str] = None
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    area_ha: Optional[float] = None
+    criada_em: str
+    atualizada_em: str
+
+
+class AnaliseDetalheOut(AnaliseResumoOut):
+    gleba_geojson: Optional[dict] = None
+    resultados: Optional[dict] = None
+
+
+# ----- Fase 12 — painel admin -----
+
+class AdminMetricasOut(BaseModel):
+    total_clientes: int
+    total_analises: int
+    novos_clientes_mes: int
+    por_uf: dict  # {"SP": 3, ...}
+    por_cidade: dict  # {"São Roque": 2, ...}
+
+
+class AdminClienteOut(BaseModel):
+    id: str
+    email: str
+    nome: Optional[str] = None
+    papel: str
+    ativo: bool
+    criado_em: str
+    n_analises: int
+    cidades: list[str]
+    ufs: list[str]

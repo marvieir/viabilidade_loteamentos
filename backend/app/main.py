@@ -7,6 +7,8 @@ dimensão Casca + Aproveitamento (routers/analises.py).
 import os
 from pathlib import Path
 
+from contextlib import asynccontextmanager
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,9 +18,11 @@ from fastapi.middleware.cors import CORSMiddleware
 # (ex.: as do docker-compose), então container e dev convivem.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+from app.core.db import criar_tabelas
 from app.routers import (
     ambiental,
     analises,
+    auth,
     conformidade,
     declividade,
     economica,
@@ -31,9 +35,18 @@ from app.routers import (
     vegetacao,
 )
 
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Fase 12 — garante o schema (usuarios/analises) no boot. Idempotente; Alembic entra
+    # quando o schema estabilizar. Em produção com Postgres, roda no start do container.
+    criar_tabelas()
+    yield
+
+
 app = FastAPI(
     title="Pré-Viabilidade de Loteamento — API",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Frontend roda em porta > 3700 (convenção do projeto). CORS liberado p/ dev;
@@ -47,6 +60,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api")
 app.include_router(analises.router, prefix="/api")
 app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")

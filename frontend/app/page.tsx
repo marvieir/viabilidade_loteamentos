@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { UploadKmz } from "@/components/UploadKmz";
+import { RequireAuth } from "@/components/auth/RequireAuth";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/shell/Sidebar";
@@ -143,6 +144,7 @@ export default function Home() {
     dadosAmb?.alertas.filter((a) => a.severidade === "ALERTA").length ?? 0;
 
   return (
+    <RequireAuth>
     <div className="min-h-screen">
       <TopBar
         analise={analise}
@@ -320,6 +322,7 @@ export default function Home() {
         </div>
       )}
     </div>
+    </RequireAuth>
   );
 }
 

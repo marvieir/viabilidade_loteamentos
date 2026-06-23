@@ -51,3 +51,7 @@ backend/.env
 # CA corporativa para TLS sob inspeção (Fase 1.8) — segredo da máquina, fora do git.
 backend/certs/
 # Premissas/execução financeira por análise (Fase 4) — também cobre 4.1/4.2.
+
+# Fase 12 — banco de dev/teste (SQLite local). Produção usa Postgres em volume.
+backend/dev.db
+backend/*.db

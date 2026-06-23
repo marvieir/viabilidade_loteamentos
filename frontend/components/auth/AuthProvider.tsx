@@ -1,0 +1,79 @@
+"use client";
+
+// Fase 12 — contexto de autenticação. Mantém o usuário logado em memória e expõe
+// login/registrar/logout. No mount tenta um refresh silencioso (o cookie httpOnly
+// sobrevive ao reload, o access token em memória não) para reidratar a sessão.
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import type { Usuario } from "@/lib/auth";
+import * as auth from "@/lib/auth";
+
+interface AuthContextValue {
+  usuario: Usuario | null;
+  carregando: boolean; // true enquanto tenta o refresh inicial
+  entrar: (email: string, senha: string) => Promise<void>;
+  cadastrar: (email: string, senha: string, nome?: string) => Promise<void>;
+  sair: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [carregando, setCarregando] = useState(true);
+
+  // Reidrata a sessão no load: se houver cookie de refresh válido, recupera o usuário.
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        await auth.refresh();
+        const u = await auth.me();
+        if (vivo) setUsuario(u);
+      } catch {
+        if (vivo) setUsuario(null);
+      } finally {
+        if (vivo) setCarregando(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  const entrar = useCallback(async (email: string, senha: string) => {
+    await auth.login(email, senha);
+    setUsuario(await auth.me());
+  }, []);
+
+  const cadastrar = useCallback(
+    async (email: string, senha: string, nome?: string) => {
+      await auth.registrar(email, senha, nome);
+      setUsuario(await auth.me());
+    },
+    [],
+  );
+
+  const sair = useCallback(async () => {
+    await auth.logout();
+    setUsuario(null);
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ usuario, carregando, entrar, cadastrar, sair }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth precisa de <AuthProvider>.");
+  return ctx;
+}

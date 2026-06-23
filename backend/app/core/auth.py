@@ -1,0 +1,101 @@
+"""Fase 12 — autenticação (produção). Senha com bcrypt; sessão com JWT.
+
+- **Senha:** bcrypt via passlib (nunca em texto).
+- **Access token:** JWT curto (30 min), assinado com ``JWT_SECRET`` (env), enviado no
+  header ``Authorization: Bearer``. Guardado em memória no front (resistente a XSS).
+- **Refresh token:** JWT longo (7 dias), assinado com ``JWT_REFRESH_SECRET``, viaja em
+  cookie httpOnly+SameSite (não acessível por JS).
+- **Guardas:** ``usuario_atual`` (decodifica o access token) e ``requer_admin``.
+
+Os segredos vêm do ambiente; há um default APENAS para dev/teste (com aviso). Em produção
+defina ``JWT_SECRET``/``JWT_REFRESH_SECRET`` por env (Compose), nunca no código.
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Literal
+
+import jwt
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from passlib.context import CryptContext
+from sqlalchemy.orm import Session
+
+from app.core.db import get_db
+from app.models.db_models import Usuario
+
+_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Default só para dev/teste — em produção SOBRESCREVA por env. Diferenciar os dois segredos
+# impede que um refresh seja aceito como access (e vice-versa).
+JWT_SECRET = os.getenv("JWT_SECRET", "dev-inseguro-troque-em-producao")
+JWT_REFRESH_SECRET = os.getenv("JWT_REFRESH_SECRET", "dev-inseguro-refresh-troque")
+JWT_ALG = "HS256"
+ACCESS_TTL_MIN = int(os.getenv("JWT_ACCESS_TTL_MIN", "30"))
+REFRESH_TTL_DIAS = int(os.getenv("JWT_REFRESH_TTL_DIAS", "7"))
+
+
+def hash_senha(senha: str) -> str:
+    return _pwd.hash(senha)
+
+
+def verifica_senha(senha: str, senha_hash: str) -> bool:
+    return _pwd.verify(senha, senha_hash)
+
+
+def _emitir(sub: str, papel: str, tipo: Literal["access", "refresh"]) -> str:
+    agora = datetime.now(timezone.utc)
+    ttl = timedelta(minutes=ACCESS_TTL_MIN) if tipo == "access" else timedelta(days=REFRESH_TTL_DIAS)
+    segredo = JWT_SECRET if tipo == "access" else JWT_REFRESH_SECRET
+    payload = {"sub": sub, "papel": papel, "tipo": tipo, "iat": agora, "exp": agora + ttl}
+    return jwt.encode(payload, segredo, algorithm=JWT_ALG)
+
+
+def token_acesso(usuario: Usuario) -> str:
+    return _emitir(usuario.id, usuario.papel, "access")
+
+
+def token_refresh(usuario: Usuario) -> str:
+    return _emitir(usuario.id, usuario.papel, "refresh")
+
+
+def _decodificar(token: str, tipo: Literal["access", "refresh"]) -> dict:
+    segredo = JWT_SECRET if tipo == "access" else JWT_REFRESH_SECRET
+    try:
+        payload = jwt.decode(token, segredo, algorithms=[JWT_ALG])
+    except jwt.PyJWTError:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token inválido ou expirado.")
+    if payload.get("tipo") != tipo:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tipo de token inválido.")
+    return payload
+
+
+def sub_do_refresh(token: str) -> str:
+    """Valida um refresh token (cookie) e devolve o id do usuário."""
+    return _decodificar(token, "refresh")["sub"]
+
+
+_bearer = HTTPBearer(auto_error=False)
+
+
+def usuario_atual(
+    cred: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> Usuario:
+    """Guarda: exige um access token válido e devolve o usuário ativo."""
+    if cred is None:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Autenticação necessária.")
+    payload = _decodificar(cred.credentials, "access")
+    usuario = db.get(Usuario, payload["sub"])
+    if usuario is None or not usuario.ativo:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Usuário inexistente ou inativo.")
+    return usuario
+
+
+def requer_admin(usuario: Usuario = Depends(usuario_atual)) -> Usuario:
+    """Guarda: além de logado, exige papel admin."""
+    if usuario.papel != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Acesso restrito ao administrador.")
+    return usuario

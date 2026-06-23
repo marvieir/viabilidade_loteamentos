@@ -5,7 +5,30 @@ Convenção: cada entrada traz o **problema**, a **correção** e o **efeito med
 São Roque, salvo nota). A régua continua sendo a dos `CLAUDE.md`/`ARCHITECTURE.md`: cálculo só no
 backend, determinismo, proveniência, e valores-ouro por fase passando.
 
-## [não publicado] — 2026-06-21
+## [não publicado] — 2026-06-23
+
+### Fase 12.1 — fundação multi-tenant: banco + autenticação (SaaS, parte 1/3)
+- **O quê:** primeiro passo do plano `docs/plano-multitenant.md` — a ferramenta deixa de ser
+  single-tenant anônima e ganha **contas de cliente** (registro/login). Aditivo: o motor de
+  análise não muda; passa a rodar sob um usuário autenticado.
+- **Backend:**
+  - `app/core/db.py` — camada SQLAlchemy 2.x agnóstica ao banco (SQLite no dev/teste, Postgres
+    em produção, só a `DATABASE_URL` muda); `criar_tabelas()` idempotente no boot (lifespan).
+  - `app/models/db_models.py` — modelos `usuarios` (id/email/senha_hash/nome/papel/ativo/criado_em)
+    e `analises` (dono + gleba_geojson + cidade/uf/area_ha + resultados snapshot + datas).
+  - `app/core/auth.py` — senha **bcrypt** (passlib); sessão **JWT** (access 30 min no header,
+    refresh 7 dias em cookie httpOnly); guardas `usuario_atual` e `requer_admin`.
+  - `app/routers/auth.py` — `/api/auth/registrar|login|refresh|logout|me`. Cadastro **aberto**
+    (vira `cliente`); refresh rotacionado no uso; e-mail case-insensitive.
+  - 10 testes de fluxo (`tests/test_auth.py`) — registro/login/refresh/me/guarda 401, e-mail
+    duplicado, senha curta. Suíte **415 passed, 3 skipped** (sem regressão).
+- **Frontend:** `AuthProvider` (token em **memória** + refresh silencioso no load), wrapper
+  `apiFetch` (injeta Bearer, tenta refresh no 401), páginas `/login` e `/registrar`, porteiro
+  `RequireAuth` (sem login → `/login`) e chip de usuário + **Sair** na TopBar. `tsc` limpo.
+- **Deploy:** Compose ganha serviço **`db`** (postgres:16 + volume `pgdata` + healthcheck);
+  `api` recebe `DATABASE_URL`/`JWT_SECRET`/`JWT_REFRESH_SECRET`/`COOKIE_SECURE` (env). `.env.example`
+  e `requirements.txt` atualizados (SQLAlchemy, Alembic, psycopg, PyJWT, passlib[bcrypt]).
+- **Próximo (12.2):** área do cliente — salvar/listar/carregar/editar/excluir análises.
 
 ### Fase 11.12 — alerta de VOCAÇÃO do terreno (topografia → perfil sugerido)
 - **Ideia (operador):** alertar o cliente sobre a vocação do terreno pela topografia. O card de
