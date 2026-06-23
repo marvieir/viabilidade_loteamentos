@@ -20,6 +20,7 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from app.core.db import criar_tabelas
 from app.routers import (
+    admin,
     ambiental,
     analises,
     auth,
@@ -31,6 +32,7 @@ from app.routers import (
     laudo,
     localizacao,
     perfil,
+    salvas,
     urbanismo,
     vegetacao,
 )
@@ -61,6 +63,8 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(salvas.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 app.include_router(analises.router, prefix="/api")
 app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")

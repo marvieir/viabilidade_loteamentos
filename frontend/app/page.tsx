@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { UploadKmz } from "@/components/UploadKmz";
 import { RequireAuth } from "@/components/auth/RequireAuth";
+import { MinhasAnalises } from "@/components/cliente/MinhasAnalises";
+import { salvarAnalise, atualizarAnalise } from "@/lib/salvas";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/shell/Sidebar";
@@ -63,6 +65,10 @@ export default function Home() {
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
   const [sinal, setSinal] = useState(0);
   const [gerandoLaudo, setGerandoLaudo] = useState(false);
+  // Fase 12.2 — "Minhas análises": id da análise salva carregada (PUT vs POST) + salvando.
+  const [salvaId, setSalvaId] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [recarregarSalvas, setRecarregarSalvas] = useState(0);
   // #3 — progresso por seção: cada card reporta "analisando"/"ok"/"erro"; o botão e a sidebar leem.
   const [statusSec, setStatusSec] = useState<Record<string, "analisando" | "ok" | "erro">>({});
   const SECOES_ANALISE = [
@@ -112,8 +118,59 @@ export default function Home() {
     }
   }
 
+  // Snapshot dos resultados que os cards já receberam (o backend só guarda JSON).
+  function snapshotResultados() {
+    return {
+      aproveitamento: dadosAprov,
+      ambiental: dadosAmb,
+      vegetacao: dadosVerde,
+      declividade: dadosDecliv,
+      juridico: dadosJuridico,
+      financeira: dadosFinanceira,
+      economica: dadosEconomica,
+      localizacao: dadosLocalizacao,
+    } as Record<string, unknown>;
+  }
+
+  // Fase 12.2 — salvar a análise corrente (POST) ou atualizar a carregada (PUT).
+  async function onSalvar() {
+    if (!analise) return;
+    const padrao =
+      analise.jurisdicao.municipio ?? `Análise ${new Date().toLocaleDateString("pt-BR")}`;
+    const titulo = window.prompt("Título da análise:", padrao);
+    if (titulo === null) return; // cancelou
+    setSalvando(true);
+    try {
+      const payload = {
+        titulo: titulo.trim() || padrao,
+        gleba_geojson: analise.geometria.geojson,
+        cidade: analise.jurisdicao.municipio,
+        uf: analise.jurisdicao.uf,
+        area_ha: analise.geometria.area_ha,
+        resultados: snapshotResultados(),
+      };
+      const salva = salvaId
+        ? await atualizarAnalise(salvaId, payload)
+        : await salvarAnalise(payload);
+      setSalvaId(salva.id);
+      setRecarregarSalvas((n) => n + 1);
+      alert(salvaId ? "Análise atualizada." : "Análise salva em “Minhas análises”.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Falha ao salvar a análise.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // Carrega uma análise salva (reidratada no backend) e a recoloca na tela.
+  function onCarregarSalva(a: Analise, idSalva: string) {
+    onAnalise(a);
+    setSalvaId(idSalva);
+  }
+
   function onAnalise(a: Analise | null) {
     setAnalise(a);
+    setSalvaId(null);
     setSecao("visao");
     setOverlaysAmb({});
     setOverlaysVerde({});
@@ -153,10 +210,13 @@ export default function Home() {
         analisando={analisandoTudo}
         onLaudo={onLaudo}
         gerandoLaudo={gerandoLaudo}
+        onSalvar={onSalvar}
+        salvando={salvando}
+        jaSalva={salvaId !== null}
       />
 
       {!analise ? (
-        <UploadHero onAnalise={onAnalise} />
+        <UploadHero onAnalise={onAnalise} onCarregar={onCarregarSalva} recarregar={recarregarSalvas} />
       ) : (
         <div className="flex">
           <Sidebar
@@ -326,9 +386,17 @@ export default function Home() {
   );
 }
 
-function UploadHero({ onAnalise }: { onAnalise: (a: Analise) => void }) {
+function UploadHero({
+  onAnalise,
+  onCarregar,
+  recarregar,
+}: {
+  onAnalise: (a: Analise) => void;
+  onCarregar: (a: Analise, salvaId: string) => void;
+  recarregar: number;
+}) {
   return (
-    <main className="mx-auto grid max-w-3xl place-items-center px-4 py-16 sm:py-24">
+    <main className="mx-auto grid max-w-3xl gap-8 px-4 py-16 sm:py-24">
       <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
         <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
           <IconMap width={28} height={28} />
@@ -345,6 +413,13 @@ function UploadHero({ onAnalise }: { onAnalise: (a: Analise) => void }) {
           <UploadKmz onAnalise={onAnalise} />
         </div>
       </div>
+
+      <section className="w-full">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Minhas análises
+        </h2>
+        <MinhasAnalises onCarregar={onCarregar} recarregar={recarregar} />
+      </section>
     </main>
   );
 }

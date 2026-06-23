@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { IconDownload, IconMap, IconPlay, IconPlus } from "@/components/Icons";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { Analise } from "@/lib/api";
@@ -17,6 +18,9 @@ export function TopBar({
   analisando,
   onLaudo,
   gerandoLaudo,
+  onSalvar,
+  salvando,
+  jaSalva,
 }: {
   analise: Analise | null;
   onNova: () => void;
@@ -24,6 +28,9 @@ export function TopBar({
   analisando?: boolean;
   onLaudo?: () => void;
   gerandoLaudo?: boolean;
+  onSalvar?: () => void;
+  salvando?: boolean;
+  jaSalva?: boolean;
 }) {
   const { usuario, sair } = useAuth();
   const jur = analise?.jurisdicao;
@@ -68,6 +75,17 @@ export function TopBar({
               <IconPlay width={15} height={15} />
               {analisando ? "Analisando…" : "Analisar tudo"}
             </button>
+            {onSalvar && (
+              <button
+                type="button"
+                onClick={onSalvar}
+                disabled={salvando}
+                title="Salva esta análise em 'Minhas análises' (geometria + resultados)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {salvando ? "Salvando…" : jaSalva ? "Atualizar" : "Salvar análise"}
+              </button>
+            )}
             {onLaudo && (
               <button
                 type="button"
@@ -92,6 +110,14 @@ export function TopBar({
         </button>
         {usuario && (
           <div className="ml-1 flex items-center gap-2 border-l border-slate-200 pl-2">
+            {usuario.papel === "admin" && (
+              <Link
+                href="/admin"
+                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+              >
+                Admin
+              </Link>
+            )}
             <span
               className="hidden max-w-[14rem] truncate text-sm text-slate-600 sm:block"
               title={usuario.email}

@@ -7,6 +7,25 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-23
 
+### Fase 12.3 — painel admin (SaaS, parte 3/3)
+- **Backend:** router `/api/admin` (guarda `requer_admin`): `GET /metricas` (nº de clientes,
+  nº de análises, novos clientes no mês, distribuição por UF e por cidade) e `GET /clientes`
+  (e-mail, data de cadastro, nº de análises, cidades/UFs analisadas). `scripts/criar_admin.py`
+  — seed do 1º admin (cria ou **promove** um e-mail; senha por prompt; idempotente). Admin
+  **nunca** nasce pela UI. 4 testes (guarda 403/401, agregação, listagem).
+- **Frontend:** página `/admin` com **cards** (3 KPIs + 2 distribuições) e tabela de clientes;
+  link "Admin" na TopBar visível só para `papel=admin`; dupla checagem (front + backend).
+
+### Fase 12.2 — área do cliente: salvar/carregar/editar/excluir análises (SaaS, parte 2/3)
+- **Backend:** router `/api/salvas` (escopado ao dono — multi-tenant): `GET` lista, `POST`
+  salva (gleba + snapshot de resultados), `GET/{id}` detalha, `PUT/{id}` edita, `DELETE/{id}`,
+  e `POST/{id}/carregar` que **reidrata a gleba no STORE** (reaproveita todo o pipeline de
+  dimensões) e devolve o shape do upload — daí o cliente re-roda (edita) com novos parâmetros.
+  Isolamento testado (intruso recebe 404, não vê/edita/exclui). 6 testes.
+- **Frontend:** componente "Minhas análises" (cards: título, cidade/UF, área, data; Abrir /
+  Excluir) na tela inicial; botão **Salvar análise / Atualizar** na TopBar (POST 1ª vez, PUT
+  depois) que persiste a geometria + os JSONs que os cards já receberam. `tsc` limpo.
+
 ### Fase 12.1 — fundação multi-tenant: banco + autenticação (SaaS, parte 1/3)
 - **O quê:** primeiro passo do plano `docs/plano-multitenant.md` — a ferramenta deixa de ser
   single-tenant anônima e ganha **contas de cliente** (registro/login). Aditivo: o motor de

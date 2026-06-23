@@ -16,8 +16,7 @@ SQLAlchemy==2.0.36        # ORM (modelos usuarios/analises)
 alembic==1.14.0           # migrações versionadas (schema estável)
 psycopg[binary]==3.2.3    # driver Postgres (produção); SQLite no dev/teste é nativo
 PyJWT==2.10.1             # tokens de sessão (access/refresh)
-passlib[bcrypt]==1.7.4    # hash de senha (bcrypt)
-bcrypt==4.2.1             # backend do passlib (pin explícito p/ compat)
+bcrypt==4.2.1             # hash de senha (usado direto, sem passlib)
 
 # dev / testes
 pytest==8.3.4

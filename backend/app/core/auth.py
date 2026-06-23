@@ -17,16 +17,14 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
+import bcrypt
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.core.db import get_db
 from app.models.db_models import Usuario
-
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Default só para dev/teste — em produção SOBRESCREVA por env. Diferenciar os dois segredos
 # impede que um refresh seja aceito como access (e vice-versa).
@@ -37,12 +35,20 @@ ACCESS_TTL_MIN = int(os.getenv("JWT_ACCESS_TTL_MIN", "30"))
 REFRESH_TTL_DIAS = int(os.getenv("JWT_REFRESH_TTL_DIAS", "7"))
 
 
+# bcrypt opera sobre no máx. 72 bytes; truncamos o excedente (limite do algoritmo).
+def _bytes(senha: str) -> bytes:
+    return senha.encode("utf-8")[:72]
+
+
 def hash_senha(senha: str) -> str:
-    return _pwd.hash(senha)
+    return bcrypt.hashpw(_bytes(senha), bcrypt.gensalt()).decode("utf-8")
 
 
 def verifica_senha(senha: str, senha_hash: str) -> bool:
-    return _pwd.verify(senha, senha_hash)
+    try:
+        return bcrypt.checkpw(_bytes(senha), senha_hash.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 def _emitir(sub: str, papel: str, tipo: Literal["access", "refresh"]) -> str:

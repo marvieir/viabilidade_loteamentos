@@ -139,10 +139,16 @@ contexto de um usuário e de uma análise salva**.
    (registrar/login/refresh/logout/me) + guardas `usuario_atual`/`requer_admin`; frontend `/login`,
    `/registrar`, `AuthProvider` (token em memória + refresh httpOnly), `RequireAuth` + Sair na TopBar.
    10 testes de auth; suíte verde (415 passed).
-2. **Área do cliente (#2)** — salvar/listar/carregar/editar/excluir análises do usuário; tela
-   "Minhas análises".
-3. **Painel admin (#3)** — papel admin + seed do 1º admin; `/admin/metricas` e `/admin/clientes`;
-   tela `/admin` com os cards.
+2. **Área do cliente (#2)** — ✅ **FEITA (Fase 12.2).** `/api/salvas` (CRUD escopado ao dono) +
+   `POST /{id}/carregar` (reidrata a gleba no STORE → re-rodar = editar); tela "Minhas análises"
+   (cards Abrir/Excluir) + botão Salvar/Atualizar na TopBar. 6 testes; isolamento multi-tenant.
+3. **Painel admin (#3)** — ✅ **FEITA (Fase 12.3).** Papel admin + seed `scripts/criar_admin.py`;
+   `/api/admin/metricas` e `/api/admin/clientes`; tela `/admin` com cards (3 KPIs + 2 distribuições)
+   + tabela de clientes; link Admin na TopBar só p/ admin. 4 testes.
+
+> **Plano concluído.** Próximos passos opcionais (não bloqueiam): Alembic versionado (hoje
+> `create_all`), rate-limit no `/login`, verificação de e-mail / reset de senha, exclusão de
+> conta (LGPD), pré-carregar os resultados salvos nos cards (hoje "carregar" reidrata e re-roda).
 
 ---
 
