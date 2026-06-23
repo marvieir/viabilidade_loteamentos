@@ -7,7 +7,7 @@ rasterio, sem rede (igual ao padrão da 2.2/área verde).
 
 import numpy as np
 from pyproj import Transformer
-from shapely.geometry import Polygon
+from shapely.geometry import Polygon, box
 from shapely.ops import transform as shp_transform
 
 from app.core.declividade import (
@@ -17,6 +17,7 @@ from app.core.declividade import (
     FonteDEMRasterLocal,
     _proj4_aeqd,
     _tile_copernicus,
+    amostrar_declividade,
     analisar_declividade,
     get_fonte_dem,
 )
@@ -86,6 +87,40 @@ def test_rampa_15pct_sem_vedacao():
     assert res.geojson_vedacao == {}
     media = next(f for f in res.faixas if f.classe == "media")
     assert media.pct > 0.99
+
+
+# 6b — declividade POR LOTE (Fase 11.13): amostra a mesma grade, alinhada por índice ----------
+def test_amostra_por_lote_rampa_uniforme():
+    # Rampa 35% → todo lote dentro da gleba amostra ~35%.
+    dem = _dem_para_gleba(GLEBA, lambda xx, yy: 0.35 * xx)
+    minx, miny, maxx, maxy = GLEBA.bounds
+    mx = (minx + maxx) / 2
+    lotes = [GLEBA.intersection(box(minx, miny, mx, maxy)),
+             GLEBA.intersection(box(mx, miny, maxx, maxy))]
+    vals = amostrar_declividade(dem, lotes)
+    assert len(vals) == 2
+    assert all(v is not None and abs(v - 35.0) < 1.5 for v in vals)
+
+
+def test_amostra_por_lote_distingue_plano_de_encosta():
+    # Elevação só cresce na metade direita (x métrico > centro) → lote direito íngreme, esquerdo plano.
+    c = GLEBA.centroid
+    to_m = Transformer.from_crs("EPSG:4326", _proj4_aeqd(c.x, c.y), always_xy=True).transform
+    cx = shp_transform(to_m, GLEBA).centroid.x
+    dem = _dem_para_gleba(GLEBA, lambda xx, yy: np.where(xx > cx, 0.4 * (xx - cx), 0.0))
+    minx, miny, maxx, maxy = GLEBA.bounds
+    mx = (minx + maxx) / 2
+    esq = GLEBA.intersection(box(minx, miny, mx, maxy))
+    dir_ = GLEBA.intersection(box(mx, miny, maxx, maxy))
+    v_esq, v_dir = amostrar_declividade(dem, [esq, dir_])
+    assert v_esq is not None and v_dir is not None
+    assert v_dir > v_esq + 10.0  # encosta nitidamente mais íngreme que o platô
+
+
+def test_amostra_por_lote_degrada_sem_dem():
+    assert amostrar_declividade(None, [GLEBA]) == [None]
+    dem = _dem_para_gleba(GLEBA, lambda xx, yy: np.zeros_like(xx))
+    assert amostrar_declividade(dem, []) == []  # lista vazia → vazia (sem erro)
 
 
 # 7 — degradação honesta: DEM não consultado --------------------------------------------

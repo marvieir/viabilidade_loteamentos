@@ -23,7 +23,7 @@ from app.core import conexao as conexao_mod
 from app.core import urbanismo_geom as geom
 from app.core import urbanismo_medida as medida
 from app.core.camadas import FonteCamadas, get_fonte_camadas
-from app.core.declividade import FonteDEM, get_fonte_dem
+from app.core.declividade import FonteDEM, amostrar_declividade, get_fonte_dem
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
 from app.core.urbanismo_diretrizes import resolver_diretrizes
@@ -258,13 +258,16 @@ def propor(
     decliv_acentuada_m = transform(to_local, acentuada_wgs) if acentuada_wgs is not None else None
 
     # 1b) (c) Topografia: orienta a grelha pela curva de nível do DEM (2.5), se disponível.
+    # Amostra o DEM UMA vez (reuso p/ orientação e p/ a declividade por lote — Fase 11.13).
     orientacao = 0.0
+    dem_recorte = None
     if fonte_dem is not None:
         try:
-            ang = geom.orientacao_contorno(fonte_dem.amostrar(registro["poly"]))
+            dem_recorte = fonte_dem.amostrar(registro["poly"])
+            ang = geom.orientacao_contorno(dem_recorte)
             orientacao = ang if ang is not None else 0.0
         except Exception:  # noqa: BLE001 — DEM indisponível → sem orientação (degrada honesto)
-            orientacao = 0.0
+            dem_recorte, orientacao = None, 0.0
 
     # 2) BORDA: o LLM propõe o PROGRAMA (estratégia), nunca a geometria/número.
     contexto = {
@@ -301,6 +304,11 @@ def propor(
     layout.restricao_origem = restr_origem
     med = medida.medir(layout)
     quadro, indicadores, heatmap = _medicao_dicts(med)
+
+    # Fase 11.13 — declividade média por lote (orientativa, DSM 30 m): amostra o DEM nos lotes
+    # (frame métrico → WGS) p/ o popup do mapa exibir. Sem DEM → tudo None (degrada honesto).
+    lotes_wgs = [transform(to_wgs, g) for g in layout.lotes]
+    decliv_por_lote = amostrar_declividade(dem_recorte, lotes_wgs)
 
     # Fase 9.10 — PONTE: teto regulatório (mesma fórmula/cenário do Aproveitamento) p/ a referência
     # cruzada. É só EXIBIÇÃO — o nº de lotes do estudo (medido acima) não usa este número.
@@ -353,7 +361,9 @@ def propor(
         versao=versao,
         perfil={"tipo_loteamento": body.tipo_loteamento, "publico_alvo": body.publico_alvo},
         programa=_programa_out(prog),
-        geometria=medida.geojson_do_layout(layout, to_wgs, med.heatmap.get("por_lote")),
+        geometria=medida.geojson_do_layout(
+            layout, to_wgs, med.heatmap.get("por_lote"), declividade_por_lote=decliv_por_lote
+        ),
         quadro_areas=quadro,
         indicadores=indicadores,
         heatmap=heatmap,

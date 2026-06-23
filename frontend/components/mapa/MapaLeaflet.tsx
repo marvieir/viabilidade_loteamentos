@@ -129,8 +129,12 @@ export default function MapaLeaflet({
             const p = (f.properties ?? {}) as Record<string, unknown>;
             const area = typeof p.area_m2 === "number" ? Math.round(p.area_m2) : "—";
             const score = typeof p.score === "number" ? p.score.toFixed(1) : "—";
+            // Fase 11.13 — declividade média do lote (amostrada do DEM no backend; orientativa,
+            // DSM 30 m). Só exibe se houver DEM; sem dado, omite a parcela (não inventa).
+            const decliv =
+              typeof p.declividade_pct === "number" ? ` · decliv. ${p.declividade_pct}%` : "";
             layer.bindPopup(
-              `Lote ${p.lote_id ?? "—"} · ${area} m² · score ${score} · quadra ${p.quadra_id ?? "—"}`
+              `Lote ${p.lote_id ?? "—"} · ${area} m² · score ${score} · quadra ${p.quadra_id ?? "—"}${decliv}`
             );
           }}
         />

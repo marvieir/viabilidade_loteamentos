@@ -18,9 +18,14 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
   como **penalidade SUAVE**: faces predominantemente íngremes (≥25% cobertas por >20% de
   declividade) viram VERDE/preservação ANTES das planas — sobra o terreno plano para os lotes.
 - **Determinismo preservado:** sem DEM (glebas sintéticas dos valores-ouro), a faixa é vazia → a
-  ordenação é idêntica à anterior. Suíte **425 passed** (inalterada) + 3 testes novos do
+  ordenação é idêntica à anterior. Suíte **431 passed** (inalterada) + testes novos do
   comportamento slope-aware. Ressalva honesta mantida: GLO-30 é DSM 30 m (pode superestimar
   declividade sob mata), então é orientativo.
+- **Declividade por LOTE no mapa:** o backend amostra a declividade média (%) de cada lote no DEM
+  (`amostrar_declividade`, mesma grade de `analisar_declividade`) e a devolve nas propriedades de
+  `lotes_features`. O popup do lote passa a exibir `decliv. X%` junto de tamanho/quadra/score. Tudo
+  no backend (CLAUDE.md §1): o front só renderiza. Sem DEM → omite (não inventa). Lote menor que o
+  pixel (30 m) cai no pixel mais próximo do centroide — ORIENTATIVO, não greide de projeto.
 
 ### Fase 12.3 — painel admin (SaaS, parte 3/3)
 - **Backend:** router `/api/admin` (guarda `requer_admin`): `GET /metricas` (nº de clientes,

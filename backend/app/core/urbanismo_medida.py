@@ -326,14 +326,18 @@ def _faixa_de_score(score) -> Optional[str]:
     return _FAIXAS[-1][0]
 
 
-def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
+def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lote=None) -> dict:
     """Camadas do layout (métrico) → GeoJSON WGS84 para o mapa.
 
     Fase 9.5 — PARCELAMENTO LEGÍVEL: ``lotes_features`` é uma FeatureCollection com **uma Feature
     por lote** (geometria + props que JÁ existem, casadas por índice: ``por_lote[i]``,
     ``layout.lote_quadra[i]``, ``_lados_mrr``). NENHUM número novo — só deixa de fundir. O
-    ``lotes`` (MultiPolygon unido) permanece por compatibilidade/fallback."""
+    ``lotes`` (MultiPolygon unido) permanece por compatibilidade/fallback.
+
+    ``declividade_por_lote`` (Fase 11.13): declividade média (%) por lote, AMOSTRADA pelo backend
+    no DEM e alinhada por índice a ``layout.lotes`` (o front só exibe). ``None`` sem DEM."""
     por_lote = por_lote or []
+    declividade_por_lote = declividade_por_lote or []
 
     def _gj(geom):
         if geom is None or geom.is_empty:
@@ -358,6 +362,9 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None) -> dict:
                 "profundidade_m": p,
                 "quadra_id": layout.lote_quadra[i] if i < len(layout.lote_quadra) else None,
                 "faixa_score": _faixa_de_score(score),
+                "declividade_pct": (
+                    declividade_por_lote[i] if i < len(declividade_por_lote) else None
+                ),
             },
         })
 

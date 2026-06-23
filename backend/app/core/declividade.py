@@ -21,7 +21,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass, field
-from typing import Optional, Protocol, runtime_checkable
+from typing import Optional, Protocol, Sequence, runtime_checkable
 
 from pyproj import Transformer
 from shapely.geometry import box, mapping
@@ -108,6 +108,65 @@ class ResultadoDeclividade:
     # de 30%). O motor de urbanismo a usa como penalidade SUAVE: prefere terreno plano para os
     # lotes e empurra verde/preservação para a encosta. Vazia quando não há DEM (degrada honesto).
     geojson_acentuada: dict = field(default_factory=dict)
+
+
+def amostrar_declividade(
+    dem: Optional[DEMRecorte], poligonos_wgs: Sequence[BaseGeometry]
+) -> list[Optional[float]]:
+    """Declividade média (%) de cada polígono WGS84, na MESMA grade de ``analisar_declividade``.
+
+    Para cada polígono: reprojeta p/ o CRS métrico do DEM e tira a média dos pixels cujo CENTRO
+    cai dentro. Lote menor que o pixel (30 m) → cai no pixel mais próximo do centroide. Devolve
+    ``None`` por polígono quando não há DEM ou nenhum pixel o cobre. Determinístico, alinhado por
+    índice à lista de entrada.
+
+    AVISO HONESTO: GLO-30 é DSM de 30 m — um lote de ~600 m² mal cobre um pixel. A declividade por
+    lote é ORIENTATIVA (compara lotes entre si), NÃO é greide de projeto (ver ``RESSALVA_DSM``)."""
+    n = len(poligonos_wgs)
+    if dem is None or dem.elevacao is None or n == 0:
+        return [None] * n
+
+    import numpy as np
+
+    elev = np.asarray(dem.elevacao, dtype="float64")
+    px = dem.px_m
+    h, w = elev.shape
+    gy, gx = np.gradient(elev, px, px)           # mesma fórmula de analisar_declividade
+    slope_pct = np.hypot(gx, gy) * 100.0
+    cols = dem.x0_m + (np.arange(w) + 0.5) * px  # centro X de cada coluna (CRS métrico do DEM)
+    rows = dem.y0_m - (np.arange(h) + 0.5) * px  # centro Y de cada linha
+    to_metric = Transformer.from_crs("EPSG:4326", dem.crs_proj4, always_xy=True).transform
+
+    try:
+        from shapely import contains_xy
+    except Exception:  # noqa: BLE001 — shapely < 2 não esperado
+        contains_xy = None
+
+    out: list[Optional[float]] = []
+    for g in poligonos_wgs:
+        if g is None or g.is_empty:
+            out.append(None)
+            continue
+        gm = shp_transform(to_metric, g)
+        minx, miny, maxx, maxy = gm.bounds
+        c_sel = np.where((cols >= minx) & (cols <= maxx))[0]  # janela do bbox (não varre a grade)
+        r_sel = np.where((rows >= miny) & (rows <= maxy))[0]
+        vals = np.empty(0)
+        if contains_xy is not None and c_sel.size and r_sel.size:
+            cc, rr = np.meshgrid(cols[c_sel], rows[r_sel])
+            dentro = contains_xy(gm, cc.ravel(), rr.ravel())
+            sub = slope_pct[np.ix_(r_sel, c_sel)].ravel()
+            vals = sub[dentro & np.isfinite(sub)]
+        if vals.size:
+            out.append(round(float(vals.mean()), 1))
+            continue
+        # Lote menor que o pixel: usa o pixel mais próximo do centroide (clamp à grade).
+        cen = gm.centroid
+        ci = int(np.clip(round((cen.x - cols[0]) / px), 0, w - 1))
+        ri = int(np.clip(round((rows[0] - cen.y) / px), 0, h - 1))
+        v = slope_pct[ri, ci]
+        out.append(round(float(v), 1) if np.isfinite(v) else None)
+    return out
 
 
 def analisar_declividade(
