@@ -26,6 +26,9 @@ from app.core.extrator_luos import MODELO_PADRAO, cadeia_de_modelos, _opcoes_tls
 
 _log = logging.getLogger(__name__)
 
+# Rung BARATO no fim da cadeia Claude: raramente sobrecarrega (529) e basta p/ propor o programa.
+MODELO_BARATO = "claude-haiku-4-5-20251001"
+
 TIPOS = ("aberto", "fechado", "condominio_lotes", "desmembramento", "loteamento_rural")
 PUBLICOS = ("baixa", "media", "alta")
 
@@ -320,44 +323,83 @@ _FERRAMENTA = {
 }
 
 
+def _prompt_usuario(contexto: dict, tipo_loteamento: str, publico_alvo: str) -> str:
+    """Prompt do usuário (idêntico p/ todos os provedores — a proposta deve ser estável)."""
+    return (
+        f"Gleba: público-alvo '{publico_alvo}', tipo '{tipo_loteamento}'. "
+        f"Contexto medido pelo motor (NÃO recalcule): {contexto}. "
+        "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
+    )
+
+
+# Chaves que o LLM PODE propor e o preset funde (mesma lista p/ Claude e Gemini — contrato §2).
+_CHAVES_LLM = (
+    "lote_alvo_m2", "pct_lazer", "largura_via_m", "amenidades",
+    "pct_institucional", "esqueleto", "estrategia_mix", "heuristicas",
+)
+
+
+def _montar_programa(bruto: dict, publico_alvo: str, overrides: Optional[dict] = None) -> Programa:
+    """Funde a proposta CRUA do LLM (dict de tool-use/JSON) com o preset (defaults) e os
+    ``overrides`` do usuário (que vencem). Caps de consistência (§4) + §2 aplicados aqui —
+    UM só lugar, para Claude e Gemini produzirem o MESMO Programa a partir do mesmo bruto."""
+    merged = dict(overrides or {})
+    for k in _CHAVES_LLM:
+        if k in bruto and k not in merged:
+            merged[k] = bruto[k]
+    # CAP de lazer da IA (consistência §4 + §2): a IA pode REDUZIR o lazer (mais lote), mas NÃO
+    # exceder o padrão do perfil — 22% (vs 20%) reserva verde demais e derruba o nº de lotes entre
+    # regenerações. NÃO toca override EXPLÍCITO do usuário (esse vale como pedido).
+    if "pct_lazer" in merged and "pct_lazer" not in (overrides or {}):
+        base_lazer = float(PRESETS.get(publico_alvo, PRESETS["media"])["pct_lazer"])
+        try:
+            merged["pct_lazer"] = min(float(merged["pct_lazer"]), base_lazer)
+        except (TypeError, ValueError):
+            merged.pop("pct_lazer", None)  # valor capenga do LLM → usa o do preset
+    prog = programa_do_preset(publico_alvo, merged)
+    prog.densidade = bruto.get("densidade", prog.densidade)
+    prog.arquetipo_viario = bruto.get("arquetipo_viario", prog.arquetipo_viario)
+    prog.origem = "proposto_llm"
+    prog.esqueleto_origem = "llm" if prog.esqueleto else "vazio"  # 9.9 — origem do esqueleto
+    prog.justificativa = bruto.get("justificativa", prog.justificativa)
+    return prog
+
+
 class GeradorProgramaClaude:
-    """Proposta real via Claude API (tool use forçado). Import de ``anthropic`` é TARDIO.
-    Falha de serviço → cai no preset (degradação honesta), nunca quebra o estudo."""
+    """Provedor Claude (tool use forçado). Import de ``anthropic`` é TARDIO. Expõe ``propor_bruto``
+    (dict cru) — a fusão/preset fica no compositor. Cadeia: Fable 5/Opus 4.8 → Haiku (barato, raro
+    sobrecarregar) com retry no 529. Erro de serviço propaga p/ o compositor tentar o próximo."""
+
+    nome = "Claude"
 
     def __init__(self, api_key: Optional[str] = None, modelo: str = MODELO_PADRAO):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        # Cadeia de modelos: env URBANISMO_MODELO fixa um modelo; senão Fable 5 → Opus 4.8.
+        # Cadeia: env URBANISMO_MODELO fixa um modelo; senão Fable 5 → Opus 4.8, + Haiku no fim
+        # (degrada do mais capaz ao mais barato/disponível antes de cair p/ outro provedor).
         self.modelos = cadeia_de_modelos(os.getenv("URBANISMO_MODELO"))
+        if MODELO_BARATO not in self.modelos:
+            self.modelos = [*self.modelos, MODELO_BARATO]
+        self.modelo_usado: Optional[str] = None
 
-    def propor(self, contexto, tipo_loteamento, publico_alvo, overrides=None) -> Programa:
+    def propor_bruto(self, contexto, tipo_loteamento, publico_alvo) -> Optional[dict]:
         try:
             import anthropic
         except ImportError as exc:
             raise GeradorIndisponivel("Pacote 'anthropic' ausente.") from exc
 
-        # Esta chamada TEM fallback (preset) — então poucas retentativas do SDK p/ degradar
-        # RÁPIDO se a API estiver sobrecarregada (evita o request travar e o front cair).
+        # max_retries=2: o SDK já faz backoff exponencial no 429/500/529 (sobrecarga). Modesto de
+        # propósito — há fallback (Haiku/Gemini/preset), então degrada sem travar o request.
         # (sem ``timeout=`` aqui: é mutuamente exclusivo com o http_client da TLS corporativa.)
-        client = anthropic.Anthropic(api_key=self.api_key, max_retries=1, **_opcoes_tls())
-        prompt = (
-            f"Gleba: público-alvo '{publico_alvo}', tipo '{tipo_loteamento}'. "
-            f"Contexto medido pelo motor (NÃO recalcule): {contexto}. "
-            "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
-        )
-        # Tenta a cadeia de modelos (Fable 5 → Opus 4.8): o 1º que responder vence. Um modelo
-        # indisponível (org sem acesso/ZDR → 400/404) cai p/ o próximo; só se TODOS falharem é que
-        # degrada p/ o preset determinístico (não inventa).
-        resp = None
-        ultimo_erro: Optional[Exception] = None
+        client = anthropic.Anthropic(api_key=self.api_key, max_retries=2, **_opcoes_tls())
+        prompt = _prompt_usuario(contexto, tipo_loteamento, publico_alvo)
+        resp, ultimo_erro = None, None
         for modelo in self.modelos:
             try:
                 resp = client.messages.create(
                     model=modelo,
                     max_tokens=4000,
                     # NÃO passar `temperature`: alguns modelos novos (Opus 4.8/Fable 5) a depreciaram
-                    # e devolvem 400 → a chamada caía no preset. A CONSISTÊNCIA (§4) vem do CAP de
-                    # lazer/largura (motor é dono da medida) + da regra 5 da instrução (use o padrão
-                    # do perfil, não varie). Sem isto a IA quebrava e nunca propunha de fato.
+                    # e devolvem 400. A CONSISTÊNCIA (§4) vem do CAP de lazer/largura + da regra 5.
                     system=_INSTRUCAO,
                     tools=[_FERRAMENTA],
                     tool_choice={"type": "tool", "name": _FERRAMENTA["name"]},
@@ -365,55 +407,154 @@ class GeradorProgramaClaude:
                 )
                 self.modelo_usado = modelo  # proveniência: qual modelo de fato serviu
                 break
-            except Exception as exc:  # noqa: BLE001 — tenta o próximo modelo; se acabar, preset
+            except Exception as exc:  # noqa: BLE001 — tenta o próximo modelo da cadeia
                 ultimo_erro = exc
-                _log.warning("Programa via IA: modelo %s falhou — tentando próximo: %r", modelo, exc)
+                _log.warning("Claude: modelo %s falhou — tentando próximo: %r", modelo, exc)
         if resp is None:
-            # NÃO engolir o motivo: loga o erro real (traceback) e expõe TIPO + msg curta na
-            # justificativa, p/ o operador diagnosticar (key inválida? rede/TLS? sobrecarga?).
-            _log.warning("Programa via IA falhou em todos os modelos — caindo no preset: %r",
-                         ultimo_erro, exc_info=ultimo_erro is not None)
-            detalhe = f"{type(ultimo_erro).__name__}: {ultimo_erro}"[:160] if ultimo_erro else "sem modelo"
-            prog = programa_do_preset(publico_alvo, overrides)
-            prog.justificativa = (
-                f"Serviço de IA indisponível ({detalhe}) — programa do preset. " + prog.justificativa
-            )
-            return prog
-
+            if ultimo_erro is not None:
+                raise ultimo_erro  # compositor decide: próximo provedor ou preset
+            return None
         bruto = next(
             (b.input for b in resp.content if getattr(b, "type", None) == "tool_use"), None
         )
-        if not isinstance(bruto, dict):
-            return programa_do_preset(publico_alvo, overrides)
+        return bruto if isinstance(bruto, dict) else None
 
-        # Funde a proposta do LLM com o preset (defaults) e aplica overrides do usuário por cima.
-        merged = dict(overrides or {})
-        for k in ("lote_alvo_m2", "pct_lazer", "largura_via_m", "amenidades",
-                  "pct_institucional", "esqueleto", "estrategia_mix", "heuristicas"):
-            if k in bruto and k not in merged:
-                merged[k] = bruto[k]
-        # CAP de lazer da IA (consistência §4 + §2): a IA pode reduzir o lazer (mais lote), mas NÃO
-        # exceder o padrão do perfil — um sorteio de 22% (vs 20%) reserva verde demais e derruba o nº
-        # de lotes entre regenerações. NÃO toca override EXPLÍCITO do usuário (esse vale como pedido).
-        if "pct_lazer" in merged and "pct_lazer" not in (overrides or {}):
-            base_lazer = float(PRESETS.get(publico_alvo, PRESETS["media"])["pct_lazer"])
-            merged["pct_lazer"] = min(float(merged["pct_lazer"]), base_lazer)
-        prog = programa_do_preset(publico_alvo, merged)
-        prog.densidade = bruto.get("densidade", prog.densidade)
-        prog.arquetipo_viario = bruto.get("arquetipo_viario", prog.arquetipo_viario)
-        prog.origem = "proposto_llm"
-        # Fase 9.9 — marca a origem do esqueleto: "llm" se o modelo de fato propôs a(s) curva(s).
-        prog.esqueleto_origem = "llm" if prog.esqueleto else "vazio"
-        prog.justificativa = bruto.get("justificativa", prog.justificativa)
+
+# Sufixo de formato p/ o Gemini (JSON mode): mesma estratégia, sem tool-use (formato difere).
+_SUFIXO_JSON_GEMINI = (
+    "\n\nResponda APENAS com um objeto JSON (sem markdown, sem comentários) com as chaves: "
+    "lote_alvo_m2 (number), densidade ('alta'|'media'|'baixa'), pct_lazer (fração, ex.: 0.20), "
+    "amenidades (array de string), arquetipo_viario (string), largura_via_m (number), "
+    "pct_institucional (fração; 0 se não souber), esqueleto (array de polilinhas [[x,y],...] "
+    "normalizadas 0..1 do bbox; [] em grelha_eficiente), travessia (array [x,y] ou []), "
+    "estrategia_mix (array de objetos), heuristicas (objeto), justificativa (string)."
+)
+
+
+def _extrair_json(txt: str) -> Optional[dict]:
+    """Extrai o 1º objeto JSON de um texto (tolera cerca ```json ... ``` ou ruído ao redor)."""
+    import json
+
+    s = txt.strip()
+    if s.startswith("```"):
+        s = s.strip("`")
+        s = s[4:] if s[:4].lower() == "json" else s
+    ini, fim = s.find("{"), s.rfind("}")
+    if ini == -1 or fim <= ini:
+        return None
+    try:
+        data = json.loads(s[ini:fim + 1])
+        return data if isinstance(data, dict) else None
+    except json.JSONDecodeError:
+        return None
+
+
+def _gemini_thinking(types) -> dict:
+    """Config de thinking do Gemini, nível MÉDIO por padrão (pedido do operador). Configurável por
+    ``URBANISMO_GEMINI_THINKING`` (``low``/``medium``/``high`` ou um nº de tokens). Robusto à versão
+    do SDK: tenta a API por NÍVEL (Gemini 3.x: ``thinking_level``) e cai p/ ORÇAMENTO de tokens
+    (Gemini 2.x: ``thinking_budget``); se nenhuma existir, degrada SEM thinking (não quebra)."""
+    bruto = os.getenv("URBANISMO_GEMINI_THINKING", "medium").strip().lower()
+    if bruto.isdigit():
+        try:
+            return {"thinking_config": types.ThinkingConfig(thinking_budget=int(bruto))}
+        except Exception:  # noqa: BLE001
+            return {}
+    try:
+        return {"thinking_config": types.ThinkingConfig(thinking_level=bruto)}
+    except Exception:  # noqa: BLE001 — SDK por tokens: mapeia o nível p/ um orçamento equivalente
+        pass
+    budget = {"low": 2048, "medium": 8192, "high": 16384}.get(bruto, 8192)
+    try:
+        return {"thinking_config": types.ThinkingConfig(thinking_budget=budget)}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+class GeradorProgramaGemini:
+    """Provedor de FALLBACK Gemini (Google). Import de ``google-genai`` é TARDIO. Usa JSON mode
+    (o formato de tool difere do Claude) + thinking nível médio. Modelo configurável por
+    ``URBANISMO_GEMINI_MODELO`` (default ``gemini-3.5-flash``) — corrige o ID sem mexer no código."""
+
+    nome = "Gemini"
+
+    def __init__(self, api_key: Optional[str] = None, modelo: Optional[str] = None):
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        self.modelo = modelo or os.getenv("URBANISMO_GEMINI_MODELO", "gemini-3.5-flash")
+        self.modelo_usado = self.modelo
+
+    def propor_bruto(self, contexto, tipo_loteamento, publico_alvo) -> Optional[dict]:
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError as exc:
+            raise GeradorIndisponivel("Pacote 'google-genai' ausente.") from exc
+
+        client = genai.Client(api_key=self.api_key)
+        prompt = _prompt_usuario(contexto, tipo_loteamento, publico_alvo) + _SUFIXO_JSON_GEMINI
+        config = types.GenerateContentConfig(
+            system_instruction=_INSTRUCAO,
+            response_mime_type="application/json",
+            **_gemini_thinking(types),
+        )
+        resp = client.models.generate_content(model=self.modelo, contents=prompt, config=config)
+        txt = (getattr(resp, "text", None) or "").strip()
+        if not txt:
+            return None
+        import json
+
+        try:
+            data = json.loads(txt)
+        except json.JSONDecodeError:
+            data = _extrair_json(txt)  # tolera cerca/ruído
+        return data if isinstance(data, dict) else None
+
+
+class GeradorProgramaEmCadeia:
+    """Compositor: tenta os provedores em ORDEM (Claude → Gemini); o 1º que devolver um bruto
+    válido vence (fundido pelo preset). TODOS falharem → preset determinístico (degradação
+    honesta, nunca quebra o estudo). Nunca propaga exceção p/ o router — sempre devolve Programa."""
+
+    def __init__(self, provedores: list):
+        self.provedores = provedores
+        self.modelo_usado: Optional[str] = None
+
+    def propor(self, contexto, tipo_loteamento, publico_alvo, overrides=None) -> Programa:
+        erros: list[str] = []
+        for prov in self.provedores:
+            try:
+                bruto = prov.propor_bruto(contexto, tipo_loteamento, publico_alvo)
+            except Exception as exc:  # noqa: BLE001 — provedor falhou → tenta o próximo
+                erros.append(f"{prov.nome}: {type(exc).__name__}: {exc}")
+                _log.warning("Programa via %s falhou — tentando próximo provedor: %r",
+                             prov.nome, exc, exc_info=True)
+                continue
+            if isinstance(bruto, dict):
+                self.modelo_usado = getattr(prov, "modelo_usado", None) or prov.nome
+                return _montar_programa(bruto, publico_alvo, overrides)
+            erros.append(f"{prov.nome}: resposta sem JSON/tool_use")
+        # Todos os provedores falharam → preset honesto, com o motivo na proveniência.
+        detalhe = " | ".join(erros)[:200] if erros else "sem provedor configurado"
+        _log.warning("Programa via IA falhou em todos os provedores — caindo no preset: %s", detalhe)
+        prog = programa_do_preset(publico_alvo, overrides)
+        prog.justificativa = (
+            f"Serviço de IA indisponível ({detalhe}) — programa do preset. " + prog.justificativa
+        )
         return prog
 
 
 def get_gerador_programa() -> Optional[GeradorPrograma]:
-    """Dependência FastAPI. Liga o Claude só com ``ANTHROPIC_API_KEY`` e sem
-    ``URBANISMO_GERADOR_DESLIGADO``; senão ``None`` → router responde 503 honesto.
+    """Dependência FastAPI. Monta a CADEIA de provedores conforme as credenciais presentes:
+    Claude (``ANTHROPIC_API_KEY``) → Gemini (``GOOGLE_API_KEY``/``GEMINI_API_KEY``). Sem nenhuma
+    credencial (ou ``URBANISMO_GERADOR_DESLIGADO``) → ``None`` → router responde 503 honesto.
     Nos testes é sobrescrito por um stub offline (ou ``None`` para exercer o 503)."""
     if os.getenv("URBANISMO_GERADOR_DESLIGADO"):
         return None
+    provedores: list = []
     if os.getenv("ANTHROPIC_API_KEY"):
-        return GeradorProgramaClaude()
-    return None
+        provedores.append(GeradorProgramaClaude())
+    if os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY"):
+        provedores.append(GeradorProgramaGemini())
+    if not provedores:
+        return None
+    return GeradorProgramaEmCadeia(provedores)

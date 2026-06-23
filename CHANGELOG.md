@@ -7,6 +7,24 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-23
 
+### Fase 11.14 — fallback de IA no gerador de programa (Claude → Gemini → preset)
+- **Problema (operador):** picos de `529 OverloadedError` (sobrecarga da Anthropic) derrubavam a
+  proposta da IA direto para o preset — a cadeia era 100% Anthropic com 1 retry só.
+- **Correção:** o gerador virou uma **cadeia de provedores** (`GeradorProgramaEmCadeia`): Claude
+  (com `max_retries=2` no 529 + rung **Haiku** barato no fim da cadeia) → **Gemini** (fallback) →
+  **preset** determinístico. O 1º que responder vence; todos falharem → preset com o motivo real na
+  proveniência. A lógica de fusão/cap (consistência §4) foi extraída p/ `_montar_programa` — UM só
+  lugar, idêntico p/ os dois provedores (mesmo contrato §2: a IA não devolve nº/área).
+- **Gemini 3.5 Flash** com *thinking* nível **médio**: JSON mode (o formato de tool difere do
+  Claude), SDK `google-genai` com import TARDIO e gated por `GOOGLE_API_KEY` (sem chave → ignora).
+  Modelo e nível de thinking **configuráveis por env** (`URBANISMO_GEMINI_MODELO`,
+  `URBANISMO_GEMINI_THINKING`) — corrige o ID/nível sem mexer no código. `_gemini_thinking` é
+  robusto à versão do SDK (tenta `thinking_level`; cai p/ `thinking_budget`).
+- **Wiring honesto:** o gerador liga se houver `ANTHROPIC_API_KEY` **e/ou**
+  `GOOGLE_API_KEY`/`GEMINI_API_KEY` (funciona só com o Gemini também). Sem nenhuma → 503 honesto,
+  como antes. `.env.example` documenta tudo. Suíte **448 passed** (+17 testes do fallback, todos
+  offline — provedores e `types` fakes, sem rede).
+
 ### Fase 11.13 — motor de urbanismo consciente da declividade (slope-aware)
 - **Problema (operador):** o motor jogava lotes para a encosta e deixava VERDE no platô plano.
   Causa: entre 0–30%, o motor era **cego à inclinação** — só conhecia a vedação binária ≥30%
