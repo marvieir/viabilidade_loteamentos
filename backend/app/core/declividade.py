@@ -104,6 +104,10 @@ class ResultadoDeclividade:
     geojson_vedacao: dict  # = flag_vedacao.geojson (atalho p/ a união do aproveitável)
     proveniencia: Optional[str]
     avisos: list[str]
+    # Faixa de declividade ACENTUADA (>20%, "alta") em WGS84 — íngreme mas LEGAL (abaixo do veto
+    # de 30%). O motor de urbanismo a usa como penalidade SUAVE: prefere terreno plano para os
+    # lotes e empurra verde/preservação para a encosta. Vazia quando não há DEM (degrada honesto).
+    geojson_acentuada: dict = field(default_factory=dict)
 
 
 def analisar_declividade(
@@ -198,21 +202,26 @@ def analisar_declividade(
         _faixa("alta", f">{_n(LIMIAR_MEDIA_PCT)}%", alta),
     ]
 
-    # Flag legal ≥30% — poligoniza os pixels vedados (boxes no CRS métrico) → WGS84.
-    vedado = mask & (slope_pct >= LIMIAR_VEDACAO_PCT)
-    flag = None
-    geojson_vedacao: dict = {}
-    n_vedado = int(vedado.sum())
-    if n_vedado > 0:
-        to_wgs = Transformer.from_crs(dem.crs_proj4, "EPSG:4326", always_xy=True).transform
+    to_wgs = Transformer.from_crs(dem.crs_proj4, "EPSG:4326", always_xy=True).transform
+
+    def _poligonizar(sel) -> dict:
+        """Une os pixels selecionados (boxes no CRS métrico) e reprojeta p/ WGS84."""
+        if int(sel.sum()) == 0:
+            return {}
         boxes = []
-        idx_r, idx_c = np.where(vedado)
+        idx_r, idx_c = np.where(sel)
         for r, c in zip(idx_r.tolist(), idx_c.tolist()):
             x_esq = dem.x0_m + c * px
             y_sup = dem.y0_m - r * px
             boxes.append(box(x_esq, y_sup - px, x_esq + px, y_sup))
-        geom_wgs = shp_transform(to_wgs, unary_union(boxes))
-        geojson_vedacao = mapping(geom_wgs)
+        return mapping(shp_transform(to_wgs, unary_union(boxes)))
+
+    # Flag legal ≥30% — poligoniza os pixels vedados (boxes no CRS métrico) → WGS84.
+    vedado = mask & (slope_pct >= LIMIAR_VEDACAO_PCT)
+    geojson_vedacao = _poligonizar(vedado)
+    flag = None
+    n_vedado = int(vedado.sum())
+    if n_vedado > 0:
         area_vedada = round(n_vedado * px_area, 2)
         flag = FlagVedacao(
             limite_pct=LIMIAR_VEDACAO_PCT,
@@ -223,6 +232,11 @@ def analisar_declividade(
             ressalva=RESSALVA_VEDACAO,
         )
 
+    # Faixa ACENTUADA (>20%, "alta") — íngreme mas LEGAL; entra como penalidade suave no motor de
+    # urbanismo (lote no plano, verde na encosta). Inclui o ≥30% (já vedado por lei): overlap
+    # inofensivo, pois o lote já o evita por outra via.
+    geojson_acentuada = _poligonizar(alta)
+
     return ResultadoDeclividade(
         consultada=True,
         fonte=dem.fonte,
@@ -232,6 +246,7 @@ def analisar_declividade(
         geojson_vedacao=geojson_vedacao,
         proveniencia=_proveniencia(dem),
         avisos=[*dem.avisos, RESSALVA_DSM],
+        geojson_acentuada=geojson_acentuada,
     )
 
 

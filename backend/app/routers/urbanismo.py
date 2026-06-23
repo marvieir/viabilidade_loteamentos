@@ -252,6 +252,10 @@ def propor(
     restr_m = transform(to_local, restr_wgs) if restr_wgs is not None else None
     # Fase 10.8 — ≥30% (veta só LOTE) no frame métrico; o motor o desconta das quadras, não das vias.
     decliv_lote_m = transform(to_local, decliv_wgs) if decliv_wgs is not None else None
+    # Declividade ACENTUADA (>20%, legal mas íngreme) — penalidade SUAVE: o motor prefere o terreno
+    # plano para os lotes e reserva a encosta como verde. Cacheada por _coletar_geoms (via _aprov.).
+    acentuada_wgs = registro.get("declividade_acentuada")
+    decliv_acentuada_m = transform(to_local, acentuada_wgs) if acentuada_wgs is not None else None
 
     # 1b) (c) Topografia: orienta a grelha pela curva de nível do DEM (2.5), se disponível.
     orientacao = 0.0
@@ -291,6 +295,7 @@ def propor(
     layout = geom.gerar_layout(
         aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao, diretrizes=diretrizes,
         travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
+        declividade_acentuada=decliv_acentuada_m,
     )
     layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
     layout.restricao_origem = restr_origem

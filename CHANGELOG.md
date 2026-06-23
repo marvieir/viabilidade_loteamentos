@@ -7,6 +7,21 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-23
 
+### Fase 11.13 — motor de urbanismo consciente da declividade (slope-aware)
+- **Problema (operador):** o motor jogava lotes para a encosta e deixava VERDE no platô plano.
+  Causa: entre 0–30%, o motor era **cego à inclinação** — só conhecia a vedação binária ≥30%
+  (Lei 6.766). A escolha de verde (`_selecionar_verde`) usava só a FORMA da face (irregular →
+  verde), nunca a inclinação. Um platô plano de forma irregular virava verde; uma encosta de
+  20–25% de forma regular virava lote — invertido do ponto de vista de terraplenagem/valor.
+- **Correção:** a análise de declividade (que já calcula a malha de inclinação) passa a
+  **poligonizar também a faixa acentuada >20%** (`geojson_acentuada`). O motor recebe essa faixa
+  como **penalidade SUAVE**: faces predominantemente íngremes (≥25% cobertas por >20% de
+  declividade) viram VERDE/preservação ANTES das planas — sobra o terreno plano para os lotes.
+- **Determinismo preservado:** sem DEM (glebas sintéticas dos valores-ouro), a faixa é vazia → a
+  ordenação é idêntica à anterior. Suíte **425 passed** (inalterada) + 3 testes novos do
+  comportamento slope-aware. Ressalva honesta mantida: GLO-30 é DSM 30 m (pode superestimar
+  declividade sob mata), então é orientativo.
+
 ### Fase 12.3 — painel admin (SaaS, parte 3/3)
 - **Backend:** router `/api/admin` (guarda `requer_admin`): `GET /metricas` (nº de clientes,
   nº de análises, novos clientes no mês, distribuição por UF e por cidade) e `GET /clientes`

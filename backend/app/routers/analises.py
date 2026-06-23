@@ -75,6 +75,11 @@ def _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem=None):
         res = declividade_motor.analisar_declividade(gleba, dem)
         if res.geojson_vedacao:
             decliv_geom = shape(res.geojson_vedacao)
+        # Faixa íngreme >20% (legal, mas penaliza lote): cacheada no registro p/ o motor de
+        # urbanismo ler sem mudar a aridade deste helper (que o aproveitamento também usa).
+        registro["declividade_acentuada"] = (
+            shape(res.geojson_acentuada) if res.geojson_acentuada else None
+        )
     return verde_geom, overlays, decliv_geom
 
 

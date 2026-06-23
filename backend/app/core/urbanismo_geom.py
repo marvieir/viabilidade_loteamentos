@@ -820,18 +820,39 @@ def clube_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeomet
     return q, {"forma": "quadra", "frente_via_m": round(fr, 2)}
 
 
-def _selecionar_verde(pool: Sequence[BaseGeometry], alvo: float):
+# Fração de uma face coberta por declividade >20% a partir da qual ela é considerada ÍNGREME
+# (vai p/ verde antes das planas). Calibrado p/ não marcar faces de borda quase planas.
+FRAC_FACE_INGREME = 0.25
+
+
+def _selecionar_verde(
+    pool: Sequence[BaseGeometry], alvo: float, ingreme: Optional[BaseGeometry] = None
+):
     """Reserva quadras VERDES formadas até somar ~``alvo`` (sem estourar muito além — preserva lotes).
 
     Fase 11.2 — boas práticas §3.4 (Unwin/Alexander): o verde vai para a TERRA MARGINAL, não para a
     parcela nobre. Reserva primeiro as faces MENOS aptas a lote (mais irregulares/côncavas — que
     virariam sobra de qualquer jeito), deixando as REGULARES e cheias p/ virar lote. Entre faces de
-    mesma aptidão, a maior primeiro (menos peças). Antes pegava "as maiores" → tomava o platô."""
+    mesma aptidão, a maior primeiro (menos peças). Antes pegava "as maiores" → tomava o platô.
+
+    Slope-aware: faces predominantemente ÍNGREMES (≥``FRAC_FACE_INGREME`` cobertas por >20% de
+    declividade) viram verde ANTES das demais — preserva a encosta e deixa o terreno PLANO para os
+    lotes. Sem DEM (``ingreme`` None), a fração é 0 em tudo → ordenação idêntica à de antes."""
     if alvo <= 0 or not pool:
         return [], list(pool)
 
-    def _ordem(g):  # aptidão p/ lote ASC (irregular = verde primeiro); entre iguais, maior primeiro
-        return (round(g.area / max(g.convex_hull.area, 1e-9), 3), -g.area)
+    def _frac_ingreme(g) -> float:
+        if ingreme is None:
+            return 0.0
+        try:
+            inter = g.intersection(ingreme)
+            return inter.area / g.area if (not inter.is_empty and g.area > 0) else 0.0
+        except Exception:  # noqa: BLE001 — geometria capenga → trata como plana (não penaliza)
+            return 0.0
+
+    def _ordem(g):  # íngreme primeiro (verde); depois aptidão p/ lote ASC (irregular); maior primeiro
+        ingreme_flag = 0 if _frac_ingreme(g) >= FRAC_FACE_INGREME else 1
+        return (ingreme_flag, round(g.area / max(g.convex_hull.area, 1e-9), 3), -g.area)
     verdes, acc = [], 0.0
     for f in sorted(pool, key=_ordem):
         if acc >= alvo - 1e-6:
@@ -1034,6 +1055,7 @@ def gerar_layout(
     diretrizes: Optional[dict] = None,
     travessia_eixo: Optional[BaseGeometry] = None,
     travessia_diag: Optional[dict] = None,
+    declividade_acentuada: Optional[BaseGeometry] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1116,6 +1138,11 @@ def gerar_layout(
     # Fase 10.8 — ≥30% (lote vetado) no frame da grelha; usado só p/ tirar lote das quadras, não via.
     restr_lote_reg = (rotate(restr_lote, -ang_deg, origin=cen)
                       if (restr_lote is not None and ang_deg) else restr_lote)
+    # Declividade acentuada (>20%, legal) no frame da grelha — penalidade SUAVE: a seleção de verde
+    # prefere reservar as faces ÍNGREMES (encosta), deixando o terreno PLANO para os lotes.
+    ingreme_reg = (rotate(declividade_acentuada, -ang_deg, origin=cen)
+                   if (declividade_acentuada is not None and not declividade_acentuada.is_empty and ang_deg)
+                   else declividade_acentuada)
 
     via_local = min(via, VIA_LOCAL_M)         # rua de quadra (local)
     # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO usa a
@@ -1324,7 +1351,9 @@ def gerar_layout(
 
     # 4.c VERDE: quadras verdes formadas até o orçamento de lazer — sempre deixando ≥1 p/ lotes.
     verde_budget = max(lazer_area - (clube_reg.area if clube_reg is not None else 0.0), 0.0)
-    verdes_reg, pool = _selecionar_verde(pool, verde_budget) if _pode_reservar(pool) else ([], pool)
+    verdes_reg, pool = (
+        _selecionar_verde(pool, verde_budget, ingreme_reg) if _pode_reservar(pool) else ([], pool)
+    )
     if not pool and verdes_reg:  # nunca consome a última face — uma quadra sempre vira lotes
         pool = [verdes_reg.pop()]
 
