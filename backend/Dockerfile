@@ -22,6 +22,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
+# scripts/ — comandos manuais do operador (ex.: seed de admin via scripts/criar_admin.py). NÃO são
+# agentes; precisam estar na imagem p/ rodar `podman exec api python -m scripts.<cmd>`.
+COPY scripts ./scripts
 
 EXPOSE 8700
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8700"]
