@@ -10,11 +10,11 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 ### Fase 11.14 — fallback de IA no gerador de programa (Claude → Gemini → preset)
 - **Problema (operador):** picos de `529 OverloadedError` (sobrecarga da Anthropic) derrubavam a
   proposta da IA direto para o preset — a cadeia era 100% Anthropic com 1 retry só.
-- **Correção:** o gerador virou uma **cadeia de provedores** (`GeradorProgramaEmCadeia`): Claude
-  (com `max_retries=2` no 529 + rung **Haiku** barato no fim da cadeia) → **Gemini** (fallback) →
-  **preset** determinístico. O 1º que responder vence; todos falharem → preset com o motivo real na
-  proveniência. A lógica de fusão/cap (consistência §4) foi extraída p/ `_montar_programa` — UM só
-  lugar, idêntico p/ os dois provedores (mesmo contrato §2: a IA não devolve nº/área).
+- **Correção:** o gerador virou uma **cadeia de provedores** (`GeradorProgramaEmCadeia`): Claude →
+  **Gemini** (fallback) → **preset** determinístico. O 1º que responder vence; todos falharem →
+  preset com o motivo real na proveniência. A lógica de fusão/cap (consistência §4) foi extraída p/
+  `_montar_programa` — UM só lugar, idêntico p/ os dois provedores (mesmo contrato §2: a IA não
+  devolve nº/área). A cadeia de modelos do Claude segue a de antes (sem mexer).
 - **Gemini 3.5 Flash** com *thinking* nível **médio**: JSON mode (o formato de tool difere do
   Claude), SDK `google-genai` com import TARDIO e gated por `GOOGLE_API_KEY` (sem chave → ignora).
   Modelo e nível de thinking **configuráveis por env** (`URBANISMO_GEMINI_MODELO`,

@@ -26,9 +26,6 @@ from app.core.extrator_luos import MODELO_PADRAO, cadeia_de_modelos, _opcoes_tls
 
 _log = logging.getLogger(__name__)
 
-# Rung BARATO no fim da cadeia Claude: raramente sobrecarrega (529) e basta p/ propor o programa.
-MODELO_BARATO = "claude-haiku-4-5-20251001"
-
 TIPOS = ("aberto", "fechado", "condominio_lotes", "desmembramento", "loteamento_rural")
 PUBLICOS = ("baixa", "media", "alta")
 
@@ -367,18 +364,15 @@ def _montar_programa(bruto: dict, publico_alvo: str, overrides: Optional[dict] =
 
 class GeradorProgramaClaude:
     """Provedor Claude (tool use forçado). Import de ``anthropic`` é TARDIO. Expõe ``propor_bruto``
-    (dict cru) — a fusão/preset fica no compositor. Cadeia: Fable 5/Opus 4.8 → Haiku (barato, raro
-    sobrecarregar) com retry no 529. Erro de serviço propaga p/ o compositor tentar o próximo."""
+    (dict cru) — a fusão/preset fica no compositor. Cadeia de modelos via ``cadeia_de_modelos``;
+    erro de serviço (ex.: 529) propaga p/ o compositor tentar o próximo provedor (Gemini)."""
 
     nome = "Claude"
 
     def __init__(self, api_key: Optional[str] = None, modelo: str = MODELO_PADRAO):
         self.api_key = api_key or os.getenv("ANTHROPIC_API_KEY")
-        # Cadeia: env URBANISMO_MODELO fixa um modelo; senão Fable 5 → Opus 4.8, + Haiku no fim
-        # (degrada do mais capaz ao mais barato/disponível antes de cair p/ outro provedor).
+        # Cadeia de modelos: env URBANISMO_MODELO fixa um modelo; senão Fable 5 → Opus 4.8.
         self.modelos = cadeia_de_modelos(os.getenv("URBANISMO_MODELO"))
-        if MODELO_BARATO not in self.modelos:
-            self.modelos = [*self.modelos, MODELO_BARATO]
         self.modelo_usado: Optional[str] = None
 
     def propor_bruto(self, contexto, tipo_loteamento, publico_alvo) -> Optional[dict]:
@@ -387,10 +381,10 @@ class GeradorProgramaClaude:
         except ImportError as exc:
             raise GeradorIndisponivel("Pacote 'anthropic' ausente.") from exc
 
-        # max_retries=2: o SDK já faz backoff exponencial no 429/500/529 (sobrecarga). Modesto de
-        # propósito — há fallback (Haiku/Gemini/preset), então degrada sem travar o request.
+        # Poucas retentativas do SDK (degradar RÁPIDO): há fallback (Gemini → preset), então não
+        # vale travar o request num 529 prolongado — o compositor passa pro próximo provedor.
         # (sem ``timeout=`` aqui: é mutuamente exclusivo com o http_client da TLS corporativa.)
-        client = anthropic.Anthropic(api_key=self.api_key, max_retries=2, **_opcoes_tls())
+        client = anthropic.Anthropic(api_key=self.api_key, max_retries=1, **_opcoes_tls())
         prompt = _prompt_usuario(contexto, tipo_loteamento, publico_alvo)
         resp, ultimo_erro = None, None
         for modelo in self.modelos:
