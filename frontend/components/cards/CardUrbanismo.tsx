@@ -14,6 +14,7 @@ import {
   proporUrbanismo,
   type ChaveOverlay,
   type ConformidadeLegal,
+  type Declividade,
   type ItemFidelidadeArea,
   type PerfilMunicipal,
   type PropostaUrbanistica,
@@ -80,11 +81,13 @@ export function CardUrbanismo({
   glebaGeojson,
   perfil,
   onData,
+  declividade,
 }: {
   analiseId: string;
   glebaGeojson: GeoJSON.Polygon;
   perfil?: PerfilMunicipal | null;
   onData?: (p: PropostaUrbanistica | null) => void;
+  declividade?: Declividade | null; // Fase 11.12 — vocação do terreno (topografia → perfil sugerido)
 }) {
   const zonas = perfil?.zonas.map((z) => z.codigo) ?? [];
   const [tipo, setTipo] = useState<TipoLoteamento>("aberto");
@@ -145,6 +148,35 @@ export function CardUrbanismo({
 
   const q = proposta?.quadro_areas;
   const ind = proposta?.indicadores;
+
+  // Fase 11.12 — VOCAÇÃO do terreno pela topografia: a app sugere o perfil (e avisa se o escolhido
+  // não combina). Heurística sobre a declividade já calculada (média + fração ≥30%).
+  const decMedia = declividade?.declividade_media_pct ?? null;
+  const ved30 = declividade?.flag_vedacao?.pct_da_gleba ?? 0;
+  let vocacao: { perfil: PublicoAlvo; texto: string } | null = null;
+  if (decMedia != null) {
+    const m = decMedia.toFixed(0);
+    const v = ved30 >= 0.05 ? `, ${(ved30 * 100).toFixed(0)}% em ≥30%` : "";
+    if (decMedia >= 15 || ved30 >= 0.12) {
+      vocacao = {
+        perfil: "alta",
+        texto: `Terreno de serra (declividade média ${m}%${v}) → vocação ALTA RENDA: lotes amplos, baixa densidade e valor de paisagem. Baixa renda densa renderia pouco aqui.`,
+      };
+    } else if (decMedia < 8 && ved30 < 0.05) {
+      vocacao = {
+        perfil: "baixa",
+        texto: `Terreno plano (declividade média ${m}%) → viável para todos os perfis; baixa/média renda densa rende bem.`,
+      };
+    } else {
+      vocacao = {
+        perfil: "media",
+        texto: `Relevo moderado (declividade média ${m}%${v}) → vocação média/alta renda.`,
+      };
+    }
+  }
+  const vocacaoConflita =
+    vocacao != null && vocacao.perfil !== publico &&
+    !(vocacao.perfil === "media" && publico === "alta");
 
   return (
     <Card>
@@ -219,6 +251,27 @@ export function CardUrbanismo({
             {carregando ? "Gerando…" : "Gerar estudo de massa (IA)"}
           </Button>
         </div>
+
+        {/* Fase 11.12 — VOCAÇÃO do terreno: a app sugere o perfil pela topografia e avisa conflito. */}
+        {vocacao && (
+          <p
+            className={`rounded-lg p-2.5 text-sm ${
+              vocacaoConflita
+                ? "bg-amber-50 text-amber-800"
+                : "bg-sky-50 text-sky-800"
+            }`}
+          >
+            {vocacaoConflita ? "⚠️ " : "🧭 "}
+            {vocacao.texto}
+            {vocacaoConflita && (
+              <>
+                {" "}
+                Você selecionou <strong>{publico === "baixa" ? "baixa renda" : publico === "media" ? "média renda" : "alta renda"}</strong>
+                {" "}— considere ajustar o público-alvo à vocação do terreno.
+              </>
+            )}
+          </p>
+        )}
 
         {/* Fase 11.11 — VALIDAÇÃO: o app corrige o usuário. Lote máx. perto do piso da zona =
             janela apertada → sobra. Avisa (não bloqueia). O piso vem do estudo já gerado. */}

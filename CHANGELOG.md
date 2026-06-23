@@ -7,6 +7,14 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-21
 
+### Fase 11.12 — alerta de VOCAÇÃO do terreno (topografia → perfil sugerido)
+- **Ideia (operador):** alertar o cliente sobre a vocação do terreno pela topografia. O card de
+  Urbanismo agora mostra, com base na declividade já calculada (média + fração ≥30%):
+  serra (média ≥15% ou ≥12% em ≥30%) → **vocação ALTA RENDA** (lotes amplos, baixa densidade);
+  plano (<8% e <5% em ≥30%) → viável p/ todos; relevo moderado → média/alta. Se o público-alvo
+  selecionado **conflita** com a vocação (ex.: baixa renda em serra), o aviso fica âmbar e sugere
+  ajustar — sem bloquear. Frontend-only; usa o `dadosDecliv` que a análise de declividade já produz.
+
 ### Fase 11.11 — validação de tamanho de lote na interface (o app corrige o usuário)
 - **Princípio (operador):** o cliente pode errar ao sugerir tamanhos; o papel da app é corrigi-lo —
   (a) corrigir sozinha o que é seguro (já feito no 11.10: janela mínima no default), (b) AVISAR

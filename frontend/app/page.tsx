@@ -269,6 +269,7 @@ export default function Home() {
                 analiseId={analise.analise_id}
                 glebaGeojson={analise.geometria.geojson}
                 perfil={perfil}
+                declividade={dadosDecliv}
               />
             </div>
             <div className={secao === "conformidade" ? "" : "hidden"}>
