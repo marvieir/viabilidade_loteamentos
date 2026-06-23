@@ -10,15 +10,31 @@ import type { ChaveOverlay } from "@/lib/api";
 import { CORES_FAIXA, CORES_OVERLAY, ESTILO_OVERLAY } from "@/components/mapa/overlays";
 
 // O front apenas RENDERIZA o GeoJSON que veio do backend. Nenhuma geo-matemática
-// aqui — fitBounds é só enquadramento de tela, não cálculo de viabilidade.
-function EnquadrarPoligono({ geojson }: { geojson: GeoJSON.Polygon }) {
+// aqui — fitBounds/invalidateSize são só enquadramento de tela, não cálculo de viabilidade.
+//
+// Leaflet mede o container UMA vez no mount. Se naquele instante ele estava oculto
+// (display:none, ex.: seção em aba não-ativa) ou se a altura muda depois (botão
+// "Expandir mapa"), o mapa não recalcula sozinho — só o tile inicial carrega e o resto
+// fica CINZA, com a vista presa no zoom inicial. Este helper recalcula o tamanho E
+// re-enquadra o polígono no mount e a cada redimensionamento do container.
+function AjustarEEnquadrar({ geojson }: { geojson: GeoJSON.Polygon }) {
   const map = useMap();
   useEffect(() => {
-    const layer = L.geoJSON(geojson as GeoJsonObject);
-    const bounds = layer.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [24, 24] });
-    }
+    const ajustar = () => {
+      map.invalidateSize();
+      const bounds = L.geoJSON(geojson as GeoJsonObject).getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [24, 24] });
+      }
+    };
+    // Primeiro ajuste após o layout assentar (container já com tamanho real).
+    const t = setTimeout(ajustar, 0);
+    const ro = new ResizeObserver(ajustar);
+    ro.observe(map.getContainer());
+    return () => {
+      clearTimeout(t);
+      ro.disconnect();
+    };
   }, [geojson, map]);
   return null;
 }
@@ -125,7 +141,7 @@ export default function MapaLeaflet({
         data={geojson as GeoJsonObject}
         style={{ color: "#f59e0b", weight: 2, fill: false }}
       />
-      <EnquadrarPoligono geojson={geojson} />
+      <AjustarEEnquadrar geojson={geojson} />
     </MapContainer>
   );
 }
