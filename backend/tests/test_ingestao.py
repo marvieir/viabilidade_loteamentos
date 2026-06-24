@@ -78,6 +78,21 @@ def test_c2c_poligonos_conexos_unidos(client):
     assert any("conexos" in a for a in data["avisos"])
 
 
+# 2d) Feição LINEAR (córrego/via como polígono fino) + bloco de área → linear é descartada.
+_BLOCO = [(-47.10, -23.52), (-47.09, -23.52), (-47.09, -23.51), (-47.10, -23.51)]  # compacto
+_LINEAR = [(-47.30, -23.55), (-47.05, -23.55), (-47.05, -23.5505), (-47.30, -23.5505)]  # fita fina
+
+
+def test_c2d_feicao_linear_descartada(client):
+    r = _post(client, make_kmz([_BLOCO, _LINEAR]))
+    assert r.status_code == 200, r.text
+    data = r.json()
+    # gleba = só o bloco (a fita fina, córrego/via, foi descartada)
+    so_bloco = _post(client, make_kmz([_BLOCO])).json()["geometria"]["area_m2"]
+    assert data["geometria"]["area_m2"] == so_bloco
+    assert any("linear" in a for a in data["avisos"])
+
+
 # 3) 1 LineString simples FECHADA → LINHA_FECHAVEL; área bate com o polígono equivalente.
 def test_c3_linha_fechada(client):
     r = _post(client, make_kmz_linhas([LINHA_FECHADA]))

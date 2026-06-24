@@ -7,6 +7,7 @@ Endpoints:
 """
 
 import hashlib
+import math
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -202,31 +203,64 @@ async def criar_analise(
     return await _criar_analise_agrupada(arquivos, fonte_malha)
 
 
+# Compacidade Polsby-Popper (4π·área/perímetro²): abaixo de _COMPAC_LINEAR a forma é claramente
+# LINEAR (córrego/via como polígono fino/ramificado, ex.: 0,033); _COMPAC_BLOCO marca uma área
+# "cheia" (quadra/lote, ex.: 0,6). Strip-amos a linear só quando ambos coexistem (conservador).
+_COMPAC_LINEAR = 0.08
+_COMPAC_BLOCO = 0.30
+
+
 def _gleba_de_poligonos(poligonos, rotulo: str = ""):
     """Monta a gleba a partir dos N polígonos de UM arquivo (decisão do operador, Fase 1.x):
 
     - 1 polígono → ele mesmo.
-    - CONEXOS (se tocam/sobrepõem → ``unary_union`` vira um ``Polygon`` só) → UNE: é um projeto
-      único, então a gleba é o conjunto completo (mostra todas as áreas, não só a maior peça).
-    - DISJUNTOS (união vira ``MultiPolygon`` → parcelas separadas no mesmo arquivo) → usa a de
-      MAIOR área + aviso (não funde glebas sem relação espacial).
+    - FEIÇÃO LINEAR (córrego/via desenhada como polígono finíssimo/ramificado — compacidade
+      Polsby-Popper baixíssima) é DESCARTADA quando há bloco de ÁREA compacto no mesmo arquivo
+      (heurística conservadora: só dispara com os dois sinais juntos — não funde nem strip-a uma
+      gleba genuinamente irregular que esteja sozinha).
+    - Dos que sobram: CONEXOS (se tocam/sobrepõem → ``unary_union`` vira um ``Polygon``) → UNE
+      (projeto único, mostra todas as áreas); DISJUNTOS (``MultiPolygon`` → parcelas separadas)
+      → o de MAIOR área + aviso (não funde glebas sem relação espacial).
 
     Devolve ``(gleba, avisos)``. Determinístico.
     """
     pref = f"{rotulo}: " if rotulo else ""
     if len(poligonos) <= 1:
         return poligonos[0], []
-    uni = unary_union(poligonos)
+
+    avisos: list[str] = []
+    # Compacidade geodésica (4π·área/perímetro²): 1=círculo, ~0=linha/ramificado. Usa a MESMA
+    # medida métrica do resto do tool (geometria.medir), não área em graus.
+    medidos = []
+    for p in poligonos:
+        area_m2, per_m = geometria.medir(p)
+        comp = (4.0 * math.pi * area_m2) / (per_m * per_m) if per_m else 0.0
+        medidos.append((p, comp))
+    tem_bloco = any(c >= _COMPAC_BLOCO for _, c in medidos)
+    lineares = [m for m in medidos if m[1] < _COMPAC_LINEAR]
+    if tem_bloco and lineares:
+        medidos = [m for m in medidos if m[1] >= _COMPAC_LINEAR]
+        avisos.append(
+            f"{pref}{len(lineares)} feição(ões) linear(es) (córrego/via desenhada como polígono) "
+            "descartada(s) — não é gleba."
+        )
+
+    polys = [m[0] for m in medidos]
+    if len(polys) == 1:
+        return polys[0], avisos
+    uni = unary_union(polys)
     if uni.geom_type == "Polygon":
-        return uni, [
-            f"{pref}KMZ continha {len(poligonos)} polígonos conexos; unidos como projeto único "
+        avisos.append(
+            f"{pref}KMZ continha {len(polys)} polígonos conexos; unidos como projeto único "
             "(a gleba é o conjunto completo das áreas)."
-        ]
+        )
+        return uni, avisos
     maior = max(uni.geoms, key=lambda g: g.area)
-    return maior, [
-        f"{pref}KMZ continha {len(poligonos)} polígonos SEPARADOS (não conexos); usado o de "
+    avisos.append(
+        f"{pref}KMZ continha {len(polys)} polígonos SEPARADOS (não conexos); usado o de "
         "maior área."
-    ]
+    )
+    return maior, avisos
 
 
 async def _criar_analise_unica(upload: UploadFile, fonte_malha):

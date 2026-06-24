@@ -16,13 +16,17 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
   recupera são DESCARTADOS (com aviso), em vez de seguirem inválidos e derrubarem o upload.
   Polígono quebrado COM área real segue recusado com diagnóstico. Se sobrar nada → recusa honesta
   (422), sem `IndexError`.
-- **Gleba de N polígonos (`analises._gleba_de_poligonos`, decisão do operador):** CONEXOS (se
-  tocam/sobrepõem → `unary_union` vira um `Polygon`) → **unidos como projeto único** (a gleba é o
-  conjunto completo); DISJUNTOS (vira `MultiPolygon`) → o de **maior área** + aviso (não funde
-  parcelas sem relação). Aplicado no caminho de 1 arquivo e no de 2+ (consistente).
-- Validado no KMZ do operador: 11 polígonos → 9 válidos → gleba unida de **50,77 ha** (antes
-  mostrava só 35,63 ha de uma peça). Suíte **450 passed** (+3 testes: degenerado isolado,
-  fragmento descartado, polígonos conexos unidos).
+- **Gleba de N polígonos (`analises._gleba_de_poligonos`, decisão do operador):**
+  - **Feição LINEAR descartada:** córrego/via desenhada como polígono finíssimo/ramificado
+    (compacidade Polsby-Popper < 0,08) é removida quando há bloco de ÁREA compacto (≥ 0,30) no
+    mesmo arquivo — heurística conservadora (só dispara com os dois sinais juntos; não toca numa
+    gleba irregular sozinha).
+  - Dos que sobram: CONEXOS (`unary_union` vira `Polygon`) → **unidos como projeto único**;
+    DISJUNTOS (`MultiPolygon`) → o de **maior área** + aviso. Aplicado em 1 arquivo e em 2+.
+- Validado no KMZ do operador: 11 polígonos → 9 válidos → 1 córrego/via descartado → **gleba real
+  de 18,71 ha** (perímetro 11.935 → 1.967 m; antes mostrava o córrego de 35,63 ha). Suíte
+  **451 passed** (+4 testes: degenerado isolado, fragmento descartado, conexos unidos, feição
+  linear descartada).
 
 ### Fase 11.14 — fallback de IA no gerador de programa (Claude → Gemini → preset)
 - **Problema (operador):** picos de `529 OverloadedError` (sobrecarga da Anthropic) derrubavam a
