@@ -48,6 +48,21 @@ def test_c2_multipoligono_maior_e_aviso(client):
     assert data["geometria"]["area_m2"] == so_maior["geometria"]["area_m2"]
 
 
+# 2b) Polígono válido + fragmento DEGENERADO (área zero, ex.: anel colinear de export CAD) →
+# carrega normalmente; o lixo é descartado (não dá 422) e a gleba (maior área) é usada.
+_DEGENERADO = [(-47.10, -23.52), (-47.11, -23.53)]  # _fechar → [a,b,a]: espícula, área zero
+
+
+def test_c2b_fragmento_sem_area_descartado(client):
+    r = _post(client, make_kmz([RET_RETANGULO, _DEGENERADO]))
+    assert r.status_code == 200, r.text  # não derruba o upload (antes: 422 "Too few points")
+    data = r.json()
+    # área = só a do retângulo válido (o fragmento de área zero foi ignorado)
+    so_valido = _post(client, make_kmz([RET_RETANGULO])).json()
+    assert data["geometria"]["area_m2"] == so_valido["geometria"]["area_m2"]
+    assert any("sem área" in a for a in data["avisos"])  # avisa o descarte (honesto)
+
+
 # 3) 1 LineString simples FECHADA → LINHA_FECHAVEL; área bate com o polígono equivalente.
 def test_c3_linha_fechada(client):
     r = _post(client, make_kmz_linhas([LINHA_FECHADA]))

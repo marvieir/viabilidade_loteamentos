@@ -56,8 +56,8 @@ def test_polygon_auto_interseccionado_reparado(client):
 
 
 def test_geometria_irreparavel_422(client):
-    """Degenerado (agulha de área 0) → buffer(0) vazio → segue inválido → 422 honesto.
-    O auto-reparo só desbloqueia o que vira polígono de área; o resto continua recusado."""
+    """Degenerado (agulha de área 0) → buffer(0) vazio → descartado → sem gleba → 422 honesto.
+    O auto-reparo só desbloqueia o que vira polígono de área; arquivo só com lixo é recusado."""
     agulha = [(-47.14, -23.53), (-47.13, -23.52), (-47.14, -23.53), (-47.13, -23.52)]
     r = _post_analise(client, [agulha])
     assert r.status_code == 422

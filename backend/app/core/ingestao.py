@@ -155,6 +155,7 @@ def _reparar_poligonos(poligonos: list[Polygon]) -> tuple[list[Polygon], bool, l
     """
     out: list[Polygon] = []
     reparados = 0
+    descartados = 0
     avisos: list[str] = []
     for p in poligonos:
         if not p.is_empty and p.is_valid:
@@ -162,6 +163,13 @@ def _reparar_poligonos(poligonos: list[Polygon]) -> tuple[list[Polygon], bool, l
             continue
         rep = p.buffer(0)  # buffer 0 = limpeza topológica (distância 0; vale em graus)
         if rep.is_empty or not rep.is_valid:
+            # buffer(0) não recuperou. Se o polígono é DEGENERADO (área zero — linha/ponto
+            # disfarçado de <Polygon>, lixo comum de export CAD), DESCARTA: não é gleba e não
+            # pode bloquear um arquivo que TEM polígonos válidos (o motor escolhe o de maior
+            # área adiante). Com área real (boundary quebrada) → mantém p/ recusa diagnóstica.
+            if p.area == 0:
+                descartados += 1
+                continue
             out.append(p)  # não deu para reparar → segue inválido (recusa diagnóstica adiante)
             continue
         if rep.geom_type == "MultiPolygon":
@@ -177,6 +185,11 @@ def _reparar_poligonos(poligonos: list[Polygon]) -> tuple[list[Polygon], bool, l
             0,
             f"{reparados} polígono(s) com auto-interseção corrigido(s) automaticamente "
             "(buffer 0). Confira o traçado no mapa antes de confiar nos números.",
+        )
+    if descartados:
+        avisos.append(
+            f"{descartados} fragmento(s) sem área (linha/ponto disfarçado de polígono) "
+            "descartado(s) do arquivo."
         )
     return out, reparados > 0, avisos
 
@@ -196,16 +209,28 @@ def ingerir(
 
     if n_poly >= 1:
         poligonos, reparou, avisos = _reparar_poligonos(conteudo_kml.poligonos)
-        return Ingestao(
-            ok=True,
-            rota="POLYGON_REPARADO" if reparou else "POLYGON_DIRETO",
-            descricao=(
-                "polígono corrigido (auto-interseção) do arquivo"
-                if reparou
-                else "polígono direto do arquivo"
-            ),
-            poligonos=poligonos,
-            avisos=avisos,
+        if poligonos:  # sobrou ao menos um polígono com área (a gleba)
+            return Ingestao(
+                ok=True,
+                rota="POLYGON_REPARADO" if reparou else "POLYGON_DIRETO",
+                descricao=(
+                    "polígono corrigido (auto-interseção) do arquivo"
+                    if reparou
+                    else "polígono direto do arquivo"
+                ),
+                poligonos=poligonos,
+                avisos=avisos,
+            )
+        # TODO "polígono" do arquivo era DEGENERADO (área zero) e foi descartado → não há gleba.
+        # Recusa honesta (antes o degenerado seguia inválido e o motor recusava em geometria.medir;
+        # agora, descartado, a lista esvazia — então recusamos aqui, sem IndexError no router).
+        return _recusa(
+            "POLIGONO_DEGENERADO",
+            "poligono_degenerado",
+            f"{n_poly} polígono(s) inválido(s)/sem área (geometria degenerada); nenhuma gleba.",
+            n_poly,
+            n_lin,
+            n_pts,
         )
 
     if n_lin == 1:
