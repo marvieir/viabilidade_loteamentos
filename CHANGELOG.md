@@ -7,6 +7,23 @@ backend, determinismo, proveniência, e valores-ouro por fase passando.
 
 ## [não publicado] — 2026-06-23
 
+### Fase 1.x (fix) — KMZ multi-polígono: descarta lixo e une projeto conexo
+- **Problema (operador):** KMZ real (export CAD, "retificadas") com vários polígonos quebrava o
+  upload (`422 Too few points`) por causa de 2 fragmentos de área zero (linha/ponto disfarçado de
+  `<Polygon>`); e, quando carregava, mostrava só **o polígono de maior área** — uma figura fina/
+  ramificada — em vez das áreas delimitadas do projeto.
+- **Descarte de lixo (`ingestao._reparar_poligonos`):** fragmentos sem área que o `buffer(0)` não
+  recupera são DESCARTADOS (com aviso), em vez de seguirem inválidos e derrubarem o upload.
+  Polígono quebrado COM área real segue recusado com diagnóstico. Se sobrar nada → recusa honesta
+  (422), sem `IndexError`.
+- **Gleba de N polígonos (`analises._gleba_de_poligonos`, decisão do operador):** CONEXOS (se
+  tocam/sobrepõem → `unary_union` vira um `Polygon`) → **unidos como projeto único** (a gleba é o
+  conjunto completo); DISJUNTOS (vira `MultiPolygon`) → o de **maior área** + aviso (não funde
+  parcelas sem relação). Aplicado no caminho de 1 arquivo e no de 2+ (consistente).
+- Validado no KMZ do operador: 11 polígonos → 9 válidos → gleba unida de **50,77 ha** (antes
+  mostrava só 35,63 ha de uma peça). Suíte **450 passed** (+3 testes: degenerado isolado,
+  fragmento descartado, polígonos conexos unidos).
+
 ### Fase 11.14 — fallback de IA no gerador de programa (Claude → Gemini → preset)
 - **Problema (operador):** picos de `529 OverloadedError` (sobrecarga da Anthropic) derrubavam a
   proposta da IA direto para o preset — a cadeia era 100% Anthropic com 1 retry só.

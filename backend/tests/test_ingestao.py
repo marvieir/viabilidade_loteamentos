@@ -63,6 +63,21 @@ def test_c2b_fragmento_sem_area_descartado(client):
     assert any("sem área" in a for a in data["avisos"])  # avisa o descarte (honesto)
 
 
+# 2c) Polígonos CONEXOS (se sobrepõem) → unidos como projeto único (não só o maior).
+_RET_A = [(-47.10, -23.52), (-47.08, -23.52), (-47.08, -23.51), (-47.10, -23.51)]
+_RET_B = [(-47.09, -23.52), (-47.07, -23.52), (-47.07, -23.51), (-47.09, -23.51)]  # sobrepõe A
+
+
+def test_c2c_poligonos_conexos_unidos(client):
+    r = _post(client, make_kmz([_RET_A, _RET_B]))
+    assert r.status_code == 200, r.text
+    data = r.json()
+    area_uniao = data["geometria"]["area_m2"]
+    so_a = _post(client, make_kmz([_RET_A])).json()["geometria"]["area_m2"]
+    assert area_uniao > so_a  # união cobre mais que uma peça só (não é "o maior")
+    assert any("conexos" in a for a in data["avisos"])
+
+
 # 3) 1 LineString simples FECHADA → LINHA_FECHAVEL; área bate com o polígono equivalente.
 def test_c3_linha_fechada(client):
     r = _post(client, make_kmz_linhas([LINHA_FECHADA]))

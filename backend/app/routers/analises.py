@@ -202,6 +202,33 @@ async def criar_analise(
     return await _criar_analise_agrupada(arquivos, fonte_malha)
 
 
+def _gleba_de_poligonos(poligonos, rotulo: str = ""):
+    """Monta a gleba a partir dos N polígonos de UM arquivo (decisão do operador, Fase 1.x):
+
+    - 1 polígono → ele mesmo.
+    - CONEXOS (se tocam/sobrepõem → ``unary_union`` vira um ``Polygon`` só) → UNE: é um projeto
+      único, então a gleba é o conjunto completo (mostra todas as áreas, não só a maior peça).
+    - DISJUNTOS (união vira ``MultiPolygon`` → parcelas separadas no mesmo arquivo) → usa a de
+      MAIOR área + aviso (não funde glebas sem relação espacial).
+
+    Devolve ``(gleba, avisos)``. Determinístico.
+    """
+    pref = f"{rotulo}: " if rotulo else ""
+    if len(poligonos) <= 1:
+        return poligonos[0], []
+    uni = unary_union(poligonos)
+    if uni.geom_type == "Polygon":
+        return uni, [
+            f"{pref}KMZ continha {len(poligonos)} polígonos conexos; unidos como projeto único "
+            "(a gleba é o conjunto completo das áreas)."
+        ]
+    maior = max(uni.geoms, key=lambda g: g.area)
+    return maior, [
+        f"{pref}KMZ continha {len(poligonos)} polígonos SEPARADOS (não conexos); usado o de "
+        "maior área."
+    ]
+
+
 async def _criar_analise_unica(upload: UploadFile, fonte_malha):
     """Caminho de UM arquivo — comportamento idêntico ao da Fase 1.5/1.7 (não-regressão)."""
     conteudo = await upload.read()
@@ -228,23 +255,17 @@ async def _criar_analise_unica(upload: UploadFile, fonte_malha):
 
     avisos: list[str] = list(res.avisos)
 
-    # Mede todos; geometria inválida → 422 (não 500, não silêncio).
-    medidos = []
+    # Valida cada polígono (geometria inválida → 422 honesto, não 500, não silêncio).
     for poly in res.poligonos:
         try:
-            area, perimetro = geometria.medir(poly)
+            geometria.medir(poly)
         except geometria.GeometriaInvalida as exc:
             raise HTTPException(422, str(exc))
-        medidos.append((poly, area, perimetro))
 
-    # Múltiplos polígonos → usa o de maior área e registra o aviso.
-    medidos.sort(key=lambda t: t[1], reverse=True)
-    if len(medidos) > 1:
-        avisos.append(
-            f"KMZ continha {len(medidos)} polígonos; usado o de maior área."
-        )
-
-    poly, area, perimetro = medidos[0]
+    # Vários polígonos → conexos viram a gleba unida (projeto único); disjuntos → o de maior área.
+    poly, avisos_gleba = _gleba_de_poligonos(res.poligonos)
+    avisos.extend(avisos_gleba)
+    area, perimetro = geometria.medir(poly)
     jur = resolver_jurisdicao(poly, fonte_malha)
 
     analise_id = str(
@@ -283,9 +304,10 @@ def _crs_local_aeqd(lon: float, lat: float) -> CRS:
 
 async def _ler_gleba(upload: UploadFile):
     """Lê um arquivo → (polígono da gleba, conteúdo, avisos). 1 gleba por arquivo: vários
-    polígonos no mesmo arquivo → o de maior área (mesma regra do caminho único). Levanta
-    ``HTTPException`` (arquivo vazio/inválido) ou devolve ``(None, res, [])`` em recusa de
-    ingestão para o chamador emitir o 422 diagnóstico por arquivo."""
+    polígonos no mesmo arquivo → CONEXOS unidos / DISJUNTOS o de maior área (via
+    ``_gleba_de_poligonos``, mesma regra do caminho único). Levanta ``HTTPException`` (arquivo
+    vazio/inválido) ou devolve ``(None, res, [])`` em recusa de ingestão para o chamador emitir
+    o 422 diagnóstico por arquivo."""
     conteudo = await upload.read()
     if not conteudo:
         raise HTTPException(422, f"Arquivo vazio: {upload.filename}.")
@@ -296,21 +318,16 @@ async def _ler_gleba(upload: UploadFile):
     if not res.ok:
         return None, res, []
 
-    medidos = []
     for poly in res.poligonos:
         try:
-            area, _ = geometria.medir(poly)
+            geometria.medir(poly)
         except geometria.GeometriaInvalida as exc:
             raise HTTPException(422, f"{upload.filename}: {exc}")
-        medidos.append((poly, area))
-    medidos.sort(key=lambda t: t[1], reverse=True)
 
     avisos = [f"{upload.filename}: {a}" for a in res.avisos]
-    if len(medidos) > 1:
-        avisos.append(
-            f"{upload.filename}: continha {len(medidos)} polígonos; usado o de maior área."
-        )
-    return medidos[0][0], conteudo, avisos
+    gleba, avisos_gleba = _gleba_de_poligonos(res.poligonos, rotulo=upload.filename)
+    avisos.extend(avisos_gleba)
+    return gleba, conteudo, avisos
 
 
 async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha):
