@@ -13,6 +13,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   verde_dura: "#dc2626", // verde em APP/UC = restrição dura (Fase 2.3)
   verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
   declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5)
+  areas_umidas: "#0d9488", // área úmida/alagável (APP candidata) — teal/azul-esverdeado
   // Fase 9 — estudo de massa esquemático
   urb_lotes: "#6366f1",
   urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
@@ -44,6 +45,9 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   urb_verde_sobra: { color: "#65a30d", weight: 1.5, fillColor: "#bef264", fillOpacity: 0.5, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
+  // Área úmida/alagável: teal com hachura "ondulada" (dash) — lê como água/charco, distinto do
+  // verde (vegetação) e do azul de APP de hidrografia. Fica sobre o satélite sem virar bloco sólido.
+  areas_umidas: { color: "#0f766e", weight: 2, fillColor: "#14b8a6", fillOpacity: 0.45, dashArray: "3 4" },
   // Fase 11.3 — PÓRTICO/ENTRADA: marcador ROSA/MAGENTA forte (cor única no mapa, borda grossa) —
   // lê como o componente "portaria" no acesso único, achável sobre o satélite e os lotes.
   urb_portico: { color: "#831843", weight: 3, fillColor: "#ec4899", fillOpacity: 0.95 },
@@ -65,6 +69,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   verde_dura: "Verde em APP/UC (restrição dura)",
   verde_verificar: "Verde a verificar",
   declividade_vedada: "Declividade ≥30% (vedada)",
+  areas_umidas: "Área úmida/alagável (APP candidata)",
   urb_lotes: "Lotes (vendável)",
   urb_quadras: "Quadras (faces da malha)",
   urb_arruamento: "Sistema viário (malha)",

@@ -17,6 +17,7 @@ import { CardUrbanismo } from "@/components/cards/CardUrbanismo";
 import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
+import { CardAreasUmidas } from "@/components/cards/CardAreasUmidas";
 import { CardDeclividade } from "@/components/cards/CardDeclividade";
 import { CardJuridico } from "@/components/cards/CardJuridico";
 import { CardConformidade } from "@/components/cards/CardConformidade";
@@ -48,6 +49,7 @@ export default function Home() {
   // Overlays por origem (cada card alimenta o seu); o mapa-herói mostra a união.
   const [overlaysAmb, setOverlaysAmb] = useState<Overlays>({});
   const [overlaysVerde, setOverlaysVerde] = useState<Overlays>({});
+  const [overlaysUmidas, setOverlaysUmidas] = useState<Overlays>({});
   const [overlaysDecliv, setOverlaysDecliv] = useState<Overlays>({});
   const [ocultos, setOcultos] = useState<Set<ChaveOverlay>>(new Set());
 
@@ -85,7 +87,7 @@ export default function Home() {
       Object.entries(m).map(([k, v]) => [k, v === "analisando" ? "ok" : v]))), 60000);
   }
 
-  const overlays: Overlays = { ...overlaysAmb, ...overlaysVerde, ...overlaysDecliv };
+  const overlays: Overlays = { ...overlaysAmb, ...overlaysVerde, ...overlaysUmidas, ...overlaysDecliv };
 
   // Fase 7 — laudo PDF: repassa os JSONs que os cards já receberam (front não recalcula).
   async function onLaudo() {
@@ -174,6 +176,7 @@ export default function Home() {
     setSecao("visao");
     setOverlaysAmb({});
     setOverlaysVerde({});
+    setOverlaysUmidas({});
     setOverlaysDecliv({});
     setOcultos(new Set());
     setPerfil(null);
@@ -294,11 +297,16 @@ export default function Home() {
                 onIr={setSecao}
               />
             </div>
-            <div className={secao === "ambiental" ? "" : "hidden"}>
+            <div className={secao === "ambiental" ? "space-y-4" : "hidden"}>
               <CardAmbiental
                 analiseId={analise.analise_id}
                 onOverlays={setOverlaysAmb}
                 onData={(d) => { setDadosAmb(d); marcar("ambiental")("ok"); }}
+                sinal={sinal}
+              />
+              <CardAreasUmidas
+                analiseId={analise.analise_id}
+                onOverlaysUmidas={setOverlaysUmidas}
                 sinal={sinal}
               />
             </div>

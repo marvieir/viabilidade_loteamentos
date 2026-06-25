@@ -391,6 +391,7 @@ export type ChaveOverlay =
   | "verde_dura"
   | "verde_verificar"
   | "declividade_vedada"
+  | "areas_umidas"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
   | "urb_lotes"
   | "urb_quadras"
@@ -468,6 +469,30 @@ export interface SeveridadeVerde {
 
 export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {
   const res = await fetch(`${API_BASE}/api/analises/${analiseId}/vegetacao`);
+  return jsonOrThrow(res);
+}
+
+// ----- Áreas úmidas / alagadas (nova dimensão ambiental) -----
+export interface ProvenienciaAreasUmidas {
+  fonte: string | null;
+  data_referencia: string | null;
+  classes: string[];
+  base_legal: string | null;
+  ressalva: string | null;
+}
+
+export interface AreasUmidas {
+  consultada: boolean;
+  area_total_m2: number;
+  area_umida_m2: number | null;
+  pct_da_gleba: number | null;
+  geojson_umidas: GeoJSON.Geometry | Record<string, never>;
+  proveniencia: ProvenienciaAreasUmidas | null;
+  avisos: string[];
+}
+
+export async function buscarAreasUmidas(analiseId: string): Promise<AreasUmidas> {
+  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/areas-umidas`);
   return jsonOrThrow(res);
 }
 
