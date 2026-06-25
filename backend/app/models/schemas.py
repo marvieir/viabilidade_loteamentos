@@ -298,6 +298,25 @@ class SeveridadeVerdeOut(BaseModel):
     ressalva: str
 
 
+# ----- Áreas úmidas / alagadas (nova dimensão ambiental) -----
+class ProvenienciaAreasUmidasOut(BaseModel):
+    fonte: Optional[str] = None
+    data_referencia: Optional[str] = None
+    classes: list[str] = []
+    base_legal: Optional[str] = None
+    ressalva: Optional[str] = None
+
+
+class AreasUmidasOut(BaseModel):
+    consultada: bool
+    area_total_m2: float
+    area_umida_m2: Optional[float] = None   # None = não consultada (sem marcação)
+    pct_da_gleba: Optional[float] = None
+    geojson_umidas: dict = {}               # overlay no mapa (área úmida/alagável)
+    proveniencia: Optional[ProvenienciaAreasUmidasOut] = None
+    avisos: list[str] = []
+
+
 # ----- Fase 2.5 — Declividade via DEM (faixas + flag legal ≥30%) -----
 class FaixaDeclividadeOut(BaseModel):
     classe: Literal["suave", "media", "alta"]

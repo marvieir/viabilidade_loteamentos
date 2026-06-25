@@ -23,6 +23,7 @@ from app.routers import (
     admin,
     ambiental,
     analises,
+    areas_umidas,
     auth,
     conformidade,
     declividade,
@@ -68,6 +69,7 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(analises.router, prefix="/api")
 app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")
+app.include_router(areas_umidas.router, prefix="/api")
 app.include_router(declividade.router, prefix="/api")
 app.include_router(perfil.router, prefix="/api")
 app.include_router(juridico.router, prefix="/api")

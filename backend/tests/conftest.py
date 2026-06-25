@@ -30,6 +30,7 @@ from app.core.financeira_store import get_fonte_financeira
 from app.core.localizacao import FonteLocalizacaoMemoria, get_fonte_localizacao
 from app.core.store import STORE
 from app.core.declividade import DEMRecorte, get_fonte_dem
+from app.core.areas_umidas import CoberturaUmida, get_fonte_areas_umidas
 from app.core.vegetacao import CoberturaVerde, get_fonte_vegetacao
 from app.main import app
 from app.models.schemas import FichaJuridica, PerfilMunicipal
@@ -226,6 +227,8 @@ def _vegetacao_auto_off(monkeypatch):
     # fica DESLIGADO (sem rede/rasterio no sandbox), preservando o caminho "sem fonte →
     # degrada honesto". Testes que exercem o modo auto religam via monkeypatch.
     monkeypatch.setenv("VEGETACAO_WORLDCOVER_AUTO", "0")
+    # Idem para a camada de áreas úmidas (WorldCover classe 90 via HTTP é o default em produção).
+    monkeypatch.setenv("AREAS_UMIDAS_WORLDCOVER_AUTO", "0")
     # Idem para o DEM da declividade (Copernicus via HTTP é o default em produção).
     monkeypatch.setenv("DEM_FONTE", "none")
 
@@ -270,6 +273,27 @@ def fonte_vegetacao():
 
     yield _set
     app.dependency_overrides.pop(get_fonte_vegetacao, None)
+
+
+class StubFonteAreasUmidas:
+    """Fonte de áreas úmidas de TESTE — devolve uma CoberturaUmida fixa, sem raster/rede."""
+
+    def __init__(self, cobertura: "CoberturaUmida"):
+        self._cobertura = cobertura
+
+    def areas_umidas(self, gleba):  # assinatura de FonteAreasUmidas
+        return self._cobertura
+
+
+@pytest.fixture
+def fonte_areas_umidas():
+    """Injeta uma fonte de áreas úmidas-stub. Uso: ``fonte_areas_umidas(CoberturaUmida(...))``."""
+
+    def _set(cobertura: "CoberturaUmida"):
+        app.dependency_overrides[get_fonte_areas_umidas] = lambda: StubFonteAreasUmidas(cobertura)
+
+    yield _set
+    app.dependency_overrides.pop(get_fonte_areas_umidas, None)
 
 
 @pytest.fixture
