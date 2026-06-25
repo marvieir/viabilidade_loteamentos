@@ -42,6 +42,9 @@ ARQUETIPO_GRELHA = "grelha_eficiente"
 VIA_LOCAL_M = 8.0
 # Frente mínima legal (Lei 6.766/79 art. 4º II) — testada nunca abaixo disso.
 FRENTE_MIN_M = 5.0
+# Fase 11.3/11.4 — raio do disco do PÓRTICO (marcador da portaria no mapa). Também é a folga mínima
+# da boca de entrada à mata reservada: a portaria não pode invadir a área preservada.
+RAIO_PORTICO_M = 12.0
 
 # ---- Fase 9.7: MALHA VIÁRIA + QUADRAS COMO FACES (a inversão da geração, §0 da spec) ----
 # Largura do TRONCO/coletora (hierarquia legal ≥21 m) — os eixos da IA viram via principal.
@@ -1489,17 +1492,36 @@ def gerar_layout(
     inst_na_entrada = False
     if arruamento is not None and not arruamento.is_empty:
         gminx, gminy, gmaxx, gmaxy = aprov.bounds
-        # Fase 11.3 — ENTRADA = onde a VIA toca a BORDA da gleba (a via sai p/ a estrada externa ali).
-        # Pega o MAIOR trecho de borda coberto por via (a boca principal); fallback = meio-sul do bbox.
+        # Fase 11.4 — ENTRADA = onde a VIA toca a BORDA da gleba (a via sai p/ a estrada externa ali).
+        # A via de CONTORNO corre RENTE à mata preservada/não-edificável e gera o MAIOR contato de
+        # borda — justo onde a portaria NÃO pode cair (gate encravado no meio da reserva). Por isso o
+        # critério antigo "maior trecho" punha o pórtico na frente da mata. Agora: entre os contatos,
+        # mantém só os que AFASTAM a boca da reserva o bastante p/ o disco do pórtico não invadir a
+        # mata (clearance = RAIO_PORTICO_M) e, entre esses, escolhe o MAIOR (a boca principal — uma
+        # frente de rua larga, não um arranhão). Relaxa em degraus se nada limpar (degradação honesta).
+        def _meio(s):
+            return s.interpolate(0.5, normalized=True)
         borda_via = _valido(aprov.boundary.intersection(arruamento.buffer(1.0)))
         segs = []
         if borda_via is not None and not borda_via.is_empty:
             segs = list(borda_via.geoms) if hasattr(borda_via, "geoms") else [borda_via]
-            segs = [s for s in segs if getattr(s, "length", 0) > 0]
-        if segs:
-            portico_pt = max(segs, key=lambda s: s.length).interpolate(0.5, normalized=True)
+            segs = [s for s in segs if getattr(s, "length", 0) >= 2.0]
+        reserva = verde_reservado if (verde_reservado is not None and not verde_reservado.is_empty) else None
+        candidatos = segs
+        if reserva is not None and segs:
+            for folga in (RAIO_PORTICO_M, 2.0):
+                limpos = [s for s in segs if _meio(s).distance(reserva) >= folga]
+                if limpos:
+                    candidatos = limpos
+                    break
+        if candidatos:
+            portico_pt = _meio(max(candidatos, key=lambda s: s.length))
         else:
-            portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
+            nucleo = unary_union(lotes).centroid if lotes else aprov.centroid
+            if nucleo is not None and not nucleo.is_empty:
+                portico_pt = nearest_points(nucleo, arruamento)[1]
+            else:
+                portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
         if inst is not None and not inst.is_empty:
             diag_gleba = math.hypot(gmaxx - gminx, gmaxy - gminy)
             inst_na_entrada = inst.distance(portico_pt) <= 0.35 * max(diag_gleba, 1.0)
@@ -1507,7 +1529,7 @@ def gerar_layout(
     # Fase 11.3 — marcador do PÓRTICO p/ o mapa (disco no acesso): elemento visível da "portaria",
     # não só o contador. Disco cheio (~12 m de raio) na entrada — NÃO clipa ao aproveitável (a
     # portaria fica na boca do acesso, meio na borda), senão num acesso estreito o marcador some.
-    portico_geom = (_valido(portico_pt.buffer(12.0)) if portico_pt is not None else None)
+    portico_geom = (_valido(portico_pt.buffer(RAIO_PORTICO_M)) if portico_pt is not None else None)
     # 9.9 — sinuosidade: média da razão curva/reta dos eixos usados; >1,1 = curvo (1,0 = reto).
     sinus = [_sinuosidade(c) for c in curvas_ia if c is not None and not c.is_empty]
     sinuosidade_media = round(sum(sinus) / len(sinus), 3) if sinus else 1.0
