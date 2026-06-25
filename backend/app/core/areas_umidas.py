@@ -93,13 +93,32 @@ def analisar_areas_umidas(
     gleba_l = transform(to_local, gleba)
     area_total = round(gleba_l.area, 2)
 
-    if cobertura is None or cobertura.geometria is None:
-        avisos = list(cobertura.avisos) if cobertura else []
-        if not avisos:
-            avisos = ["Áreas úmidas não consultadas (fonte de dados não configurada)."]
+    # Sem fonte configurada → NÃO consultada (não inventa).
+    if cobertura is None:
         return ResultadoAreasUmidas(
-            area_total, None, None, {}, None, avisos, consultada=False
+            area_total, None, None, {}, None,
+            ["Áreas úmidas não consultadas (fonte de dados não configurada)."],
+            consultada=False,
         )
+    # Sem geometria: distingue "fonte LIDA, porém zero área úmida" de "não consultada/falha".
+    # Honesto: se a fonte respondeu (``cobertura.fonte`` setado), foi CONSULTADA com resultado
+    # ZERO — com proveniência —, não a mesma coisa que "não deu p/ consultar".
+    if cobertura.geometria is None:
+        if cobertura.fonte:
+            prov = {
+                "fonte": cobertura.fonte,
+                "data_referencia": cobertura.data_referencia,
+                "classes": list(cobertura.classes),
+                "base_legal": BASE_LEGAL_UMIDA,
+                "ressalva": RESSALVA_UMIDA,
+            }
+            return ResultadoAreasUmidas(
+                area_total, 0.0, 0.0, {}, prov, list(cobertura.avisos), consultada=True
+            )
+        avisos = list(cobertura.avisos) or [
+            "Áreas úmidas não consultadas (fonte de dados não configurada)."
+        ]
+        return ResultadoAreasUmidas(area_total, None, None, {}, None, avisos, consultada=False)
 
     umida_in = transform(to_local, cobertura.geometria).intersection(gleba_l)
     area_umida = round(umida_in.area, 2) if not umida_in.is_empty else 0.0

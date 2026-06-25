@@ -63,16 +63,29 @@ def test_sem_fonte_nao_marca(client):
     assert any("não consultad" in a.lower() for a in data["avisos"]), data["avisos"]
 
 
-# 3 — gleba sem área úmida: consultada, porém zero (não degrada) -------------------
+# 3 — fonte LIDA, porém zero área úmida: consultada=True, area=0 (≠ "não consultada") ----
 def test_consultada_sem_umida(client, fonte_areas_umidas):
     fonte_areas_umidas(
-        CoberturaUmida(geometria=None, fonte="WorldCover (teste)", data_referencia=DATA_REF)
+        CoberturaUmida(geometria=None, fonte="MapBiomas (teste)", data_referencia=DATA_REF)
     )
     aid = _criar_analise(client)
     data = client.get(f"/api/analises/{aid}/areas-umidas").json()
-    # geometria None ⇒ tratamos como não consultada (sem marcação) — degradação honesta.
-    assert data["consultada"] is False
+    # fonte respondeu (sem classe úmida na gleba) ⇒ CONSULTADA com resultado ZERO, com proveniência.
+    assert data["consultada"] is True
+    assert data["area_umida_m2"] == 0
+    assert data["pct_da_gleba"] == 0
+    assert data["geojson_umidas"] == {}
+    assert data["proveniencia"]["fonte"] == "MapBiomas (teste)"
     assert data["area_total_m2"] > 0
+
+
+# 3b — sem fonte de fato (geometria e fonte nulas) ⇒ NÃO consultada (degrada honesto) ----
+def test_nao_consultada_sem_fonte_real(client, fonte_areas_umidas):
+    fonte_areas_umidas(CoberturaUmida(geometria=None, fonte=None, avisos=["egress bloqueado?"]))
+    aid = _criar_analise(client)
+    data = client.get(f"/api/analises/{aid}/areas-umidas").json()
+    assert data["consultada"] is False
+    assert data["area_umida_m2"] is None
 
 
 # 4 — determinismo do motor: mesma entrada → mesma saída ---------------------------
