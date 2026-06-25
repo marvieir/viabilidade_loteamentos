@@ -48,6 +48,7 @@ from app.core.camadas import (
     FeicaoLinhaTransmissao,
     FeicaoMassaDagua,
     FeicaoMineracao,
+    FeicaoReservaLegal,
     FeicaoUC,
 )
 
@@ -84,9 +85,19 @@ URL_MASSA_DAGUA_GRANDE = os.getenv(
     "AMB_URL_MASSA_DAGUA_GRANDE", f"{_BASE_ANA}/Massa_d%C3%81gua_Grande/MapServer/0/query"
 )
 
+# Reserva Legal (SICAR/CAR) — GeoServer WFS público (geoserver.car.gov.br). PENDENTE de
+# confirmação ao vivo: o egress do sandbox de desenvolvimento bloqueia o host (403), e o CAR
+# distribui dados majoritariamente por recorte estadual — o typeName/axis-order do WFS varia.
+# Por isso NÃO há default chumbado (evita endpoint errado): o operador confirma no deploy e
+# exporta a URL COMPLETA de GetFeature em ``AMBIENTAL_URL_CAR_RL`` (placeholders disponíveis:
+# ``{bbox}`` = minx,miny,maxx,maxy e ``{bbox_inv}`` = miny,minx,maxy,minx p/ WFS lat,lon). A
+# resposta esperada é GeoJSON (FeatureCollection). Vazio → camada simplesmente não consultada.
+URL_CAR_RL = os.getenv("AMBIENTAL_URL_CAR_RL", "").strip()
+
 # Códigos curtos de camada (para camadas_consultadas / camadas_indisponiveis — Fase 2.1).
 COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
 COD_MASSA = "Massa d'água"
+COD_CAR_RL = "SICAR-RL"
 
 # Timeout de leitura por camada (s) — CONFIGURÁVEL por ambiente. Antes 30 fixo: como as 6
 # camadas eram consultadas EM SÉRIE, uma rede ruim somava 6×30 = 180 s (3 min) só de espera.
@@ -118,6 +129,27 @@ def _get_json(url: str, params: dict) -> dict:
     # em vez de mascarar como consultada-vazia.
     if isinstance(data, dict) and "error" in data:
         raise RuntimeError(f"erro do serviço ArcGIS: {data['error']}")
+    return data
+
+
+def _get_json_url(full_url: str) -> dict:
+    """GET de uma URL JÁ MONTADA (com query própria) — p/ endpoints que não seguem o padrão
+    ArcGIS ``?{params}`` (ex.: WFS do SICAR). Mesma decodificação gzip + checagem de erro."""
+    req = urllib.request.Request(
+        full_url,
+        headers={
+            "User-Agent": "viabilidade-loteamentos/0.2",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, identity",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:  # noqa: S310 (URL de config)
+        raw = resp.read()
+    if resp.headers.get("Content-Encoding") == "gzip" or raw[:2] == b"\x1f\x8b":
+        raw = gzip.decompress(raw)
+    data = json.loads(raw.decode("utf-8"))
+    if isinstance(data, dict) and "error" in data:
+        raise RuntimeError(f"erro do serviço: {data['error']}")
     return data
 
 
@@ -296,5 +328,31 @@ class FonteCamadasINDE:
         else:
             c.indisponiveis.append(COD_MASSA)
             c.avisos.append("Camada de massas d'água (ANA) indisponível — " + "; ".join(md_err))
+
+        # Reserva Legal (SICAR/CAR) — só consulta se o operador configurou a URL (endpoint
+        # pendente de confirmação ao vivo). Sem URL → camada não consultada (degrada honesto).
+        if URL_CAR_RL:
+            try:
+                minx, miny, maxx, maxy = bbox
+                u = URL_CAR_RL.replace(
+                    "{bbox}", f"{minx},{miny},{maxx},{maxy}"
+                ).replace("{bbox_inv}", f"{miny},{minx},{maxy},{maxx}")
+                fc = _get_json_url(u)
+                for ft in _features(fc):
+                    geom = shape(ft["geometry"])
+                    props = ft.get("properties", {}) or {}
+                    c.reserva_legal.append(
+                        FeicaoReservaLegal(
+                            geometria=geom,
+                            cod_imovel=_first(props, "cod_imovel", "COD_IMOVEL", "cod_imove"),
+                        )
+                    )
+                c.data_reserva_legal = hoje
+                c.consultadas.append(COD_CAR_RL)
+            except Exception as exc:  # noqa: BLE001 — degradar a camada, não derrubar
+                c.indisponiveis.append(COD_CAR_RL)
+                c.avisos.append(
+                    f"Camada de Reserva Legal (SICAR/CAR) indisponível — {_detalhe_erro(exc)}"
+                )
 
         return c

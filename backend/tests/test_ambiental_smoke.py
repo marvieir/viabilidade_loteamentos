@@ -47,6 +47,19 @@ def test_smoke_hidrografia_real_ao_vivo():
     assert camadas.hidrografia, "esperado ao menos um curso d'água no bbox conhecido"
 
 
+def test_smoke_reserva_legal_car_ao_vivo():
+    """CAR/Reserva Legal: SÓ roda se o operador confirmou e exportou ``AMBIENTAL_URL_CAR_RL``
+    (endpoint pendente de confirmação ao vivo — o sandbox bloqueia geoserver.car.gov.br). Com a
+    URL configurada, o BBOX rural conhecido deve trazer ao menos um polígono de Reserva Legal."""
+    if not os.getenv("AMBIENTAL_URL_CAR_RL"):
+        pytest.skip("AMBIENTAL_URL_CAR_RL não configurada — confirme o endpoint do SICAR no deploy")
+    from app.core.camadas_inde import FonteCamadasINDE
+
+    camadas = FonteCamadasINDE().coletar(BBOX, UF)
+    assert "SICAR-RL" in camadas.consultadas, "; ".join(camadas.avisos)
+    assert camadas.reserva_legal, "esperada ao menos uma Reserva Legal no bbox rural conhecido"
+
+
 def test_smoke_aquisicao_degrada_por_camada_ao_vivo():
     """Mesmo ao vivo, toda camada termina como consultada OU indisponível — nunca em silêncio.
 

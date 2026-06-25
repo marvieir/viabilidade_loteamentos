@@ -234,6 +234,7 @@ class AlertaAmbientalOut(BaseModel):
         "APP_MASSA_DAGUA",
         "FAIXA_NAO_EDIFICAVEL",
         "FAIXA_SERVIDAO_LT",
+        "RESERVA_LEGAL",
     ]
     severidade: Literal["ALERTA", "INFORMATIVO"]
     intersecta: bool

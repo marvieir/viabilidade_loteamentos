@@ -362,7 +362,8 @@ export type TipoAlerta =
   | "APP_HIDROGRAFIA"
   | "APP_MASSA_DAGUA"
   | "FAIXA_NAO_EDIFICAVEL"
-  | "FAIXA_SERVIDAO_LT";
+  | "FAIXA_SERVIDAO_LT"
+  | "RESERVA_LEGAL";
 
 export interface ProvenienciaAmbiental {
   camada: string;
@@ -392,6 +393,7 @@ export type ChaveOverlay =
   | "verde_verificar"
   | "declividade_vedada"
   | "areas_umidas"
+  | "reserva_legal"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
   | "urb_lotes"
   | "urb_quadras"

@@ -14,6 +14,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
   declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5)
   areas_umidas: "#0d9488", // área úmida/alagável (APP candidata) — teal/azul-esverdeado
+  reserva_legal: "#15803d", // Reserva Legal averbada no CAR — verde-escuro
   // Fase 9 — estudo de massa esquemático
   urb_lotes: "#6366f1",
   urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
@@ -48,6 +49,8 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // Área úmida/alagável: teal com hachura "ondulada" (dash) — lê como água/charco, distinto do
   // verde (vegetação) e do azul de APP de hidrografia. Fica sobre o satélite sem virar bloco sólido.
   areas_umidas: { color: "#0f766e", weight: 2, fillColor: "#14b8a6", fillOpacity: 0.45, dashArray: "3 4" },
+  // Reserva Legal (CAR): verde-escuro com hachura — área averbada de uso restrito, não loteável.
+  reserva_legal: { color: "#14532d", weight: 2, fillColor: "#16a34a", fillOpacity: 0.4, dashArray: "6 3" },
   // Fase 11.3 — PÓRTICO/ENTRADA: marcador ROSA/MAGENTA forte (cor única no mapa, borda grossa) —
   // lê como o componente "portaria" no acesso único, achável sobre o satélite e os lotes.
   urb_portico: { color: "#831843", weight: 3, fillColor: "#ec4899", fillOpacity: 0.95 },
@@ -70,6 +73,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   verde_verificar: "Verde a verificar",
   declividade_vedada: "Declividade ≥30% (vedada)",
   areas_umidas: "Área úmida/alagável (APP candidata)",
+  reserva_legal: "Reserva Legal (CAR)",
   urb_lotes: "Lotes (vendável)",
   urb_quadras: "Quadras (faces da malha)",
   urb_arruamento: "Sistema viário (malha)",

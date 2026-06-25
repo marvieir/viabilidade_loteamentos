@@ -7,6 +7,7 @@ from app.core.camadas import (
     FeicaoLinhaTransmissao,
     FeicaoMassaDagua,
     FeicaoMineracao,
+    FeicaoReservaLegal,
     FeicaoUC,
 )
 from tests.conftest import (
@@ -64,6 +65,25 @@ def test_mineracao_intersecta(client, fonte):
     assert "SIGMINE" in al[0]["proveniencia"]["camada"]
     assert al[0]["area_afetada_m2"] > 0
     assert "mineracao" in data["geojson_overlays"]
+
+
+# 1b — Reserva Legal (SICAR/CAR) -------------------------------------------
+def test_reserva_legal_intersecta(client, fonte):
+    data = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            reserva_legal=[FeicaoReservaLegal(UC_COBRE, cod_imovel="SP-3550308-ABC123")],
+            data_reserva_legal=DATA_REF,
+        ),
+    )
+    al = _do_tipo(data, "RESERVA_LEGAL")
+    assert al, data
+    assert al[0]["intersecta"] is True
+    assert al[0]["area_afetada_m2"] > 0
+    assert "SP-3550308-ABC123" in al[0]["detalhe"]
+    assert "Reserva Legal" in al[0]["proveniencia"]["camada"]
+    assert "reserva_legal" in data["geojson_overlays"]
 
 
 # 2 -------------------------------------------------------------------------

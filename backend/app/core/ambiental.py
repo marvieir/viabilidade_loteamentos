@@ -56,6 +56,7 @@ CAMADA_UC = "ICMBio/CNUC — unidades de conservação"
 CAMADA_MINERACAO = "SIGMINE/ANM — processos minerários"
 CAMADA_LT = "ANEEL/SIGEL — linhas de transmissão"
 CAMADA_MASSA_DAGUA = "ANA — massas d'água (lagos/reservatórios)"
+CAMADA_RESERVA_LEGAL = "SICAR/CAR — Reserva Legal"
 
 
 def app_por_largura(largura_m: Optional[float]) -> float:
@@ -288,6 +289,32 @@ def analisar(gleba, camadas: Camadas) -> ResultadoAmbiental:
                     area_afetada_m2=round(inter_lt.area, 2),
                 )
             )
+
+    # --- Reserva Legal (SICAR/CAR) → área de uso restrito (non aedificandi p/ parcelamento) ---
+    rl_geoms = []
+    for f in camadas.reserva_legal:
+        geom_l = transform(to_local, f.geometria)
+        inter = geom_l.intersection(gleba_l)
+        if not inter.is_empty and inter.area > 0:
+            rl_geoms.append(geom_l)
+            alertas.append(
+                Alerta(
+                    tipo="RESERVA_LEGAL",
+                    severidade="ALERTA",
+                    intersecta=True,
+                    detalhe=(
+                        "Reserva Legal averbada no CAR incide sobre a gleba"
+                        + (f" (imóvel {f.cod_imovel})" if f.cod_imovel else "")
+                        + " — área de uso restrito (Lei 12.651/2012), não loteável; "
+                        "conferir averbação e possibilidade de cômputo na área verde."
+                    ),
+                    camada=CAMADA_RESERVA_LEGAL,
+                    data_referencia=camadas.data_reserva_legal,
+                    area_afetada_m2=round(inter.area, 2),
+                )
+            )
+    if rl_geoms:
+        overlays["reserva_legal"] = mapping(transform(to_wgs, unary_union(rl_geoms)))
 
     return ResultadoAmbiental(
         alertas=alertas,

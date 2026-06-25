@@ -72,6 +72,15 @@ class FeicaoMassaDagua:
     tipo: Optional[str] = None  # natural/artificial, se a fonte informar
 
 
+@dataclass(frozen=True)
+class FeicaoReservaLegal:
+    """Reserva Legal averbada no CAR (SICAR). Polígono da RL do imóvel rural — área de uso
+    restrito (Lei 12.651/2012, art. 12 e ss.), non aedificandi para parcelamento."""
+
+    geometria: BaseGeometry  # Polygon/MultiPolygon (WGS84)
+    cod_imovel: Optional[str] = None  # código do imóvel no CAR, se a fonte informar
+
+
 @dataclass
 class Camadas:
     """Feições recortadas para o bbox da gleba + proveniência (data) por camada.
@@ -85,11 +94,13 @@ class Camadas:
     mineracao: list[FeicaoMineracao] = field(default_factory=list)
     linhas_transmissao: list[FeicaoLinhaTransmissao] = field(default_factory=list)
     massas_dagua: list[FeicaoMassaDagua] = field(default_factory=list)
+    reserva_legal: list[FeicaoReservaLegal] = field(default_factory=list)
     data_hidrografia: Optional[str] = None
     data_uc: Optional[str] = None
     data_mineracao: Optional[str] = None
     data_lt: Optional[str] = None
     data_massa_dagua: Optional[str] = None
+    data_reserva_legal: Optional[str] = None
     # Degradação por camada (Fase 2.1): quais camadas foram efetivamente consultadas e
     # quais falharam — códigos curtos (SIGMINE/ANA/ICMBio/ANEEL). Uma fonte fora do ar
     # entra em ``indisponiveis`` sem derrubar as demais.
