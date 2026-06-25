@@ -227,8 +227,8 @@ def _vegetacao_auto_off(monkeypatch):
     # fica DESLIGADO (sem rede/rasterio no sandbox), preservando o caminho "sem fonte →
     # degrada honesto". Testes que exercem o modo auto religam via monkeypatch.
     monkeypatch.setenv("VEGETACAO_WORLDCOVER_AUTO", "0")
-    # Idem para a camada de áreas úmidas (WorldCover classe 90 via HTTP é o default em produção).
-    monkeypatch.setenv("AREAS_UMIDAS_WORLDCOVER_AUTO", "0")
+    # Idem para a camada de áreas úmidas (MapBiomas via HTTP é o default em produção).
+    monkeypatch.setenv("AREAS_UMIDAS_AUTO", "0")
     # Idem para o DEM da declividade (Copernicus via HTTP é o default em produção).
     monkeypatch.setenv("DEM_FONTE", "none")
 

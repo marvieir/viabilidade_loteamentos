@@ -112,6 +112,7 @@ def _extrair_cobertura(
     gleba: BaseGeometry,
     classes: set[int],
     fonte_nome: str,
+    assunto: str = "cobertura vegetal",
 ) -> CoberturaVerde:
     """Lê uma ou mais fontes raster (arquivo local OU ``/vsicurl/`` COG remoto) e devolve a
     cobertura verde da gleba (união, WGS84). ``rasterio.mask`` recorta pela gleba; as classes
@@ -130,8 +131,9 @@ def _extrair_cobertura(
         from shapely.ops import transform as shp_transform
         from shapely.ops import unary_union
     except Exception as exc:  # noqa: BLE001 — sem rasterio → degrada
+        Assunto = assunto[:1].upper() + assunto[1:]
         return CoberturaVerde(
-            avisos=[f"Cobertura vegetal indisponível — {type(exc).__name__}: {exc}"[:200]]
+            avisos=[f"{Assunto} indisponível — {type(exc).__name__}: {exc}"[:200]]
         )
 
     polys_wgs = []
@@ -159,30 +161,30 @@ def _extrair_cobertura(
             classes=[str(c) for c in sorted(classes)],
         )
 
-    # Sem polígono de verde. Se TODAS as fontes falharam é erro real (não "gleba sem mata").
+    # Sem polígono detectado. Se TODAS as fontes falharam é erro real (não "gleba sem a classe").
+    Assunto = assunto[:1].upper() + assunto[1:]
     if erros and len(erros) == len(fontes):
         bruto = erros[0]
         if "do not overlap" in bruto:
             aviso = (
-                "Cobertura vegetal indisponível — o recorte de vegetação não cobre esta "
-                "gleba (foi gerado para outra área). Use o modo automático (WorldCover por "
-                "HTTP, sem recorte) ou gere o recorte deste KMZ."
+                f"{Assunto} indisponível — o recorte não cobre esta gleba (foi gerado para "
+                "outra área). Use o modo automático (COG por HTTP, sem recorte) ou gere o "
+                "recorte deste KMZ."
             )
         elif any(k in bruto for k in ("curl", "HTTP", "Connection", "timed out", "403", "404")):
             aviso = (
-                "Cobertura vegetal indisponível — não foi possível ler o ESA WorldCover por "
-                "HTTP (egress bloqueado?). Libere o acesso ao bucket público ou aponte um "
-                "recorte local em VEGETACAO_RASTER_PATH."
+                f"{Assunto} indisponível — não foi possível ler o raster por HTTP (egress "
+                "bloqueado?). Libere o acesso ao bucket público ou aponte um recorte local."
             )
         else:
-            aviso = f"Cobertura vegetal indisponível — {bruto}"
+            aviso = f"{Assunto} indisponível — {bruto}"
         return CoberturaVerde(avisos=[aviso[:200]])
 
-    # Fonte(s) lida(s) com sucesso, mas sem classe verde na gleba — degrada honesto.
+    # Fonte(s) lida(s) com sucesso, mas sem a classe na gleba — degrada honesto.
     return CoberturaVerde(
         fonte=fonte_nome,
         data_referencia=date.today().isoformat(),
-        avisos=["Nenhuma cobertura vegetal detectada na gleba (raster)."],
+        avisos=[f"Nenhuma {assunto} detectada na gleba (raster)."],
     )
 
 

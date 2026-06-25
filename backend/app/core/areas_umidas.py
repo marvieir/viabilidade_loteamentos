@@ -8,10 +8,11 @@ APP (isso é do engenheiro ambiental). Determinístico: mesma gleba + mesma cobe
 
 Reusa O MESMO mecanismo da vegetação (raster COG por ``/vsicurl/``, ``rasterio.mask`` →
 ``rasterio.features.shapes``): só muda o CONJUNTO DE CLASSES filtrado. A fonte é injetável:
-- DEFAULT (sem provisionar nada): ESA WorldCover classe 90 (área úmida herbácea) — público,
-  10 m, sem login; é o COG que a vegetação já lê em produção.
-- OVERRIDE (Brasil): MapBiomas classe 11 (campo alagado e área pantanosa) + água (33), via
-  recorte local em ``AREAS_UMIDAS_RASTER_PATH`` (ou GEE, quando disponível).
+- DEFAULT (sem provisionar nada): MapBiomas classe 11 (campo alagado e área pantanosa) + água
+  (33), lido do COG NACIONAL público no Google Cloud Storage (anônimo, sem login). É a legenda
+  brasileira, captura o alagado sazonal que o WorldCover (10 m) não pega.
+- ALTERNATIVA: ESA WorldCover classe 90 (área úmida herbácea) via ``AREAS_UMIDAS_FONTE=worldcover``.
+- OVERRIDE: recorte raster LOCAL em ``AREAS_UMIDAS_RASTER_PATH``.
 """
 
 from __future__ import annotations
@@ -116,13 +117,23 @@ def analisar_areas_umidas(
     )
 
 
-def _coletar(fontes: list[str], gleba: BaseGeometry, classes: set[int], fonte_nome: str) -> CoberturaUmida:
-    """Lê o(s) raster(es) e devolve a cobertura úmida (reusa o extrator da vegetação)."""
-    cv = _extrair_cobertura(fontes, gleba, classes, fonte_nome)
+def _coletar(
+    fontes: list[str],
+    gleba: BaseGeometry,
+    classes: set[int],
+    fonte_nome: str,
+    data_ref: Optional[str] = None,
+) -> CoberturaUmida:
+    """Lê o(s) raster(es) e devolve a cobertura úmida (reusa o extrator da vegetação).
+
+    ``data_ref`` (ex.: ano do mapa MapBiomas) sobrescreve a data de referência só quando a
+    fonte foi REALMENTE lida (proveniência honesta: a data é a do mapa, não a do fetch)."""
+    cv = _extrair_cobertura(fontes, gleba, classes, fonte_nome, assunto="área úmida/alagável")
+    data = data_ref if (data_ref and cv.fonte) else cv.data_referencia
     return CoberturaUmida(
         geometria=cv.geometria,
         fonte=cv.fonte,
-        data_referencia=cv.data_referencia,
+        data_referencia=data,
         classes=cv.classes,
         avisos=cv.avisos,
     )
@@ -147,6 +158,46 @@ class FonteAreasUmidasRaster:
 
     def areas_umidas(self, gleba: BaseGeometry) -> CoberturaUmida:
         return _coletar([self.caminho], gleba, self.classes, self.fonte)
+
+
+# COG nacional PÚBLICO do MapBiomas (Google Cloud Storage, anônimo, SEM login) — confirmado
+# tiled (256×256), leitura por janela via /vsicurl funciona como no WorldCover. Coleção/ano
+# sobrescrevíveis por env (a coleção mais nova muda de tempos em tempos).
+MAPBIOMAS_COG_URL = (
+    "https://storage.googleapis.com/mapbiomas-public/initiatives/brasil/"
+    "collection_{colecao}/lulc/coverage/brazil_coverage_{ano}.tif"
+)
+
+
+class FonteAreasUmidasMapBiomasAuto:
+    """Lê o MapBiomas (cobertura nacional) DIRETO do COG público por HTTP, filtrando as classes
+    úmidas/água {11, 33}. Lê só a janela da gleba (range requests) — funciona p/ qualquer KMZ
+    do Brasil SEM recorte manual. Único requisito: egress ao bucket público no deploy.
+    """
+
+    def __init__(
+        self,
+        classes: Optional[set[int]] = None,
+        fonte: Optional[str] = None,
+        url: Optional[str] = None,
+    ):
+        self.classes = classes or _classes_env() or CLASSES_UMIDA_MAPBIOMAS
+        self.colecao = os.getenv("MAPBIOMAS_COLECAO", "10")
+        self.ano = os.getenv("MAPBIOMAS_ANO", "2024")
+        self.url = (
+            url
+            or os.getenv("AREAS_UMIDAS_MAPBIOMAS_URL")
+            or MAPBIOMAS_COG_URL.format(colecao=self.colecao, ano=self.ano)
+        )
+        self.fonte = (
+            fonte
+            or os.getenv("AREAS_UMIDAS_FONTE_NOME")
+            or f"MapBiomas Col.{self.colecao} ({self.ano}) — campo alagado + água"
+        )
+
+    def areas_umidas(self, gleba: BaseGeometry) -> CoberturaUmida:
+        _gdal_anon_http_env()
+        return _coletar([f"/vsicurl/{self.url}"], gleba, self.classes, self.fonte, data_ref=self.ano)
 
 
 class FonteAreasUmidasWorldCoverAuto:
@@ -178,15 +229,17 @@ def _classes_env() -> Optional[set[int]]:
 def get_fonte_areas_umidas() -> Optional[FonteAreasUmidas]:
     """Escolhe a fonte de áreas úmidas (degrada honesto se nenhuma servir):
 
-    1. ``AREAS_UMIDAS_RASTER_PATH`` → recorte LOCAL (MapBiomas {11,33} por default; override Brasil).
-    2. senão, modo AUTOMÁTICO (WorldCover classe 90 via COG/HTTP) — funciona p/ qualquer KMZ;
-       desligável com ``AREAS_UMIDAS_WORLDCOVER_AUTO=0`` (ex.: egress fechado / testes).
+    1. ``AREAS_UMIDAS_RASTER_PATH`` → recorte LOCAL (override; classes MapBiomas {11,33} default).
+    2. senão, modo AUTOMÁTICO (default ``MapBiomas`` classe 11 + água via COG/HTTP — captura o
+       alagado sazonal BR que o WorldCover não pega). Trocável por ``AREAS_UMIDAS_FONTE=worldcover``.
+       Desligável com ``AREAS_UMIDAS_AUTO=0`` (ex.: egress fechado / testes).
     3. senão → ``None`` (não marca, não inventa).
     """
     caminho = os.getenv("AREAS_UMIDAS_RASTER_PATH")
     if caminho:
         return FonteAreasUmidasRaster(caminho)
-    auto = os.getenv("AREAS_UMIDAS_WORLDCOVER_AUTO", "1").strip().lower()
-    if auto not in ("0", "false", "no", "off"):
+    if os.getenv("AREAS_UMIDAS_AUTO", "1").strip().lower() in ("0", "false", "no", "off"):
+        return None
+    if os.getenv("AREAS_UMIDAS_FONTE", "mapbiomas").strip().lower() == "worldcover":
         return FonteAreasUmidasWorldCoverAuto()
-    return None
+    return FonteAreasUmidasMapBiomasAuto()
