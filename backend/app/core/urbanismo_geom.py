@@ -1059,6 +1059,7 @@ def gerar_layout(
     travessia_eixo: Optional[BaseGeometry] = None,
     travessia_diag: Optional[dict] = None,
     declividade_acentuada: Optional[BaseGeometry] = None,
+    restricao_externa: Optional[BaseGeometry] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1506,7 +1507,15 @@ def gerar_layout(
         if borda_via is not None and not borda_via.is_empty:
             segs = list(borda_via.geoms) if hasattr(borda_via, "geoms") else [borda_via]
             segs = [s for s in segs if getattr(s, "length", 0) >= 2.0]
-        reserva = verde_reservado if (verde_reservado is not None and not verde_reservado.is_empty) else None
+        # `restricao_externa` (mata/APP/≥30%) já foi DESCONTADA da gleba pelo chamador → vira um BURACO
+        # na aproveitável, e a via de contorno corre rente à borda desse buraco. Ela NÃO aparece no
+        # `verde_reservado` interno (o motor nunca a viu como geometria), então PRECISA entrar no veto
+        # do pórtico — senão a portaria cai justamente na frente da mata preservada.
+        reserva = _uniao_segura([
+            g for g in (verde_reservado, restricao_externa) if g is not None and not g.is_empty
+        ])
+        if reserva is not None and reserva.is_empty:
+            reserva = None
         candidatos = segs
         if reserva is not None and segs:
             for folga in (RAIO_PORTICO_M, 2.0):

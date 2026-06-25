@@ -299,6 +299,9 @@ def propor(
         aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao, diretrizes=diretrizes,
         travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
         declividade_acentuada=decliv_acentuada_m,
+        # Fase 11.4 — a restrição (mata/APP/≥30%) é um BURACO na aproveitável; passa p/ o motor vetar
+        # a portaria na frente da mata preservada (a via de contorno corre rente a essa borda).
+        restricao_externa=restr_m,
     )
     layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
     layout.restricao_origem = restr_origem

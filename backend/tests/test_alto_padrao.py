@@ -54,6 +54,30 @@ def test_portico_nao_invade_mata_preservada():
     assert lotes.distance(pt) < reserva.distance(pt)    # entrada serve as quadras (perto de lote, longe da mata)
 
 
+def test_portico_evita_mata_externa_descontada():
+    """Fase 11.4: a mata/APP/≥30% é DESCONTADA da gleba pelo chamador → vira um BURACO na
+    aproveitável que a via de contorno acompanha. Sem informar essa restrição ao motor, a portaria
+    cai justamente na frente da mata (o maior contato via-borda). Passando ``restricao_externa``, o
+    veto afasta o pórtico da mata. Repro sintética determinística (não depende de fixture)."""
+    from shapely.geometry import Point, Polygon, box
+
+    dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
+    prog = programa_do_preset("alta", {"pct_lazer": 0.2})
+    gleba = box(0, 0, 360, 220)
+    mata = Polygon([(140, 30), (360, 30), (360, 190), (140, 190), (220, 110)])  # língua que entra pelo leste
+    aprov = gleba.difference(mata)
+
+    bug = geom.gerar_layout(aprov, prog, diretrizes=dd, restricao_externa=None)
+    fix = geom.gerar_layout(aprov, prog, diretrizes=dd, restricao_externa=mata)
+    pt_bug = Point(bug.viario_diagnostico["alto_padrao"]["portico_ponto"])
+    pt_fix = Point(fix.viario_diagnostico["alto_padrao"]["portico_ponto"])
+
+    assert bug.portico.intersects(mata)            # sem o veto, a portaria invade a mata (regressão)
+    assert not fix.portico.intersects(mata)        # com o veto, o disco fica fora da mata preservada
+    assert mata.distance(pt_fix) >= geom.RAIO_PORTICO_M
+    assert mata.distance(pt_fix) > mata.distance(pt_bug)
+
+
 def test_institucional_na_entrada_e_tags():
     """Critério P4.2/3: a flag `institucional_na_entrada` existe (setorização da entrada) e a
     arborização viária é exposta como TAG (não muda área de lote — §1-A)."""
