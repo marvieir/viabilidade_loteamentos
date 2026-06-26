@@ -17,6 +17,7 @@ from shapely.geometry import mapping, shape
 from shapely.ops import transform as shp_transform
 from shapely.ops import unary_union
 
+from app.core.uploads import ler_upload_limitado
 from app.core import agrupamento as agrupamento_mod
 from app.core import ambiental as ambiental_motor
 from app.core import aproveitamento as motor
@@ -265,7 +266,7 @@ def _gleba_de_poligonos(poligonos, rotulo: str = ""):
 
 async def _criar_analise_unica(upload: UploadFile, fonte_malha):
     """Caminho de UM arquivo — comportamento idêntico ao da Fase 1.5/1.7 (não-regressão)."""
-    conteudo = await upload.read()
+    conteudo = await ler_upload_limitado(upload)
     if not conteudo:
         raise HTTPException(422, "Arquivo vazio.")
 
@@ -342,7 +343,7 @@ async def _ler_gleba(upload: UploadFile):
     ``_gleba_de_poligonos``, mesma regra do caminho único). Levanta ``HTTPException`` (arquivo
     vazio/inválido) ou devolve ``(None, res, [])`` em recusa de ingestão para o chamador emitir
     o 422 diagnóstico por arquivo."""
-    conteudo = await upload.read()
+    conteudo = await ler_upload_limitado(upload)
     if not conteudo:
         raise HTTPException(422, f"Arquivo vazio: {upload.filename}.")
     try:

@@ -13,6 +13,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
+from app.core.uploads import ler_upload_limitado
 from app.core.extrator_luos import (
     ExtratorIndisponivel,
     ExtratorLUOS,
@@ -67,7 +68,7 @@ async def extrair_perfil(
             "Extração assistida indisponível — configure a credencial de LLM "
             "(ANTHROPIC_API_KEY) ou cadastre o perfil manualmente.",
         )
-    conteudo = await pdf.read()
+    conteudo = await ler_upload_limitado(pdf)
     if not conteudo:
         raise HTTPException(422, "PDF vazio.")
     try:

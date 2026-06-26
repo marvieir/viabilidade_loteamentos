@@ -14,6 +14,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
+from app.core.uploads import ler_upload_limitado
 from app.core import juridico_documental as nucleo
 from app.core.alertas_geo import ProvedorAlertasGeo, get_provedor_alertas_geo
 from app.core.extrator_documento import (
@@ -85,7 +86,7 @@ async def extrair_juridico(
         )
     arquivos: list[tuple[bytes, str]] = []
     for up in documentos:
-        dados = await up.read()
+        dados = await ler_upload_limitado(up)
         if not dados:
             continue
         mt = _media_type(up)

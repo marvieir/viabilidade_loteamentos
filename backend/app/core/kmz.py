@@ -7,8 +7,12 @@ responsabilidade da camada de ingestão (``app.core.ingestao``); aqui só extra�
 """
 
 import io
+import os
 import zipfile
 from dataclasses import dataclass
+
+# Teto do .kml DESCOMPRIMIDO (anti zip-bomb): um KMZ pequeno pode declarar GBs de KML.
+_MAX_KML_BYTES = int(os.getenv("MAX_KML_MB", "60")) * 1024 * 1024
 
 from lxml import etree
 from shapely.geometry import Polygon
@@ -36,6 +40,12 @@ def _ler_kml(conteudo: bytes) -> bytes:
                 raise KmzInvalido("KMZ não contém arquivo .kml.")
             # doc.kml é o padrão; senão, o primeiro .kml encontrado
             nome = next((n for n in kmls if n.lower().endswith("doc.kml")), kmls[0])
+            # Anti zip-bomb: recusa pelo tamanho DECLARADO (descomprimido) antes de ler na memória.
+            if zf.getinfo(nome).file_size > _MAX_KML_BYTES:
+                raise KmzInvalido(
+                    f"KML interno grande demais ({zf.getinfo(nome).file_size} bytes) — "
+                    "possível zip-bomb; recusado."
+                )
             return zf.read(nome)
     except zipfile.BadZipFile:
         # pode ser um .kml cru
