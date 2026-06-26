@@ -78,3 +78,21 @@ def test_analise_isolada_por_dono(client):
         f"/api/analises/{aid}/ambiental", headers={"Authorization": f"Bearer {tok2}"}
     )
     assert intruso.status_code == 404  # intruso não acessa
+
+
+def test_rate_limit_no_login(client_anon):
+    """#6 — força bruta barrada: muitas tentativas de login do mesmo IP → 429."""
+    from app.core.ratelimit import limiter
+
+    limiter.enabled = True
+    try:
+        codes = [
+            client_anon.post(
+                "/api/auth/login", json={"email": "x@y.com", "senha": "errada"}
+            ).status_code
+            for _ in range(15)
+        ]
+    finally:
+        limiter.enabled = False
+    assert 429 in codes  # o rate limit barrou após o teto
+    assert codes[0] == 401  # as primeiras passam (credencial errada), depois 429

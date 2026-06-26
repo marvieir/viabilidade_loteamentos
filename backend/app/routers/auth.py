@@ -6,13 +6,13 @@ cookie; ``me`` devolve o usuário logado. Cadastro é ABERTO (qualquer um vira `
 o papel ``admin`` só nasce por seed (scripts/criar_admin.py), nunca pela UI.
 """
 
-from __future__ import annotations
-
 import os
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+
+from app.core.ratelimit import LIMITE_AUTH, limiter
 
 from app.core.auth import (
     hash_senha,
@@ -54,7 +54,8 @@ def _set_refresh(resp: Response, usuario: Usuario) -> None:
 
 
 @router.post("/registrar", response_model=TokenOut, status_code=status.HTTP_201_CREATED)
-def registrar(body: RegistrarIn, resp: Response, db: Session = Depends(get_db)) -> TokenOut:
+@limiter.limit(LIMITE_AUTH)
+def registrar(request: Request, resp: Response, body: RegistrarIn, db: Session = Depends(get_db)) -> TokenOut:
     email = body.email.strip().lower()
     if not email or "@" not in email:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "E-mail inválido.")
@@ -72,7 +73,8 @@ def registrar(body: RegistrarIn, resp: Response, db: Session = Depends(get_db)) 
 
 
 @router.post("/login", response_model=TokenOut)
-def login(body: LoginIn, resp: Response, db: Session = Depends(get_db)) -> TokenOut:
+@limiter.limit(LIMITE_AUTH)
+def login(request: Request, resp: Response, body: LoginIn, db: Session = Depends(get_db)) -> TokenOut:
     email = body.email.strip().lower()
     usuario = db.query(Usuario).filter(func.lower(Usuario.email) == email).first()
     if usuario is None or not verifica_senha(body.senha, usuario.senha_hash):
@@ -84,7 +86,9 @@ def login(body: LoginIn, resp: Response, db: Session = Depends(get_db)) -> Token
 
 
 @router.post("/refresh", response_model=TokenOut)
+@limiter.limit(LIMITE_AUTH)
 def refresh(
+    request: Request,
     resp: Response,
     refresh_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),

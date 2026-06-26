@@ -19,6 +19,7 @@ alembic==1.14.0           # migrações versionadas (schema estável)
 psycopg[binary]==3.2.3    # driver Postgres (produção); SQLite no dev/teste é nativo
 PyJWT==2.10.1             # tokens de sessão (access/refresh)
 bcrypt==4.2.1             # hash de senha (usado direto, sem passlib)
+slowapi==0.1.10           # Fase 13 — rate limiting (anti brute-force) nos endpoints de auth
 
 # dev / testes
 pytest==8.3.4

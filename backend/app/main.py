@@ -20,8 +20,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # (ex.: as do docker-compose), então container e dev convivem.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+
 from app.core.config import EH_PRODUCAO, validar_seguranca_producao
 from app.core.db import criar_tabelas
+from app.core.ratelimit import limiter
 from app.routers import (
     admin,
     ambiental,
@@ -57,6 +61,10 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# Fase 13 — rate limiting (anti brute-force) nos endpoints de auth (decorados em routers/auth).
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # Fase 13 — security headers (defesa contra clickjacking / MIME sniffing; HSTS só em HTTPS/prod).

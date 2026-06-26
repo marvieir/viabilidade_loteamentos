@@ -233,6 +233,10 @@ def _vegetacao_auto_off(monkeypatch):
     monkeypatch.setenv("DEM_FONTE", "none")
     # Idem para as vias do pórtico (OSM/Overpass via HTTP é o default em produção).
     monkeypatch.setenv("VIAS_OSM_AUTO", "0")
+    # Rate limiting DESLIGADO nos testes (eles fazem muitos logins/registros). Religado no teste
+    # específico de rate limit. O limiter é singleton criado no import → seta o atributo direto.
+    from app.core.ratelimit import limiter
+    limiter.enabled = False
 
 
 class StubFonteDEM:
