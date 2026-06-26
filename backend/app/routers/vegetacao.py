@@ -20,7 +20,8 @@ from app.core.store import STORE
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
 
-router = APIRouter()
+from app.core.acesso import analise_do_dono
+router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 
 @router.get(

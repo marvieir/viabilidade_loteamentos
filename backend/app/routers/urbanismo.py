@@ -37,7 +37,8 @@ from app.core.vias import FonteVias, get_fonte_vias
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
 
-router = APIRouter()
+from app.core.acesso import analise_do_dono
+router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 # Faixas não-edificáveis que viram restrição (espelha o aproveitamento — Fase 2.2).
 _CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")

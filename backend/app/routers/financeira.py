@@ -15,7 +15,8 @@ from app.core.financeira_store import FonteFinanceira, get_fonte_financeira
 from app.core.store import STORE
 from app.models import schemas
 
-router = APIRouter()
+from app.core.acesso import analise_do_dono
+router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 
 def _resolver_lotes(lotes: schemas.LotesIn) -> tuple[int, str, str | None]:

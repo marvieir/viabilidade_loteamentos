@@ -121,6 +121,9 @@ def client():
     app.dependency_overrides[get_fonte_malha] = lambda: StubMalha([(SAO_ROQUE, SAO_ROQUE_POLY)])
     app.dependency_overrides[get_fonte_lista] = lambda: FonteListaArquivo(LISTA)
     with TestClient(app) as c:
+        # Fase 13 — endpoints exigem login; autentica o cliente local (igual ao conftest).
+        r = c.post("/api/auth/registrar", json={"email": "agr@cliente.com", "senha": "senha-teste-forte-1"})
+        c.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
         yield c
     app.dependency_overrides.pop(get_fonte_malha, None)
     app.dependency_overrides.pop(get_fonte_lista, None)

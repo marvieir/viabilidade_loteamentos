@@ -28,7 +28,8 @@ from app.core.juridico_store import FonteJuridica, get_fonte_juridica
 from app.core.store import STORE
 from app.models import schemas
 
-router = APIRouter()
+from app.core.acesso import analise_do_dono
+router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 
 def _exige_analise(analise_id: str):

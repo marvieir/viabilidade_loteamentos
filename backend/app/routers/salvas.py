@@ -171,6 +171,7 @@ def carregar(
         "area_m2": area,
         "perimetro_m": perimetro,
         "jurisdicao": jur,
+        "usuario_id": usuario.id,  # Fase 13 — registro do STORE escopado ao dono (guarda de acesso)
     }
     return schemas.AnaliseOut(
         analise_id=novo_id,

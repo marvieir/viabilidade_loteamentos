@@ -9,7 +9,7 @@ assim).
 
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 from app.core import laudo as laudo_core
@@ -18,7 +18,8 @@ from app.core.jurisdicao import Jurisdicao
 from app.core.store import STORE
 from app.models import schemas
 
-router = APIRouter()
+from app.core.acesso import analise_do_dono
+router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 
 def _identificacao(analise_id: str, registro: dict) -> dict:

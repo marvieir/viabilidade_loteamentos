@@ -14,7 +14,8 @@ from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
 from app.models import schemas
 
-router = APIRouter()
+from app.core.acesso import analise_do_dono
+router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 
 @router.get(

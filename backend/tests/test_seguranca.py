@@ -44,3 +44,37 @@ def test_guard_ok_com_config_segura(monkeypatch):
     monkeypatch.setenv("COOKIE_SECURE", "1")
     assert problemas_de_seguranca_producao() == []
     validar_seguranca_producao()
+
+
+# --- Achado nº1 da auditoria: endpoints de dimensão exigem login + dono ---
+_MIME = "application/vnd.google-earth.kmz"
+
+
+def test_criar_analise_exige_login(client_anon):
+    from tests.conftest import RET_RETANGULO, make_kmz
+
+    r = client_anon.post("/api/analises", files={"kmz": ("g.kmz", make_kmz([RET_RETANGULO]), _MIME)})
+    assert r.status_code == 401  # sem token → barrado
+
+
+def test_dimensao_exige_login(client_anon):
+    r = client_anon.get("/api/analises/qualquer-id/ambiental")
+    assert r.status_code == 401
+
+
+def test_analise_isolada_por_dono(client):
+    """O dono acessa sua análise; OUTRO usuário recebe 404 (não vê análise de terceiro)."""
+    from tests.conftest import RET_RETANGULO, make_kmz
+
+    aid = client.post(
+        "/api/analises", files={"kmz": ("g.kmz", make_kmz([RET_RETANGULO]), _MIME)}
+    ).json()["analise_id"]
+    assert client.get(f"/api/analises/{aid}/ambiental").status_code == 200  # dono OK
+
+    tok2 = client.post(
+        "/api/auth/registrar", json={"email": "intruso@x.com", "senha": "senha-teste-forte-1"}
+    ).json()["access_token"]
+    intruso = client.get(
+        f"/api/analises/{aid}/ambiental", headers={"Authorization": f"Bearer {tok2}"}
+    )
+    assert intruso.status_code == 404  # intruso não acessa

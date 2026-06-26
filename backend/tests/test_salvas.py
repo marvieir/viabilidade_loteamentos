@@ -34,8 +34,8 @@ def _payload(titulo="Gleba Teste"):
     }
 
 
-def test_salvar_exige_login(client):
-    assert client.post("/api/salvas", json=_payload()).status_code in (401, 403)
+def test_salvar_exige_login(client_anon):
+    assert client_anon.post("/api/salvas", json=_payload()).status_code in (401, 403)
 
 
 def test_ciclo_salvar_listar_obter(client):
@@ -101,5 +101,6 @@ def test_carregar_reidrata_gleba(client):
     ap = client.post(
         f"/api/analises/{corpo['analise_id']}/aproveitamento",
         json={"regime": "URBANO", "lote_min_m2": 250},
+        headers=_auth(tok),  # Fase 13 — a análise reidratada é do dono (tok); acesso exige o dono
     )
     assert ap.status_code == 200, ap.text

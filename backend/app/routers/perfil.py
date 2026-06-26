@@ -23,7 +23,8 @@ from app.core.extrator_luos import (
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.models import schemas
 
-router = APIRouter()
+from app.core.auth import usuario_atual
+router = APIRouter(dependencies=[Depends(usuario_atual)])
 
 # Param que entra no número (gateado): precisa de citação para ser confirmável (critério 2).
 _PARAMS_GATEADOS = ("lote_min_m2", "doacao_pct")

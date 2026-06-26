@@ -222,6 +222,9 @@ def client():
         [{"cod_ibge": "3550605", "municipio": "São Roque", "uf": "SP"}]
     )
     with TestClient(app) as c:
+        # Fase 13 — endpoints exigem login; autentica o cliente local.
+        r = c.post("/api/auth/registrar", json={"email": "laudo@cliente.com", "senha": "senha-teste-forte-1"})
+        c.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
         yield c
     app.dependency_overrides.clear()
 

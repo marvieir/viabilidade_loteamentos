@@ -685,24 +685,42 @@ def localizacao():
     app.dependency_overrides.pop(get_fonte_localizacao, None)
 
 
-@pytest.fixture
-def client_producao():
-    """Cliente com o comportamento REAL: SEM malha geométrica configurada.
-
-    A lista leve permanece no default (seed embarcado) → busca/override por nome ainda
-    funcionam sem a malha (decisão #2). Para determinismo, os testes podem injetar ``lista``.
-    """
-    app.dependency_overrides.pop(get_fonte_malha, None)
-    with TestClient(app) as c:
-        yield c
+def _auto_autenticar(c, email: str) -> None:
+    """Registra um usuário de teste e injeta o Bearer em TODAS as requisições do cliente.
+    Fase 13 — os endpoints de dimensão passam a exigir login; o cliente padrão é autenticado p/
+    os testes existentes seguirem transparentes. Testes que precisam de OUTRO usuário passam
+    header próprio (sobrescreve o default); testes de 'exige login' usam ``client_anon``."""
+    r = c.post("/api/auth/registrar", json={"email": email, "senha": "senha-teste-forte-1"})
+    assert r.status_code in (200, 201), r.text
+    c.headers.update({"Authorization": f"Bearer {r.json()['access_token']}"})
 
 
 @pytest.fixture
-def client():
-    """Cliente de teste com malha (São Roque/SP) e lista leve padrão injetadas."""
+def client_anon():
+    """Cliente SEM autenticação (malha+lista injetadas). Para testes de auth e de 'exige login'."""
     app.dependency_overrides[get_fonte_malha] = lambda: StubMalha(MALHA_SAO_ROQUE)
     app.dependency_overrides[get_fonte_lista] = lambda: FonteListaArquivo(LISTA_PADRAO)
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.pop(get_fonte_malha, None)
     app.dependency_overrides.pop(get_fonte_lista, None)
+
+
+@pytest.fixture
+def client_producao():
+    """Cliente com o comportamento REAL: SEM malha geométrica configurada. Autenticado por padrão.
+
+    A lista leve permanece no default (seed embarcado) → busca/override por nome ainda
+    funcionam sem a malha (decisão #2). Para determinismo, os testes podem injetar ``lista``.
+    """
+    app.dependency_overrides.pop(get_fonte_malha, None)
+    with TestClient(app) as c:
+        _auto_autenticar(c, "teste-prod@cliente.com")
+        yield c
+
+
+@pytest.fixture
+def client(client_anon):
+    """Cliente de teste com malha (São Roque/SP) + lista padrão E autenticado por padrão."""
+    _auto_autenticar(client_anon, "teste@cliente.com")
+    yield client_anon

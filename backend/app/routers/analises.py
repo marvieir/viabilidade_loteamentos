@@ -18,6 +18,9 @@ from shapely.ops import transform as shp_transform
 from shapely.ops import unary_union
 
 from app.core.uploads import ler_upload_limitado
+from app.core.acesso import analise_do_dono, id_analise
+from app.core.auth import usuario_atual
+from app.models.db_models import Usuario
 from app.core import agrupamento as agrupamento_mod
 from app.core import ambiental as ambiental_motor
 from app.core import aproveitamento as motor
@@ -144,7 +147,7 @@ def _consolidar_descontos(gleba, total, verde_geom, overlays, decliv_geom=None):
     )
     return descontos, cons.area_restritiva_m2
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(usuario_atual)])
 
 # UUID determinístico: mesmo KMZ → mesmo analise_id (critério de determinismo).
 _NS_ANALISE = uuid.uuid5(uuid.NAMESPACE_URL, "viabilidade-loteamentos/analise")
@@ -192,6 +195,7 @@ async def criar_analise(
     kmz: list[UploadFile] = File(default=[]),
     kml: list[UploadFile] = File(default=[]),
     fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
+    usuario: Usuario = Depends(usuario_atual),
 ):
     # O NÚMERO DE ARQUIVOS É A INTENÇÃO (Fase 8): 1 = fluxo de hoje (intacto), 2+ = projeto
     # unificado (união geométrica). Aceita os arquivos sob a chave ``kmz`` e/ou ``kml``.
@@ -200,8 +204,8 @@ async def criar_analise(
         raise HTTPException(422, "Envie um arquivo KMZ ou KML.")
 
     if len(arquivos) == 1:
-        return await _criar_analise_unica(arquivos[0], fonte_malha)
-    return await _criar_analise_agrupada(arquivos, fonte_malha)
+        return await _criar_analise_unica(arquivos[0], fonte_malha, usuario)
+    return await _criar_analise_agrupada(arquivos, fonte_malha, usuario)
 
 
 # Compacidade Polsby-Popper (4π·área/perímetro²): abaixo de _COMPAC_LINEAR a forma é claramente
@@ -264,7 +268,7 @@ def _gleba_de_poligonos(poligonos, rotulo: str = ""):
     return maior, avisos
 
 
-async def _criar_analise_unica(upload: UploadFile, fonte_malha):
+async def _criar_analise_unica(upload: UploadFile, fonte_malha, usuario: Usuario):
     """Caminho de UM arquivo — comportamento idêntico ao da Fase 1.5/1.7 (não-regressão)."""
     conteudo = await ler_upload_limitado(upload)
     if not conteudo:
@@ -303,14 +307,13 @@ async def _criar_analise_unica(upload: UploadFile, fonte_malha):
     area, perimetro = geometria.medir(poly)
     jur = resolver_jurisdicao(poly, fonte_malha)
 
-    analise_id = str(
-        uuid.uuid5(_NS_ANALISE, hashlib.sha256(conteudo).hexdigest())
-    )
+    analise_id = id_analise(conteudo, usuario)
     STORE[analise_id] = {
         "poly": poly,
         "area_m2": area,
         "perimetro_m": perimetro,
         "jurisdicao": jur,
+        "usuario_id": usuario.id,
     }
 
     return schemas.AnaliseOut(
@@ -365,7 +368,7 @@ async def _ler_gleba(upload: UploadFile):
     return gleba, conteudo, avisos
 
 
-async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha):
+async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha, usuario: Usuario):
     """Caminho de 2+ arquivos (Fase 8): valida contiguidade + município comum e produz a
     UNIÃO como geometria da análise. Recusa é sempre diagnóstica e NÃO cria análise parcial.
     A jusante nada muda — o pipeline recebe um Polygon, cego à origem múltipla."""
@@ -428,7 +431,7 @@ async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha):
 
     # ID determinístico independe da ORDEM de upload: hash dos conteúdos, ordenado.
     semente = "|".join(sorted(hashlib.sha256(c).hexdigest() for c in conteudos))
-    analise_id = str(uuid.uuid5(_NS_ANALISE, semente))
+    analise_id = str(uuid.uuid5(_NS_ANALISE, semente + ":" + str(usuario.id)))
 
     agr_out = schemas.AgrupamentoOut(
         n_glebas=res_agr.n_glebas,
@@ -451,6 +454,7 @@ async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha):
         "perimetro_m": perimetro,
         "jurisdicao": jur,
         "agrupamento": agr_out.model_dump(),
+        "usuario_id": usuario.id,
     }
 
     return schemas.AnaliseOut(
@@ -500,13 +504,11 @@ def buscar_municipios(
 def corrigir_municipio(
     analise_id: str,
     body: schemas.MunicipioIn,
+    registro: dict = Depends(analise_do_dono),
     fonte_lista: FonteLista | None = Depends(get_fonte_lista),
 ):
     """Override: fixa o município pelo código IBGE (resolvido na **lista leve**) e marca a
     origem como ``informado``. Usa a lista, não a malha → sobrevive sem a malha geométrica."""
-    registro = STORE.get(analise_id)
-    if registro is None:
-        raise HTTPException(404, "Análise não encontrada.")
     try:
         jur = atualizar_municipio(body.cod_ibge, fonte_lista)
     except ValueError as exc:
@@ -522,6 +524,7 @@ def corrigir_municipio(
 def calcular_aproveitamento(
     analise_id: str,
     body: schemas.AproveitamentoIn,
+    registro: dict = Depends(analise_do_dono),
     fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
     fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
@@ -529,10 +532,6 @@ def calcular_aproveitamento(
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
     fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
 ):
-    registro = STORE.get(analise_id)
-    if registro is None:
-        raise HTTPException(404, "Análise não encontrada.")
-
     # Regime é obrigatório: nunca assumir parcelamento urbano em silêncio (falha da Fase 2).
     if body.regime is None:
         return JSONResponse(
