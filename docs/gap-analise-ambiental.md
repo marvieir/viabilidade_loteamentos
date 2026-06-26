@@ -89,6 +89,43 @@ nacional — caso a caso).
 - 🏛️ **Licenciamento:** loteamento em SP → **CETESB via GRAPROHAB** (estadual). Útil como nota de
   proveniência/encaminhamento (não é cálculo).
 
+## 4.1 Status de implementação (atualizado)
+
+✅ **Implementadas** (lógica testada offline; aquisição dual-intake — URL ou arquivo local):
+Áreas úmidas (MapBiomas, auto), **Reserva Legal/CAR** (arquivo local — WFS do CAR está fora do ar),
+**Mata Atlântica**, **Terra Indígena**, **Quilombola**, **Assentamento**, **Caverna (CECAV)**,
+**Área de Proteção de Mananciais**, **Dutovia (ANP)**. Linhas de transmissão, UC, mineração,
+hidrografia/APP, massas d'água, declividade já existiam.
+
+⏳ **Deferidas** (cauda longa / baixo valor — fáceis de plugar no mesmo mecanismo quando precisar):
+APCB, IPHAN/arqueológico, áreas contaminadas (CETESB), ZEE, corredores ecológicos, Reserva da
+Biosfera, RAMSAR, PDUI, plano diretor ambiental municipal, faixa DNIT, aeródromos.
+
+> **Limitação conhecida:** o sandbox de desenvolvimento bloqueia todos os geoservices gov (403) e
+> alguns endpoints oficiais estão fora do ar (ex.: geoserver do CAR). Por isso **nenhum endpoint
+> foi confirmado ao vivo daqui** — a lógica é testada offline e a confirmação roda no deploy
+> (smoke `RUN_LIVE_SMOKE`). Cada camada nasce desligada até o operador apontar a fonte viva.
+
+## 4.2 Como LIGAR cada camada no deploy (`backend/.env`)
+
+Primeiro, ligar a aquisição real: `AMBIENTAL_FONTE_REAL=1`. Depois, por camada, aponte **uma URL**
+(WFS/ArcGIS que devolva GeoJSON; use `{bbox}` = `minx,miny,maxx,maxy` ou `{bbox_inv}` = `miny,minx,maxy,maxx`
+conforme o eixo do serviço) **ou um arquivo GeoJSON local** (baixado do portal e convertido com
+`ogr2ogr -f GeoJSON saida.geojson entrada.shp`). Sem nenhum dos dois → camada "não consultada".
+
+| Camada | Var de URL | Var de arquivo local |
+|---|---|---|
+| Reserva Legal (CAR) | `AMBIENTAL_URL_CAR_RL` | `AMBIENTAL_CAR_RL_PATH` |
+| Mata Atlântica | `AMBIENTAL_URL_MATA_ATL` | `AMBIENTAL_MATA_ATL_PATH` |
+| Terra Indígena (FUNAI) | `AMBIENTAL_URL_FUNAI_TI` | `AMBIENTAL_FUNAI_TI_PATH` |
+| Quilombola (INCRA/Palmares) | `AMBIENTAL_URL_QUILOMBO` | `AMBIENTAL_QUILOMBO_PATH` |
+| Assentamento (INCRA) | `AMBIENTAL_URL_INCRA_PA` | `AMBIENTAL_INCRA_PA_PATH` |
+| Caverna (CECAV) | `AMBIENTAL_URL_CECAV_CAV` | `AMBIENTAL_CECAV_CAV_PATH` |
+| Área Prot. Mananciais | `AMBIENTAL_URL_APM` | `AMBIENTAL_APM_PATH` |
+| Dutovia (ANP) | `AMBIENTAL_URL_ANP_DUTO` | `AMBIENTAL_ANP_DUTO_PATH` |
+
+Validar cada uma no deploy: `RUN_LIVE_SMOKE=1 pytest tests/test_ambiental_smoke.py`.
+
 ## 5. Como decidir
 
 Sugestão de ordem (maior valor × menor esforço, priorizando 🟢 federal auto-fetch):
