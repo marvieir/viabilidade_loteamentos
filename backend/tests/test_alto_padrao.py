@@ -93,3 +93,23 @@ def test_caixa_limpa_uma_entrada():
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
     lay = geom.gerar_layout(box(0, 0, 343, 172), programa_do_preset("alta", {"pct_lazer": 0.2}), diretrizes=dd)
     assert lay.viario_diagnostico["alto_padrao"]["porticos"] == 1
+
+
+def test_portico_gleba_real_sao_roque_fica_no_norte_perto_dos_lotes():
+    """Regressão com a GLEBA REAL (Urbanisi/São Roque, 3 matrículas, 18,71 ha): o pórtico não pode
+    voltar pro exit remoto no sul (de frente p/ a mata externa). Deve cair na metade NORTE (lado da
+    estrada de acesso) e PERTO dos lotes — a entrada serve o miolo loteado, não uma ponta isolada."""
+    from shapely import wkb
+    from shapely.geometry import Point
+    from shapely.ops import unary_union
+
+    d = json.loads(Path("tests/fixtures/sao_roque_gleba_real.json").read_text())
+    gleba_m = wkb.loads(d["gleba_metrica_wkb_hex"], hex=True)
+    dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
+    lay = geom.gerar_layout(gleba_m, programa_do_preset("alta", {"pct_lazer": 0.2}), diretrizes=dd)
+    pt = Point(lay.viario_diagnostico["alto_padrao"]["portico_ponto"])
+    gminx, gminy, gmaxx, gmaxy = gleba_m.bounds
+    y_rel = (pt.y - gminy) / (gmaxy - gminy)
+    lotes = unary_union(lay.lotes)
+    assert y_rel > 0.5, f"pórtico caiu no sul (y_rel={y_rel:.2f}) — regressão da entrada na mata"
+    assert lotes.distance(pt) <= 15.0  # entrada junto às quadras (não numa ponta isolada)

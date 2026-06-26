@@ -1498,8 +1498,8 @@ def gerar_layout(
         # borda — justo onde a portaria NÃO pode cair (gate encravado no meio da reserva). Por isso o
         # critério antigo "maior trecho" punha o pórtico na frente da mata. Agora: entre os contatos,
         # mantém só os que AFASTAM a boca da reserva o bastante p/ o disco do pórtico não invadir a
-        # mata (clearance = RAIO_PORTICO_M) e, entre esses, escolhe o MAIOR (a boca principal — uma
-        # frente de rua larga, não um arranhão). Relaxa em degraus se nada limpar (degradação honesta).
+        # mata (clearance = RAIO_PORTICO_M) e, entre esses, escolhe o mais PERTO do miolo loteado.
+        # Relaxa em degraus se nada limpar (degradação honesta).
         def _meio(s):
             return s.interpolate(0.5, normalized=True)
         borda_via = _valido(aprov.boundary.intersection(arruamento.buffer(1.0)))
@@ -1523,14 +1523,20 @@ def gerar_layout(
                 if limpos:
                     candidatos = limpos
                     break
-        if candidatos:
+        # Núcleo do loteamento = centróide dos LOTES (onde o desenvolvimento se concentra). A entrada
+        # deve SERVIR esse miolo, não ser uma saída remota: entre os contatos limpos, escolhe o mais
+        # PERTO do núcleo — NÃO o mais longo. O mais longo costuma ser um trecho de contorno na ponta
+        # da gleba (longe das quadras, de frente p/ mata/fundo), que era justamente o que dava errado.
+        # O comprimento mínimo (≥2 m) já descarta arranhões.
+        nucleo = unary_union(lotes).centroid if lotes else aprov.centroid
+        if candidatos and nucleo is not None and not nucleo.is_empty:
+            portico_pt = _meio(min(candidatos, key=lambda s: _meio(s).distance(nucleo)))
+        elif candidatos:
             portico_pt = _meio(max(candidatos, key=lambda s: s.length))
+        elif nucleo is not None and not nucleo.is_empty:
+            portico_pt = nearest_points(nucleo, arruamento)[1]
         else:
-            nucleo = unary_union(lotes).centroid if lotes else aprov.centroid
-            if nucleo is not None and not nucleo.is_empty:
-                portico_pt = nearest_points(nucleo, arruamento)[1]
-            else:
-                portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
+            portico_pt = nearest_points(Point((gminx + gmaxx) / 2.0, gminy), arruamento)[1]
         if inst is not None and not inst.is_empty:
             diag_gleba = math.hypot(gmaxx - gminx, gmaxy - gminy)
             inst_na_entrada = inst.distance(portico_pt) <= 0.35 * max(diag_gleba, 1.0)
