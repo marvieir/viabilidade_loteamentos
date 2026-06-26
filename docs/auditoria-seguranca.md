@@ -43,17 +43,17 @@ Base razoável (bcrypt real, access em memória, refresh em cookie httpOnly, seg
 - **[MÉDIO] Containers rodam como root** (Dockerfiles sem `USER`). → usuário não-root.
 - **[BAIXO] Dependências defasadas** (`next@14.2.21`). → `npm audit`/`pip-audit` + patch do `next`.
 
-## TOP-10 MUST-FIX antes de expor (Lightsail)
-1. **Auth + propriedade por usuário em TODOS os routers de dimensão**; trocar o `analise_id` determinístico por token não adivinhável (CRÍTICO).
-2. **Eliminar segredos default** (JWT×2 + Postgres): sem fallback, boot falha se ausentes; `.env.example` com `CHANGE_ME` (CRÍTICO).
-3. **TLS + reverse proxy** (Caddy/nginx + Let's Encrypt); não publicar 8700/3700; só 443 (CRÍTICO).
-4. **Autenticar + cotar endpoints de LLM** (`/juridico/extrair`, `/perfil`) — DoS financeiro (ALTO).
-5. **Limite de upload + anti zip-bomb** (KMZ/PDF) (ALTO).
-6. **Rate limiting** em login/registro/refresh (ALTO).
-7. **CORS explícito** (domínio do front), nunca `*` com credentials (ALTO).
-8. **Security headers + TrustedHost** (ALTO).
-9. **`COOKIE_SECURE=1`** em produção (MÉDIO, depende do #3).
-10. **Postgres com senha forte + não-root + TLS no DB se externo**; adotar Alembic (MÉDIO).
+## TOP-10 MUST-FIX antes de expor (Lightsail) — STATUS
+1. ✅ **Auth + propriedade por usuário em TODOS os routers de dimensão**; `analise_id` agora por-usuário, não adivinhável (`core/acesso.py`).
+2. ✅ **Eliminar segredos default** (JWT×2 + Postgres): boot aborta em produção; `.env.example` com `CHANGE_ME` (`core/config.py`).
+3. ✅ **TLS + reverse proxy** (Caddy + Let's Encrypt); api/web/db sem porta no host (`docker-compose.prod.yml` + `Caddyfile`).
+4. ✅ **Autenticar endpoints de LLM** (`/juridico/extrair`, `/perfil`) — fim do DoS anônimo. *(cota por usuário: pendente, robustez)*.
+5. ✅ **Limite de upload + anti zip-bomb** (`core/uploads.py` + `core/kmz.py`).
+6. ✅ **Rate limiting** em login/registro/refresh (`core/ratelimit.py`, slowapi).
+7. ✅ **CORS explícito** — boot exige origem em produção.
+8. ✅ **Security headers + TrustedHost** (`main.py`).
+9. ✅ **`COOKIE_SECURE=1`** em produção — exigido pelo boot guard.
+10. ⏳ **Postgres senha forte** ✅ (guard) + **não-root** ✅ (Dockerfiles); **Alembic** (migrações) e **TLS no DB externo**: pendentes (robustez, não bloqueiam go-live com DB interno).
 
 ### Já correto (não regredir)
 bcrypt real; access em memória + refresh httpOnly; ORM parametrizado; isolamento multi-tenant nas *salvas*/admin; segredos access≠refresh com checagem de `tipo`; `.env` gitignored; SSRF baixo.
