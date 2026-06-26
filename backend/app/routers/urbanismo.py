@@ -33,6 +33,7 @@ from app.core.urbanismo_programa import (
     get_gerador_programa,
 )
 from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
+from app.core.vias import FonteVias, get_fonte_vias
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
 
@@ -231,6 +232,7 @@ def propor(
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
+    fonte_vias: FonteVias | None = Depends(get_fonte_vias),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -295,6 +297,23 @@ def propor(
     # mediu o greide real (acima); passa o eixo p/ a via de conexão ligar as porções (§2 refinado).
     travessia_eixo, travessia_diag = _travessia_conexao(
         aprov_m, registro, to_wgs, fonte_dem, prog, restr_m)
+
+    # Fase 11.5 — PÓRTICO de frente à VIA mais próxima (geral, p/ qualquer terreno): busca as ruas
+    # do entorno (OSM) e acha o ponto da BORDA da gleba mais perto de uma via real. Esse é o alvo da
+    # entrada — o motor põe a portaria no contato via-interna↔borda mais perto dele. Sem via/sem rede
+    # → ``None`` e o motor usa o fallback (miolo loteado). Determinístico.
+    acesso_externo_m = None
+    if fonte_vias is not None:
+        try:
+            cob_vias = fonte_vias.vias(registro["poly"])
+            if cob_vias.geometria is not None and not cob_vias.geometria.is_empty:
+                vias_m = transform(to_local, cob_vias.geometria)
+                gleba_m = transform(to_local, registro["poly"])
+                from shapely.ops import nearest_points
+                acesso_externo_m = nearest_points(gleba_m.boundary, vias_m)[0]
+        except Exception:  # noqa: BLE001 — vias são um PLUS; falha não derruba o urbanismo
+            acesso_externo_m = None
+
     layout = geom.gerar_layout(
         aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao, diretrizes=diretrizes,
         travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
@@ -302,6 +321,8 @@ def propor(
         # Fase 11.4 — a restrição (mata/APP/≥30%) é um BURACO na aproveitável; passa p/ o motor vetar
         # a portaria na frente da mata preservada (a via de contorno corre rente a essa borda).
         restricao_externa=restr_m,
+        # Fase 11.5 — alvo da entrada = via de acesso mais próxima (OSM); None → fallback miolo.
+        acesso_externo=acesso_externo_m,
     )
     layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
     layout.restricao_origem = restr_origem

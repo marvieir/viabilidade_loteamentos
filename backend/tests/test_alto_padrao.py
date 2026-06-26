@@ -113,3 +113,27 @@ def test_portico_gleba_real_sao_roque_fica_no_norte_perto_dos_lotes():
     lotes = unary_union(lay.lotes)
     assert y_rel > 0.5, f"pórtico caiu no sul (y_rel={y_rel:.2f}) — regressão da entrada na mata"
     assert lotes.distance(pt) <= 15.0  # entrada junto às quadras (não numa ponta isolada)
+
+
+def test_portico_de_frente_a_via_mais_proxima():
+    """Fase 11.5 (GERAL, qualquer terreno): com a via de acesso informada (``acesso_externo`` = ponto
+    da borda mais perto de uma rua real), o pórtico nasce DE FRENTE a ela. Numa caixa limpa, mover o
+    acesso de um lado p/ o outro move o pórtico junto — não é customizado p/ KMZ/localidade."""
+    from shapely.geometry import Point, box
+
+    dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
+    prog = programa_do_preset("alta", {"pct_lazer": 0.2})
+    gleba = box(0, 0, 343, 172)
+
+    # acesso ao NORTE (centro do topo) → pórtico na metade norte
+    norte = geom.gerar_layout(gleba, prog, diretrizes=dd, acesso_externo=Point(171, 172))
+    p_norte = Point(norte.viario_diagnostico["alto_padrao"]["portico_ponto"])
+    # acesso ao SUL (centro da base) → pórtico na metade sul
+    sul = geom.gerar_layout(gleba, prog, diretrizes=dd, acesso_externo=Point(171, 0))
+    p_sul = Point(sul.viario_diagnostico["alto_padrao"]["portico_ponto"])
+
+    assert p_norte.y > p_sul.y, "o pórtico deveria seguir a via de acesso (norte > sul)"
+    # cada pórtico fica do lado do seu acesso (metade norte / metade sul)
+    assert p_norte.y > 86 and p_sul.y < 86
+    # e é o contato mais perto da via informada
+    assert Point(171, 172).distance(p_norte) < Point(171, 172).distance(p_sul)

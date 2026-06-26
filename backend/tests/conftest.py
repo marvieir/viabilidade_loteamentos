@@ -231,6 +231,8 @@ def _vegetacao_auto_off(monkeypatch):
     monkeypatch.setenv("AREAS_UMIDAS_AUTO", "0")
     # Idem para o DEM da declividade (Copernicus via HTTP é o default em produção).
     monkeypatch.setenv("DEM_FONTE", "none")
+    # Idem para as vias do pórtico (OSM/Overpass via HTTP é o default em produção).
+    monkeypatch.setenv("VIAS_OSM_AUTO", "0")
 
 
 class StubFonteDEM:

@@ -1060,6 +1060,7 @@ def gerar_layout(
     travessia_diag: Optional[dict] = None,
     declividade_acentuada: Optional[BaseGeometry] = None,
     restricao_externa: Optional[BaseGeometry] = None,
+    acesso_externo: Optional[BaseGeometry] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1523,14 +1524,20 @@ def gerar_layout(
                 if limpos:
                     candidatos = limpos
                     break
-        # Núcleo do loteamento = centróide dos LOTES (onde o desenvolvimento se concentra). A entrada
-        # deve SERVIR esse miolo, não ser uma saída remota: entre os contatos limpos, escolhe o mais
-        # PERTO do núcleo — NÃO o mais longo. O mais longo costuma ser um trecho de contorno na ponta
-        # da gleba (longe das quadras, de frente p/ mata/fundo), que era justamente o que dava errado.
-        # O comprimento mínimo (≥2 m) já descarta arranhões.
+        # ALVO da entrada (geral, p/ qualquer terreno): de frente à VIA de acesso mais próxima.
+        # ``acesso_externo`` (ponto da borda da gleba mais perto de uma rua real do OSM, vindo do
+        # chamador) é o alvo PREFERIDO — entre os contatos limpos, escolhe o mais perto dele, então
+        # o pórtico nasce de frente à via mais próxima. Sem via mapeada → cai no FALLBACK: centróide
+        # dos LOTES (serve o miolo, nunca uma saída remota de contorno). Comprimento mín. já filtra
+        # arranhões. NÃO usa "o mais longo" (premiava a ponta isolada de frente p/ mata/fundo).
         nucleo = unary_union(lotes).centroid if lotes else aprov.centroid
-        if candidatos and nucleo is not None and not nucleo.is_empty:
-            portico_pt = _meio(min(candidatos, key=lambda s: _meio(s).distance(nucleo)))
+        alvo = (
+            acesso_externo
+            if (acesso_externo is not None and not acesso_externo.is_empty)
+            else nucleo
+        )
+        if candidatos and alvo is not None and not alvo.is_empty:
+            portico_pt = _meio(min(candidatos, key=lambda s: _meio(s).distance(alvo)))
         elif candidatos:
             portico_pt = _meio(max(candidatos, key=lambda s: s.length))
         elif nucleo is not None and not nucleo.is_empty:
