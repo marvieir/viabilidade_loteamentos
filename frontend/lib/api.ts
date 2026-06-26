@@ -370,7 +370,10 @@ export type TipoAlerta =
   | "ASSENTAMENTO"
   | "CAVERNA"
   | "AREA_PROTECAO_MANANCIAL"
-  | "DUTOVIA";
+  | "DUTOVIA"
+  | "PATRIMONIO_CULTURAL"
+  | "AREA_CONTAMINADA"
+  | "APCB";
 
 export interface ProvenienciaAmbiental {
   camada: string;
@@ -408,6 +411,9 @@ export type ChaveOverlay =
   | "caverna"
   | "area_protecao_manancial"
   | "dutovia"
+  | "patrimonio_cultural"
+  | "area_contaminada"
+  | "apcb"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
   | "urb_lotes"
   | "urb_quadras"

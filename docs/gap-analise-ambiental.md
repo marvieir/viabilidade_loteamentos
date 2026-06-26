@@ -94,12 +94,13 @@ nacional — caso a caso).
 ✅ **Implementadas** (lógica testada offline; aquisição dual-intake — URL ou arquivo local):
 Áreas úmidas (MapBiomas, auto), **Reserva Legal/CAR** (arquivo local — WFS do CAR está fora do ar),
 **Mata Atlântica**, **Terra Indígena**, **Quilombola**, **Assentamento**, **Caverna (CECAV)**,
-**Área de Proteção de Mananciais**, **Dutovia (ANP)**. Linhas de transmissão, UC, mineração,
+**Área de Proteção de Mananciais**, **Dutovia (ANP)**, **IPHAN/patrimônio cultural-arqueológico**,
+**Áreas contaminadas (CETESB)**, **APCB (MMA)**. Linhas de transmissão, UC, mineração,
 hidrografia/APP, massas d'água, declividade já existiam.
 
 ⏳ **Deferidas** (cauda longa / baixo valor — fáceis de plugar no mesmo mecanismo quando precisar):
-APCB, IPHAN/arqueológico, áreas contaminadas (CETESB), ZEE, corredores ecológicos, Reserva da
-Biosfera, RAMSAR, PDUI, plano diretor ambiental municipal, faixa DNIT, aeródromos.
+ZEE, corredores ecológicos, Reserva da Biosfera, RAMSAR, PDUI, plano diretor ambiental municipal,
+faixa DNIT, aeródromos.
 
 > **Limitação conhecida:** o sandbox de desenvolvimento bloqueia todos os geoservices gov (403) e
 > alguns endpoints oficiais estão fora do ar (ex.: geoserver do CAR). Por isso **nenhum endpoint
@@ -123,6 +124,9 @@ conforme o eixo do serviço) **ou um arquivo GeoJSON local** (baixado do portal 
 | Caverna (CECAV) | `AMBIENTAL_URL_CECAV_CAV` | `AMBIENTAL_CECAV_CAV_PATH` |
 | Área Prot. Mananciais | `AMBIENTAL_URL_APM` | `AMBIENTAL_APM_PATH` |
 | Dutovia (ANP) | `AMBIENTAL_URL_ANP_DUTO` | `AMBIENTAL_ANP_DUTO_PATH` |
+| Patrimônio/arqueológico (IPHAN) | `AMBIENTAL_URL_IPHAN` | `AMBIENTAL_IPHAN_PATH` |
+| Áreas contaminadas (CETESB) | `AMBIENTAL_URL_CETESB_AC` | `AMBIENTAL_CETESB_AC_PATH` |
+| APCB (MMA) | `AMBIENTAL_URL_MMA_APCB` | `AMBIENTAL_MMA_APCB_PATH` |
 
 Validar cada uma no deploy: `RUN_LIVE_SMOKE=1 pytest tests/test_ambiental_smoke.py`.
 

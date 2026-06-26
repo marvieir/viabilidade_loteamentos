@@ -98,6 +98,9 @@ def test_reserva_legal_intersecta(client, fonte):
         ("TERRITORIO_QUILOMBOLA", "territorio_quilombola"),
         ("ASSENTAMENTO", "assentamento"),
         ("AREA_PROTECAO_MANANCIAL", "area_protecao_manancial"),
+        ("PATRIMONIO_CULTURAL", "patrimonio_cultural"),
+        ("AREA_CONTAMINADA", "area_contaminada"),
+        ("APCB", "apcb"),
     ],
 )
 def test_restricao_poligonal_intersecta(client, fonte, tipo, overlay):

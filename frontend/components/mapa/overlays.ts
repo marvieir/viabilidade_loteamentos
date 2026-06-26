@@ -22,6 +22,9 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   caverna: "#57534e", // Caverna (CECAV) + raio de influência — cinza-pedra
   area_protecao_manancial: "#0369a1", // Área de Proteção de Mananciais — azul-água
   dutovia: "#b91c1c", // Dutovia (gás/petróleo) + faixa — vermelho
+  patrimonio_cultural: "#7c3aed", // Patrimônio cultural/arqueológico (IPHAN) — violeta
+  area_contaminada: "#65a30d", // Área contaminada (CETESB) — verde-oliva (passivo)
+  apcb: "#0891b2", // Área Prioritária Biodiversidade (MMA) — ciano (diretriz)
   // Fase 9 — estudo de massa esquemático
   urb_lotes: "#6366f1",
   urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
@@ -88,6 +91,9 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   caverna: "Caverna (CECAV) + raio",
   area_protecao_manancial: "Área de Proteção de Mananciais",
   dutovia: "Dutovia (gás/petróleo) + faixa",
+  patrimonio_cultural: "Patrimônio cultural/arqueológico (IPHAN)",
+  area_contaminada: "Área contaminada (CETESB)",
+  apcb: "Área Prioritária Biodiversidade (MMA)",
   urb_lotes: "Lotes (vendável)",
   urb_quadras: "Quadras (faces da malha)",
   urb_arruamento: "Sistema viário (malha)",

@@ -242,6 +242,9 @@ class AlertaAmbientalOut(BaseModel):
         "CAVERNA",
         "AREA_PROTECAO_MANANCIAL",
         "DUTOVIA",
+        "PATRIMONIO_CULTURAL",
+        "AREA_CONTAMINADA",
+        "APCB",
     ]
     severidade: Literal["ALERTA", "INFORMATIVO"]
     intersecta: bool

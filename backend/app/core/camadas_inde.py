@@ -159,6 +159,27 @@ _RESTRICOES: list[dict] = [
         "detalhe": "Dutovia (gás/petróleo) com faixa non aedificandi (≈20 m/lado, triagem) na "
                    "gleba — afastamento de segurança; consultar a transportadora/ANP.",
     },
+    {
+        "tipo": "PATRIMONIO_CULTURAL", "cod": "IPHAN", "overlay": "patrimonio_cultural",
+        "sev": "ALERTA", "camada": "IPHAN — patrimônio cultural/arqueológico", "buffer": 100.0,
+        "nome": ["identific", "nome", "nm_bem", "sitio"],
+        "detalhe": "Bem cultural / sítio arqueológico (IPHAN) na área/entorno — exige avaliação e "
+                   "eventual prospecção arqueológica com anuência do IPHAN (Lei 3.924/61; IN 01/2015).",
+    },
+    {
+        "tipo": "AREA_CONTAMINADA", "cod": "CETESB-AC", "overlay": "area_contaminada",
+        "sev": "ALERTA", "camada": "Estadual (ex.: CETESB) — áreas contaminadas", "buffer": 100.0,
+        "nome": ["nome", "empreend", "atividade"],
+        "detalhe": "Área contaminada/em reabilitação (cadastro estadual) na área/entorno — passivo "
+                   "ambiental; exige investigação e gerenciamento (Res. CONAMA 420/2009).",
+    },
+    {
+        "tipo": "APCB", "cod": "MMA-APCB", "overlay": "apcb", "sev": "INFORMATIVO",
+        "camada": "MMA — Áreas Prioritárias p/ Conservação da Biodiversidade", "buffer": 0.0,
+        "nome": ["nome", "importanc", "acao"],
+        "detalhe": "Área Prioritária para Conservação da Biodiversidade (MMA) — diretriz de "
+                   "conservação (não é vedação); pode influenciar licenciamento e compensação.",
+    },
 ]
 
 # Timeout de leitura por camada (s) — CONFIGURÁVEL por ambiente. Antes 30 fixo: como as 6
