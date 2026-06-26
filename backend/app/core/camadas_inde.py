@@ -236,26 +236,32 @@ def _get_json_url(full_url: str) -> dict:
     return data
 
 
-def _geojson_local_no_bbox(path: str, bbox: BBox) -> list[tuple]:
-    """Lê um GeoJSON local (FeatureCollection) e devolve [(geom, props)] das feições que tocam
-    o bbox da gleba — recorte simples p/ não carregar um estado inteiro no alerta. Sem dep nova
-    (stdlib json + shapely)."""
-    from shapely.geometry import box as _box
+def _ler_vetor_local_bbox(path: str, bbox: BBox) -> list[tuple]:
+    """Lê SÓ a JANELA (bbox da gleba) de um arquivo vetorial local via pyogrio/GDAL e devolve
+    [(geom, props)]. ESCALA p/ arquivos de ESTADO/BRASIL: em GeoPackage/FlatGeobuf/shapefile o
+    bbox usa o ÍNDICE ESPACIAL (lê só a janela — rápido, pouca memória); GeoJSON cai em varredura
+    (funciona, mas converta os grandes p/ .gpkg). O arquivo deve estar em WGS84/EPSG:4326 (o bbox
+    é interpretado no CRS do arquivo). Sem pyogrio → degrada (erro → camada indisponível)."""
+    from pyogrio.raw import read as _ogr_read
+    from shapely import wkb as _wkb
 
-    with open(path, encoding="utf-8") as fh:
-        fc = json.load(fh)
-    clip = _box(*bbox)
+    meta, _fids, geometry, field_data = _ogr_read(path, bbox=tuple(bbox))
+    if geometry is None or len(geometry) == 0:
+        return []
+    fields = list(meta.get("fields") or [])
     out: list[tuple] = []
-    for ft in _features(fc):
-        geom_raw = ft.get("geometry")
-        if not geom_raw:
+    for i in range(len(geometry)):
+        raw = geometry[i]
+        if raw is None:
             continue
         try:
-            g = shape(geom_raw)
-        except Exception:  # noqa: BLE001 — feição degenerada, ignora
+            g = _wkb.loads(bytes(raw))
+        except Exception:  # noqa: BLE001 — geometria degenerada, ignora
             continue
-        if not g.is_empty and g.intersects(clip):
-            out.append((g, ft.get("properties", {}) or {}))
+        if g.is_empty:
+            continue
+        props = {fields[j]: field_data[j][i] for j in range(len(fields))}
+        out.append((g, props))
     return out
 
 
@@ -440,7 +446,7 @@ class FonteCamadasINDE:
         if PATH_CAR_RL or URL_CAR_RL:
             try:
                 if PATH_CAR_RL:
-                    feats = _geojson_local_no_bbox(PATH_CAR_RL, bbox)
+                    feats = _ler_vetor_local_bbox(PATH_CAR_RL, bbox)
                 else:
                     minx, miny, maxx, maxy = bbox
                     u = URL_CAR_RL.replace(
@@ -476,7 +482,7 @@ class FonteCamadasINDE:
                 continue
             try:
                 if path:
-                    feats = _geojson_local_no_bbox(path, bbox)
+                    feats = _ler_vetor_local_bbox(path, bbox)
                 else:
                     u = url.replace("{bbox}", f"{minx},{miny},{maxx},{maxy}").replace(
                         "{bbox_inv}", f"{miny},{minx},{maxy},{maxx}"

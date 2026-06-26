@@ -4,6 +4,19 @@
 > bloqueia os geoservices gov e alguns endpoints estão fora do ar, **o download é do seu lado**.
 > Aqui está o passo a passo por camada: baixar → converter p/ GeoJSON (WGS84) → apontar no `.env`.
 
+## Escala "Brasil inteiro" (GeoPackage + leitura por janela)
+O backend agora lê **só a janela da gleba** de cada arquivo (via `pyogrio`/GDAL). Para arquivos
+grandes (estado/Brasil), use **GeoPackage** (`.gpkg`) — ele tem **índice espacial**, então a leitura
+é rápida mesmo num arquivo de SP inteiro. Assim você **não precisa recortar por município/gleba**:
+aponte o `.gpkg` do estado e qualquer gleba funciona.
+```bash
+# converter um shapefile grande p/ GeoPackage (cria índice espacial automaticamente)
+ogr2ogr -f GPKG -t_srs EPSG:4326 reserva_legal_sp.gpkg RESERVA_LEGAL_1.shp
+ogr2ogr -f GPKG -t_srs EPSG:4326 -update -append reserva_legal_sp.gpkg RESERVA_LEGAL_2.shp
+# no .env: AMBIENTAL_CAR_RL_PATH=/data/ambiental/reserva_legal_sp.gpkg
+```
+> GeoJSON ainda funciona (recortes pequenos), mas faz varredura — para estado/Brasil prefira `.gpkg`.
+
 ## Pré-requisitos
 - **GDAL/ogr2ogr** (converte shapefile→GeoJSON e reprojeta). Mac: `brew install gdal` (ou já vem
   com o QGIS, em `/Applications/QGIS.app/Contents/MacOS/bin/ogr2ogr`).
