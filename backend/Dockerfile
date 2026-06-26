@@ -26,5 +26,9 @@ COPY app ./app
 # agentes; precisam estar na imagem p/ rodar `podman exec api python -m scripts.<cmd>`.
 COPY scripts ./scripts
 
+# Fase 13 (hardening) — roda como usuário NÃO-root (defesa em profundidade).
+RUN useradd -m -u 10001 appuser && chown -R appuser /app
+USER appuser
+
 EXPOSE 8700
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8700"]

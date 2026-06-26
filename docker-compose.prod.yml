@@ -1,0 +1,75 @@
+# Compose de PRODUÇÃO (Lightsail) — stack completo atrás de um reverse proxy com HTTPS.
+# Diferenças vs. docker-compose.yml (dev): só o Caddy expõe portas (80/443); api/web e db ficam
+# na rede interna (sem publicar 8700/3700/5432); ENV=production (boot exige segredos seguros).
+#
+# Uso (na instância, com backend/.env preenchido — ver docs/migracao-lightsail.md):
+#   DOMINIO=app.seudominio.com.br docker compose -f docker-compose.prod.yml up -d --build
+#
+# .env OBRIGATÓRIO: ENV=production, JWT_SECRET, JWT_REFRESH_SECRET, POSTGRES_PASSWORD (gerados),
+#   CORS_ORIGINS=https://${DOMINIO}, COOKIE_SECURE=1, ALLOWED_HOSTS=${DOMINIO}, ANTHROPIC_API_KEY.
+services:
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"      # ACME http-01 + redirect p/ https
+      - "443:443"    # TLS público (Let's Encrypt automático)
+    environment:
+      DOMINIO: "${DOMINIO:?defina DOMINIO no ambiente}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data        # certificados (persistem entre deploys)
+      - caddy_config:/config
+    depends_on: [api, web]
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    expose:
+      - "8700"        # só na rede interna — NÃO publica no host
+    env_file:
+      - ./backend/.env
+    environment:
+      ENV: "production"
+      DATABASE_URL: "postgresql+psycopg://viabilidade:${POSTGRES_PASSWORD:?}@db:5432/viabilidade"
+      # Dados ambientais (CAR/Mata Atlântica/etc.) — monte o volume e aponte os AMBIENTAL_*_PATH no .env.
+    volumes:
+      - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
+      - ./backend/app/perfis/municipais:/data/perfis-municipais
+      - ${DADOS_AMBIENTAIS:-./dados-ambientais}:/data/ambiental:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        # O front é buildado apontando p/ o domínio HTTPS (o navegador fala com o Caddy).
+        NEXT_PUBLIC_API_BASE: "https://${DOMINIO}"
+    expose:
+      - "3700"        # só na rede interna
+    depends_on: [api]
+    restart: unless-stopped
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: "viabilidade"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD forte}"
+      POSTGRES_DB: "viabilidade"
+    expose:
+      - "5432"        # NÃO publica no host
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U viabilidade -d viabilidade"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

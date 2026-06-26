@@ -22,5 +22,7 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Fase 13 (hardening) — roda como usuário NÃO-root (a imagem node já traz o usuário `node`).
+USER node
 EXPOSE 3700
 CMD ["node", "server.js"]

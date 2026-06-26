@@ -41,9 +41,9 @@
 - **`config` central com `ENV`**: em `ENV=production`, abortar boot se `JWT_SECRET`/`JWT_REFRESH_SECRET`/`POSTGRES_PASSWORD`/`CORS_ORIGINS` ausentes ou default.
 - **Dependência de auth** nos routers de dimensão (`Depends(usuario_atual)`) + `STORE` escopado por `usuario.id` (ou persistir e validar dono).
 - **Middlewares**: rate limit (`slowapi`), security headers, `TrustedHostMiddleware`, limite de body.
-- **`docker-compose.prod.yml`**: remove `ports:` de api/web; adiciona serviço `caddy` (com volume de certs); `restart: unless-stopped`; `env_file` só de segredos.
-- **`Caddyfile`**: `dominio { reverse_proxy /api/* api:8700 ; reverse_proxy web:3700 ; header { Strict-Transport-Security ... } }`.
-- **Dockerfiles**: `USER appuser` (não-root) em api e web; `web` buildado com `NEXT_PUBLIC_API_BASE=https://<dominio>`.
+- **`docker-compose.prod.yml`** ✅ **pronto** (raiz do repo): Caddy (80/443) + api/web só com `expose` (sem publicar no host) + db interno + `ENV=production`. Sobe com `DOMINIO=... docker compose -f docker-compose.prod.yml up -d --build`.
+- **`Caddyfile`** ✅ **pronto** (raiz do repo): HTTPS automático (Let's Encrypt) + security headers; `/api/*`→api, resto→web.
+- **Dockerfiles** ✅ **não-root** (`USER appuser`/`USER node`); o `web` em prod é buildado com `NEXT_PUBLIC_API_BASE=https://${DOMINIO}`.
 
 ## 4) Passo a passo do deploy
 1. **Provisionar**: instância Lightsail Ubuntu + IP estático; abrir no firewall só **22, 80, 443**.

@@ -1,0 +1,27 @@
+# Reverse proxy de produção — HTTPS automático (Let's Encrypt) + security headers.
+# O domínio vem do ambiente (DOMINIO) — ver docker-compose.prod.yml.
+{$DOMINIO} {
+	encode gzip
+
+	# Cabeçalhos de segurança (defesa em profundidade — o app também envia alguns).
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	# API → serviço interno (sem porta pública). O front fala /api/* com o mesmo domínio.
+	handle /api/* {
+		reverse_proxy api:8700
+	}
+	handle /health {
+		reverse_proxy api:8700
+	}
+
+	# Resto → frontend Next.js.
+	handle {
+		reverse_proxy web:3700
+	}
+}
