@@ -363,7 +363,14 @@ export type TipoAlerta =
   | "APP_MASSA_DAGUA"
   | "FAIXA_NAO_EDIFICAVEL"
   | "FAIXA_SERVIDAO_LT"
-  | "RESERVA_LEGAL";
+  | "RESERVA_LEGAL"
+  | "MATA_ATLANTICA"
+  | "TERRA_INDIGENA"
+  | "TERRITORIO_QUILOMBOLA"
+  | "ASSENTAMENTO"
+  | "CAVERNA"
+  | "AREA_PROTECAO_MANANCIAL"
+  | "DUTOVIA";
 
 export interface ProvenienciaAmbiental {
   camada: string;
@@ -394,6 +401,13 @@ export type ChaveOverlay =
   | "declividade_vedada"
   | "areas_umidas"
   | "reserva_legal"
+  | "mata_atlantica"
+  | "terra_indigena"
+  | "territorio_quilombola"
+  | "assentamento"
+  | "caverna"
+  | "area_protecao_manancial"
+  | "dutovia"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
   | "urb_lotes"
   | "urb_quadras"

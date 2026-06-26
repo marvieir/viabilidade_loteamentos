@@ -73,6 +73,26 @@ class FeicaoMassaDagua:
 
 
 @dataclass(frozen=True)
+class FeicaoRestricao:
+    """Restrição territorial GENÉRICA de triagem por interseção (mesma forma p/ várias camadas:
+    Mata Atlântica, Terra Indígena, Quilombola, Assentamento, Caverna, APM, Dutovia…).
+
+    Cada feição carrega a própria proveniência (``camada`` + ``data_referencia``) e o texto legal
+    (``detalhe``), porque cada fonte tem origem/data distintas. ``buffer_m`` > 0 trata feição de
+    PONTO/LINHA como faixa (caverna = raio de influência; dutovia = faixa non aedificandi)."""
+
+    geometria: BaseGeometry  # Polygon/Line/Point (WGS84)
+    tipo: str  # TERRA_INDIGENA | TERRITORIO_QUILOMBOLA | ASSENTAMENTO | MATA_ATLANTICA | CAVERNA | AREA_PROTECAO_MANANCIAL | DUTOVIA
+    overlay_key: str  # chave do overlay no mapa
+    camada: str  # rótulo de proveniência (fonte)
+    nome: Optional[str] = None
+    detalhe: Optional[str] = None
+    severidade: str = "ALERTA"  # "ALERTA" | "INFORMATIVO"
+    buffer_m: float = 0.0
+    data_referencia: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class FeicaoReservaLegal:
     """Reserva Legal averbada no CAR (SICAR). Polígono da RL do imóvel rural — área de uso
     restrito (Lei 12.651/2012, art. 12 e ss.), non aedificandi para parcelamento."""
@@ -95,6 +115,7 @@ class Camadas:
     linhas_transmissao: list[FeicaoLinhaTransmissao] = field(default_factory=list)
     massas_dagua: list[FeicaoMassaDagua] = field(default_factory=list)
     reserva_legal: list[FeicaoReservaLegal] = field(default_factory=list)
+    restricoes: list[FeicaoRestricao] = field(default_factory=list)  # camadas genéricas de interseção
     data_hidrografia: Optional[str] = None
     data_uc: Optional[str] = None
     data_mineracao: Optional[str] = None

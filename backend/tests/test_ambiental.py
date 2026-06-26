@@ -1,6 +1,8 @@
 """Critérios de aceite das Fases 2 e 2.1 — Ambiental, offline com camadas-stub."""
 
 from app.core.ambiental import faixa_servidao
+import pytest
+
 from app.core.camadas import (
     Camadas,
     FeicaoHidrografia,
@@ -8,6 +10,7 @@ from app.core.camadas import (
     FeicaoMassaDagua,
     FeicaoMineracao,
     FeicaoReservaLegal,
+    FeicaoRestricao,
     FeicaoUC,
 )
 from tests.conftest import (
@@ -84,6 +87,61 @@ def test_reserva_legal_intersecta(client, fonte):
     assert "SP-3550308-ABC123" in al[0]["detalhe"]
     assert "Reserva Legal" in al[0]["proveniencia"]["camada"]
     assert "reserva_legal" in data["geojson_overlays"]
+
+
+# 1c — restrições territoriais genéricas (Mata Atlântica, TI, quilombola, etc.) -------
+@pytest.mark.parametrize(
+    "tipo,overlay",
+    [
+        ("MATA_ATLANTICA", "mata_atlantica"),
+        ("TERRA_INDIGENA", "terra_indigena"),
+        ("TERRITORIO_QUILOMBOLA", "territorio_quilombola"),
+        ("ASSENTAMENTO", "assentamento"),
+        ("AREA_PROTECAO_MANANCIAL", "area_protecao_manancial"),
+    ],
+)
+def test_restricao_poligonal_intersecta(client, fonte, tipo, overlay):
+    data = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            restricoes=[
+                FeicaoRestricao(
+                    UC_COBRE, tipo=tipo, overlay_key=overlay, camada=f"Fonte {tipo}",
+                    nome="Feição X", detalhe=f"detalhe {tipo}", data_referencia=DATA_REF,
+                )
+            ]
+        ),
+    )
+    al = _do_tipo(data, tipo)
+    assert al, data
+    assert al[0]["intersecta"] is True
+    assert al[0]["area_afetada_m2"] > 0
+    assert al[0]["proveniencia"]["camada"] == f"Fonte {tipo}"
+    assert overlay in data["geojson_overlays"]
+
+
+def test_restricao_com_buffer_ponto(client, fonte):
+    """Caverna/dutovia: feição de PONTO vira faixa pelo buffer (raio de influência)."""
+    from shapely.geometry import Point
+
+    # ponto ~no centro da gleba RET_RETANGULO; buffer de 250 m garante interseção com a gleba.
+    data = _ambiental(
+        client,
+        fonte,
+        Camadas(
+            restricoes=[
+                FeicaoRestricao(
+                    Point(-47.130, -23.525), tipo="CAVERNA", overlay_key="caverna",
+                    camada="CECAV", buffer_m=250.0, data_referencia=DATA_REF,
+                )
+            ]
+        ),
+    )
+    al = _do_tipo(data, "CAVERNA")
+    assert al, data
+    assert al[0]["area_afetada_m2"] > 0
+    assert "caverna" in data["geojson_overlays"]
 
 
 # 2 -------------------------------------------------------------------------

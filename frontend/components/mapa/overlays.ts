@@ -15,6 +15,13 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5)
   areas_umidas: "#0d9488", // área úmida/alagável (APP candidata) — teal/azul-esverdeado
   reserva_legal: "#15803d", // Reserva Legal averbada no CAR — verde-escuro
+  mata_atlantica: "#047857", // domínio Mata Atlântica (Lei 11.428) — verde-mata
+  terra_indigena: "#c2410c", // Terra Indígena (FUNAI) — laranja-terra
+  territorio_quilombola: "#a16207", // Território Quilombola — âmbar-escuro
+  assentamento: "#9333ea", // Assentamento (INCRA) — roxo
+  caverna: "#57534e", // Caverna (CECAV) + raio de influência — cinza-pedra
+  area_protecao_manancial: "#0369a1", // Área de Proteção de Mananciais — azul-água
+  dutovia: "#b91c1c", // Dutovia (gás/petróleo) + faixa — vermelho
   // Fase 9 — estudo de massa esquemático
   urb_lotes: "#6366f1",
   urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
@@ -74,6 +81,13 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   declividade_vedada: "Declividade ≥30% (vedada)",
   areas_umidas: "Área úmida/alagável (APP candidata)",
   reserva_legal: "Reserva Legal (CAR)",
+  mata_atlantica: "Domínio Mata Atlântica (Lei 11.428)",
+  terra_indigena: "Terra Indígena (FUNAI)",
+  territorio_quilombola: "Território Quilombola",
+  assentamento: "Assentamento (INCRA)",
+  caverna: "Caverna (CECAV) + raio",
+  area_protecao_manancial: "Área de Proteção de Mananciais",
+  dutovia: "Dutovia (gás/petróleo) + faixa",
   urb_lotes: "Lotes (vendável)",
   urb_quadras: "Quadras (faces da malha)",
   urb_arruamento: "Sistema viário (malha)",

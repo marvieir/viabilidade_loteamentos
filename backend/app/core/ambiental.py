@@ -316,6 +316,30 @@ def analisar(gleba, camadas: Camadas) -> ResultadoAmbiental:
     if rl_geoms:
         overlays["reserva_legal"] = mapping(transform(to_wgs, unary_union(rl_geoms)))
 
+    # --- Restrições territoriais genéricas (Mata Atlântica, TI, quilombola, assentamento,
+    # caverna, APM, dutovia…) — mesma forma: interseção (com buffer p/ ponto/linha) → alerta +
+    # overlay agrupado por chave. Cada feição traz sua própria proveniência e texto legal. ---
+    restr_overlays: dict = {}
+    for f in camadas.restricoes:
+        geom_l = transform(to_local, f.geometria)
+        g = geom_l.buffer(f.buffer_m) if f.buffer_m else geom_l
+        inter = g.intersection(gleba_l)
+        if not inter.is_empty and inter.area > 0:
+            restr_overlays.setdefault(f.overlay_key, []).append(g)
+            alertas.append(
+                Alerta(
+                    tipo=f.tipo,
+                    severidade=f.severidade,
+                    intersecta=True,
+                    detalhe=f.detalhe or ("Sobreposição com " + (f.nome or f.tipo)),
+                    camada=f.camada,
+                    data_referencia=f.data_referencia,
+                    area_afetada_m2=round(inter.area, 2),
+                )
+            )
+    for chave, geoms in restr_overlays.items():
+        overlays[chave] = mapping(transform(to_wgs, unary_union(geoms)))
+
     return ResultadoAmbiental(
         alertas=alertas,
         geojson_overlays=overlays,

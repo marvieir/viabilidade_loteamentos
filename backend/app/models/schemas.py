@@ -235,6 +235,13 @@ class AlertaAmbientalOut(BaseModel):
         "FAIXA_NAO_EDIFICAVEL",
         "FAIXA_SERVIDAO_LT",
         "RESERVA_LEGAL",
+        "MATA_ATLANTICA",
+        "TERRA_INDIGENA",
+        "TERRITORIO_QUILOMBOLA",
+        "ASSENTAMENTO",
+        "CAVERNA",
+        "AREA_PROTECAO_MANANCIAL",
+        "DUTOVIA",
     ]
     severidade: Literal["ALERTA", "INFORMATIVO"]
     intersecta: bool

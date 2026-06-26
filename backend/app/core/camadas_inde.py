@@ -49,6 +49,7 @@ from app.core.camadas import (
     FeicaoMassaDagua,
     FeicaoMineracao,
     FeicaoReservaLegal,
+    FeicaoRestricao,
     FeicaoUC,
 )
 
@@ -102,6 +103,63 @@ PATH_CAR_RL = os.getenv("AMBIENTAL_CAR_RL_PATH", "").strip()
 COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
 COD_MASSA = "Massa d'água"
 COD_CAR_RL = "SICAR-RL"
+
+# Restrições territoriais genéricas (interseção → alerta). Mesmo modelo dual-intake do CAR: cada
+# uma lê de uma URL (WFS/ArcGIS GeoJSON, com placeholders {bbox}/{bbox_inv}) OU de um GeoJSON local
+# — o operador configura no deploy a que estiver viva (muitos geoservices gov caem ou bloqueiam).
+# Sem URL nem arquivo → camada não consultada (degrada honesto). Vars por ``cod`` (ex.: MATA-ATL →
+# AMBIENTAL_URL_MATA_ATL / AMBIENTAL_MATA_ATL_PATH). Endpoints PENDENTES de confirmação ao vivo.
+_RESTRICOES: list[dict] = [
+    {
+        "tipo": "MATA_ATLANTICA", "cod": "MATA-ATL", "overlay": "mata_atlantica", "sev": "ALERTA",
+        "camada": "IBGE — domínio Mata Atlântica (Lei 11.428)", "buffer": 0.0,
+        "nome": ["bioma", "nome", "fitofisionomia"],
+        "detalhe": "Gleba no domínio da Mata Atlântica (Lei 11.428/2006) — supressão de vegetação "
+                   "nativa exige compensação e anuência específica (órgão estadual/IBAMA).",
+    },
+    {
+        "tipo": "TERRA_INDIGENA", "cod": "FUNAI-TI", "overlay": "terra_indigena", "sev": "ALERTA",
+        "camada": "FUNAI — Terras Indígenas", "buffer": 0.0,
+        "nome": ["terrai_nom", "nome_ti", "nome"],
+        "detalhe": "Terra Indígena (FUNAI) na área/entorno — restrição fundiária forte; consultar "
+                   "a FUNAI e o órgão licenciador.",
+    },
+    {
+        "tipo": "TERRITORIO_QUILOMBOLA", "cod": "QUILOMBO", "overlay": "territorio_quilombola",
+        "sev": "ALERTA", "camada": "INCRA/Fundação Palmares — Territórios Quilombolas", "buffer": 0.0,
+        "nome": ["nome", "nm_comunid", "comunidade"],
+        "detalhe": "Território Quilombola (INCRA/Fundação Palmares) na área/entorno — restrição "
+                   "fundiária; consultar o órgão competente.",
+    },
+    {
+        "tipo": "ASSENTAMENTO", "cod": "INCRA-PA", "overlay": "assentamento", "sev": "ALERTA",
+        "camada": "INCRA — Assentamentos rurais", "buffer": 0.0,
+        "nome": ["nome_proje", "nome", "projeto"],
+        "detalhe": "Assentamento rural (INCRA) na área — incompatível com loteamento urbano sem "
+                   "desafetação; consultar o INCRA.",
+    },
+    {
+        "tipo": "CAVERNA", "cod": "CECAV-CAV", "overlay": "caverna", "sev": "ALERTA",
+        "camada": "CECAV/ICMBio — cavidades naturais", "buffer": 250.0,
+        "nome": ["nome", "nom_cav", "id"],
+        "detalhe": "Cavidade natural (CECAV) com raio de influência (250 m, triagem) incidindo na "
+                   "gleba — exige estudo espeleológico (Decreto 6.640/2008).",
+    },
+    {
+        "tipo": "AREA_PROTECAO_MANANCIAL", "cod": "APM", "overlay": "area_protecao_manancial",
+        "sev": "ALERTA", "camada": "Estadual — Área de Proteção de Mananciais", "buffer": 0.0,
+        "nome": ["nome", "apm", "bacia"],
+        "detalhe": "Área de Proteção de Mananciais (lei estadual) — restringe densidade e "
+                   "impermeabilização; verificar a lei específica da bacia.",
+    },
+    {
+        "tipo": "DUTOVIA", "cod": "ANP-DUTO", "overlay": "dutovia", "sev": "ALERTA",
+        "camada": "ANP/EPE — dutovias (gás/petróleo)", "buffer": 20.0,
+        "nome": ["nome", "duto", "tipo"],
+        "detalhe": "Dutovia (gás/petróleo) com faixa non aedificandi (≈20 m/lado, triagem) na "
+                   "gleba — afastamento de segurança; consultar a transportadora/ANP.",
+    },
+]
 
 # Timeout de leitura por camada (s) — CONFIGURÁVEL por ambiente. Antes 30 fixo: como as 6
 # camadas eram consultadas EM SÉRIE, uma rede ruim somava 6×30 = 180 s (3 min) só de espera.
@@ -385,5 +443,44 @@ class FonteCamadasINDE:
                 c.avisos.append(
                     f"Camada de Reserva Legal (SICAR/CAR) indisponível — {_detalhe_erro(exc)}"
                 )
+
+        # Restrições territoriais genéricas (Mata Atlântica, TI, quilombola, assentamento, caverna,
+        # APM, dutovia) — cada uma só roda se o operador configurou URL ou arquivo local (dual-intake).
+        minx, miny, maxx, maxy = bbox
+        for cfg in _RESTRICOES:
+            env_key = cfg["cod"].replace("-", "_")
+            url = os.getenv(f"AMBIENTAL_URL_{env_key}", "").strip()
+            path = os.getenv(f"AMBIENTAL_{env_key}_PATH", "").strip()
+            if not (url or path):
+                continue
+            try:
+                if path:
+                    feats = _geojson_local_no_bbox(path, bbox)
+                else:
+                    u = url.replace("{bbox}", f"{minx},{miny},{maxx},{maxy}").replace(
+                        "{bbox_inv}", f"{miny},{minx},{maxy},{maxx}"
+                    )
+                    feats = [
+                        (shape(ft["geometry"]), ft.get("properties", {}) or {})
+                        for ft in _features(_get_json_url(u))
+                    ]
+                for geom, props in feats:
+                    c.restricoes.append(
+                        FeicaoRestricao(
+                            geometria=geom,
+                            tipo=cfg["tipo"],
+                            overlay_key=cfg["overlay"],
+                            camada=cfg["camada"],
+                            nome=_first(props, *cfg["nome"]),
+                            detalhe=cfg["detalhe"],
+                            severidade=cfg["sev"],
+                            buffer_m=cfg["buffer"],
+                            data_referencia=hoje,
+                        )
+                    )
+                c.consultadas.append(cfg["cod"])
+            except Exception as exc:  # noqa: BLE001 — degradar a camada, não derrubar
+                c.indisponiveis.append(cfg["cod"])
+                c.avisos.append(f"Camada {cfg['camada']} indisponível — {_detalhe_erro(exc)}")
 
         return c
