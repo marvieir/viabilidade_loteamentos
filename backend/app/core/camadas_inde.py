@@ -93,6 +93,10 @@ URL_MASSA_DAGUA_GRANDE = os.getenv(
 # ``{bbox}`` = minx,miny,maxx,maxy e ``{bbox_inv}`` = miny,minx,maxy,minx p/ WFS lat,lon). A
 # resposta esperada é GeoJSON (FeatureCollection). Vazio → camada simplesmente não consultada.
 URL_CAR_RL = os.getenv("AMBIENTAL_URL_CAR_RL", "").strip()
+# O geoserver legado do CAR está fora do ar (timeout até de egress aberto). Caminho REALISTA:
+# o operador baixa o recorte do município (consultapublica.car.gov.br) e converte p/ GeoJSON
+# (``ogr2ogr -f GeoJSON rl.geojson RESERVA_LEGAL.shp``), apontando ``AMBIENTAL_CAR_RL_PATH``.
+PATH_CAR_RL = os.getenv("AMBIENTAL_CAR_RL_PATH", "").strip()
 
 # Códigos curtos de camada (para camadas_consultadas / camadas_indisponiveis — Fase 2.1).
 COD_MINERACAO, COD_HIDRO, COD_UC, COD_LT = "SIGMINE", "ANA", "ICMBio", "ANEEL"
@@ -151,6 +155,29 @@ def _get_json_url(full_url: str) -> dict:
     if isinstance(data, dict) and "error" in data:
         raise RuntimeError(f"erro do serviço: {data['error']}")
     return data
+
+
+def _geojson_local_no_bbox(path: str, bbox: BBox) -> list[tuple]:
+    """Lê um GeoJSON local (FeatureCollection) e devolve [(geom, props)] das feições que tocam
+    o bbox da gleba — recorte simples p/ não carregar um estado inteiro no alerta. Sem dep nova
+    (stdlib json + shapely)."""
+    from shapely.geometry import box as _box
+
+    with open(path, encoding="utf-8") as fh:
+        fc = json.load(fh)
+    clip = _box(*bbox)
+    out: list[tuple] = []
+    for ft in _features(fc):
+        geom_raw = ft.get("geometry")
+        if not geom_raw:
+            continue
+        try:
+            g = shape(geom_raw)
+        except Exception:  # noqa: BLE001 — feição degenerada, ignora
+            continue
+        if not g.is_empty and g.intersects(clip):
+            out.append((g, ft.get("properties", {}) or {}))
+    return out
 
 
 def _detalhe_erro(exc: Exception) -> str:
@@ -329,18 +356,22 @@ class FonteCamadasINDE:
             c.indisponiveis.append(COD_MASSA)
             c.avisos.append("Camada de massas d'água (ANA) indisponível — " + "; ".join(md_err))
 
-        # Reserva Legal (SICAR/CAR) — só consulta se o operador configurou a URL (endpoint
-        # pendente de confirmação ao vivo). Sem URL → camada não consultada (degrada honesto).
-        if URL_CAR_RL:
+        # Reserva Legal (SICAR/CAR): preferimos o ARQUIVO LOCAL (o WFS do CAR está fora do ar);
+        # se houver só a URL, tenta WFS. Sem nenhum → camada não consultada (degrada honesto).
+        if PATH_CAR_RL or URL_CAR_RL:
             try:
-                minx, miny, maxx, maxy = bbox
-                u = URL_CAR_RL.replace(
-                    "{bbox}", f"{minx},{miny},{maxx},{maxy}"
-                ).replace("{bbox_inv}", f"{miny},{minx},{maxy},{maxx}")
-                fc = _get_json_url(u)
-                for ft in _features(fc):
-                    geom = shape(ft["geometry"])
-                    props = ft.get("properties", {}) or {}
+                if PATH_CAR_RL:
+                    feats = _geojson_local_no_bbox(PATH_CAR_RL, bbox)
+                else:
+                    minx, miny, maxx, maxy = bbox
+                    u = URL_CAR_RL.replace(
+                        "{bbox}", f"{minx},{miny},{maxx},{maxy}"
+                    ).replace("{bbox_inv}", f"{miny},{minx},{maxy},{maxx}")
+                    feats = [
+                        (shape(ft["geometry"]), ft.get("properties", {}) or {})
+                        for ft in _features(_get_json_url(u))
+                    ]
+                for geom, props in feats:
                     c.reserva_legal.append(
                         FeicaoReservaLegal(
                             geometria=geom,
