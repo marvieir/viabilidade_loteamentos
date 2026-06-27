@@ -26,10 +26,33 @@ OSM_HIGHWAYS = (
     "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|"
     "service|track|road|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link"
 )
-URL_OVERPASS = os.getenv("VIAS_OVERPASS_URL", "https://overpass-api.de/api/interpreter")
+# Endpoints Overpass (espelhos). O serviço público é gratuito e INSTÁVEL (limita/cai) — um único
+# host fazia o pórtico cair no fallback toda vez que ele estava fora. Tenta em ordem até um responder.
+# Override por env: VIAS_OVERPASS_URLS (lista separada por vírgula) ou VIAS_OVERPASS_URL (1 só).
+_DEFAULT_OVERPASS = (
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+)
+
+
+def _urls_overpass() -> list[str]:
+    bruto = os.getenv("VIAS_OVERPASS_URLS") or os.getenv("VIAS_OVERPASS_URL")
+    if bruto:
+        urls = [u.strip() for u in bruto.split(",") if u.strip()]
+        if urls:
+            return urls
+    return list(_DEFAULT_OVERPASS)
+
+
+# Compat: nome antigo ainda exportado (1º endpoint efetivo).
+URL_OVERPASS = _urls_overpass()[0]
 # Entorno consultado ao redor do bbox da gleba (graus): ~600 m pega a via de acesso mais próxima.
 BUFFER_GRAUS = float(os.getenv("VIAS_BUFFER_GRAUS", "0.006"))
 _TIMEOUT = max(int(os.getenv("VIAS_HTTP_TIMEOUT", "25")), 1)
+# Tentativas POR endpoint antes de passar pro próximo (cobre 429/timeout transitório).
+_TENTATIVAS = max(int(os.getenv("VIAS_TENTATIVAS", "2")), 1)
 
 
 @dataclass
@@ -58,20 +81,32 @@ class FonteViasOSM:
             f'[out:json][timeout:{_TIMEOUT}];'
             f'way["highway"~"^({OSM_HIGHWAYS})$"]({bbox});out geom;'
         )
-        try:
-            req = urllib.request.Request(
-                URL_OVERPASS,
-                data=urllib.parse.urlencode({"data": ql}).encode(),
-                headers={
-                    "User-Agent": "viabilidade-loteamentos/0.2",
-                    "Accept": "application/json",
-                },
-            )
-            with urllib.request.urlopen(req, timeout=_TIMEOUT + 5) as resp:  # noqa: S310 (URL de config)
-                d = json.loads(resp.read().decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001 — sem rede/Overpass fora → degrada honesto
+        # Falha-e-passa-pro-próximo: tenta cada espelho (com retry) até um responder. Só degrada
+        # honesto se TODOS falharem — assim um Overpass fora não joga mais o pórtico no fallback.
+        falhas: list[str] = []
+        d = None
+        for url in _urls_overpass():
+            for tentativa in range(_TENTATIVAS):
+                try:
+                    req = urllib.request.Request(
+                        url,
+                        data=urllib.parse.urlencode({"data": ql}).encode(),
+                        headers={
+                            "User-Agent": "viabilidade-loteamentos/0.2",
+                            "Accept": "application/json",
+                        },
+                    )
+                    with urllib.request.urlopen(req, timeout=_TIMEOUT + 5) as resp:  # noqa: S310 (URL de config)
+                        d = json.loads(resp.read().decode("utf-8"))
+                    break
+                except Exception as exc:  # noqa: BLE001 — tenta o próximo espelho
+                    host = urllib.parse.urlparse(url).netloc or url
+                    falhas.append(f"{host} ({type(exc).__name__})")
+            if d is not None:
+                break
+        if d is None:
             return CoberturaVias(
-                avisos=[f"Vias (OSM/Overpass) indisponíveis — {type(exc).__name__}: {exc}"[:200]]
+                avisos=[f"Vias (OSM/Overpass) indisponíveis — tentativas: {'; '.join(falhas)}"[:300]]
             )
 
         linhas = []
