@@ -204,6 +204,11 @@ class ExtratorLUOSClaude:
             resp = client.messages.create(
                 model=self.modelo,
                 max_tokens=16000,
+                # Leitura estruturada quer a interpretação MAIS provável, não variação criativa.
+                # temperature=0 → mesmo PDF rende leitura muito mais estável/completa rodada-a-
+                # rodada (não 100% determinístico com tool use, mas elimina a maior parte da
+                # variância). Coerente com o eixo do projeto: extração assistida, não criativa.
+                temperature=0,
                 system=_INSTRUCAO_ANTIALUCINACAO,
                 tools=[_FERRAMENTA],
                 # Força a saída estruturada: o modelo PRECISA chamar a ferramenta, então não
