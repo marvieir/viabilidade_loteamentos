@@ -27,7 +27,13 @@ COPY app ./app
 COPY scripts ./scripts
 
 # Fase 13 (hardening) — roda como usuário NÃO-root (defesa em profundidade).
-RUN useradd -m -u 10001 appuser && chown -R appuser /app
+# /data/perfis-municipais é o volume nomeado onde a Fase 1.8 GRAVA os perfis confirmados.
+# Criar a pasta na imagem com dono=appuser faz um volume nomeado NOVO herdar esse dono
+# (Docker copia dono/permissões do diretório da imagem para o volume vazio na 1ª montagem);
+# sem isso o volume nasce root e o appuser leva PermissionError ao salvar o perfil.
+RUN useradd -m -u 10001 appuser \
+    && mkdir -p /data/perfis-municipais \
+    && chown -R appuser /app /data
 USER appuser
 
 EXPOSE 8700
