@@ -204,11 +204,10 @@ class ExtratorLUOSClaude:
             resp = client.messages.create(
                 model=self.modelo,
                 max_tokens=16000,
-                # Leitura estruturada quer a interpretação MAIS provável, não variação criativa.
-                # temperature=0 → mesmo PDF rende leitura muito mais estável/completa rodada-a-
-                # rodada (não 100% determinístico com tool use, mas elimina a maior parte da
-                # variância). Coerente com o eixo do projeto: extração assistida, não criativa.
-                temperature=0,
+                # NÃO passar `temperature`: o Opus 4.8 deprecou o parâmetro (400 invalid_request).
+                # A consistência da leitura vem do prompt forte (instrução anti-alucinação + formato
+                # estruturado) + tool_choice forçado, não do controle de amostragem. O gate humano
+                # segue como rede de segurança (extração assistida, nunca número direto).
                 system=_INSTRUCAO_ANTIALUCINACAO,
                 tools=[_FERRAMENTA],
                 # Força a saída estruturada: o modelo PRECISA chamar a ferramenta, então não
