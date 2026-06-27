@@ -154,7 +154,9 @@ def obter_juridico(
     cons = nucleo.consolidar_fichas(fichas)
 
     area_check = (
-        nucleo.cross_check_area(cons["area_matricula_m2"], area_kmz)
+        nucleo.cross_check_area(
+            cons["area_matricula_m2"], area_kmz, n_matriculas=cons["n_matriculas"]
+        )
         if cons["documentos"]
         else None
     )

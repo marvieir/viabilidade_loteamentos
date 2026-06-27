@@ -63,8 +63,10 @@ def cross_check_area(
     area_matricula_m2: float | None,
     area_kmz_m2: float,
     tol: float = TOL_AREA_DEFAULT,
+    n_matriculas: int = 0,
 ) -> schemas.AreaCheckOut:
     """divergencia = |area_matricula − area_kmz| / area_kmz. ≤ tol → conforme; senão atenção.
+    Multi-matrícula: ``area_matricula_m2`` é a SOMA das matrículas (item 7c do roteiro).
     Sem área de matrícula confirmada → indisponível (nunca inventa)."""
     if area_matricula_m2 is None:
         return schemas.AreaCheckOut(
@@ -72,15 +74,22 @@ def cross_check_area(
             area_kmz_m2=round(area_kmz_m2, 2),
             divergencia_pct=None,
             status="indisponivel",
+            n_matriculas=n_matriculas,
             proveniencia="Área da matrícula não confirmada; apenas a medição do KMZ (Fase 1).",
         )
     div = abs(area_matricula_m2 - area_kmz_m2) / area_kmz_m2 if area_kmz_m2 else 0.0
+    base = (
+        f"Soma de {n_matriculas} matrículas (área registrada)"
+        if n_matriculas > 1
+        else "Matrícula (área registrada)"
+    )
     return schemas.AreaCheckOut(
         area_matricula_m2=round(area_matricula_m2, 2),
         area_kmz_m2=round(area_kmz_m2, 2),
         divergencia_pct=round(div, 4),
         status="conforme" if div <= tol else "atencao",
-        proveniencia="Matrícula (área registrada) × medição do KMZ (Fase 1).",
+        n_matriculas=n_matriculas,
+        proveniencia=f"{base} × medição do KMZ (Fase 1).",
     )
 
 
@@ -94,13 +103,33 @@ def consolidar_fichas(fichas: list[schemas.FichaJuridica]) -> dict:
     onus_out: list[schemas.OnusOut] = []
     averbacoes_out: list[schemas.AverbacaoOut] = []
     certidoes_out: list[schemas.CertidaoOut] = []
-    area_matricula_m2: float | None = None
+    # Multi-matrícula: SOMA das áreas (não "a última") + contagem, p/ cruzar a soma com o total
+    # da gleba (item 7c do roteiro). area_matricula_total_m2 fica None se NENHUMA matrícula trouxe
+    # área — pra distinguir "sem área" de "soma zero".
+    area_matricula_total_m2: float | None = None
+    n_matriculas = 0
     indisponivel_consta = False
 
     for f in fichas:
         if f.status != "confirmado":
             continue  # gate: só ficha confirmada entra
         ref_doc = f.fonte_documento or f.tipo
+        n_mat = None
+        if f.identificacao and f.identificacao.matricula:
+            n_mat = f.identificacao.matricula.valor
+        prop = None
+        if f.identificacao and f.identificacao.proprietario_atual:
+            prop = f.identificacao.proprietario_atual.valor
+        area_doc: float | None = None
+        if (
+            f.tipo == "matricula"
+            and f.identificacao
+            and f.identificacao.area_registrada_m2
+        ):
+            v = f.identificacao.area_registrada_m2.valor
+            if v is not None:
+                area_doc = float(v)
+
         documentos.append(
             schemas.DocumentoResumoOut(
                 tipo=f.tipo,
@@ -108,17 +137,16 @@ def consolidar_fichas(fichas: list[schemas.FichaJuridica]) -> dict:
                 fonte=f.fonte_documento,
                 validado_por=f.validado_por,
                 data_referencia=f.data_referencia,
+                matricula=n_mat,
+                proprietario=prop,
+                area_m2=round(area_doc, 2) if area_doc is not None else None,
             )
         )
-        n_mat = None
-        if f.identificacao and f.identificacao.matricula:
-            n_mat = f.identificacao.matricula.valor
 
         if f.tipo == "matricula":
-            if f.identificacao and f.identificacao.area_registrada_m2:
-                v = f.identificacao.area_registrada_m2.valor
-                if v is not None:
-                    area_matricula_m2 = float(v)
+            if area_doc is not None:
+                area_matricula_total_m2 = (area_matricula_total_m2 or 0.0) + area_doc
+                n_matriculas += 1
             for o in f.onus:
                 ativo = o.situacao == "consta"
                 onus_out.append(
@@ -161,7 +189,8 @@ def consolidar_fichas(fichas: list[schemas.FichaJuridica]) -> dict:
         "onus": onus_out,
         "averbacoes": averbacoes_out,
         "certidoes": certidoes_out,
-        "area_matricula_m2": area_matricula_m2,
+        "area_matricula_m2": area_matricula_total_m2,  # SOMA das matrículas (não "a última")
+        "n_matriculas": n_matriculas,
         "indisponivel_consta": indisponivel_consta,
     }
 

@@ -157,8 +157,9 @@ export function CardJuridico({
           </Button>
         </div>
         <p className="-mt-2 text-[11px] text-slate-500">
-          PDF ou imagens (JPEG/PNG). Documento de várias páginas? Selecione todos os arquivos
-          de uma vez — eles entram como um só documento.
+          PDF ou imagens (JPEG/PNG). <strong>Uma</strong> matrícula por vez: selecione todas as
+          páginas dela de uma vez (entram como um só documento), confirme, e repita para a
+          próxima. Várias matrículas (ex.: gleba com 3 áreas) somam e aparecem todas na lista.
         </p>
 
         {erro && (
@@ -407,9 +408,48 @@ function Resultado({ r }: { r: JuridicoDocumental }) {
         )}
       </div>
 
+      {r.documentos.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Documentos analisados{" "}
+            {r.documentos.filter((d) => d.tipo === "matricula").length > 1 &&
+              `· ${r.documentos.filter((d) => d.tipo === "matricula").length} matrículas`}
+          </p>
+          <ul className="space-y-1">
+            {r.documentos.map((d, i) => (
+              <li
+                key={i}
+                className="flex flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm"
+              >
+                <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                  {d.tipo}
+                </span>
+                {d.matricula && (
+                  <span className="font-medium">Matrícula {d.matricula}</span>
+                )}
+                {d.proprietario && (
+                  <span className="text-slate-600">· {d.proprietario}</span>
+                )}
+                {d.area_m2 != null && (
+                  <span className="text-slate-600">
+                    · {d.area_m2.toLocaleString("pt-BR")} m²
+                  </span>
+                )}
+                {d.fonte && (
+                  <span className="text-xs text-slate-400">· {d.fonte}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {r.area_check && (
         <div className="rounded-xl border border-slate-200 p-3 text-sm">
-          <span className="font-medium">Área:</span> matrícula{" "}
+          <span className="font-medium">Área:</span>{" "}
+          {r.area_check.n_matriculas > 1
+            ? `soma de ${r.area_check.n_matriculas} matrículas `
+            : "matrícula "}
           {r.area_check.area_matricula_m2?.toLocaleString("pt-BR") ?? "—"} m² × KMZ{" "}
           {r.area_check.area_kmz_m2.toLocaleString("pt-BR")} m² ·{" "}
           <span

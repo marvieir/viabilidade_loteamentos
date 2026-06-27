@@ -732,10 +732,11 @@ export interface AverbacaoOut {
   proveniencia: string;
 }
 export interface AreaCheckOut {
-  area_matricula_m2: number | null;
+  area_matricula_m2: number | null; // SOMA das matrículas confirmadas
   area_kmz_m2: number;
   divergencia_pct: number | null;
   status: "conforme" | "atencao" | "indisponivel";
+  n_matriculas: number;
   proveniencia: string;
 }
 export interface CertidaoOut {
@@ -751,6 +752,9 @@ export interface DocumentoResumoOut {
   fonte: string | null;
   validado_por: string | null;
   data_referencia: string | null;
+  matricula: string | null;
+  proprietario: string | null;
+  area_m2: number | null;
 }
 export interface SinteseRisco {
   nivel: "alto" | "medio" | "baixo";

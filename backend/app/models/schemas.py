@@ -569,6 +569,11 @@ class DocumentoResumoOut(BaseModel):
     fonte: Optional[str] = None
     validado_por: Optional[str] = None
     data_referencia: Optional[str] = None
+    # Fase 3.A (multi-matrícula): identidade por documento, p/ a tela listar cada matrícula
+    # com sua área/dono (em vez de achatar tudo num número só).
+    matricula: Optional[str] = None
+    proprietario: Optional[str] = None
+    area_m2: Optional[float] = None
 
 
 class OnusOut(BaseModel):
@@ -588,12 +593,16 @@ class AverbacaoOut(BaseModel):
 
 
 class AreaCheckOut(BaseModel):
-    """Cross-check determinístico: área da matrícula × área medida do KMZ (Fase 1)."""
+    """Cross-check determinístico: área da(s) matrícula(s) × área medida do KMZ (Fase 1).
 
-    area_matricula_m2: Optional[float] = None
+    Multi-matrícula: ``area_matricula_m2`` é a SOMA das áreas das matrículas confirmadas
+    (item 7c do roteiro: a soma das áreas tem de totalizar a área do imóvel)."""
+
+    area_matricula_m2: Optional[float] = None  # SOMA das matrículas confirmadas
     area_kmz_m2: float
     divergencia_pct: Optional[float] = None  # null se não há área de matrícula confirmada
     status: Literal["conforme", "atencao", "indisponivel"]
+    n_matriculas: int = 0  # quantas matrículas entraram na soma
     proveniencia: str
 
 
