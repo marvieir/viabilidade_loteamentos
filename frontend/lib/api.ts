@@ -1,5 +1,6 @@
 // Cliente do backend. O front NUNCA calcula nem reformata números:
 // só transporta JSON do FastAPI e o repassa aos componentes.
+import { apiFetch } from "@/lib/auth";
 
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8700";
@@ -231,7 +232,7 @@ export async function criarAnalise(kmz: File | File[]): Promise<Analise> {
   const arquivos = Array.isArray(kmz) ? kmz : [kmz];
   const form = new FormData();
   arquivos.forEach((f) => form.append("kmz", f));
-  const res = await fetch(`${API_BASE}/api/analises`, {
+  const res = await apiFetch(`/api/analises`, {
     method: "POST",
     body: form,
   });
@@ -273,7 +274,7 @@ export async function gerarLaudo(
   analiseId: string,
   dims: Record<string, unknown>
 ): Promise<Blob> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/laudo`, {
+  const res = await apiFetch(`/api/analises/${analiseId}/laudo`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(dims),
@@ -289,8 +290,8 @@ export async function gerarLaudo(
 export async function buscarMunicipios(q: string): Promise<MunicipioRef[]> {
   const termo = q.trim();
   if (termo.length === 0) return [];
-  const res = await fetch(
-    `${API_BASE}/api/municipios?q=${encodeURIComponent(termo)}`
+  const res = await apiFetch(
+    `/api/municipios?q=${encodeURIComponent(termo)}`
   );
   return jsonOrThrow(res);
 }
@@ -300,8 +301,8 @@ export async function corrigirMunicipio(
   analiseId: string,
   codIbge: string
 ): Promise<Jurisdicao> {
-  const res = await fetch(
-    `${API_BASE}/api/analises/${analiseId}/municipio`,
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/municipio`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -319,8 +320,8 @@ export async function calcularUrbano(
   modalidade: ModalidadeUrbana = "loteamento_aberto",
   zona?: string | null
 ): Promise<Aproveitamento> {
-  const res = await fetch(
-    `${API_BASE}/api/analises/${analiseId}/aproveitamento`,
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/aproveitamento`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -340,8 +341,8 @@ export async function calcularRural(
   analiseId: string,
   fmpM2?: number
 ): Promise<Aproveitamento> {
-  const res = await fetch(
-    `${API_BASE}/api/analises/${analiseId}/aproveitamento`,
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/aproveitamento`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -436,7 +437,7 @@ export interface Ambiental {
 }
 
 export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/ambiental`);
+  const res = await apiFetch(`/api/analises/${analiseId}/ambiental`);
   return jsonOrThrow(res);
 }
 
@@ -490,7 +491,7 @@ export interface SeveridadeVerde {
 }
 
 export async function buscarVegetacao(analiseId: string): Promise<Vegetacao> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/vegetacao`);
+  const res = await apiFetch(`/api/analises/${analiseId}/vegetacao`);
   return jsonOrThrow(res);
 }
 
@@ -514,7 +515,7 @@ export interface AreasUmidas {
 }
 
 export async function buscarAreasUmidas(analiseId: string): Promise<AreasUmidas> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/areas-umidas`);
+  const res = await apiFetch(`/api/analises/${analiseId}/areas-umidas`);
   return jsonOrThrow(res);
 }
 
@@ -548,7 +549,7 @@ export interface Declividade {
 export async function buscarDeclividade(
   analiseId: string
 ): Promise<Declividade> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/declividade`);
+  const res = await apiFetch(`/api/analises/${analiseId}/declividade`);
   return jsonOrThrow(res);
 }
 
@@ -618,8 +619,8 @@ export async function extrairPerfil(
   const qs = new URLSearchParams();
   if (municipio) qs.set("municipio", municipio);
   if (uf) qs.set("uf", uf);
-  const res = await fetch(
-    `${API_BASE}/api/municipios/${codIbge}/perfil/extrair?${qs.toString()}`,
+  const res = await apiFetch(
+    `/api/municipios/${codIbge}/perfil/extrair?${qs.toString()}`,
     { method: "POST", body: form }
   );
   return jsonOrThrow(res);
@@ -632,7 +633,7 @@ export async function confirmarPerfil(
   perfil: PerfilMunicipal,
   validadoPor: string
 ): Promise<PerfilMunicipal> {
-  const res = await fetch(`${API_BASE}/api/municipios/${codIbge}/perfil`, {
+  const res = await apiFetch(`/api/municipios/${codIbge}/perfil`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...perfil, validado_por: validadoPor }),
@@ -644,7 +645,7 @@ export async function confirmarPerfil(
 export async function obterPerfil(
   codIbge: string
 ): Promise<PerfilMunicipal | null> {
-  const res = await fetch(`${API_BASE}/api/municipios/${codIbge}/perfil`);
+  const res = await apiFetch(`/api/municipios/${codIbge}/perfil`);
   if (res.status === 404) return null;
   return jsonOrThrow(res);
 }
@@ -779,8 +780,8 @@ export async function extrairJuridico(
   const form = new FormData();
   documentos.forEach((d) => form.append("documentos", d));
   form.append("tipo", tipo);
-  const res = await fetch(
-    `${API_BASE}/api/analises/${analiseId}/juridico/extrair`,
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/juridico/extrair`,
     { method: "POST", body: form }
   );
   return jsonOrThrow(res);
@@ -792,7 +793,7 @@ export async function confirmarJuridico(
   ficha: FichaJuridica,
   validadoPor: string
 ): Promise<FichaJuridica> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/juridico`, {
+  const res = await apiFetch(`/api/analises/${analiseId}/juridico`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...ficha, validado_por: validadoPor }),
@@ -804,7 +805,7 @@ export async function confirmarJuridico(
 export async function buscarJuridico(
   analiseId: string
 ): Promise<JuridicoDocumental> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/juridico`);
+  const res = await apiFetch(`/api/analises/${analiseId}/juridico`);
   return jsonOrThrow(res);
 }
 
@@ -845,8 +846,8 @@ export async function buscarConformidade(
   const qs = new URLSearchParams();
   if (zona) qs.set("zona", zona);
   if (modalidade) qs.set("modalidade", modalidade);
-  const res = await fetch(
-    `${API_BASE}/api/analises/${analiseId}/conformidade?${qs.toString()}`
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/conformidade?${qs.toString()}`
   );
   return jsonOrThrow(res);
 }
@@ -991,7 +992,7 @@ export async function calcularFinanceira(
   analiseId: string,
   premissas: PremissasFinanceira
 ): Promise<Financeira> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/financeira`, {
+  const res = await apiFetch(`/api/analises/${analiseId}/financeira`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(premissas),
@@ -1003,7 +1004,7 @@ export async function calcularFinanceira(
 export async function obterFinanceira(
   analiseId: string
 ): Promise<Financeira | null> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/financeira`);
+  const res = await apiFetch(`/api/analises/${analiseId}/financeira`);
   if (res.status === 404) return null;
   return jsonOrThrow(res);
 }
@@ -1053,7 +1054,7 @@ export async function calcularEconomica(
   tmaAaReal: number,
   curva?: { min_aa: number; max_aa: number; passo_pp: number }
 ): Promise<Economica> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/economica`, {
+  const res = await apiFetch(`/api/analises/${analiseId}/economica`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ tma_aa_real: tmaAaReal, ...(curva ? { curva } : {}) }),
@@ -1065,7 +1066,7 @@ export async function calcularEconomica(
 export async function obterEconomica(
   analiseId: string
 ): Promise<Economica | null> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/economica`);
+  const res = await apiFetch(`/api/analises/${analiseId}/economica`);
   if (res.status === 404) return null;
   return jsonOrThrow(res);
 }
@@ -1154,7 +1155,7 @@ export interface Localizacao {
 }
 
 export async function buscarLocalizacao(analiseId: string): Promise<Localizacao> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/localizacao`);
+  const res = await apiFetch(`/api/analises/${analiseId}/localizacao`);
   return jsonOrThrow(res);
 }
 
@@ -1474,8 +1475,8 @@ export async function proporUrbanismo(
   overrides?: Record<string, unknown>,
   loteMaxM2?: number | null // Fase 11.8 — teto de lote recomendado pelo operador (m²)
 ): Promise<PropostaUrbanistica> {
-  const res = await fetch(
-    `${API_BASE}/api/analises/${analiseId}/urbanismo/propor`,
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/urbanismo/propor`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1495,6 +1496,6 @@ export async function proporUrbanismo(
 export async function listarUrbanismo(
   analiseId: string
 ): Promise<PropostaUrbanistica[]> {
-  const res = await fetch(`${API_BASE}/api/analises/${analiseId}/urbanismo`);
+  const res = await apiFetch(`/api/analises/${analiseId}/urbanismo`);
   return jsonOrThrow(res);
 }
