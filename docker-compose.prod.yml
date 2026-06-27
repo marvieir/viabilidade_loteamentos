@@ -31,11 +31,18 @@ services:
     environment:
       ENV: "production"
       DATABASE_URL: "postgresql+psycopg://viabilidade:${POSTGRES_PASSWORD:?}@db:5432/viabilidade"
-      # Dados ambientais (CAR/Mata Atlântica/etc.) — monte o volume e aponte os AMBIENTAL_*_PATH no .env.
+      # Perfis municipais confirmados (LUOS) persistem num volume nomeado (sobrevive a deploys).
+      PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
+      # Malha IBGE (detecção de município por geometria) é OPCIONAL — sem ela, cai na lista leve
+      # embarcada (cobre São Roque etc.). Para ligar: gere a malha e descomente o volume + a env
+      # MALHA_IBGE_PATH abaixo.
+      # MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
     volumes:
-      - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
-      - ./backend/app/perfis/municipais:/data/perfis-municipais
+      - perfis_municipais:/data/perfis-municipais
+      # Dados ambientais (CAR/Mata Atlântica/etc.) — coloque os .gpkg em ./dados-ambientais (ou
+      # aponte DADOS_AMBIENTAIS) e os AMBIENTAL_*_PATH no backend/.env.
       - ${DADOS_AMBIENTAIS:-./dados-ambientais}:/data/ambiental:ro
+      # - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro  # opcional (ver acima)
     depends_on:
       db:
         condition: service_healthy
@@ -73,3 +80,4 @@ volumes:
   pgdata:
   caddy_data:
   caddy_config:
+  perfis_municipais:
