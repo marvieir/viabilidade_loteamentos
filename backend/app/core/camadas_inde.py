@@ -272,7 +272,10 @@ def _ler_vetor_local_bbox(path: str, bbox: BBox) -> list[tuple]:
     meta, _fids, geometry, field_data = _ogr_read(path, bbox=bbox_consulta)
     if geometry is None or len(geometry) == 0:
         return []
-    fields = list(meta.get("fields") or [])
+    # meta["fields"] é um array numpy: NUNCA usar `or []` (bool de array com >1 elemento estoura
+    # 'truth value ambiguous'). Checagem explícita por None.
+    campos = meta.get("fields")
+    fields = list(campos) if campos is not None else []
     out: list[tuple] = []
     for i in range(len(geometry)):
         raw = geometry[i]

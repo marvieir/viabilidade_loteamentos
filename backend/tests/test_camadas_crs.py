@@ -29,11 +29,18 @@ def _grava_gpkg(path, crs):
         t = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
         xs, ys = t.transform(*_POLY_WGS.exterior.coords.xy)
         poly = Polygon(zip(xs, ys))
+    # VÁRIOS campos de propósito: meta['fields'] vira array de >1 elemento — exercita a linha
+    # que estourava 'truth value of an array ambiguous' (arquivo real do CAR tem muitos campos).
     ogr_write(
         str(path),
         geometry=np.array([wkb.dumps(poly)], dtype=object),
-        field_data=[np.array(["SP-3550605-XYZ"])],
-        fields=["cod_imovel"],
+        field_data=[
+            np.array(["SP-3550605-XYZ"]),
+            np.array([4.4587]),
+            np.array([7]),
+            np.array(["ativo"]),
+        ],
+        fields=["cod_imovel", "num_area", "ind", "status"],
         geometry_type="Polygon",
         crs=crs,
     )
