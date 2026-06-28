@@ -620,6 +620,11 @@ function Resultado({ r }: { r: JuridicoDocumental }) {
                     {p.tipo}
                   </span>
                 )}
+                {!p.vigente && (
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-700">
+                    anterior
+                  </span>
+                )}
                 <span className="font-medium">{p.nome ?? "(sem nome)"}</span>
                 {p.documento && (
                   <span className="text-slate-600">· {p.documento}</span>

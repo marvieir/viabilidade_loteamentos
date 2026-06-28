@@ -39,6 +39,7 @@ def consolidar_proprietarios(
                     nome=p.nome,
                     documento=p.documento,
                     tipo=p.tipo or _tipo_por_doc(p.documento),
+                    vigente=False,  # vira True se vigente em QUALQUER matrícula (abaixo)
                     matriculas=[],
                     proveniencia=_prov(p),
                 )
@@ -48,6 +49,10 @@ def consolidar_proprietarios(
             # completa campos faltantes se outra matrícula trouxe mais detalhe
             alvo.tipo = alvo.tipo or p.tipo or _tipo_por_doc(p.documento)
             alvo.documento = alvo.documento or p.documento
+            # atual se for vigente em ALGUMA matrícula (dono de uma área ainda que tenha saído
+            # de outra). situacao default é 'vigente', então a compat antiga continua atual.
+            if p.situacao == "vigente":
+                alvo.vigente = True
     return list(por_chave.values())
 
 
@@ -55,10 +60,18 @@ def gerar_checklist(
     proprietarios: list[schemas.ProprietarioOut],
     uf: str | None = None,
 ) -> list[schemas.ItemChecklistOut]:
-    """Monta o checklist do roteiro, personalizado pelos donos e pela UF. Determinístico."""
-    nomes = [_rotulo(p) for p in proprietarios]
-    pjs = [_rotulo(p) for p in proprietarios if p.tipo == "pj"]
-    pfs = [_rotulo(p) for p in proprietarios if p.tipo == "pf"]
+    """Monta o checklist do roteiro, personalizado pelos donos e pela UF. Determinístico.
+
+    Fidelidade ao roteiro: tributárias/registro/título são em nome dos donos ATUAIS; já
+    distribuidores e protesto pedem os titulares dos últimos 10 anos (atuais + anteriores)."""
+    # Donos ATUAIS (vigentes). Defensivo: se a extração não marcou nenhum vigente, trata todos
+    # como atuais (melhor sobre-incluir do que esvaziar as certidões obrigatórias).
+    atuais_props = [p for p in proprietarios if p.vigente] or list(proprietarios)
+    nomes = [_rotulo(p) for p in atuais_props]
+    pjs = [_rotulo(p) for p in atuais_props if p.tipo == "pj"]
+    pfs = [_rotulo(p) for p in atuais_props if p.tipo == "pf"]
+    # Titulares dos últimos 10 anos = atuais + anteriores (todos os que constam).
+    nomes_10anos = [_rotulo(p) for p in proprietarios]
     uf_norm = (uf or "").strip().upper()
     itens: list[schemas.ItemChecklistOut] = []
 
@@ -179,7 +192,7 @@ def gerar_checklist(
         "do Trabalho) — busca retroativa de 10 anos, em nome dos titulares do período "
         "(+ sócios/representantes, se PJ)",
         categoria="distribuidores",
-        em_nome_de=nomes,
+        em_nome_de=nomes_10anos,
         fonte_legal="Roteiro, item 5",
         observacao="Atenção a homônimos e variações de nome (solteira/casada, Luís/Luiz); se "
         "constar processo, juntar certidão de objeto e pé. Validade 3 meses.",
@@ -190,7 +203,7 @@ def gerar_checklist(
         chave="protesto",
         titulo="Certidões de protesto (busca retroativa de 10 anos), em nome dos titulares",
         categoria="protesto",
-        em_nome_de=nomes,
+        em_nome_de=nomes_10anos,
         auto_disponivel=True,
         fonte_legal="Roteiro, item 6",
     )

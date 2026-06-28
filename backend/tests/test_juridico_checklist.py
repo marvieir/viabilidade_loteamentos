@@ -112,3 +112,72 @@ def test_itr_condicional_nao_obrigatorio():
 def test_sem_proprietarios_checklist_vazio_pelo_router():
     # gerar_checklist sempre devolve itens; o router só chama se houver proprietários.
     assert ck.consolidar_proprietarios([]) == []
+
+
+# ---- item 2: donos atuais × anteriores (cadeia 10 anos) ----
+def _ficha_atual_e_anterior():
+    return schemas.FichaJuridica(
+        tipo="matricula",
+        status="confirmado",
+        fonte_documento="m1.pdf",
+        identificacao=schemas.IdentificacaoMatricula(
+            matricula=schemas.CampoDoc(valor="111"),
+            proprietarios=[
+                schemas.ProprietarioDoc(
+                    nome="Paduca LTDA", documento="04.597.242/0001-65",
+                    tipo="pj", situacao="vigente",
+                ),
+                schemas.ProprietarioDoc(
+                    nome="Antonio Blanco", documento="248.730.398-00",
+                    tipo="pf", situacao="anterior",  # transferiu a fração (R-6)
+                ),
+            ],
+        ),
+        validado_por="marco",
+    )
+
+
+def test_anterior_fica_fora_das_tributarias_mas_entra_nos_distribuidores():
+    props = ck.consolidar_proprietarios([_ficha_atual_e_anterior()])
+    paduca = next(p for p in props if p.tipo == "pj")
+    antonio = next(p for p in props if p.tipo == "pf")
+    assert paduca.vigente is True
+    assert antonio.vigente is False
+    itens = {i.chave: i for i in ck.gerar_checklist(props, uf="SP")}
+    # tributárias federais: só o dono ATUAL
+    fed = " ".join(itens["cnd_federal"].em_nome_de)
+    assert "Paduca" in fed and "Antonio" not in fed
+    # distribuidores: titulares de 10 anos → inclui o anterior
+    dist = " ".join(itens["distribuidores"].em_nome_de)
+    assert "Paduca" in dist and "Antonio" in dist
+    # protesto idem
+    prot = " ".join(itens["protesto"].em_nome_de)
+    assert "Antonio" in prot
+
+
+def test_vigente_em_qualquer_matricula_conta_como_atual():
+    # mesmo dono: anterior na matrícula A, vigente na matrícula B → ATUAL
+    fa = _ficha_atual_e_anterior()
+    fa.identificacao.proprietarios[1].situacao = "anterior"  # Antonio anterior aqui
+    fb = schemas.FichaJuridica(
+        tipo="matricula", status="confirmado", fonte_documento="m2.pdf",
+        identificacao=schemas.IdentificacaoMatricula(
+            matricula=schemas.CampoDoc(valor="222"),
+            proprietarios=[
+                schemas.ProprietarioDoc(
+                    nome="Antonio Blanco", documento="248.730.398-00",
+                    tipo="pf", situacao="vigente",  # vigente aqui
+                )
+            ],
+        ),
+        validado_por="marco",
+    )
+    props = ck.consolidar_proprietarios([fa, fb])
+    antonio = next(p for p in props if p.tipo == "pf")
+    assert antonio.vigente is True  # vigente em B vence
+
+
+def test_compat_sem_situacao_default_vigente():
+    # proprietário antigo sem 'situacao' explícita → vigente (não quebra fluxo existente)
+    p = schemas.ProprietarioDoc(nome="X", documento="111.222.333-44")
+    assert p.situacao == "vigente"

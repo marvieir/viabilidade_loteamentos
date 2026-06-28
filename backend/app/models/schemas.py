@@ -492,6 +492,9 @@ class ProprietarioDoc(BaseModel):
     nome: Optional[str] = None
     documento: Optional[str] = None  # CPF (PF) ou CNPJ (PJ), como consta
     tipo: Optional[Literal["pf", "pj"]] = None
+    # vigente = titular ATUAL; anterior = já transferiu/alienou a fração (titular do período,
+    # entra só nas certidões de distribuidores/protesto — 10 anos). Default vigente.
+    situacao: Literal["vigente", "anterior"] = "vigente"
     ato: Optional[str] = None  # R-x onde consta a aquisição
     pagina: Optional[int] = None
     trecho: Optional[str] = None
@@ -644,6 +647,7 @@ class ProprietarioOut(BaseModel):
     nome: Optional[str] = None
     documento: Optional[str] = None
     tipo: Optional[Literal["pf", "pj"]] = None
+    vigente: bool = True  # titular ATUAL (entra nas tributárias/registro); False = só 10 anos
     matriculas: list[str] = []  # em quais matrículas esse dono aparece
     proveniencia: str = ""
 

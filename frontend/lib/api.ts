@@ -671,6 +671,7 @@ export interface ProprietarioDoc {
   nome: string | null;
   documento: string | null;
   tipo: "pf" | "pj" | null;
+  situacao: "vigente" | "anterior";
   ato: string | null;
   pagina: number | null;
   trecho: string | null;
@@ -776,6 +777,7 @@ export interface ProprietarioOut {
   nome: string | null;
   documento: string | null;
   tipo: "pf" | "pj" | null;
+  vigente: boolean;
   matriculas: string[];
   proveniencia: string;
 }
