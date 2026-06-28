@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -67,6 +67,13 @@ export function CardJuridico({
       setCarregando(false);
     }
   }
+
+  // Ao abrir (ou trocar de análise), carrega o que JÁ está confirmado — para a lista de
+  // matrículas já salvas aparecer mesmo antes de clicar em "Analisar".
+  useEffect(() => {
+    void analisar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analiseId]);
 
   // "Analisar tudo" (sinal) dispara a síntese (roda só com os alertas geo se não houver doc).
   const ultimoSinal = useRef(0);
@@ -166,6 +173,30 @@ export function CardJuridico({
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
         )}
 
+        {resultado &&
+          resultado.documentos.filter((d) => d.tipo === "matricula").length > 0 && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-2.5 text-xs text-emerald-900">
+              <span className="font-semibold">Matrículas já confirmadas: </span>
+              {resultado.documentos
+                .filter((d) => d.tipo === "matricula")
+                .map((d, i) => (
+                  <span
+                    key={i}
+                    className="mr-1 inline-block rounded-full bg-white px-2 py-0.5"
+                  >
+                    {d.matricula ? `Matrícula ${d.matricula}` : d.fonte ?? "documento"}
+                    {d.area_m2 != null
+                      ? ` · ${d.area_m2.toLocaleString("pt-BR")} m²`
+                      : ""}
+                  </span>
+                ))}
+              <span className="mt-1 block opacity-80">
+                Carregue a próxima matrícula acima e <strong>confirme</strong> — cada uma
+                soma à lista, não substitui.
+              </span>
+            </div>
+          )}
+
         {rascunho && (
           <Revisao
             ficha={rascunho}
@@ -218,7 +249,11 @@ function Revisao({
           PROPOSTO PELO LLM
         </span>
         <span className="text-xs text-slate-500">
-          {ficha.fonte_documento} · confira cada achado contra a referência ao ato e confirme.
+          {ficha.fonte_documento} · confira cada achado contra a referência ao ato.{" "}
+          <strong className="text-indigo-700">
+            Isto é só um rascunho — clique em “Confirmar” para SALVAR esta matrícula antes de
+            carregar a próxima.
+          </strong>
         </span>
       </div>
 
