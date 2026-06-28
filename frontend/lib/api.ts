@@ -667,10 +667,20 @@ export interface CampoAreaDoc {
   trecho: string | null;
   origem: "proposto_llm" | "editado_humano";
 }
+export interface ProprietarioDoc {
+  nome: string | null;
+  documento: string | null;
+  tipo: "pf" | "pj" | null;
+  ato: string | null;
+  pagina: number | null;
+  trecho: string | null;
+  origem: "proposto_llm" | "editado_humano";
+}
 export interface IdentificacaoMatricula {
   matricula: CampoDoc | null;
   cartorio: CampoDoc | null;
   proprietario_atual: CampoDoc | null;
+  proprietarios: ProprietarioDoc[];
   area_registrada_m2: CampoAreaDoc | null;
 }
 export interface AchadoOnus {
@@ -762,12 +772,41 @@ export interface SinteseRisco {
   atencao: string[];
   resumo: string;
 }
+export interface ProprietarioOut {
+  nome: string | null;
+  documento: string | null;
+  tipo: "pf" | "pj" | null;
+  matriculas: string[];
+  proveniencia: string;
+}
+export interface ItemChecklistOut {
+  chave: string;
+  titulo: string;
+  categoria:
+    | "registro"
+    | "titulo"
+    | "tributarias"
+    | "distribuidores"
+    | "protesto"
+    | "aprovacao"
+    | "projeto"
+    | "observacao";
+  em_nome_de: string[];
+  obrigatorio: boolean;
+  condicional: string | null;
+  auto_disponivel: boolean;
+  status: "pendente" | "anexado";
+  fonte_legal: string;
+  observacao: string | null;
+}
 export interface JuridicoDocumental {
   documentos: DocumentoResumoOut[];
   onus: OnusOut[];
   averbacoes: AverbacaoOut[];
   area_check: AreaCheckOut | null;
   certidoes: CertidaoOut[];
+  proprietarios: ProprietarioOut[];
+  checklist: ItemChecklistOut[];
   sintese_risco: SinteseRisco;
   proveniencia: string;
   avisos: string[];

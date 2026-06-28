@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.core.uploads import ler_upload_limitado
 from app.core import juridico_documental as nucleo
+from app.core import juridico_checklist as checklist
 from app.core.alertas_geo import ProvedorAlertasGeo, get_provedor_alertas_geo
 from app.core.extrator_documento import (
     MEDIA_SUPORTADAS,
@@ -174,12 +175,19 @@ def obter_juridico(
     if not cons["documentos"]:
         avisos.insert(0, "Nenhum documento jurídico analisado para esta gleba.")
 
+    # Fase 3.B — checklist do roteiro, personalizado pelos donos (PF/PJ + CPF/CNPJ) e pela UF.
+    proprietarios = checklist.consolidar_proprietarios(fichas)
+    uf = registro["jurisdicao"].uf
+    itens = checklist.gerar_checklist(proprietarios, uf) if proprietarios else []
+
     return schemas.JuridicoDocumentalOut(
         documentos=cons["documentos"],
         onus=cons["onus"],
         averbacoes=cons["averbacoes"],
         area_check=area_check,
         certidoes=cons["certidoes"],
+        proprietarios=proprietarios,
+        checklist=itens,
         sintese_risco=sintese,
         proveniencia=(
             "Achados confirmados (matrícula/certidões) + alertas geo (2.1/2.3/2.5)."

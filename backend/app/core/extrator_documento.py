@@ -96,6 +96,11 @@ _INSTRUCAO_ANTIALUCINACAO = (
 _INSTRUCAO_MATRICULA = (
     "Documento: MATRÍCULA. Extraia, com referência ao ato (R-x/Av-y) e página:\n"
     "- identificacao: matricula (nº), cartorio, proprietario_atual, area_registrada_m2 (número);\n"
+    "- identificacao.proprietarios[]: TODOS os titulares ATUAIS do domínio (proprietário(s)/"
+    "co-proprietário(s) vigentes). Para CADA um: {nome, documento (CPF se pessoa física, CNPJ se "
+    "empresa — como consta), tipo ('pf' ou 'pj'), ato (R-x da aquisição), pagina, trecho}. "
+    "Inferir 'pj' quando houver CNPJ ou termos como LTDA/S.A./EIRELI/EMPRESA; senão 'pf'. "
+    "Documento ausente no texto → omita o campo (não invente número de CPF/CNPJ);\n"
     "- onus[]: hipoteca, alienação fiduciária, penhora, arresto, usufruto, servidão, "
     "inalienabilidade/impenhorabilidade (cada um {tipo, descricao, ato, pagina, situacao, trecho});\n"
     "- averbacoes[]: reserva_legal, app, georreferenciamento, construção ({tipo, descricao, ato, pagina, trecho});\n"
@@ -121,9 +126,11 @@ _FERRAMENTA_MATRICULA = {
             "identificacao": {
                 "type": "object",
                 "description": (
-                    "Cada campo: {valor, ato?, pagina, trecho?}. "
-                    "Chaves: matricula, cartorio, proprietario_atual, area_registrada_m2 "
-                    "(area_registrada_m2.valor é número em m²)."
+                    "Campos {valor, ato?, pagina, trecho?}: matricula, cartorio, "
+                    "proprietario_atual, area_registrada_m2 (area_registrada_m2.valor é número "
+                    "em m²). Além disso, 'proprietarios': lista dos titulares ATUAIS, cada um "
+                    "{nome, documento (CPF/CNPJ como consta), tipo ('pf'|'pj'), ato, pagina, "
+                    "trecho}. Omita 'documento' se o CPF/CNPJ não constar (não invente)."
                 ),
             },
             "onus": {
@@ -287,6 +294,8 @@ def _marcar_origem_llm(ficha: FichaJuridica) -> None:
             c = getattr(ficha.identificacao, nome, None)
             if c is not None:
                 c.origem = "proposto_llm"
+        for p in ficha.identificacao.proprietarios:
+            p.origem = "proposto_llm"
 
 
 def get_extrator_documento() -> Optional[ExtratorDocumento]:

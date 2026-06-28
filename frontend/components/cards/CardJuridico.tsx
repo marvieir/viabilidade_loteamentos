@@ -38,6 +38,18 @@ const TOM_NIVEL: Record<string, string> = {
   baixo: "border-emerald-200 bg-emerald-50 text-emerald-900",
 };
 
+// Ordem e rótulos das categorias do checklist (Fase 3.B — roteiro da advogada).
+const CATEGORIAS_CHECKLIST: { chave: string; rotulo: string }[] = [
+  { chave: "registro", rotulo: "Registro / requerimento" },
+  { chave: "titulo", rotulo: "Título e cadeia dominial" },
+  { chave: "tributarias", rotulo: "Certidões tributárias" },
+  { chave: "distribuidores", rotulo: "Distribuidores cíveis/criminais" },
+  { chave: "protesto", rotulo: "Protesto" },
+  { chave: "aprovacao", rotulo: "Aprovação municipal/estadual" },
+  { chave: "projeto", rotulo: "Projeto e instrumentos" },
+  { chave: "observacao", rotulo: "Observações de triagem" },
+];
+
 export function CardJuridico({
   analiseId,
   onData,
@@ -590,6 +602,107 @@ function Resultado({ r }: { r: JuridicoDocumental }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {r.proprietarios.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Proprietários (das matrículas)
+          </p>
+          <ul className="space-y-1">
+            {r.proprietarios.map((p, i) => (
+              <li
+                key={i}
+                className="flex flex-wrap items-center gap-x-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm"
+              >
+                {p.tipo && (
+                  <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-600">
+                    {p.tipo}
+                  </span>
+                )}
+                <span className="font-medium">{p.nome ?? "(sem nome)"}</span>
+                {p.documento && (
+                  <span className="text-slate-600">· {p.documento}</span>
+                )}
+                {p.matriculas.length > 0 && (
+                  <span className="text-xs text-slate-400">
+                    · matrícula(s) {p.matriculas.join(", ")}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {r.checklist.length > 0 && (
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Checklist de documentos (roteiro)
+          </p>
+          <p className="mb-2 text-[11px] text-slate-500">
+            Gerado a partir dos proprietários e da jurisdição.{" "}
+            <strong>Triagem, não parecer.</strong>{" "}
+            <span className="rounded bg-indigo-100 px-1 text-indigo-700">auto</span> = poderá
+            ser baixado por CPF/CNPJ (Fase C).
+          </p>
+          <div className="space-y-3">
+            {CATEGORIAS_CHECKLIST.filter((c) =>
+              r.checklist.some((i) => i.categoria === c.chave),
+            ).map((c) => (
+              <div key={c.chave}>
+                <p className="mb-1 text-[11px] font-semibold text-slate-600">
+                  {c.rotulo}
+                </p>
+                <ul className="space-y-1">
+                  {r.checklist
+                    .filter((i) => i.categoria === c.chave)
+                    .map((i) => (
+                      <li
+                        key={i.chave}
+                        className="rounded-lg border border-slate-200 p-2 text-sm"
+                      >
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              i.status === "anexado"
+                                ? "bg-emerald-500"
+                                : "bg-slate-300"
+                            }`}
+                          />
+                          <span className="font-medium">{i.titulo}</span>
+                          {!i.obrigatorio && (
+                            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">
+                              condicional
+                            </span>
+                          )}
+                          {i.auto_disponivel && (
+                            <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                              auto
+                            </span>
+                          )}
+                        </div>
+                        {i.em_nome_de.length > 0 && (
+                          <p className="mt-0.5 text-xs text-slate-600">
+                            Em nome de: {i.em_nome_de.join("; ")}
+                          </p>
+                        )}
+                        {i.condicional && (
+                          <p className="text-xs text-amber-700">Aplica {i.condicional}</p>
+                        )}
+                        {i.observacao && (
+                          <p className="text-xs text-slate-500">{i.observacao}</p>
+                        )}
+                        {i.fonte_legal && (
+                          <p className="text-[10px] text-slate-400">{i.fonte_legal}</p>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">

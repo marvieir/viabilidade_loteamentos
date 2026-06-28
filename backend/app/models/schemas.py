@@ -484,10 +484,25 @@ class CampoAreaDoc(BaseModel):
     origem: OrigemParam = "proposto_llm"
 
 
+class ProprietarioDoc(BaseModel):
+    """Proprietário (titular de direito real) extraído da matrícula. Fase 3.B: além do nome,
+    captura CPF/CNPJ e o tipo (PF/PJ) — é a chave que personaliza o checklist de documentos
+    (em nome de quem) e habilita o auto-download por CPF/CNPJ (Fase C)."""
+
+    nome: Optional[str] = None
+    documento: Optional[str] = None  # CPF (PF) ou CNPJ (PJ), como consta
+    tipo: Optional[Literal["pf", "pj"]] = None
+    ato: Optional[str] = None  # R-x onde consta a aquisição
+    pagina: Optional[int] = None
+    trecho: Optional[str] = None
+    origem: OrigemParam = "proposto_llm"
+
+
 class IdentificacaoMatricula(BaseModel):
     matricula: Optional[CampoDoc] = None
     cartorio: Optional[CampoDoc] = None
-    proprietario_atual: Optional[CampoDoc] = None
+    proprietario_atual: Optional[CampoDoc] = None  # mantido p/ compat (nome em texto)
+    proprietarios: list[ProprietarioDoc] = []  # Fase 3.B: lista estruturada (PF/PJ + doc)
     area_registrada_m2: Optional[CampoAreaDoc] = None
 
 
@@ -623,12 +638,45 @@ class SinteseRiscoOut(BaseModel):
     resumo: str
 
 
+class ProprietarioOut(BaseModel):
+    """Proprietário consolidado (de todas as matrículas confirmadas), p/ o checklist."""
+
+    nome: Optional[str] = None
+    documento: Optional[str] = None
+    tipo: Optional[Literal["pf", "pj"]] = None
+    matriculas: list[str] = []  # em quais matrículas esse dono aparece
+    proveniencia: str = ""
+
+
+class ItemChecklistOut(BaseModel):
+    """Item do roteiro de documentos da advogada, já personalizado por dono/jurisdição.
+
+    Determinístico (regras do roteiro; sem LLM). ``auto_disponivel`` marca os que a Fase C
+    poderá puxar por CPF/CNPJ. ``status`` na Fase B inicial é sempre 'pendente'."""
+
+    chave: str
+    titulo: str
+    categoria: Literal[
+        "registro", "titulo", "tributarias", "distribuidores", "protesto",
+        "aprovacao", "projeto", "observacao",
+    ]
+    em_nome_de: list[str] = []
+    obrigatorio: bool = True
+    condicional: Optional[str] = None  # condição p/ aplicar (ex.: "se imóvel rural <5 anos")
+    auto_disponivel: bool = False  # família B — chaveável por CPF/CNPJ (Fase C)
+    status: Literal["pendente", "anexado"] = "pendente"
+    fonte_legal: str = ""  # referência ao roteiro (ex.: "Roteiro, item 4")
+    observacao: Optional[str] = None
+
+
 class JuridicoDocumentalOut(BaseModel):
     documentos: list[DocumentoResumoOut] = []
     onus: list[OnusOut] = []
     averbacoes: list[AverbacaoOut] = []
     area_check: Optional[AreaCheckOut] = None
     certidoes: list[CertidaoOut] = []
+    proprietarios: list[ProprietarioOut] = []  # Fase 3.B
+    checklist: list[ItemChecklistOut] = []  # Fase 3.B — roteiro personalizado
     sintese_risco: SinteseRiscoOut
     proveniencia: str
     avisos: list[str] = []
