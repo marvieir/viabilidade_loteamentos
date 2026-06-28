@@ -26,6 +26,7 @@ from app.core.extrator_documento import (
     get_extrator_documento,
 )
 from app.core.juridico_store import FonteJuridica, get_fonte_juridica
+from app.core.juridico_anexos import FonteAnexos, get_fonte_anexos
 from app.core.store import STORE
 from app.models import schemas
 
@@ -144,6 +145,7 @@ def obter_juridico(
     analise_id: str,
     fonte: FonteJuridica = Depends(get_fonte_juridica),
     provedor: ProvedorAlertasGeo = Depends(get_provedor_alertas_geo),
+    fonte_anexos: FonteAnexos = Depends(get_fonte_anexos),
 ):
     """Consolida as fichas confirmadas + alertas geo numa síntese de risco. Degrada honesto:
     sem documento → ficha vazia rotulada; síntese roda só com os alertas geo. Nunca infere
@@ -180,6 +182,16 @@ def obter_juridico(
     uf = registro["jurisdicao"].uf
     itens = checklist.gerar_checklist(proprietarios, uf) if proprietarios else []
 
+    # Fase 3.C (manual) — anexa os documentos que o cliente subiu a cada item do checklist.
+    anexos = fonte_anexos.listar(analise_id)
+    por_chave: dict[str, list[schemas.AnexoOut]] = {}
+    for a in anexos:
+        por_chave.setdefault(a.chave, []).append(a)
+    for item in itens:
+        item.anexos = por_chave.get(item.chave, [])
+        if item.anexos:
+            item.status = "anexado"
+
     return schemas.JuridicoDocumentalOut(
         documentos=cons["documentos"],
         onus=cons["onus"],
@@ -193,4 +205,60 @@ def obter_juridico(
             "Achados confirmados (matrícula/certidões) + alertas geo (2.1/2.3/2.5)."
         ),
         avisos=avisos,
+    )
+
+
+# ---- Fase 3.C (manual): anexar/remover/baixar documentos do checklist ----
+@router.post("/analises/{analise_id}/juridico/anexos", response_model=schemas.AnexoOut)
+async def anexar_documento(
+    analise_id: str,
+    chave: str = Form(...),
+    documento: UploadFile = File(...),
+    fonte_anexos: FonteAnexos = Depends(get_fonte_anexos),
+):
+    """O cliente sobe o documento que baixou do órgão e o anexa ao item ``chave`` do checklist.
+    Guarda o arquivo + metadados; o GET marca o item como 'anexado'."""
+    _exige_analise(analise_id)
+    conteudo = await ler_upload_limitado(documento)
+    if not conteudo:
+        raise HTTPException(422, "Documento vazio.")
+    if not chave.strip():
+        raise HTTPException(422, "Item do checklist (chave) não informado.")
+    return fonte_anexos.salvar(
+        analise_id,
+        chave.strip(),
+        documento.filename or "documento",
+        conteudo,
+        date.today().isoformat(),
+    )
+
+
+@router.delete("/analises/{analise_id}/juridico/anexos/{anexo_id}", status_code=204)
+def remover_anexo(
+    analise_id: str,
+    anexo_id: str,
+    fonte_anexos: FonteAnexos = Depends(get_fonte_anexos),
+):
+    _exige_analise(analise_id)
+    if not fonte_anexos.remover(analise_id, anexo_id):
+        raise HTTPException(404, "Anexo não encontrado.")
+
+
+@router.get("/analises/{analise_id}/juridico/anexos/{anexo_id}/arquivo")
+def baixar_anexo(
+    analise_id: str,
+    anexo_id: str,
+    fonte_anexos: FonteAnexos = Depends(get_fonte_anexos),
+):
+    _exige_analise(analise_id)
+    res = fonte_anexos.ler(analise_id, anexo_id)
+    if res is None:
+        raise HTTPException(404, "Anexo não encontrado.")
+    nome, conteudo = res
+    from fastapi import Response
+
+    return Response(
+        content=conteudo,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
     )

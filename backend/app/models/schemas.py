@@ -652,11 +652,21 @@ class ProprietarioOut(BaseModel):
     proveniencia: str = ""
 
 
+class AnexoOut(BaseModel):
+    """Documento que o cliente baixou e anexou a um item do checklist (Fase C manual)."""
+
+    id: str
+    chave: str  # item do checklist a que pertence
+    fonte_documento: str  # nome do arquivo
+    data_referencia: str  # data do anexo (ISO)
+    tamanho_bytes: int
+
+
 class ItemChecklistOut(BaseModel):
     """Item do roteiro de documentos da advogada, já personalizado por dono/jurisdição.
 
-    Determinístico (regras do roteiro; sem LLM). ``auto_disponivel`` marca os que a Fase C
-    poderá puxar por CPF/CNPJ. ``status`` na Fase B inicial é sempre 'pendente'."""
+    Determinístico (regras do roteiro; sem LLM). ``auto_disponivel`` marca os que a automação
+    futura poderá puxar por CPF/CNPJ. ``status='anexado'`` quando o cliente subiu o documento."""
 
     chave: str
     titulo: str
@@ -667,8 +677,9 @@ class ItemChecklistOut(BaseModel):
     em_nome_de: list[str] = []
     obrigatorio: bool = True
     condicional: Optional[str] = None  # condição p/ aplicar (ex.: "se imóvel rural <5 anos")
-    auto_disponivel: bool = False  # família B — chaveável por CPF/CNPJ (Fase C)
+    auto_disponivel: bool = False  # família B — chaveável por CPF/CNPJ (automação futura)
     status: Literal["pendente", "anexado"] = "pendente"
+    anexos: list[AnexoOut] = []  # documentos que o cliente anexou a este item
     fonte_legal: str = ""  # referência ao roteiro (ex.: "Roteiro, item 4")
     observacao: Optional[str] = None
 

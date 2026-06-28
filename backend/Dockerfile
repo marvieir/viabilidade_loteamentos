@@ -32,7 +32,7 @@ COPY scripts ./scripts
 # (Docker copia dono/permissões do diretório da imagem para o volume vazio na 1ª montagem);
 # sem isso o volume nasce root e o appuser leva PermissionError ao salvar o perfil.
 RUN useradd -m -u 10001 appuser \
-    && mkdir -p /data/perfis-municipais \
+    && mkdir -p /data/perfis-municipais /data/juridico \
     && chown -R appuser /app /data
 USER appuser
 

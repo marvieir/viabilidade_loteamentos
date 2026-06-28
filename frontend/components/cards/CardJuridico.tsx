@@ -10,10 +10,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
+  anexarDocumento,
+  baixarAnexo,
   buscarJuridico,
   confirmarJuridico,
   extrairJuridico,
+  removerAnexo,
   type AchadoOnus,
+  type AnexoOut,
   type Averbacao,
   type FichaJuridica,
   type JuridicoDocumental,
@@ -239,7 +243,9 @@ export function CardJuridico({
           />
         )}
 
-        {resultado && !rascunho && <Resultado r={resultado} />}
+        {resultado && !rascunho && (
+          <Resultado r={resultado} analiseId={analiseId} onChange={analisar} />
+        )}
       </CardContent>
     </Card>
   );
@@ -552,7 +558,15 @@ function Campo({ rotulo, valor }: { rotulo: string; valor: string }) {
 }
 
 /* ---------- Ficha consolidada + síntese de risco ---------- */
-function Resultado({ r }: { r: JuridicoDocumental }) {
+function Resultado({
+  r,
+  analiseId,
+  onChange,
+}: {
+  r: JuridicoDocumental;
+  analiseId: string;
+  onChange: () => void | Promise<void>;
+}) {
   const s = r.sintese_risco;
   return (
     <div className="space-y-3">
@@ -812,6 +826,12 @@ function Resultado({ r }: { r: JuridicoDocumental }) {
                         {i.fonte_legal && (
                           <p className="text-[10px] text-slate-400">{i.fonte_legal}</p>
                         )}
+                        <ItemAnexos
+                          analiseId={analiseId}
+                          chave={i.chave}
+                          anexos={i.anexos}
+                          onChange={onChange}
+                        />
                       </li>
                     ))}
                 </ul>
@@ -826,6 +846,91 @@ function Resultado({ r }: { r: JuridicoDocumental }) {
           <p key={a}>• {a}</p>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------- Anexos de um item do checklist (Fase 3.C manual) ---------- */
+function ItemAnexos({
+  analiseId,
+  chave,
+  anexos,
+  onChange,
+}: {
+  analiseId: string;
+  chave: string;
+  anexos: AnexoOut[];
+  onChange: () => void | Promise<void>;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function anexar(arquivo: File) {
+    setOcupado(true);
+    try {
+      await anexarDocumento(analiseId, chave, arquivo);
+      await onChange();
+    } finally {
+      setOcupado(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+  async function remover(id: string) {
+    setOcupado(true);
+    try {
+      await removerAnexo(analiseId, id);
+      await onChange();
+    } finally {
+      setOcupado(false);
+    }
+  }
+  async function baixar(a: AnexoOut) {
+    const blob = await baixarAnexo(analiseId, a.id);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = a.fonte_documento;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="mt-1.5 border-t border-dashed border-slate-200 pt-1.5">
+      {anexos.map((a) => (
+        <div key={a.id} className="flex items-center gap-2 text-xs text-slate-600">
+          <span className="text-emerald-600">✓</span>
+          <button onClick={() => baixar(a)} className="truncate text-indigo-700 hover:underline">
+            {a.fonte_documento}
+          </button>
+          <span className="text-slate-400">
+            ({Math.max(1, Math.round(a.tamanho_bytes / 1024))} KB)
+          </span>
+          <button
+            onClick={() => remover(a.id)}
+            disabled={ocupado}
+            className="text-rose-600 hover:underline disabled:opacity-50"
+          >
+            remover
+          </button>
+        </div>
+      ))}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="application/pdf,image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void anexar(f);
+        }}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={ocupado}
+        className="mt-0.5 text-xs font-medium text-slate-600 hover:text-indigo-700 disabled:opacity-50"
+      >
+        {ocupado ? "enviando…" : "+ anexar documento"}
+      </button>
     </div>
   );
 }

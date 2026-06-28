@@ -33,12 +33,15 @@ services:
       DATABASE_URL: "postgresql+psycopg://viabilidade:${POSTGRES_PASSWORD:?}@db:5432/viabilidade"
       # Perfis municipais confirmados (LUOS) persistem num volume nomeado (sobrevive a deploys).
       PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
+      # Jurídico: fichas confirmadas + anexos do checklist (Fase 3.C) num volume (sobrevive a deploys).
+      JURIDICO_DIR: "/data/juridico"
       # Malha IBGE (detecção de município por geometria). O ARQUIVO é gitignored — copie-o do Mac
       # para ~/viabilidade_loteamentos/backend/app/perfis/malha_ibge.geojson (scp) ANTES de subir;
       # se o arquivo não existir no host, o bind mount abaixo cria um diretório e quebra o boot.
       MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
     volumes:
       - perfis_municipais:/data/perfis-municipais
+      - juridico:/data/juridico
       # Dados ambientais (CAR/Mata Atlântica/etc.) — coloque os .gpkg em ./dados-ambientais (ou
       # aponte DADOS_AMBIENTAIS) e os AMBIENTAL_*_PATH no backend/.env.
       - ${DADOS_AMBIENTAIS:-./dados-ambientais}:/data/ambiental:ro
@@ -81,3 +84,4 @@ volumes:
   caddy_data:
   caddy_config:
   perfis_municipais:
+  juridico:

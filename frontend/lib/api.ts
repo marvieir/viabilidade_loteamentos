@@ -781,6 +781,13 @@ export interface ProprietarioOut {
   matriculas: string[];
   proveniencia: string;
 }
+export interface AnexoOut {
+  id: string;
+  chave: string;
+  fonte_documento: string;
+  data_referencia: string;
+  tamanho_bytes: number;
+}
 export interface ItemChecklistOut {
   chave: string;
   titulo: string;
@@ -798,6 +805,7 @@ export interface ItemChecklistOut {
   condicional: string | null;
   auto_disponivel: boolean;
   status: "pendente" | "anexado";
+  anexos: AnexoOut[];
   fonte_legal: string;
   observacao: string | null;
 }
@@ -852,6 +860,45 @@ export async function buscarJuridico(
 ): Promise<JuridicoDocumental> {
   const res = await apiFetch(`/api/analises/${analiseId}/juridico`);
   return jsonOrThrow(res);
+}
+
+// Fase 3.C (manual): anexa um documento (baixado pelo cliente) a um item do checklist.
+export async function anexarDocumento(
+  analiseId: string,
+  chave: string,
+  arquivo: File
+): Promise<AnexoOut> {
+  const form = new FormData();
+  form.append("chave", chave);
+  form.append("documento", arquivo);
+  const res = await apiFetch(`/api/analises/${analiseId}/juridico/anexos`, {
+    method: "POST",
+    body: form,
+  });
+  return jsonOrThrow(res);
+}
+
+export async function removerAnexo(
+  analiseId: string,
+  anexoId: string
+): Promise<void> {
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/juridico/anexos/${anexoId}`,
+    { method: "DELETE" }
+  );
+  if (!res.ok && res.status !== 204) await jsonOrThrow(res);
+}
+
+// Baixa o anexo (Blob) — usa apiFetch p/ injetar o Bearer; o componente cria o link.
+export async function baixarAnexo(
+  analiseId: string,
+  anexoId: string
+): Promise<Blob> {
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/juridico/anexos/${anexoId}/arquivo`
+  );
+  if (!res.ok) await jsonOrThrow(res);
+  return res.blob();
 }
 
 // ----- Fase 3.5 — Conformidade urbanística (consumo puro do perfil da 1.8) -----

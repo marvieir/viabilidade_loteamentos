@@ -44,6 +44,8 @@ services:
       DEM_FONTE: "copernicus_auto"
       # Fase 1.8 — onde os perfis municipais CONFIRMADOS da LUOS persistem (volume abaixo).
       PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
+      # Fase 3 — fichas jurídicas confirmadas + anexos do checklist (Fase 3.C) — bind abaixo.
+      JURIDICO_DIR: "/data/juridico"
     volumes:
       # Monta a malha gerada no host (python -m scripts.baixar_malha_ibge) no container.
       # O arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
@@ -56,6 +58,8 @@ services:
       # Fase 1.8 — perfis confirmados da LUOS (dado do operador). Bind no host → sobrevivem
       # a rebuilds e ficam inspecionáveis em backend/app/perfis/municipais/.
       - ./backend/app/perfis/municipais:/data/perfis-municipais
+      # Fase 3 — fichas jurídicas + anexos do checklist. Bind no host → sobrevivem a rebuilds.
+      - ./backend/app/perfis/juridico:/data/juridico
       # CA corporativa (ex.: Cisco Secure Access) para religar o TLS sob inspeção: coloque o
       # PEM em backend/certs/corp-ca.pem e defina LUOS_CA_BUNDLE=/certs/corp-ca.pem no .env.
       - ./backend/certs:/certs:ro
