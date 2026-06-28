@@ -19,6 +19,7 @@ import {
   type JuridicoDocumental,
   type TipoDocumento,
 } from "@/lib/api";
+import { me } from "@/lib/auth";
 
 const TIPOS_ONUS = [
   "hipoteca",
@@ -74,6 +75,22 @@ export function CardJuridico({
     void analisar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analiseId]);
+
+  // Pré-preenche "Validado por" com o usuário logado (continua editável; o gate humano
+  // segue valendo — só tira o atrito de digitar o nome a cada matrícula).
+  useEffect(() => {
+    let vivo = true;
+    me()
+      .then((u) => {
+        if (vivo) setValidadoPor((v) => v || u.nome || u.email);
+      })
+      .catch(() => {
+        /* sem usuário → campo fica vazio (usuário digita) */
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   // "Analisar tudo" (sinal) dispara a síntese (roda só com os alertas geo se não houver doc).
   const ultimoSinal = useRef(0);
