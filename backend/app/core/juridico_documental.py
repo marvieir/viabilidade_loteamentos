@@ -148,7 +148,9 @@ def consolidar_fichas(fichas: list[schemas.FichaJuridica]) -> dict:
                 area_matricula_total_m2 = (area_matricula_total_m2 or 0.0) + area_doc
                 n_matriculas += 1
             for o in f.onus:
-                ativo = o.situacao == "consta"
+                # Ato administrativo/benigno (cancelamento, baixa, denominação, CAR…) não é
+                # gravame ativo, mesmo com situacao='consta' — não polui o risco.
+                ativo = o.situacao == "consta" and not _ato_neutro(o.tipo)
                 onus_out.append(
                     schemas.OnusOut(
                         tipo=o.tipo,
@@ -219,8 +221,8 @@ def roll_up_risco(
     atencao: list[str] = []
 
     for o in onus_out:
-        if o.situacao != "consta":
-            continue
+        if o.situacao != "consta" or _ato_neutro(o.tipo):
+            continue  # cancelamento/baixa/ato administrativo não é gravame ativo
         rot = f"{_rotulo_onus(o.tipo)}" + (f" ({o.ato})" if o.ato else "")
         (criticos if o.tipo in ONUS_BLOQUEANTES else atencao).append(rot)
 
@@ -266,9 +268,11 @@ def roll_up_risco(
     )
 
 
-# Averbações que NÃO são risco — histórico de cartório (cancelamentos, estado civil,
-# retificação, georreferenciamento). Ficam na ficha, mas fora do painel de risco.
-_AVERBACOES_NEUTRAS = (
+# Atos que NÃO são risco — histórico/administrativo de cartório (cancelamentos, baixa, estado
+# civil, retificação, georreferenciamento, denominação do imóvel, registro no CAR). Ficam na
+# ficha, mas fora do painel de risco. Vale p/ ônus E averbações (um cancelamento mal-tipado como
+# ônus não pode inflar o risco).
+_ATOS_NEUTROS = (
     "cancelament",
     "baixa",
     "casament",
@@ -278,14 +282,23 @@ _AVERBACOES_NEUTRAS = (
     "estado civil",
     "retifica",
     "georref",
+    "denominac",          # denominacao / alteracao_denominacao (nome do imóvel)
+    "cadastro_ambiental",  # cadastro_ambiental_rural (registro no CAR = informativo)
 )
+
+
+def _ato_neutro(tipo: str) -> bool:
+    """Ato administrativo/informativo (não onera nem reduz a gleba) → fora do risco."""
+    t = (tipo or "").lower().strip()
+    if t in ("car", "car_imovel"):  # CAR (registro ambiental) = informativo, não gravame
+        return True
+    return any(k in t for k in _ATOS_NEUTROS)
 
 
 def _averbacao_e_risco(tipo: str) -> bool:
     """Averbação relevante para a triagem (reduz/onera a gleba: reserva legal, APP,
     servidão, restrição, construção). Atos meramente administrativos → False."""
-    t = (tipo or "").lower()
-    return not any(k in t for k in _AVERBACOES_NEUTRAS)
+    return not _ato_neutro(tipo)
 
 
 def _rotulo_averbacao(tipo: str) -> str:
