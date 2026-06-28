@@ -17,6 +17,7 @@ import {
   type Averbacao,
   type FichaJuridica,
   type JuridicoDocumental,
+  type ProprietarioDoc,
   type TipoDocumento,
 } from "@/lib/api";
 import { me } from "@/lib/auth";
@@ -270,6 +271,42 @@ function Revisao({
       averbacoes: ficha.averbacoes.map((a, k) => (k === i ? { ...a, ...p } : a)),
     });
   }
+  // Proprietários editáveis (gate humano sobre CPF/CNPJ, PF/PJ e atual/anterior).
+  function setProp(i: number, p: Partial<ProprietarioDoc>) {
+    if (!ficha.identificacao) return;
+    const props = ficha.identificacao.proprietarios.map((pr, k) =>
+      k === i ? { ...pr, ...p, origem: "editado_humano" as const } : pr,
+    );
+    patch({ identificacao: { ...ficha.identificacao, proprietarios: props } });
+  }
+  function addProp() {
+    if (!ficha.identificacao) return;
+    const novo: ProprietarioDoc = {
+      nome: "",
+      documento: null,
+      tipo: null,
+      situacao: "vigente",
+      ato: null,
+      pagina: null,
+      trecho: null,
+      origem: "editado_humano",
+    };
+    patch({
+      identificacao: {
+        ...ficha.identificacao,
+        proprietarios: [...ficha.identificacao.proprietarios, novo],
+      },
+    });
+  }
+  function removeProp(i: number) {
+    if (!ficha.identificacao) return;
+    patch({
+      identificacao: {
+        ...ficha.identificacao,
+        proprietarios: ficha.identificacao.proprietarios.filter((_, k) => k !== i),
+      },
+    });
+  }
 
   return (
     <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
@@ -306,6 +343,80 @@ function Revisao({
                 rotulo="Área registrada (m²)"
                 valor={String(ficha.identificacao.area_registrada_m2?.valor ?? "")}
               />
+            </div>
+          )}
+
+          {ficha.identificacao && (
+            <div>
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Proprietários{" "}
+                <span className="font-normal normal-case text-slate-400">
+                  (confira CPF/CNPJ, PF/PJ e se é titular atual — alimenta o checklist)
+                </span>
+              </p>
+              {ficha.identificacao.proprietarios.length === 0 && (
+                <p className="text-xs text-slate-500">
+                  Nenhum proprietário extraído — adicione manualmente abaixo.
+                </p>
+              )}
+              <div className="space-y-2">
+                {ficha.identificacao.proprietarios.map((p, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-2"
+                  >
+                    <input
+                      value={p.nome ?? ""}
+                      onChange={(e) => setProp(i, { nome: e.target.value })}
+                      placeholder="nome"
+                      className="min-w-[12rem] flex-1 rounded border border-slate-200 px-2 py-1 text-xs"
+                    />
+                    <input
+                      value={p.documento ?? ""}
+                      onChange={(e) => setProp(i, { documento: e.target.value })}
+                      placeholder="CPF / CNPJ"
+                      className="w-40 rounded border border-slate-200 px-2 py-1 text-xs"
+                    />
+                    <select
+                      value={p.tipo ?? ""}
+                      onChange={(e) =>
+                        setProp(i, {
+                          tipo: (e.target.value || null) as "pf" | "pj" | null,
+                        })
+                      }
+                      className="rounded border border-slate-200 px-1.5 py-1 text-xs"
+                    >
+                      <option value="">tipo</option>
+                      <option value="pf">PF</option>
+                      <option value="pj">PJ</option>
+                    </select>
+                    <select
+                      value={p.situacao}
+                      onChange={(e) =>
+                        setProp(i, {
+                          situacao: e.target.value as "vigente" | "anterior",
+                        })
+                      }
+                      className="rounded border border-slate-200 px-1.5 py-1 text-xs"
+                    >
+                      <option value="vigente">atual</option>
+                      <option value="anterior">anterior</option>
+                    </select>
+                    <button
+                      onClick={() => removeProp(i)}
+                      className="text-xs text-rose-600 hover:underline"
+                    >
+                      remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={addProp}
+                className="mt-1 text-xs font-medium text-indigo-700 hover:underline"
+              >
+                + adicionar proprietário
+              </button>
             </div>
           )}
 
