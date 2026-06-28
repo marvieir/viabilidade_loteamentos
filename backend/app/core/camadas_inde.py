@@ -324,8 +324,16 @@ def _reproj_bbox(bbox: BBox, transformer) -> tuple:
 
 
 def _detalhe_erro(exc: Exception) -> str:
-    """Mensagem curta e auditável do porquê a camada falhou (HTTP, parse, timeout…)."""
-    return f"{type(exc).__name__}: {exc}"[:180]
+    """Mensagem curta e auditável do porquê a camada falhou (HTTP, parse, timeout…), com o
+    arquivo:linha do último frame — pra diagnosticar sem precisar do traceback completo."""
+    import traceback
+
+    loc = ""
+    tb = traceback.extract_tb(exc.__traceback__)
+    if tb:
+        f = tb[-1]
+        loc = f" @ {f.filename.rsplit('/', 1)[-1]}:{f.lineno}"
+    return f"{type(exc).__name__}: {exc}{loc}"[:230]
 
 
 def _prefetch_paralelo(urls: list[str], params: dict) -> dict:
@@ -351,10 +359,16 @@ def _features(fc: dict) -> list[dict]:
 
 
 def _first(props: dict, *chaves: str) -> Optional[str]:
+    """Primeiro valor não-vazio dentre as chaves (case-insensitive). Array-safe: nunca faz
+    teste booleano direto no valor (campo lista/array do GDAL estourava 'truth value ambiguous')."""
     for k in chaves:
         for kk in (k, k.upper(), k.lower()):
-            if props.get(kk) not in (None, ""):
-                return str(props[kk])
+            v = props.get(kk)
+            if v is None:
+                continue
+            s = str(v).strip()
+            if s and s.lower() not in ("nan", "none"):
+                return s
     return None
 
 

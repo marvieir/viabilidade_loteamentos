@@ -56,3 +56,19 @@ def test_e_wgs84():
     assert _e_wgs84("EPSG:4326")
     assert not _e_wgs84("EPSG:31983")
     assert not _e_wgs84("EPSG:4674")
+
+
+def test_first_array_safe():
+    """Regressão: campo lido como array (campo-lista do GDAL) NÃO pode estourar
+    'truth value of an array is ambiguous' — era o que derrubava SICAR-RL e MATA-ATL."""
+    import numpy as np
+
+    from app.core.camadas_inde import _first
+
+    # valor-array não derruba (antes: ValueError)
+    assert _first({"cod_imovel": np.array([10, 20, 30])}, "cod_imovel") == "[10 20 30]"
+    # casos normais seguem corretos
+    assert _first({"cod_imovel": "SP-A"}, "cod_imovel") == "SP-A"
+    assert _first({"x": None}, "cod_imovel") is None
+    assert _first({"cod_imovel": float("nan")}, "cod_imovel") is None
+    assert _first({"COD_IMOVEL": "SP-B"}, "cod_imovel") == "SP-B"  # case-insensitive
