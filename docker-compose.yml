@@ -50,6 +50,10 @@ services:
       # Monta a malha gerada no host (python -m scripts.baixar_malha_ibge) no container.
       # O arquivo PRECISA existir antes do `up`, senão o bind cria um diretório vazio.
       - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
+      # Dados ambientais (CAR/Mata Atlântica/etc.) — portável: por padrão usa ./dados-ambientais
+      # do projeto; aponte p/ outra pasta com DADOS_AMBIENTAIS no .env (ex.: ~/dados-ambientais).
+      # Os AMBIENTAL_*_PATH (backend/.env) devem apontar p/ /data/ambiental/<arquivo>.
+      - ${DADOS_AMBIENTAIS:-./dados-ambientais}:/data/ambiental:ro
       # Fase 2.2 — recorte LOCAL de vegetação (só no modo offline/override). No modo
       # automático (padrão) este volume NÃO é usado; descomente apenas se você gerar um
       # verde.tif (scripts/baixar_worldcover.py) e setar VEGETACAO_RASTER_PATH acima — o
