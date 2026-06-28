@@ -238,14 +238,38 @@ def _get_json_url(full_url: str) -> dict:
 
 def _ler_vetor_local_bbox(path: str, bbox: BBox) -> list[tuple]:
     """Lê SÓ a JANELA (bbox da gleba) de um arquivo vetorial local via pyogrio/GDAL e devolve
-    [(geom, props)]. ESCALA p/ arquivos de ESTADO/BRASIL: em GeoPackage/FlatGeobuf/shapefile o
-    bbox usa o ÍNDICE ESPACIAL (lê só a janela — rápido, pouca memória); GeoJSON cai em varredura
-    (funciona, mas converta os grandes p/ .gpkg). O arquivo deve estar em WGS84/EPSG:4326 (o bbox
-    é interpretado no CRS do arquivo). Sem pyogrio → degrada (erro → camada indisponível)."""
+    [(geom, props)] SEMPRE em WGS84. ESCALA p/ arquivos de ESTADO/BRASIL: em GeoPackage/
+    FlatGeobuf/shapefile o bbox usa o ÍNDICE ESPACIAL (rápido); GeoJSON cai em varredura.
+
+    CRS-robusto: o bbox vem em WGS84, mas o pyogrio filtra a janela no CRS DO ARQUIVO. Se o
+    arquivo NÃO está em WGS84 (ex.: SICAR/CAR em UTM ou SIRGAS), reprojetamos o bbox p/ o CRS do
+    arquivo ANTES de ler (senão a janela não casa e a camada SOME) e a geometria DE VOLTA p/
+    WGS84 (a análise assume WGS84). Sem pyogrio → degrada (erro → camada indisponível)."""
+    from pyogrio import read_info
     from pyogrio.raw import read as _ogr_read
     from shapely import wkb as _wkb
 
-    meta, _fids, geometry, field_data = _ogr_read(path, bbox=tuple(bbox))
+    # CRS do arquivo → decide se precisa reprojetar bbox (entrada) e geometria (saída).
+    crs_arquivo = None
+    try:
+        crs_arquivo = read_info(path).get("crs")
+    except Exception:  # noqa: BLE001 — sem info de CRS, assume WGS84 (comportamento antigo)
+        crs_arquivo = None
+
+    bbox_consulta = tuple(bbox)
+    para_wgs = None
+    if crs_arquivo and not _e_wgs84(crs_arquivo):
+        from pyproj import Transformer
+        from shapely.ops import transform as _shp_transform
+
+        ida = Transformer.from_crs("EPSG:4326", crs_arquivo, always_xy=True)
+        bbox_consulta = _reproj_bbox(bbox, ida)
+        volta = Transformer.from_crs(crs_arquivo, "EPSG:4326", always_xy=True)
+        para_wgs = lambda g: _shp_transform(  # noqa: E731
+            lambda x, y, z=None: volta.transform(x, y), g
+        )
+
+    meta, _fids, geometry, field_data = _ogr_read(path, bbox=bbox_consulta)
     if geometry is None or len(geometry) == 0:
         return []
     fields = list(meta.get("fields") or [])
@@ -260,9 +284,43 @@ def _ler_vetor_local_bbox(path: str, bbox: BBox) -> list[tuple]:
             continue
         if g.is_empty:
             continue
+        if para_wgs is not None:
+            g = para_wgs(g)
         props = {fields[j]: field_data[j][i] for j in range(len(fields))}
         out.append((g, props))
     return out
+
+
+def _e_wgs84(crs) -> bool:
+    """True se o CRS é WGS84 (EPSG:4326). Aceita string/objeto pyproj."""
+    try:
+        from pyproj import CRS
+
+        return CRS.from_user_input(crs).to_epsg() == 4326
+    except Exception:  # noqa: BLE001 — CRS exótico/ilegível → trata como não-4326 (reprojeta)
+        return False
+
+
+def _reproj_bbox(bbox: BBox, transformer) -> tuple:
+    """Reprojeta o bbox (minx,miny,maxx,maxy) densificando as bordas — a curvatura da projeção
+    pode empurrar os extremos pra fora dos 4 cantos, então amostramos uma grade e pegamos o
+    envelope (cobertura segura da janela)."""
+    minx, miny, maxx, maxy = bbox
+    xs: list[float] = []
+    ys: list[float] = []
+    n = 8
+    for i in range(n + 1):
+        for j in range(n + 1):
+            x = minx + (maxx - minx) * i / n
+            y = miny + (maxy - miny) * j / n
+            tx, ty = transformer.transform(x, y)
+            if tx in (float("inf"), float("-inf")) or ty in (float("inf"), float("-inf")):
+                continue
+            xs.append(tx)
+            ys.append(ty)
+    if not xs:
+        return tuple(bbox)
+    return (min(xs), min(ys), max(xs), max(ys))
 
 
 def _detalhe_erro(exc: Exception) -> str:
