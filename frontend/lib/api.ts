@@ -1289,7 +1289,17 @@ export interface Localizacao {
   renda: Renda;
   habitacao: Habitacao;
   faixa_etaria: FaixaEtaria;
+  bacia_hidrografica?: BaciaHidrografica | null;
   proveniencia: string;
+  avisos: string[];
+}
+
+export interface BaciaHidrografica {
+  consultado: boolean;
+  regiao_hidrografica: string | null;
+  bacia: string | null;
+  sub_bacia: string | null;
+  fonte: string | null;
   avisos: string[];
 }
 

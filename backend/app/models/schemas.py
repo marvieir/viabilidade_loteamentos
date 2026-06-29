@@ -1175,6 +1175,17 @@ class LocalizacaoMunicipioOut(BaseModel):
     uf: Optional[str] = None
 
 
+class BaciaHidrograficaOut(BaseModel):
+    """Bacia hidrográfica (ANA) incidente na gleba. null se a fonte não foi configurada."""
+
+    consultado: bool
+    regiao_hidrografica: Optional[str] = None
+    bacia: Optional[str] = None
+    sub_bacia: Optional[str] = None
+    fonte: Optional[str] = None
+    avisos: list[str] = []
+
+
 class LocalizacaoOut(BaseModel):
     avaliada: bool
     cobertura: str  # COMPLETA (4 blocos) | PARCIAL (faltou algum) | INDISPONIVEL (fora do arquivo)
@@ -1183,6 +1194,7 @@ class LocalizacaoOut(BaseModel):
     renda: RendaOut
     habitacao: HabitacaoOut
     faixa_etaria: FaixaEtariaOut
+    bacia_hidrografica: Optional[BaciaHidrograficaOut] = None  # Tier 2
     proveniencia: str
     avisos: list[str] = []
 
