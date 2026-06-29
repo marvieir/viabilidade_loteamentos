@@ -12,6 +12,7 @@ no INCRA?"). A cadeia/matrícula continua sendo trabalho do módulo jurídico.
 
 from __future__ import annotations
 
+import glob
 import os
 from dataclasses import dataclass, field
 from typing import Optional, Protocol, runtime_checkable
@@ -64,6 +65,30 @@ def _env_campos(env: str, default: tuple) -> tuple:
     return tuple(c.strip() for c in bruto.split(",") if c.strip()) if bruto else default
 
 
+_EXTS = (".shp", ".gpkg", ".geojson", ".json")
+
+
+def _resolver_arquivos(path: str) -> list[str]:
+    """Resolve a env num conjunto de arquivos vetoriais. Aceita, em ordem:
+    lista separada por vírgula · diretório (varre *.shp/*.gpkg/*.geojson) · glob · arquivo único.
+    Permite apontar UMA pasta com vários estados (SIGEF por UF) sem mexer em código."""
+    arquivos: list[str] = []
+    for parte in (p.strip() for p in path.split(",")):
+        if not parte:
+            continue
+        if os.path.isdir(parte):
+            for f in sorted(os.listdir(parte)):
+                if f.lower().endswith(_EXTS):
+                    arquivos.append(os.path.join(parte, f))
+        elif any(ch in parte for ch in "*?[]"):
+            arquivos.extend(sorted(glob.glob(parte)))
+        else:
+            arquivos.append(parte)
+    # dedup preservando ordem (determinismo)
+    vistos: set[str] = set()
+    return [a for a in arquivos if not (a in vistos or vistos.add(a))]
+
+
 def _num(s: Optional[str]) -> Optional[float]:
     """Converte texto de área (pt-BR ou en) para float; None se não der."""
     if s is None:
@@ -91,18 +116,34 @@ class FonteMalhaFundiariaArquivo:
     def identificar(self, gleba: BaseGeometry) -> ResultadoMalha:
         from app.core.camadas_inde import _first, _ler_vetor_local_bbox
 
-        try:
-            feats = _ler_vetor_local_bbox(self.path, gleba.bounds)
-        except Exception as exc:  # noqa: BLE001 — degrada honesto
+        arquivos = _resolver_arquivos(self.path)
+        if not arquivos:
             return ResultadoMalha(
                 False, [], 0, None, None, FONTE_INCRA,
-                avisos=[f"Malha fundiária indisponível — {type(exc).__name__}: {exc}"[:180]],
+                avisos=[f"Malha fundiária: nenhum arquivo vetorial em '{self.path}'."],
             )
+
+        # Lê cada arquivo (ex.: um shapefile SIGEF por UF) na janela da gleba. Só o estado
+        # da gleba retorna parcelas; os demais voltam vazios (leitura por janela é barata).
+        feats: list = []
+        falhas: list[str] = []
+        for arq in arquivos:
+            try:
+                feats.extend(_ler_vetor_local_bbox(arq, gleba.bounds))
+            except Exception as exc:  # noqa: BLE001 — um arquivo ruim não derruba os outros
+                falhas.append(f"{os.path.basename(arq)} ({type(exc).__name__})")
+
         if not feats:
-            return ResultadoMalha(
-                True, [], 0, 0.0, None, FONTE_INCRA,
-                avisos=["Nenhuma parcela georreferenciada (SIGEF/SNCI) na janela da gleba."],
-            )
+            avisos = ["Nenhuma parcela georreferenciada (SIGEF/SNCI) na janela da gleba."]
+            if falhas and len(falhas) == len(arquivos):
+                # Todos falharam → não é "ausência", é indisponibilidade (degrada honesto).
+                return ResultadoMalha(
+                    False, [], 0, None, None, FONTE_INCRA,
+                    avisos=[f"Malha fundiária indisponível — falha ao ler: {', '.join(falhas)}"[:180]],
+                )
+            if falhas:
+                avisos.append(f"Arquivos não lidos: {', '.join(falhas)}.")
+            return ResultadoMalha(True, [], 0, 0.0, None, FONTE_INCRA, avisos=avisos)
 
         c = gleba.centroid
         proj4 = (
@@ -157,6 +198,8 @@ class FonteMalhaFundiariaArquivo:
                 "Parcelas encontradas, mas sem campo de código reconhecido — configure "
                 "FUNDIARIO_MALHA_CAMPO_CODIGO com o nome do campo do arquivo."
             )
+        if falhas:
+            avisos.append(f"Arquivos não lidos: {', '.join(falhas)}.")
 
         # Determinismo: ordena por código (estável) e remove sobra com mesmo código+área.
         parcelas.sort(key=lambda p: (p.codigo or "", p.area_ha or 0.0))
@@ -173,6 +216,10 @@ class FonteMalhaFundiariaArquivo:
 
 
 def get_fonte_malha_fundiaria() -> Optional[FonteMalhaFundiaria]:
-    """Dependência FastAPI. ``FUNDIARIO_MALHA_PATH`` aponta o arquivo; sem ele → None."""
+    """Dependência FastAPI. ``FUNDIARIO_MALHA_PATH`` aponta os dados; sem ele → None.
+
+    Aceita: um diretório (varre todos os shapefiles/gpkg/geojson — ideal p/ um SIGEF
+    por UF), um glob (``.../*.shp``), uma lista separada por vírgula, ou um arquivo único.
+    """
     path = os.getenv("FUNDIARIO_MALHA_PATH", "").strip()
     return FonteMalhaFundiariaArquivo(path) if path else None
