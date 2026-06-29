@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 
 from app.core import laudo as laudo_core
+from app.core import laudo_excel
 from app.core import laudo_pdf
 from app.core.jurisdicao import Jurisdicao
 from app.core.store import STORE
@@ -53,5 +54,24 @@ def gerar_laudo(analise_id: str, body: schemas.LaudoIn):
     return Response(
         content=pdf,
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{nome}"'},
+    )
+
+
+@router.post("/analises/{analise_id}/laudo/excel")
+def gerar_laudo_excel(analise_id: str, body: schemas.LaudoIn):
+    """Export Excel (.xlsx) das dimensões já executadas — mesmo corpo do laudo PDF. Sem cálculo
+    novo, sem rede. Dimensão ausente → aba omitida."""
+    registro = STORE.get(analise_id)
+    if registro is None:
+        raise HTTPException(404, "Análise não encontrada.")
+
+    ident = _identificacao(analise_id, registro)
+    xlsx = laudo_excel.gerar_excel(ident, body.model_dump())
+
+    nome = f"viabilidade_{analise_id[:8]}.xlsx"
+    return Response(
+        content=xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f'attachment; filename="{nome}"'},
     )

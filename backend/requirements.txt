@@ -12,6 +12,7 @@ python-dotenv==1.0.1  # carrega backend/.env via `uvicorn --env-file .env`
 anthropic==0.69.0  # Fase 1.8 — extrator real da LUOS (import TARDIO, gated por ANTHROPIC_API_KEY; testes não usam)
 google-genai==1.21.0  # Fase 11.14 — fallback do gerador de programa (Gemini; import TARDIO, gated por GOOGLE_API_KEY; testes não usam)
 fpdf2==2.8.7  # Fase 7 — laudo de triagem em PDF (Python puro, offline, sem fonte externa nem rede)
+openpyxl==3.1.5  # export Excel do modelo financeiro/dimensões (offline, sem rede)
 
 # Fase 12 — multi-tenant (banco + autenticação)
 SQLAlchemy==2.0.36        # ORM (modelos usuarios/analises)

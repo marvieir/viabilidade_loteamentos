@@ -25,7 +25,7 @@ import { CardFinanceira } from "@/components/cards/CardFinanceira";
 import { CardEconomica } from "@/components/cards/CardEconomica";
 import { CardLocalizacao } from "@/components/cards/CardLocalizacao";
 import { IconMap } from "@/components/Icons";
-import { gerarLaudo } from "@/lib/api";
+import { gerarLaudo, gerarLaudoExcel } from "@/lib/api";
 import type {
   Ambiental,
   Analise,
@@ -67,6 +67,7 @@ export default function Home() {
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
   const [sinal, setSinal] = useState(0);
   const [gerandoLaudo, setGerandoLaudo] = useState(false);
+  const [gerandoExcel, setGerandoExcel] = useState(false);
   // Fase 12.2 — "Minhas análises": id da análise salva carregada (PUT vs POST) + salvando.
   const [salvaId, setSalvaId] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -117,6 +118,37 @@ export default function Home() {
       alert(e instanceof Error ? e.message : "Falha ao gerar o laudo.");
     } finally {
       setGerandoLaudo(false);
+    }
+  }
+
+  // Export Excel — mesmos JSONs do laudo PDF (front não recalcula).
+  async function onExcel() {
+    if (!analise) return;
+    setGerandoExcel(true);
+    try {
+      const dims = {
+        aproveitamento: dadosAprov,
+        ambiental: dadosAmb,
+        vegetacao: dadosVerde,
+        declividade: dadosDecliv,
+        juridico: dadosJuridico,
+        financeira: dadosFinanceira,
+        economica: dadosEconomica,
+        localizacao: dadosLocalizacao,
+      };
+      const blob = await gerarLaudoExcel(analise.analise_id, dims);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `viabilidade_${analise.analise_id.slice(0, 8)}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Falha ao gerar o Excel.");
+    } finally {
+      setGerandoExcel(false);
     }
   }
 
@@ -213,6 +245,8 @@ export default function Home() {
         analisando={analisandoTudo}
         onLaudo={onLaudo}
         gerandoLaudo={gerandoLaudo}
+        onExcel={onExcel}
+        gerandoExcel={gerandoExcel}
         onSalvar={onSalvar}
         salvando={salvando}
         jaSalva={salvaId !== null}

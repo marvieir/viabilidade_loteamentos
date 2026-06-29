@@ -285,6 +285,22 @@ export async function gerarLaudo(
   return res.blob();
 }
 
+// Export Excel (.xlsx) das dimensões já executadas — mesmo corpo do laudo PDF.
+export async function gerarLaudoExcel(
+  analiseId: string,
+  dims: Record<string, unknown>
+): Promise<Blob> {
+  const res = await apiFetch(`/api/analises/${analiseId}/laudo/excel`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dims),
+  });
+  if (!res.ok) {
+    throw new Error(`Falha ao gerar o Excel: ${res.status} ${res.statusText}`);
+  }
+  return res.blob();
+}
+
 // Autocomplete por NOME sobre a malha local (offline). O código IBGE volta no
 // payload para resolver internamente — o usuário nunca digita nem vê o código.
 export async function buscarMunicipios(q: string): Promise<MunicipioRef[]> {

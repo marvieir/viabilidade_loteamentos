@@ -18,6 +18,8 @@ export function TopBar({
   analisando,
   onLaudo,
   gerandoLaudo,
+  onExcel,
+  gerandoExcel,
   onSalvar,
   salvando,
   jaSalva,
@@ -28,6 +30,8 @@ export function TopBar({
   analisando?: boolean;
   onLaudo?: () => void;
   gerandoLaudo?: boolean;
+  onExcel?: () => void;
+  gerandoExcel?: boolean;
   onSalvar?: () => void;
   salvando?: boolean;
   jaSalva?: boolean;
@@ -96,6 +100,18 @@ export function TopBar({
               >
                 <IconDownload width={15} height={15} />
                 {gerandoLaudo ? "Gerando…" : "Gerar laudo (PDF)"}
+              </button>
+            )}
+            {onExcel && (
+              <button
+                type="button"
+                onClick={onExcel}
+                disabled={gerandoExcel}
+                title="Exporta as dimensões já analisadas em Excel (.xlsx)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                <IconDownload width={15} height={15} />
+                {gerandoExcel ? "Gerando…" : "Excel"}
               </button>
             )}
           </>
