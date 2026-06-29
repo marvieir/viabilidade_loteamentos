@@ -420,6 +420,12 @@ class ZonaParams(BaseModel):
     doacao_split: Optional[DoacaoSplit] = None
     ca: Optional[ParamProv] = None
     taxa_ocupacao: Optional[ParamProv] = None
+    # Índices informativos adicionais (Tier 1, paridade Urbia) — não entram no número.
+    recuo_frontal_m: Optional[ParamProv] = None
+    recuo_lateral_m: Optional[ParamProv] = None
+    recuo_fundos_m: Optional[ParamProv] = None
+    gabarito_m: Optional[ParamProv] = None  # gabarito/altura máxima
+    permeabilidade_min_pct: Optional[ParamProv] = None  # taxa de permeabilidade mínima (fração)
 
 
 class ModalidadeOverride(BaseModel):

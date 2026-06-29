@@ -248,6 +248,44 @@ def avaliar(
     else:
         itens.append(_nao_extraido("taxa_ocupacao", "Taxa de ocupação"))
 
+    # --- Recuos, gabarito e permeabilidade (Tier 1) — informativos, exigência de projeto. ---
+    def _item_metros(param_attr: str, rotulo: str, unidade: str = "m"):
+        p = getattr(zona.params, param_attr, None)
+        if p is not None and p.valor is not None:
+            val = _fmt(p.valor, 2).rstrip("0").rstrip(",")
+            itens.append(
+                schemas.ItemConformidadeOut(
+                    parametro=param_attr,
+                    rotulo=rotulo,
+                    valor=f"{val} {unidade}",
+                    status="exigencia_projeto",
+                    leitura=f"{rotulo}: {val} {unidade} (baliza o projeto; não altera o nº de lotes).",
+                    proveniencia=_prov(perfil, p.artigo, p.pagina),
+                )
+            )
+        else:
+            itens.append(_nao_extraido(param_attr, rotulo))
+
+    _item_metros("recuo_frontal_m", "Recuo frontal")
+    _item_metros("recuo_lateral_m", "Recuo lateral")
+    _item_metros("recuo_fundos_m", "Recuo de fundos")
+    _item_metros("gabarito_m", "Gabarito (altura máx.)")
+
+    p_perm = zona.params.permeabilidade_min_pct
+    if p_perm is not None and p_perm.valor is not None:
+        itens.append(
+            schemas.ItemConformidadeOut(
+                parametro="permeabilidade_min_pct",
+                rotulo="Permeabilidade mínima",
+                valor=_pct(p_perm.valor),
+                status="exigencia_projeto",
+                leitura=f"Área permeável mínima de {_pct(p_perm.valor)} do lote (exigência de projeto).",
+                proveniencia=_prov(perfil, p_perm.artigo, p_perm.pagina),
+            )
+        )
+    else:
+        itens.append(_nao_extraido("permeabilidade_min_pct", "Permeabilidade mínima"))
+
     return schemas.ConformidadeOut(
         avaliada=True,
         zona=zona.codigo,

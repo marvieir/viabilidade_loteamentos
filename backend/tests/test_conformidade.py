@@ -196,3 +196,28 @@ def test_nao_altera_aproveitamento(client, fonte_perfil):
     depois = client.post(f"/api/analises/{aid}/aproveitamento", json=payload).json()
     assert antes["area_aproveitavel_m2"] == depois["area_aproveitavel_m2"]
     assert antes["n_lotes_teto"] == depois["n_lotes_teto"]
+
+
+# Tier 1 — índices adicionais (recuos/gabarito/permeabilidade) na conformidade -------------
+def test_indices_adicionais_recuos_gabarito_permeabilidade():
+    from app.core import conformidade as _c
+    from app.models import schemas as _s
+
+    perfil = _s.PerfilMunicipal(
+        cod_ibge="3550605", municipio="São Roque", uf="SP", status="confirmado",
+        validado_por="marco", data_referencia="2026-06-29",
+        zonas=[_s.ZonaPerfil(codigo="MUE", params=_s.ZonaParams(
+            lote_min_m2=_s.ParamProv(valor=360, artigo="Art. 7"),
+            recuo_frontal_m=_s.ParamProv(valor=5, artigo="Art. 10"),
+            gabarito_m=_s.ParamProv(valor=9, artigo="Art. 11"),
+            permeabilidade_min_pct=_s.ParamProv(valor=0.2, artigo="Art. 12"),
+        ))],
+    )
+    out = _c.avaliar(perfil, "MUE", None, 187098.0)
+    por = {i.parametro: i for i in out.itens}
+    assert por["recuo_frontal_m"].valor == "5 m"
+    assert por["recuo_frontal_m"].status == "exigencia_projeto"
+    assert por["gabarito_m"].valor == "9 m"
+    assert por["permeabilidade_min_pct"].valor == "20%"
+    # ausente → não_extraido (não inventa)
+    assert por["recuo_fundos_m"].status == "nao_extraido"

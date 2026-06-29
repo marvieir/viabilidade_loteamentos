@@ -98,6 +98,8 @@ _INSTRUCAO_FORMATO = (
     '"modalidades": {"desmembramento": {"doacao_pct": {"valor": 0.0, "artigo": "Art. 22", '
     '"pagina": 15, "trecho": "..."}}}}], '
     '"avisos": ["..."]}\n'
+    "Capture TAMBÉM, quando constarem: recuo_frontal_m, recuo_lateral_m, recuo_fundos_m, "
+    "gabarito_m (altura máxima em metros) e permeabilidade_min_pct (fração: 20% → 0.2). "
     "Omita qualquer parâmetro cujo valor você não encontrou no texto (NÃO invente). Se não "
     "conseguir ler o documento, devolva {\"zonas\": [], \"avisos\": [\"motivo\"]}."
 )
@@ -131,7 +133,9 @@ _FERRAMENTA = {
                                 '{"valor": number, "artigo": "Art. X", "pagina": int, '
                                 '"trecho": "verbatim"}. doacao_pct é fração (0.35=35%) e '
                                 'leva "base": "total"|"liquida"|"combinada". Chaves: '
-                                "lote_min_m2, frente_min_m, doacao_pct, ca, taxa_ocupacao."
+                                "lote_min_m2, frente_min_m, doacao_pct, ca, taxa_ocupacao, "
+                                "recuo_frontal_m, recuo_lateral_m, recuo_fundos_m, gabarito_m "
+                                "(altura máx. em metros), permeabilidade_min_pct (fração: 0.2=20%)."
                             ),
                         },
                         "modalidades": {
