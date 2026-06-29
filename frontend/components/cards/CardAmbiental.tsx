@@ -104,6 +104,48 @@ export function CardAmbiental({
               </p>
             )}
 
+            {data.bacia_hidrografica?.consultado &&
+              (data.bacia_hidrografica.regiao_hidrografica ||
+                data.bacia_hidrografica.bacia ||
+                data.bacia_hidrografica.sub_bacia) && (
+                <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3 text-sm">
+                  <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Bacia hidrográfica
+                  </p>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    {data.bacia_hidrografica.regiao_hidrografica && (
+                      <span>
+                        Região:{" "}
+                        <span className="font-medium">
+                          {data.bacia_hidrografica.regiao_hidrografica}
+                        </span>
+                      </span>
+                    )}
+                    {data.bacia_hidrografica.bacia && (
+                      <span>
+                        Bacia:{" "}
+                        <span className="font-medium">
+                          {data.bacia_hidrografica.bacia}
+                        </span>
+                      </span>
+                    )}
+                    {data.bacia_hidrografica.sub_bacia && (
+                      <span>
+                        Sub-bacia:{" "}
+                        <span className="font-medium">
+                          {data.bacia_hidrografica.sub_bacia}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                  {data.bacia_hidrografica.fonte && (
+                    <p className="mt-1 text-xs text-slate-400">
+                      {data.bacia_hidrografica.fonte}
+                    </p>
+                  )}
+                </div>
+              )}
+
             {data.avisos.length > 0 && (
               <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
                 {data.avisos.map((a) => (

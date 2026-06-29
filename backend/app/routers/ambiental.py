@@ -10,6 +10,7 @@ consultada, ``sem_alertas`` e um aviso explícito. O cruzamento é determinísti
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core import ambiental as motor
+from app.core.bacia import FonteBacia, get_fonte_bacia
 from app.core.camadas import Camadas, FonteCamadas, get_fonte_camadas
 from app.core.store import STORE
 from app.models import schemas
@@ -25,6 +26,7 @@ router = APIRouter(dependencies=[Depends(analise_do_dono)])
 def analisar_ambiental(
     analise_id: str,
     fonte: FonteCamadas | None = Depends(get_fonte_camadas),
+    fonte_bacia: FonteBacia | None = Depends(get_fonte_bacia),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -44,6 +46,19 @@ def analisar_ambiental(
         camadas = fonte.coletar(gleba.bounds, uf)
 
     res = motor.analisar(gleba, camadas)
+
+    # Tier 2 — bacia hidrográfica (descritivo; junto da hidrografia ambiental).
+    bacia_out = None
+    if fonte_bacia is not None:
+        rb = fonte_bacia.identificar(gleba)
+        bacia_out = schemas.BaciaHidrograficaOut(
+            consultado=rb.consultado,
+            regiao_hidrografica=rb.regiao_hidrografica,
+            bacia=rb.bacia,
+            sub_bacia=rb.sub_bacia,
+            fonte=rb.fonte,
+            avisos=rb.avisos,
+        )
 
     return schemas.AmbientalOut(
         alertas=[
@@ -67,4 +82,5 @@ def analisar_ambiental(
         sem_alertas=res.sem_alertas,
         camadas_consultadas=res.camadas_consultadas,
         camadas_indisponiveis=res.camadas_indisponiveis,
+        bacia_hidrografica=bacia_out,
     )

@@ -11,7 +11,6 @@ consta no arquivo. **Nenhum campo daqui alimenta outra dimensão** (critério-co
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core import localizacao as motor
-from app.core.bacia import FonteBacia, get_fonte_bacia
 from app.core.localizacao import FonteLocalizacao, get_fonte_localizacao
 from app.core.store import STORE
 from app.models import schemas
@@ -27,24 +26,10 @@ router = APIRouter(dependencies=[Depends(analise_do_dono)])
 def obter_localizacao(
     analise_id: str,
     fonte: FonteLocalizacao = Depends(get_fonte_localizacao),
-    fonte_bacia: FonteBacia | None = Depends(get_fonte_bacia),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
         raise HTTPException(404, "Análise não encontrada.")
     jur = registro["jurisdicao"]
     dataset = fonte.carregar()
-    out = motor.montar_localizacao(dataset, jur.cod_ibge, jur.uf, jur.municipio)
-
-    # Tier 2 — bacia hidrográfica (se a fonte estiver configurada).
-    if fonte_bacia is not None:
-        rb = fonte_bacia.identificar(registro["poly"])
-        out.bacia_hidrografica = schemas.BaciaHidrograficaOut(
-            consultado=rb.consultado,
-            regiao_hidrografica=rb.regiao_hidrografica,
-            bacia=rb.bacia,
-            sub_bacia=rb.sub_bacia,
-            fonte=rb.fonte,
-            avisos=rb.avisos,
-        )
-    return out
+    return motor.montar_localizacao(dataset, jur.cod_ibge, jur.uf, jur.municipio)

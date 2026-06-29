@@ -254,6 +254,17 @@ class AlertaAmbientalOut(BaseModel):
     proveniencia: ProvenienciaAmbientalOut
 
 
+class BaciaHidrograficaOut(BaseModel):
+    """Bacia hidrográfica (ANA) incidente na gleba. null se a fonte não foi configurada."""
+
+    consultado: bool
+    regiao_hidrografica: Optional[str] = None
+    bacia: Optional[str] = None
+    sub_bacia: Optional[str] = None
+    fonte: Optional[str] = None
+    avisos: list[str] = []
+
+
 class AmbientalOut(BaseModel):
     alertas: list[AlertaAmbientalOut] = []
     geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, app_massa_dagua, uc, mineracao, linhas_transmissao}
@@ -262,6 +273,8 @@ class AmbientalOut(BaseModel):
     # Degradação por camada (Fase 2.1): quais fontes responderam e quais falharam.
     camadas_consultadas: list[str] = []
     camadas_indisponiveis: list[str] = []
+    # Tier 2 — bacia hidrográfica (descritivo; null se AMBIENTAL_BACIA_PATH não configurado).
+    bacia_hidrografica: Optional[BaciaHidrograficaOut] = None
 
 
 # ----- Fase 2.2 — Área verde (cobertura vegetal) -----
@@ -1175,17 +1188,6 @@ class LocalizacaoMunicipioOut(BaseModel):
     uf: Optional[str] = None
 
 
-class BaciaHidrograficaOut(BaseModel):
-    """Bacia hidrográfica (ANA) incidente na gleba. null se a fonte não foi configurada."""
-
-    consultado: bool
-    regiao_hidrografica: Optional[str] = None
-    bacia: Optional[str] = None
-    sub_bacia: Optional[str] = None
-    fonte: Optional[str] = None
-    avisos: list[str] = []
-
-
 class LocalizacaoOut(BaseModel):
     avaliada: bool
     cobertura: str  # COMPLETA (4 blocos) | PARCIAL (faltou algum) | INDISPONIVEL (fora do arquivo)
@@ -1194,7 +1196,6 @@ class LocalizacaoOut(BaseModel):
     renda: RendaOut
     habitacao: HabitacaoOut
     faixa_etaria: FaixaEtariaOut
-    bacia_hidrografica: Optional[BaciaHidrograficaOut] = None  # Tier 2
     proveniencia: str
     avisos: list[str] = []
 

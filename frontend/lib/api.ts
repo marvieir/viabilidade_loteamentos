@@ -444,6 +444,14 @@ export type ChaveOverlay =
   | "urb_portico"
   | "urb_restricao";
 
+export interface BaciaHidrografica {
+  consultado: boolean;
+  regiao_hidrografica: string | null;
+  bacia: string | null;
+  sub_bacia: string | null;
+  fonte: string | null;
+  avisos: string[];
+}
 export interface Ambiental {
   alertas: AlertaAmbiental[];
   geojson_overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
@@ -451,6 +459,7 @@ export interface Ambiental {
   sem_alertas: boolean;
   camadas_consultadas: string[];
   camadas_indisponiveis: string[];
+  bacia_hidrografica?: BaciaHidrografica | null;
 }
 
 export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {
@@ -1289,17 +1298,7 @@ export interface Localizacao {
   renda: Renda;
   habitacao: Habitacao;
   faixa_etaria: FaixaEtaria;
-  bacia_hidrografica?: BaciaHidrografica | null;
   proveniencia: string;
-  avisos: string[];
-}
-
-export interface BaciaHidrografica {
-  consultado: boolean;
-  regiao_hidrografica: string | null;
-  bacia: string | null;
-  sub_bacia: string | null;
-  fonte: string | null;
   avisos: string[];
 }
 
