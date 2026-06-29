@@ -26,6 +26,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   patrimonio_cultural: "#7c3aed", // Patrimônio cultural/arqueológico (IPHAN) — violeta
   area_contaminada: "#65a30d", // Área contaminada (CETESB) — verde-oliva (passivo)
   apcb: "#0891b2", // Área Prioritária Biodiversidade (MMA) — ciano (diretriz)
+  fund_malha: "#9a3412", // Malha fundiária SIGEF/SNCI — marrom-terra (parcela cadastral)
   // Fase 9 — estudo de massa esquemático
   urb_lotes: "#6366f1",
   urb_quadras: "#475569", // contorno das quadras (faces da malha — Fase 9.7)
@@ -62,6 +63,9 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   areas_umidas: { color: "#0f766e", weight: 2, fillColor: "#14b8a6", fillOpacity: 0.45, dashArray: "3 4" },
   // Reserva Legal (CAR): verde-escuro com hachura — área averbada de uso restrito, não loteável.
   reserva_legal: { color: "#14532d", weight: 2, fillColor: "#16a34a", fillOpacity: 0.4, dashArray: "6 3" },
+  // Malha fundiária SIGEF/SNCI: contorno marrom forte, preenchimento leve — parcela cadastral
+  // (lê como limite de propriedade registrada sobre o satélite, sem virar bloco opaco).
+  fund_malha: { color: "#7c2d12", weight: 1.5, fillColor: "#c2410c", fillOpacity: 0.18 },
   // Fase 11.3 — PÓRTICO/ENTRADA: marcador ROSA/MAGENTA forte (cor única no mapa, borda grossa) —
   // lê como o componente "portaria" no acesso único, achável sobre o satélite e os lotes.
   urb_portico: { color: "#831843", weight: 3, fillColor: "#ec4899", fillOpacity: 0.95 },
@@ -96,6 +100,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   patrimonio_cultural: "Patrimônio cultural/arqueológico (IPHAN)",
   area_contaminada: "Área contaminada (CETESB)",
   apcb: "Área Prioritária Biodiversidade (MMA)",
+  fund_malha: "Malha fundiária (SIGEF/SNCI)",
   urb_lotes: "Lotes (vendável)",
   urb_quadras: "Quadras (faces da malha)",
   urb_arruamento: "Sistema viário (malha)",

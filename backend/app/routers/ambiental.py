@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core import ambiental as motor
 from app.core.bacia import FonteBacia, get_fonte_bacia
 from app.core.camadas import Camadas, FonteCamadas, get_fonte_camadas
+from app.core.malha_fundiaria import FonteMalhaFundiaria, get_fonte_malha_fundiaria
 from app.core.store import STORE
 from app.models import schemas
 
@@ -27,6 +28,7 @@ def analisar_ambiental(
     analise_id: str,
     fonte: FonteCamadas | None = Depends(get_fonte_camadas),
     fonte_bacia: FonteBacia | None = Depends(get_fonte_bacia),
+    fonte_malha: FonteMalhaFundiaria | None = Depends(get_fonte_malha_fundiaria),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -46,6 +48,7 @@ def analisar_ambiental(
         camadas = fonte.coletar(gleba.bounds, uf)
 
     res = motor.analisar(gleba, camadas)
+    overlays = dict(res.geojson_overlays)
 
     # Tier 2 — bacia hidrográfica (descritivo; junto da hidrografia ambiental).
     bacia_out = None
@@ -59,6 +62,29 @@ def analisar_ambiental(
             fonte=rb.fonte,
             avisos=rb.avisos,
         )
+
+    # Tier 1 — malha fundiária SIGEF/SNCI (parcelas registradas + overlay no mapa).
+    malha_out = None
+    if fonte_malha is not None:
+        rm = fonte_malha.identificar(gleba)
+        malha_out = schemas.MalhaFundiariaOut(
+            consultado=rm.consultado,
+            parcelas=[
+                schemas.ParcelaFundiariaOut(
+                    codigo=p.codigo,
+                    area_ha=p.area_ha,
+                    situacao=p.situacao,
+                    titular=p.titular,
+                )
+                for p in rm.parcelas
+            ],
+            n_parcelas=rm.n_parcelas,
+            cobertura_pct=rm.cobertura_pct,
+            fonte=rm.fonte,
+            avisos=rm.avisos,
+        )
+        if rm.geojson is not None:
+            overlays["fund_malha"] = rm.geojson
 
     return schemas.AmbientalOut(
         alertas=[
@@ -77,10 +103,11 @@ def analisar_ambiental(
             )
             for a in res.alertas
         ],
-        geojson_overlays=res.geojson_overlays,
+        geojson_overlays=overlays,
         avisos=res.avisos,
         sem_alertas=res.sem_alertas,
         camadas_consultadas=res.camadas_consultadas,
         camadas_indisponiveis=res.camadas_indisponiveis,
         bacia_hidrografica=bacia_out,
+        malha_fundiaria=malha_out,
     )

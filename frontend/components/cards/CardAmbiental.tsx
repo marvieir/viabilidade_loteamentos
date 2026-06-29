@@ -104,6 +104,64 @@ export function CardAmbiental({
               </p>
             )}
 
+            {data.malha_fundiaria?.consultado && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50/60 p-3 text-sm">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Malha fundiária (SIGEF/SNCI)
+                  </p>
+                  {data.malha_fundiaria.cobertura_pct != null && (
+                    <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-900">
+                      {data.malha_fundiaria.cobertura_pct.toLocaleString("pt-BR")}% da gleba já
+                      parcelada
+                    </span>
+                  )}
+                </div>
+                {data.malha_fundiaria.n_parcelas > 0 ? (
+                  <>
+                    <p className="text-slate-700">
+                      {data.malha_fundiaria.n_parcelas}{" "}
+                      {data.malha_fundiaria.n_parcelas === 1
+                        ? "parcela registrada incide"
+                        : "parcelas registradas incidem"}{" "}
+                      sobre a gleba.
+                    </p>
+                    <ul className="mt-2 space-y-1">
+                      {data.malha_fundiaria.parcelas.map((p, i) => (
+                        <li
+                          key={`${p.codigo ?? "parcela"}-${i}`}
+                          className="flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600"
+                        >
+                          <span className="font-medium text-slate-900">
+                            {p.codigo ?? "Parcela sem código"}
+                          </span>
+                          {p.area_ha != null && (
+                            <span>
+                              ·{" "}
+                              {p.area_ha.toLocaleString("pt-BR", {
+                                maximumFractionDigits: 2,
+                              })}{" "}
+                              ha
+                            </span>
+                          )}
+                          {p.situacao && <span>· {p.situacao}</span>}
+                          {p.titular && <span>· {p.titular}</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-slate-700">
+                    Nenhuma parcela georreferenciada (SIGEF/SNCI) incide sobre a gleba — área
+                    possivelmente ainda não certificada no INCRA.
+                  </p>
+                )}
+                {data.malha_fundiaria.fonte && (
+                  <p className="mt-1 text-xs text-slate-400">{data.malha_fundiaria.fonte}</p>
+                )}
+              </div>
+            )}
+
             {data.bacia_hidrografica?.consultado &&
               (data.bacia_hidrografica.regiao_hidrografica ||
                 data.bacia_hidrografica.bacia ||

@@ -432,6 +432,7 @@ export type ChaveOverlay =
   | "patrimonio_cultural"
   | "area_contaminada"
   | "apcb"
+  | "fund_malha"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
   | "urb_lotes"
   | "urb_quadras"
@@ -452,6 +453,20 @@ export interface BaciaHidrografica {
   fonte: string | null;
   avisos: string[];
 }
+export interface ParcelaFundiaria {
+  codigo: string | null;
+  area_ha: number | null;
+  situacao: string | null;
+  titular: string | null;
+}
+export interface MalhaFundiaria {
+  consultado: boolean;
+  parcelas: ParcelaFundiaria[];
+  n_parcelas: number;
+  cobertura_pct: number | null;
+  fonte: string | null;
+  avisos: string[];
+}
 export interface Ambiental {
   alertas: AlertaAmbiental[];
   geojson_overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
@@ -460,6 +475,7 @@ export interface Ambiental {
   camadas_consultadas: string[];
   camadas_indisponiveis: string[];
   bacia_hidrografica?: BaciaHidrografica | null;
+  malha_fundiaria?: MalhaFundiaria | null;
 }
 
 export async function buscarAmbiental(analiseId: string): Promise<Ambiental> {

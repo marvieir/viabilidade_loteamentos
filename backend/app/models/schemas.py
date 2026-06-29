@@ -265,6 +265,26 @@ class BaciaHidrograficaOut(BaseModel):
     avisos: list[str] = []
 
 
+class ParcelaFundiariaOut(BaseModel):
+    """Uma parcela registrada (SIGEF/SNCI) que intersecta a gleba."""
+
+    codigo: Optional[str] = None
+    area_ha: Optional[float] = None
+    situacao: Optional[str] = None
+    titular: Optional[str] = None
+
+
+class MalhaFundiariaOut(BaseModel):
+    """Malha fundiária (INCRA — SIGEF/SNCI) incidente. null se a fonte não foi configurada."""
+
+    consultado: bool
+    parcelas: list[ParcelaFundiariaOut] = []
+    n_parcelas: int = 0
+    cobertura_pct: Optional[float] = None  # % da gleba já coberto por parcela registrada
+    fonte: Optional[str] = None
+    avisos: list[str] = []
+
+
 class AmbientalOut(BaseModel):
     alertas: list[AlertaAmbientalOut] = []
     geojson_overlays: dict = {}  # {app, faixa_nao_edificavel, app_massa_dagua, uc, mineracao, linhas_transmissao}
@@ -275,6 +295,8 @@ class AmbientalOut(BaseModel):
     camadas_indisponiveis: list[str] = []
     # Tier 2 — bacia hidrográfica (descritivo; null se AMBIENTAL_BACIA_PATH não configurado).
     bacia_hidrografica: Optional[BaciaHidrograficaOut] = None
+    # Tier 1 — malha fundiária SIGEF/SNCI (null se FUNDIARIO_MALHA_PATH não configurado).
+    malha_fundiaria: Optional[MalhaFundiariaOut] = None
 
 
 # ----- Fase 2.2 — Área verde (cobertura vegetal) -----
