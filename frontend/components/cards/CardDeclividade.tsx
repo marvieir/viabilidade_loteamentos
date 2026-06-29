@@ -30,6 +30,18 @@ const ROTULO_FAIXA: Record<string, string> = {
   alta: "Alta",
 };
 
+// Gradiente verde→vermelho das 8 faixas finas (frio = plano, quente = íngreme).
+const CORES_FINA: Record<string, string> = {
+  "0-3%": "#86efac",
+  "3-6%": "#4ade80",
+  "6-9%": "#16a34a",
+  "9-12%": "#facc15",
+  "12-20%": "#f59e0b",
+  "20-30%": "#ef4444",
+  "30-47%": "#b91c1c",
+  "47-100%": "#7f1d1d",
+};
+
 export function CardDeclividade({
   analiseId,
   onOverlaysDecliv,
@@ -118,6 +130,70 @@ export function CardDeclividade({
                 />
               ))}
             </div>
+
+            {data.relevo_predominante && (
+              <p className="text-sm text-slate-600">
+                Relevo predominante:{" "}
+                <span className="font-medium">{data.relevo_predominante}</span>
+              </p>
+            )}
+
+            {data.faixas_finas.some((f) => f.area_m2 > 0) && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Faixas de declividade
+                </p>
+                <ul className="space-y-1">
+                  {data.faixas_finas
+                    .filter((f) => f.area_m2 > 0)
+                    .map((f) => (
+                      <li key={f.classe} className="flex items-center gap-2 text-sm">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-sm"
+                          style={{ background: CORES_FINA[f.classe] ?? "#94a3b8" }}
+                        />
+                        <span className="w-16 shrink-0 font-medium">{f.classe}</span>
+                        <div className="h-2 flex-1 rounded bg-slate-100">
+                          <div
+                            className="h-2 rounded"
+                            style={{
+                              width: `${Math.min(100, f.pct * 100)}%`,
+                              background: CORES_FINA[f.classe] ?? "#94a3b8",
+                            }}
+                          />
+                        </div>
+                        <span className="w-32 shrink-0 text-right text-slate-600">
+                          {ha(f.area_m2)} · {pctBR(f.pct)}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+
+            {data.mobilidade.some((m) => m.area_m2 > 0) && (
+              <div>
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Análise de mobilidade
+                </p>
+                <ul className="space-y-1">
+                  {data.mobilidade
+                    .filter((m) => m.area_m2 > 0)
+                    .map((m) => (
+                      <li
+                        key={m.chave}
+                        className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm"
+                      >
+                        <span className="font-medium">{m.faixa}</span> ·{" "}
+                        {pctBR(m.pct)}
+                        <span className="block text-xs text-slate-500">
+                          {m.interpretacao}
+                        </span>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
 
             {/* Flag legal ≥30% — vedação de parcelamento */}
             {data.flag_vedacao ? (

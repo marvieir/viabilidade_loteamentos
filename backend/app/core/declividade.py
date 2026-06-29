@@ -85,6 +85,48 @@ class FaixaDeclividade:
 
 
 @dataclass
+class FaixaMobilidade:
+    """Leitura de mobilidade por faixa de declividade (caminhabilidade/modais)."""
+
+    chave: str
+    faixa: str
+    interpretacao: str
+    area_m2: float
+    pct: float
+
+
+# Faixas FINAS (mesma granularidade que o mercado usa) — bordas em % e rótulos.
+_FAIXAS_FINAS = [
+    (0.0, 3.0, "0-3%"),
+    (3.0, 6.0, "3-6%"),
+    (6.0, 9.0, "6-9%"),
+    (9.0, 12.0, "9-12%"),
+    (12.0, 20.0, "12-20%"),
+    (20.0, 30.0, "20-30%"),
+    (30.0, 47.0, "30-47%"),
+    (47.0, float("inf"), "47-100%"),
+]
+
+# Leitura de mobilidade (caminhabilidade/modais) por faixa.
+_MOBILIDADE = [
+    ("ate_10", "Abaixo de 10%", "Ideal para todos os modais", 0.0, 10.0),
+    ("de_10_20", "10–20%", "Ainda possível, mas começa o esforço", 10.0, 20.0),
+    ("de_20_30", "20–30%", "Restritivo para mobilidade ativa", 20.0, 30.0),
+    ("acima_30", "Acima de 30%", "Intransitável para a maioria dos modos", 30.0, float("inf")),
+]
+
+# Classes de relevo (EMBRAPA) por declividade média (%) → classificação textual.
+_RELEVO = [
+    (3.0, "Plano"),
+    (8.0, "Suave ondulado"),
+    (20.0, "Ondulado"),
+    (45.0, "Forte ondulado"),
+    (75.0, "Montanhoso"),
+    (float("inf"), "Escarpado"),
+]
+
+
+@dataclass
 class FlagVedacao:
     limite_pct: float
     area_m2: float
@@ -104,6 +146,11 @@ class ResultadoDeclividade:
     geojson_vedacao: dict  # = flag_vedacao.geojson (atalho p/ a união do aproveitável)
     proveniencia: Optional[str]
     avisos: list[str]
+    # Faixas FINAS (8 classes, ha+%), leitura de MOBILIDADE e RELEVO predominante — informativos
+    # (o motor de urbanismo continua usando ``faixas``/``geojson_acentuada``). Vazias sem DEM.
+    faixas_finas: list[FaixaDeclividade] = field(default_factory=list)
+    mobilidade: list[FaixaMobilidade] = field(default_factory=list)
+    relevo_predominante: Optional[str] = None
     # Faixa de declividade ACENTUADA (>20%, "alta") em WGS84 — íngreme mas LEGAL (abaixo do veto
     # de 30%). O motor de urbanismo a usa como penalidade SUAVE: prefere terreno plano para os
     # lotes e empurra verde/preservação para a encosta. Vazia quando não há DEM (degrada honesto).
@@ -261,6 +308,33 @@ def analisar_declividade(
         _faixa("alta", f">{_n(LIMIAR_MEDIA_PCT)}%", alta),
     ]
 
+    # Faixas FINAS (8 classes) — particiona slope_pct em [lo, hi). Determinístico.
+    faixas_finas: list[FaixaDeclividade] = []
+    for lo, hi, rot in _FAIXAS_FINAS:
+        sel = mask & (slope_pct >= lo) & (slope_pct < hi)
+        area = round(float(sel.sum()) * px_area, 2)
+        faixas_finas.append(
+            FaixaDeclividade(
+                classe=rot, limite=rot, area_m2=area,
+                pct=round(area / total_in, 4) if total_in else 0.0,
+            )
+        )
+
+    # Leitura de MOBILIDADE (caminhabilidade/modais) por faixa.
+    mobilidade: list[FaixaMobilidade] = []
+    for chave, faixa, interp, lo, hi in _MOBILIDADE:
+        sel = mask & (slope_pct >= lo) & (slope_pct < hi)
+        area = round(float(sel.sum()) * px_area, 2)
+        mobilidade.append(
+            FaixaMobilidade(
+                chave=chave, faixa=faixa, interpretacao=interp, area_m2=area,
+                pct=round(area / total_in, 4) if total_in else 0.0,
+            )
+        )
+
+    # Relevo predominante (classes EMBRAPA) pela declividade média.
+    relevo_predominante = next(rot for lim, rot in _RELEVO if media <= lim)
+
     to_wgs = Transformer.from_crs(dem.crs_proj4, "EPSG:4326", always_xy=True).transform
 
     def _poligonizar(sel) -> dict:
@@ -306,6 +380,9 @@ def analisar_declividade(
         proveniencia=_proveniencia(dem),
         avisos=[*dem.avisos, RESSALVA_DSM],
         geojson_acentuada=geojson_acentuada,
+        faixas_finas=faixas_finas,
+        mobilidade=mobilidade,
+        relevo_predominante=relevo_predominante,
     )
 
 

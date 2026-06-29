@@ -347,6 +347,24 @@ class FlagVedacaoOut(BaseModel):
     ressalva: str
 
 
+class FaixaFinaOut(BaseModel):
+    """Faixa FINA de declividade (8 classes: 0-3, 3-6, …, 47-100%)."""
+
+    classe: str  # ex.: "0-3%"
+    area_m2: float
+    pct: float
+
+
+class FaixaMobilidadeOut(BaseModel):
+    """Leitura de mobilidade (caminhabilidade/modais) por faixa de declividade."""
+
+    chave: str
+    faixa: str  # ex.: "10–20%"
+    interpretacao: str  # ex.: "Ainda possível, mas começa o esforço"
+    area_m2: float
+    pct: float
+
+
 class DeclividadeOut(BaseModel):
     consultada: bool
     fonte: Optional[str] = None
@@ -355,6 +373,10 @@ class DeclividadeOut(BaseModel):
     flag_vedacao: Optional[FlagVedacaoOut] = None  # null se área ≥30% = 0
     proveniencia: Optional[str] = None
     avisos: list[str] = []
+    # Fase 2.5+ — faixas finas (8 classes), mobilidade e relevo predominante (informativos).
+    faixas_finas: list[FaixaFinaOut] = []
+    mobilidade: list[FaixaMobilidadeOut] = []
+    relevo_predominante: Optional[str] = None
 
 
 # ----- Fase 1.8 — Perfil municipal (extração assistida da LUOS) -----

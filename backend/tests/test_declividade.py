@@ -242,3 +242,28 @@ def test_aproveitavel_sem_dem_inalterado(client):
     ).json()
     itens = out.get("descontos") or {"itens": []}
     assert "declividade_vedada" not in {i["tipo"] for i in itens["itens"]}
+
+
+# Fase 2.5+ — faixas FINAS (8 classes), mobilidade e relevo predominante --------------------
+def test_faixas_finas_mobilidade_e_relevo():
+    # rampa 15% → tudo na classe fina 12-20%, mobilidade 10-20%, relevo "Ondulado".
+    dem = _dem_para_gleba(GLEBA, lambda xx, yy: 0.15 * xx)
+    res = analisar_declividade(GLEBA, dem)
+    # faixas finas particionam: a soma das áreas = soma das faixas grossas
+    soma_fina = round(sum(f.area_m2 for f in res.faixas_finas), 1)
+    soma_grossa = round(sum(f.area_m2 for f in res.faixas), 1)
+    assert abs(soma_fina - soma_grossa) < 1.0
+    f12_20 = next(f for f in res.faixas_finas if f.classe == "12-20%")
+    assert f12_20.pct > 0.99
+    mob = next(m for m in res.mobilidade if m.chave == "de_10_20")
+    assert mob.pct > 0.99 and "esforço" in mob.interpretacao
+    assert res.relevo_predominante == "Ondulado"
+
+
+def test_relevo_classes_extremos():
+    plano = analisar_declividade(GLEBA, _dem_para_gleba(GLEBA, lambda xx, yy: 0.0 * xx))
+    assert plano.relevo_predominante == "Plano"
+    forte = analisar_declividade(GLEBA, _dem_para_gleba(GLEBA, lambda xx, yy: 0.35 * xx))
+    assert forte.relevo_predominante == "Forte ondulado"  # 35% ∈ (20,45]
+    f30_47 = next(f for f in forte.faixas_finas if f.classe == "30-47%")
+    assert f30_47.pct > 0.99

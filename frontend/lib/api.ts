@@ -536,6 +536,18 @@ export interface FlagVedacao {
   ressalva: string;
 }
 
+export interface FaixaFina {
+  classe: string; // ex.: "0-3%"
+  area_m2: number;
+  pct: number;
+}
+export interface FaixaMobilidade {
+  chave: string;
+  faixa: string;
+  interpretacao: string;
+  area_m2: number;
+  pct: number;
+}
 export interface Declividade {
   consultada: boolean;
   fonte: string | null;
@@ -544,6 +556,9 @@ export interface Declividade {
   flag_vedacao: FlagVedacao | null;
   proveniencia: string | null;
   avisos: string[];
+  faixas_finas: FaixaFina[];
+  mobilidade: FaixaMobilidade[];
+  relevo_predominante: string | null;
 }
 
 export async function buscarDeclividade(

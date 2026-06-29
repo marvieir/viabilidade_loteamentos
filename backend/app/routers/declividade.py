@@ -59,4 +59,16 @@ def analisar_declividade(
         flag_vedacao=flag,
         proveniencia=res.proveniencia,
         avisos=res.avisos,
+        faixas_finas=[
+            schemas.FaixaFinaOut(classe=x.classe, area_m2=x.area_m2, pct=x.pct)
+            for x in res.faixas_finas
+        ],
+        mobilidade=[
+            schemas.FaixaMobilidadeOut(
+                chave=m.chave, faixa=m.faixa, interpretacao=m.interpretacao,
+                area_m2=m.area_m2, pct=m.pct,
+            )
+            for m in res.mobilidade
+        ],
+        relevo_predominante=res.relevo_predominante,
     )
