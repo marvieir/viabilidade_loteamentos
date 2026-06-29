@@ -18,7 +18,10 @@ from shapely.ops import transform as shp_transform
 FONTE_ANA = "ANA/SNIRH — bacias hidrográficas"
 
 # Nomes de campo comuns por nível (case-insensitive via _first). Ajustável por env se preciso.
-_CAMPOS_REGIAO = ("rhi_nm", "nm_rh", "regiao_hidrografica", "nm_regiao", "rh", "regiao", "nome_rh")
+_CAMPOS_REGIAO = (
+    "nmrhi",  # campo OFICIAL da ANA (Regiões Hidrográficas CNRH)
+    "rhi_nm", "nm_rh", "regiao_hidrografica", "nm_regiao", "rh", "regiao", "nome_rh",
+)
 _CAMPOS_BACIA = ("nm_bacia", "bacia", "nome_bacia", "nm_bacia_h", "nmbacia", "nome")
 _CAMPOS_SUBBACIA = ("nm_sub_bac", "sub_bacia", "subbacia", "nm_subbaci", "nmsubbacia", "nome_sub")
 
