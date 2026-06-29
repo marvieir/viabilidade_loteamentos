@@ -272,6 +272,22 @@ class ProvenienciaVegetacaoOut(BaseModel):
     ressalva: Optional[str] = None
 
 
+class BiomaIncidenteOut(BaseModel):
+    nome: str
+    area_m2: float
+    pct: float
+
+
+class BiomaOut(BaseModel):
+    """Bioma(s) IBGE incidente(s) na gleba + dominante. null se a fonte não foi configurada."""
+
+    consultado: bool
+    dominante: Optional[str] = None
+    biomas: list[BiomaIncidenteOut] = []
+    fonte: Optional[str] = None
+    avisos: list[str] = []
+
+
 class VegetacaoOut(BaseModel):
     area_total_m2: float
     area_verde_m2: Optional[float] = None      # None = não consultada (sem desconto)
@@ -287,6 +303,8 @@ class VegetacaoOut(BaseModel):
     consultada: bool
     # Fase 2.3 — severidade: null se vegetação OU camadas ambientais não consultadas.
     severidade: Optional["SeveridadeVerdeOut"] = None
+    # Tier 2 — bioma IBGE (null se a fonte AMBIENTAL_BIOMA_PATH não foi configurada).
+    bioma: Optional[BiomaOut] = None
 
 
 # ----- Fase 2.3 — Severidade do verde (restrição dura × a verificar) -----

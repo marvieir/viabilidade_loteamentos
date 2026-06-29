@@ -116,6 +116,27 @@ export function CardVegetacao({
               />
             </div>
 
+            {data.bioma?.consultado && data.bioma.dominante && (
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 text-sm">
+                <span className="font-medium">Bioma:</span>{" "}
+                <span className="font-semibold text-emerald-800">
+                  {data.bioma.dominante}
+                </span>
+                {data.bioma.biomas.length > 1 && (
+                  <span className="text-slate-600">
+                    {" "}
+                    ·{" "}
+                    {data.bioma.biomas
+                      .map((b) => `${b.nome} ${pctBR(b.pct)}`)
+                      .join(" · ")}
+                  </span>
+                )}
+                {data.bioma.fonte && (
+                  <span className="block text-xs text-slate-400">{data.bioma.fonte}</span>
+                )}
+              </div>
+            )}
+
             {data.areas_canonicas != null && (
               <p className="text-sm text-slate-700">
                 Área líquida aproveitável (canônica, gleba − vegetação − declividade − APP):{" "}

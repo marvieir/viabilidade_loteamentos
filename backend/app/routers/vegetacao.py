@@ -12,6 +12,7 @@ from shapely.geometry import shape
 
 from app.core import ambiental as ambiental_motor
 from app.core import vegetacao as motor
+from app.core.bioma import FonteBioma, get_fonte_bioma
 from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.declividade import FonteDEM, get_fonte_dem
 from app.routers.analises import garantir_areas_canonicas
@@ -33,6 +34,7 @@ def analisar_vegetacao(
     fonte: FonteVegetacao | None = Depends(get_fonte_vegetacao),
     fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
+    fonte_bioma: FonteBioma | None = Depends(get_fonte_bioma),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -79,6 +81,21 @@ def analisar_vegetacao(
                 ressalva=RESSALVA,
             )
 
+    # Tier 2 — bioma IBGE (se a fonte estiver configurada).
+    bioma_out = None
+    if fonte_bioma is not None:
+        rb = fonte_bioma.identificar(gleba)
+        bioma_out = schemas.BiomaOut(
+            consultado=rb.consultado,
+            dominante=rb.dominante,
+            biomas=[
+                schemas.BiomaIncidenteOut(nome=b.nome, area_m2=b.area_m2, pct=b.pct)
+                for b in rb.biomas
+            ],
+            fonte=rb.fonte,
+            avisos=rb.avisos,
+        )
+
     prov = (
         schemas.ProvenienciaVegetacaoOut(**res.proveniencia)
         if res.proveniencia is not None
@@ -95,4 +112,5 @@ def analisar_vegetacao(
         avisos=avisos,
         consultada=res.consultada,
         severidade=severidade,
+        bioma=bioma_out,
     )

@@ -489,6 +489,20 @@ export interface Vegetacao {
   avisos: string[];
   consultada: boolean;
   severidade?: SeveridadeVerde | null;
+  bioma?: Bioma | null;
+}
+
+export interface BiomaIncidente {
+  nome: string;
+  area_m2: number;
+  pct: number;
+}
+export interface Bioma {
+  consultado: boolean;
+  dominante: string | null;
+  biomas: BiomaIncidente[];
+  fonte: string | null;
+  avisos: string[];
 }
 
 // Fase 2.3 — severidade do verde (restrição dura × a verificar)
