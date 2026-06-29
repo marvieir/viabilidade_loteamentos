@@ -151,6 +151,8 @@ class ResultadoDeclividade:
     faixas_finas: list[FaixaDeclividade] = field(default_factory=list)
     mobilidade: list[FaixaMobilidade] = field(default_factory=list)
     relevo_predominante: Optional[str] = None
+    # Mapa colorido das faixas (FeatureCollection; cada feição tem properties.classe). {} sem DEM.
+    geojson_faixas: dict = field(default_factory=dict)
     # Faixa de declividade ACENTUADA (>20%, "alta") em WGS84 — íngreme mas LEGAL (abaixo do veto
     # de 30%). O motor de urbanismo a usa como penalidade SUAVE: prefere terreno plano para os
     # lotes e empurra verde/preservação para a encosta. Vazia quando não há DEM (degrada honesto).
@@ -370,6 +372,18 @@ def analisar_declividade(
     # inofensivo, pois o lote já o evita por outra via.
     geojson_acentuada = _poligonizar(alta)
 
+    # Mapa COLORIDO de declividade — uma FeatureCollection com as 8 faixas (cada feição leva sua
+    # classe; o front pinta verde→vermelho). Camada ligável separada da mancha legal ≥30%.
+    feats_faixas = []
+    for lo, hi, rot in _FAIXAS_FINAS:
+        sel = mask & (slope_pct >= lo) & (slope_pct < hi)
+        if int(sel.sum()) == 0:
+            continue
+        geom = _poligonizar(sel)
+        if geom:
+            feats_faixas.append({"type": "Feature", "properties": {"classe": rot}, "geometry": geom})
+    geojson_faixas = {"type": "FeatureCollection", "features": feats_faixas} if feats_faixas else {}
+
     return ResultadoDeclividade(
         consultada=True,
         fonte=dem.fonte,
@@ -383,6 +397,7 @@ def analisar_declividade(
         faixas_finas=faixas_finas,
         mobilidade=mobilidade,
         relevo_predominante=relevo_predominante,
+        geojson_faixas=geojson_faixas,
     )
 
 

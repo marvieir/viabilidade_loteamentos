@@ -14,6 +14,7 @@ import {
   type ChaveOverlay,
   type Declividade,
 } from "@/lib/api";
+import { CORES_FINA } from "@/components/mapa/overlays";
 
 const ha = (v: number) =>
   (v / 10000).toLocaleString("pt-BR", { maximumFractionDigits: 2 }) + " ha";
@@ -30,17 +31,6 @@ const ROTULO_FAIXA: Record<string, string> = {
   alta: "Alta",
 };
 
-// Gradiente verde→vermelho das 8 faixas finas (frio = plano, quente = íngreme).
-const CORES_FINA: Record<string, string> = {
-  "0-3%": "#86efac",
-  "3-6%": "#4ade80",
-  "6-9%": "#16a34a",
-  "9-12%": "#facc15",
-  "12-20%": "#f59e0b",
-  "20-30%": "#ef4444",
-  "30-47%": "#b91c1c",
-  "47-100%": "#7f1d1d",
-};
 
 export function CardDeclividade({
   analiseId,
@@ -68,6 +58,9 @@ export function CardDeclividade({
       const ov: OverlaysDecliv = {};
       if (r.flag_vedacao && ehGeom(r.flag_vedacao.geojson))
         ov.declividade_vedada = r.flag_vedacao.geojson;
+      // Camada colorida das faixas (FeatureCollection) — toggle separado da ≥30%.
+      if (r.geojson_faixas && "type" in r.geojson_faixas)
+        ov.declividade_faixas = r.geojson_faixas as unknown as GeoJSON.Geometry;
       onOverlaysDecliv?.(ov);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");

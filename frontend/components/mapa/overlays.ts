@@ -13,6 +13,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   verde_dura: "#dc2626", // verde em APP/UC = restrição dura (Fase 2.3)
   verde_verificar: "#eab308", // verde fora de APP/UC = a verificar (Fase 2.3)
   declividade_vedada: "#b91c1c", // declividade ≥30% vedada (Fase 2.5)
+  declividade_faixas: "#f59e0b", // mapa colorido de declividade (faixas; pintado por feição)
   areas_umidas: "#0d9488", // área úmida/alagável (APP candidata) — teal/azul-esverdeado
   reserva_legal: "#15803d", // Reserva Legal averbada no CAR — verde-escuro
   mata_atlantica: "#047857", // domínio Mata Atlântica (Lei 11.428) — verde-mata
@@ -82,6 +83,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   verde_dura: "Verde em APP/UC (restrição dura)",
   verde_verificar: "Verde a verificar",
   declividade_vedada: "Declividade ≥30% (vedada)",
+  declividade_faixas: "Declividade (faixas)",
   areas_umidas: "Área úmida/alagável (APP candidata)",
   reserva_legal: "Reserva Legal (CAR)",
   mata_atlantica: "Domínio Mata Atlântica (Lei 11.428)",
@@ -104,6 +106,18 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_institucional: "Institucional",
   urb_portico: "Pórtico / entrada",
   urb_restricao: "Bosque/área verde preservada (não-edif.: mata/≥30%/APP)",
+};
+
+// Cores das 8 faixas de declividade (verde→vermelho) — usadas no card E na camada do mapa.
+export const CORES_FINA: Record<string, string> = {
+  "0-3%": "#86efac",
+  "3-6%": "#4ade80",
+  "6-9%": "#16a34a",
+  "9-12%": "#facc15",
+  "12-20%": "#f59e0b",
+  "20-30%": "#ef4444",
+  "30-47%": "#b91c1c",
+  "47-100%": "#7f1d1d",
 };
 
 // Fase 9.5 — cores das faixas de score (frio→quente) p/ colorir cada LOTE no mapa (heatmap real).

@@ -419,6 +419,7 @@ export type ChaveOverlay =
   | "verde_dura"
   | "verde_verificar"
   | "declividade_vedada"
+  | "declividade_faixas"
   | "areas_umidas"
   | "reserva_legal"
   | "mata_atlantica"
@@ -575,6 +576,7 @@ export interface Declividade {
   faixas_finas: FaixaFina[];
   mobilidade: FaixaMobilidade[];
   relevo_predominante: string | null;
+  geojson_faixas: GeoJSON.FeatureCollection | Record<string, never>;
 }
 
 export async function buscarDeclividade(

@@ -7,7 +7,7 @@ import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
 import type { Feature, GeoJsonObject } from "geojson";
 import L from "leaflet";
 import type { ChaveOverlay } from "@/lib/api";
-import { CORES_FAIXA, CORES_OVERLAY, ESTILO_OVERLAY } from "@/components/mapa/overlays";
+import { CORES_FAIXA, CORES_FINA, CORES_OVERLAY, ESTILO_OVERLAY } from "@/components/mapa/overlays";
 
 // O front apenas RENDERIZA o GeoJSON que veio do backend. Nenhuma geo-matemática
 // aqui — fitBounds/invalidateSize são só enquadramento de tela, não cálculo de viabilidade.
@@ -79,11 +79,26 @@ export default function MapaLeaflet({
           );
         })()}
 
+      {/* Declividade (faixas): FeatureCollection pintada POR FEIÇÃO (cada uma tem properties.classe
+          → cor verde→vermelho). Camada ligável separada da mancha legal ≥30%. */}
+      {overlays?.declividade_faixas && (
+        <GeoJSON
+          key={`declividade_faixas-${JSON.stringify(overlays.declividade_faixas)}`}
+          data={overlays.declividade_faixas as GeoJsonObject}
+          style={(f?: Feature) => {
+            const classe = (f?.properties?.classe as string) ?? "";
+            const cor = CORES_FINA[classe] ?? "#9ca3af";
+            return { color: cor, weight: 0.5, fillColor: cor, fillOpacity: 0.55 };
+          }}
+        />
+      )}
+
       {/* Camadas de área (via/verde reservado/remanescente/lazer/institucional) — estilo próprio
           com contraste sobre satélite (Fase 9.6) */}
       {overlays &&
         (Object.keys(overlays) as ChaveOverlay[]).map((chave) => {
           if (chave === "urb_restricao") return null; // já desenhada ao fundo (acima)
+          if (chave === "declividade_faixas") return null; // desenhada por feição (acima)
           const g = overlays[chave];
           if (!g) return null;
           const cor = CORES_OVERLAY[chave];

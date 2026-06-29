@@ -377,6 +377,7 @@ class DeclividadeOut(BaseModel):
     faixas_finas: list[FaixaFinaOut] = []
     mobilidade: list[FaixaMobilidadeOut] = []
     relevo_predominante: Optional[str] = None
+    geojson_faixas: dict = {}  # FeatureCollection das faixas (camada colorida do mapa)
 
 
 # ----- Fase 1.8 — Perfil municipal (extração assistida da LUOS) -----

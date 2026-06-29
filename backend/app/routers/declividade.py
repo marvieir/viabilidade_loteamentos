@@ -71,4 +71,5 @@ def analisar_declividade(
             for m in res.mobilidade
         ],
         relevo_predominante=res.relevo_predominante,
+        geojson_faixas=res.geojson_faixas,
     )
