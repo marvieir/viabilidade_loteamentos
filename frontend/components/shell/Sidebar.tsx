@@ -22,20 +22,26 @@ export function Sidebar({
         Análise
       </p>
       <nav className="space-y-1 text-sm">
-        {SECOES.map(({ id, rotulo, Icone }) => {
+        {SECOES.map(({ id, rotulo, Icone, sub }) => {
           const ativo = secao === id;
           return (
             <button
               key={id}
               type="button"
               onClick={() => onSecao(id)}
-              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+              className={`flex w-full items-center gap-3 rounded-lg py-2 text-left transition-colors ${
+                sub ? "ml-3 border-l border-slate-200 pl-4 pr-3" : "px-3"
+              } ${
                 ativo
                   ? "bg-slate-900 font-medium text-white"
                   : "text-slate-600 hover:bg-slate-100"
               }`}
             >
-              <Icone className={ativo ? "text-white" : "text-slate-400"} width={17} height={17} />
+              <Icone
+                className={ativo ? "text-white" : "text-slate-400"}
+                width={sub ? 15 : 17}
+                height={sub ? 15 : 17}
+              />
               <span className="truncate">{rotulo}</span>
               {id === "ambiental" && alertas ? (
                 <span className="ml-auto rounded-full bg-rose-100 px-1.5 text-[11px] font-semibold text-rose-700">

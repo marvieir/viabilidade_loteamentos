@@ -32,11 +32,12 @@ export const SECOES: {
   id: Secao;
   rotulo: string;
   Icone: (p: React.SVGProps<SVGSVGElement>) => JSX.Element;
+  sub?: boolean; // item filho (recuado sob o menu pai imediatamente acima)
 }[] = [
   { id: "visao", rotulo: "Visão geral", Icone: IconVisao },
   { id: "ambiental", rotulo: "Ambiental", Icone: IconAmbiental },
-  { id: "verde", rotulo: "Área verde", Icone: IconVerde },
-  { id: "declividade", rotulo: "Declividade", Icone: IconDeclividade },
+  { id: "verde", rotulo: "Área verde", Icone: IconVerde, sub: true },
+  { id: "declividade", rotulo: "Declividade", Icone: IconDeclividade, sub: true },
   { id: "aproveitamento", rotulo: "Aproveitamento", Icone: IconAproveitamento },
   { id: "urbanismo", rotulo: "Urbanismo (IA)", Icone: IconUrbanismo },
   { id: "custo", rotulo: "Custo (infra)", Icone: IconFinanceira },

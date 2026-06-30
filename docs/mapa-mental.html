@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mapa Mental — Pré-Viabilidade de Loteamento</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 1.25rem; background: #f8fafc; color: #0f172a; }
+    header { margin-bottom: .75rem; }
+    h1 { font-size: 1.15rem; margin: 0; }
+    p.sub { margin: .25rem 0 0; color: #64748b; font-size: .85rem; }
+    .wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; overflow: auto; }
+    .mermaid { font-size: 15px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Mapa Mental — Pré-Viabilidade de Loteamento</h1>
+    <p class="sub">Abra este arquivo no navegador. Precisa de internet para carregar a biblioteca de render (Mermaid via CDN).</p>
+  </header>
+  <div class="wrap">
+    <pre class="mermaid">
+mindmap
+  root((Pré-Viabilidade de Loteamento))
+    Entrada
+      KMZ ou KML da gleba
+      Multi-matrícula
+      Detecção de município
+    Núcleo determinístico
+      Parse e geometria
+      Cálculo geodésico área e perímetro
+      Jurisdição município UF IBGE
+      STORE em memória por análise
+      Fontes injetáveis get_fonte
+    Regras inegociáveis
+      Cálculo só no backend
+      Front só renderiza JSON
+      Proveniência em todo número
+      Determinismo
+      Degradação honesta
+    Dimensões de análise
+      Ambiental
+        Área verde
+        Declividade
+        Bacia hidrográfica ANA
+        Malha fundiária SIGEF SNCI
+        Bioma
+        APP e UC e mineração
+        Reserva legal CAR
+      Aproveitamento
+      Urbanismo IA
+        Lotes e viário e quadras
+        Pórtico de entrada
+        Heatmap de score
+      Custo de infraestrutura
+        Paramétrico por disciplina
+        Padrão econômico médio alto
+        BDI
+      Conformidade LUOS
+      Jurídico
+        Cadeia dominial
+        Proprietários PF PJ
+        Checklist e anexos
+      Financeira
+      Econômica VPL TIR payback
+      Localização IBGE
+      Diretriz LUOS
+    Uso de LLM
+      Extração LUOS Opus
+      Urbanismo IA Fable e Opus
+      Extração jurídica Opus
+      Fallback Gemini
+    Fontes de dados
+      OSM Overpass
+      CAR SICAR
+      IBGE biomas
+      ANA bacias
+      INCRA SIGEF
+      Copernicus DEM
+      MapBiomas WorldCover
+      SINAPI SICRO metodologia
+    Cobertura
+      BASE_FEDERAL
+      PARCIAL_UF
+      COMPLETA
+    Plataforma
+      Backend FastAPI Python
+      Frontend Next.js React Leaflet
+      Auth multi-tenant
+      Docker Compose
+      AWS Lightsail
+      Fluxo dev main AWS
+    </pre>
+  </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', maxTextSize: 200000 });
+  </script>
+</body>
+</html>
