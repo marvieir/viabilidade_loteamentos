@@ -461,6 +461,7 @@ export interface ParcelaFundiaria {
 }
 export interface MalhaFundiaria {
   consultado: boolean;
+  na_cobertura: boolean;
   parcelas: ParcelaFundiaria[];
   n_parcelas: number;
   cobertura_pct: number | null;

@@ -278,6 +278,7 @@ class MalhaFundiariaOut(BaseModel):
     """Malha fundiária (INCRA — SIGEF/SNCI) incidente. null se a fonte não foi configurada."""
 
     consultado: bool
+    na_cobertura: bool = True  # False = gleba fora do footprint dos dados SIGEF carregados
     parcelas: list[ParcelaFundiariaOut] = []
     n_parcelas: int = 0
     cobertura_pct: Optional[float] = None  # % da gleba já coberto por parcela registrada

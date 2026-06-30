@@ -69,6 +69,7 @@ def analisar_ambiental(
         rm = fonte_malha.identificar(gleba)
         malha_out = schemas.MalhaFundiariaOut(
             consultado=rm.consultado,
+            na_cobertura=rm.na_cobertura,
             parcelas=[
                 schemas.ParcelaFundiariaOut(
                     codigo=p.codigo,

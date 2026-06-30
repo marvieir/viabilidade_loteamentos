@@ -47,9 +47,10 @@ class ParcelaInfo:
 @dataclass
 class ResultadoMalha:
     consultado: bool
+    na_cobertura: bool  # gleba dentro do footprint dos dados carregados (vs. UF sem dado)
     parcelas: list[ParcelaInfo]
     n_parcelas: int
-    cobertura_pct: Optional[float]  # % da gleba sobreposto por parcela registrada
+    cobertura_pct: Optional[float]  # % da gleba sobreposto por parcela registrada (None se fora)
     geojson: Optional[dict]  # MultiPolygon das parcelas (WGS84) para overlay
     fonte: Optional[str]
     avisos: list[str] = field(default_factory=list)
@@ -89,6 +90,35 @@ def _resolver_arquivos(path: str) -> list[str]:
     return [a for a in arquivos if not (a in vistos or vistos.add(a))]
 
 
+def _extent_wgs84(path: str) -> Optional[tuple]:
+    """Footprint (minx,miny,maxx,maxy) do arquivo em WGS84, lido do CABEÇALHO (barato —
+    não varre feições). Serve p/ saber se a gleba cai na cobertura e p/ pular arquivos
+    de outros estados. None se não der pra determinar (aí o arquivo é lido por garantia)."""
+    try:
+        from pyogrio import read_info
+
+        info = read_info(path)
+    except Exception:  # noqa: BLE001
+        return None
+    tb = info.get("total_bounds")
+    if tb is None or len(tb) != 4 or any(v is None for v in tb):
+        return None
+    tb = tuple(float(v) for v in tb)
+    crs = info.get("crs")
+    from app.core.camadas_inde import _e_wgs84, _reproj_bbox
+
+    if crs and not _e_wgs84(crs):
+        from pyproj import Transformer
+
+        tr = Transformer.from_crs(crs, "EPSG:4326", always_xy=True)
+        return _reproj_bbox(tb, tr)
+    return tb
+
+
+def _bbox_intersecta(a: tuple, b: tuple) -> bool:
+    return not (a[2] < b[0] or b[2] < a[0] or a[3] < b[1] or b[3] < a[1])
+
+
 def _num(s: Optional[str]) -> Optional[float]:
     """Converte texto de área (pt-BR ou en) para float; None se não der."""
     if s is None:
@@ -119,31 +149,57 @@ class FonteMalhaFundiariaArquivo:
         arquivos = _resolver_arquivos(self.path)
         if not arquivos:
             return ResultadoMalha(
-                False, [], 0, None, None, FONTE_INCRA,
+                False, False, [], 0, None, None, FONTE_INCRA,
                 avisos=[f"Malha fundiária: nenhum arquivo vetorial em '{self.path}'."],
             )
 
-        # Lê cada arquivo (ex.: um shapefile SIGEF por UF) na janela da gleba. Só o estado
-        # da gleba retorna parcelas; os demais voltam vazios (leitura por janela é barata).
+        # Pré-filtra por FOOTPRINT (cabeçalho, barato): só lê o arquivo do estado em que a gleba
+        # cai — pular MG/PR/… quando a gleba é de SP evita varrer shapefiles de centenas de MB.
+        # Footprint indeterminado → lê por garantia (não dá pra afirmar cobertura).
+        bbox = gleba.bounds
+        ler: list[str] = []
+        cobertura_conhecida = False
+        for arq in arquivos:
+            ext = _extent_wgs84(arq)
+            if ext is None:
+                ler.append(arq)  # sem footprint legível: lê assim mesmo
+            else:
+                cobertura_conhecida = True
+                if _bbox_intersecta(ext, bbox):
+                    ler.append(arq)
+
+        # Gleba fora de TODOS os footprints conhecidos → fora da cobertura carregada.
+        # Honestidade (regra 5): não é "0 parcelas" — é "não temos o dado desta UF".
+        na_cobertura = bool(ler) or not cobertura_conhecida
+        if cobertura_conhecida and not ler:
+            return ResultadoMalha(
+                True, False, [], 0, None, None, FONTE_INCRA,
+                avisos=[
+                    "Gleba fora da cobertura de dados SIGEF carregada — a malha fundiária "
+                    "não foi avaliada aqui. Carregue o SIGEF da UF correspondente."
+                ],
+            )
+
+        # Lê a janela da gleba só nos arquivos relevantes.
         feats: list = []
         falhas: list[str] = []
-        for arq in arquivos:
+        for arq in ler:
             try:
-                feats.extend(_ler_vetor_local_bbox(arq, gleba.bounds))
+                feats.extend(_ler_vetor_local_bbox(arq, bbox))
             except Exception as exc:  # noqa: BLE001 — um arquivo ruim não derruba os outros
                 falhas.append(f"{os.path.basename(arq)} ({type(exc).__name__})")
 
         if not feats:
             avisos = ["Nenhuma parcela georreferenciada (SIGEF/SNCI) na janela da gleba."]
-            if falhas and len(falhas) == len(arquivos):
+            if falhas and len(falhas) == len(ler):
                 # Todos falharam → não é "ausência", é indisponibilidade (degrada honesto).
                 return ResultadoMalha(
-                    False, [], 0, None, None, FONTE_INCRA,
+                    False, na_cobertura, [], 0, None, None, FONTE_INCRA,
                     avisos=[f"Malha fundiária indisponível — falha ao ler: {', '.join(falhas)}"[:180]],
                 )
             if falhas:
                 avisos.append(f"Arquivos não lidos: {', '.join(falhas)}.")
-            return ResultadoMalha(True, [], 0, 0.0, None, FONTE_INCRA, avisos=avisos)
+            return ResultadoMalha(True, na_cobertura, [], 0, 0.0, None, FONTE_INCRA, avisos=avisos)
 
         c = gleba.centroid
         proj4 = (
@@ -183,7 +239,7 @@ class FonteMalhaFundiariaArquivo:
 
         if not parcelas:
             return ResultadoMalha(
-                True, [], 0, 0.0, None, FONTE_INCRA,
+                True, na_cobertura, [], 0, 0.0, None, FONTE_INCRA,
                 avisos=["Nenhuma parcela registrada intersecta a gleba."],
             )
 
@@ -206,6 +262,7 @@ class FonteMalhaFundiariaArquivo:
 
         return ResultadoMalha(
             consultado=True,
+            na_cobertura=na_cobertura,
             parcelas=parcelas,
             n_parcelas=len(parcelas),
             cobertura_pct=cobertura_pct,

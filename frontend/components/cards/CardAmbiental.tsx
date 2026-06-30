@@ -117,7 +117,12 @@ export function CardAmbiental({
                     </span>
                   )}
                 </div>
-                {data.malha_fundiaria.n_parcelas > 0 ? (
+                {!data.malha_fundiaria.na_cobertura ? (
+                  <p className="rounded bg-amber-50 p-2 text-xs text-amber-900">
+                    Gleba fora da cobertura de dados SIGEF carregada — a malha fundiária não foi
+                    avaliada nesta UF. Carregue o SIGEF do estado correspondente.
+                  </p>
+                ) : data.malha_fundiaria.n_parcelas > 0 ? (
                   <>
                     <p className="text-slate-700">
                       {data.malha_fundiaria.n_parcelas}{" "}
