@@ -20,6 +20,7 @@ export type Secao =
   | "declividade"
   | "aproveitamento"
   | "urbanismo"
+  | "custo"
   | "conformidade"
   | "juridico"
   | "financeira"
@@ -38,6 +39,7 @@ export const SECOES: {
   { id: "declividade", rotulo: "Declividade", Icone: IconDeclividade },
   { id: "aproveitamento", rotulo: "Aproveitamento", Icone: IconAproveitamento },
   { id: "urbanismo", rotulo: "Urbanismo (IA)", Icone: IconUrbanismo },
+  { id: "custo", rotulo: "Custo (infra)", Icone: IconFinanceira },
   { id: "conformidade", rotulo: "Conformidade", Icone: IconConformidade },
   { id: "juridico", rotulo: "Jurídico", Icone: IconJuridico },
   { id: "financeira", rotulo: "Financeira", Icone: IconFinanceira },

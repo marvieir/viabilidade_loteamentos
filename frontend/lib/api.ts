@@ -1664,3 +1664,106 @@ export async function listarUrbanismo(
   const res = await apiFetch(`/api/analises/${analiseId}/urbanismo`);
   return jsonOrThrow(res);
 }
+
+// ===== Tier 3 — Motor de custo de infraestrutura (paramétrico por disciplina) =====
+export interface BaseOpcao {
+  chave: string;
+  rotulo: string;
+}
+export interface DisciplinaCustoConfig {
+  chave: string;
+  rotulo: string;
+  base: string;
+  base_rotulo: string;
+  ancora: string;
+  bases_disponiveis: BaseOpcao[];
+  custo_economico: number | null;
+  custo_medio: number | null;
+  custo_alto: number | null;
+}
+export interface PerfilCustos {
+  bdi_pct: number;
+  data_referencia: string | null;
+  uf: string | null;
+  fonte: string | null;
+  observacao: string | null;
+  padroes: BaseOpcao[];
+  disciplinas: DisciplinaCustoConfig[];
+  configurado: boolean;
+}
+export interface DisciplinaCustoIn {
+  chave: string;
+  base: string;
+  custo_economico: number | null;
+  custo_medio: number | null;
+  custo_alto: number | null;
+}
+export interface PerfilCustosIn {
+  bdi_pct: number;
+  data_referencia?: string | null;
+  uf?: string | null;
+  fonte?: string | null;
+  observacao?: string | null;
+  disciplinas: DisciplinaCustoIn[];
+}
+export interface DisciplinaCusto {
+  chave: string;
+  rotulo: string;
+  base: string;
+  base_rotulo: string;
+  ancora: string;
+  unidade: string;
+  quantidade: number | null;
+  quantidade_fmt: string | null;
+  custo_unitario: number | null;
+  custo_unitario_fmt: string | null;
+  subtotal: number | null;
+  subtotal_fmt: string | null;
+  preenchido: boolean;
+  aviso: string | null;
+}
+export interface CustoInfra {
+  padrao: string;
+  padrao_rotulo: string;
+  cobertura: "COMPLETA" | "PARCIAL" | "INDISPONIVEL";
+  disciplinas: DisciplinaCusto[];
+  subtotal_direto: number | null;
+  subtotal_direto_fmt: string | null;
+  bdi_pct: number;
+  bdi_valor: number | null;
+  bdi_valor_fmt: string | null;
+  total: number | null;
+  total_fmt: string | null;
+  custo_por_lote: number | null;
+  custo_por_lote_fmt: string | null;
+  custo_por_m2: number | null;
+  custo_por_m2_fmt: string | null;
+  n_lotes: number | null;
+  area_urbanizada_m2: number | null;
+  proveniencia: string;
+  avisos: string[];
+}
+
+export async function obterPerfilCustos(): Promise<PerfilCustos> {
+  const res = await apiFetch(`/api/perfil-custos`);
+  return jsonOrThrow(res);
+}
+export async function salvarPerfilCustos(
+  body: PerfilCustosIn
+): Promise<PerfilCustos> {
+  const res = await apiFetch(`/api/perfil-custos`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return jsonOrThrow(res);
+}
+export async function calcularCustoInfra(
+  analiseId: string,
+  padrao: string
+): Promise<CustoInfra> {
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/custo-infra?padrao=${encodeURIComponent(padrao)}`
+  );
+  return jsonOrThrow(res);
+}

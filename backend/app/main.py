@@ -33,6 +33,7 @@ from app.routers import (
     areas_umidas,
     auth,
     conformidade,
+    custo_infra,
     declividade,
     economica,
     financeira,
@@ -116,6 +117,7 @@ app.include_router(economica.router, prefix="/api")
 app.include_router(localizacao.router, prefix="/api")
 app.include_router(laudo.router, prefix="/api")
 app.include_router(urbanismo.router, prefix="/api")
+app.include_router(custo_infra.router, prefix="/api")
 
 
 @app.get("/health")

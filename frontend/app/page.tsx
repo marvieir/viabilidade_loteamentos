@@ -14,6 +14,7 @@ import { MapHero } from "@/components/dashboard/MapHero";
 import { VisaoGeral } from "@/components/dashboard/VisaoGeral";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
 import { CardUrbanismo } from "@/components/cards/CardUrbanismo";
+import { CardCustoInfra } from "@/components/cards/CardCustoInfra";
 import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
 import { CardVegetacao } from "@/components/cards/CardVegetacao";
@@ -375,6 +376,9 @@ export default function Home() {
                 perfil={perfil}
                 declividade={dadosDecliv}
               />
+            </div>
+            <div className={secao === "custo" ? "" : "hidden"}>
+              <CardCustoInfra analiseId={analise.analise_id} sinal={sinal} />
             </div>
             <div className={secao === "conformidade" ? "" : "hidden"}>
               <CardConformidade

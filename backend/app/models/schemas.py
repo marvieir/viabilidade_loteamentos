@@ -1594,3 +1594,96 @@ class AdminClienteOut(BaseModel):
     n_analises: int
     cidades: list[str]
     ufs: list[str]
+
+
+# ===== Tier 3 — Motor de custo de infraestrutura (paramétrico por disciplina) =====
+# Determinístico: quantidades vêm do layout de Urbanismo; custos unitários vêm do
+# perfil de custos PREENCHIDO PELO OPERADOR (proveniência própria). Indexado por padrão
+# (econômico/médio/alto). Degrada honesto: sem perfil/sem layout → cobertura INDISPONIVEL.
+
+class BaseOpcaoOut(BaseModel):
+    chave: str
+    rotulo: str
+
+
+class DisciplinaCustoIn(BaseModel):
+    chave: str
+    base: str
+    custo_economico: Optional[float] = None
+    custo_medio: Optional[float] = None
+    custo_alto: Optional[float] = None
+
+
+class PerfilCustosIn(BaseModel):
+    """Tabela de custos GLOBAL do operador (preenche uma vez; vale para todas as análises)."""
+
+    bdi_pct: float = 0.0
+    data_referencia: Optional[str] = None
+    uf: Optional[str] = None
+    fonte: Optional[str] = None
+    observacao: Optional[str] = None
+    disciplinas: list[DisciplinaCustoIn] = []
+
+
+class DisciplinaCustoConfigOut(BaseModel):
+    """Uma disciplina no editor do perfil (config + valores por padrão)."""
+
+    chave: str
+    rotulo: str
+    base: str
+    base_rotulo: str
+    ancora: str
+    bases_disponiveis: list[BaseOpcaoOut] = []
+    custo_economico: Optional[float] = None
+    custo_medio: Optional[float] = None
+    custo_alto: Optional[float] = None
+
+
+class PerfilCustosOut(BaseModel):
+    bdi_pct: float = 0.0
+    data_referencia: Optional[str] = None
+    uf: Optional[str] = None
+    fonte: Optional[str] = None
+    observacao: Optional[str] = None
+    padroes: list[BaseOpcaoOut] = []  # [{economico, Econômico}, ...]
+    disciplinas: list[DisciplinaCustoConfigOut] = []
+    configurado: bool = False  # já tem ao menos um custo preenchido
+
+
+class DisciplinaCustoOut(BaseModel):
+    chave: str
+    rotulo: str
+    base: str
+    base_rotulo: str
+    ancora: str
+    unidade: str  # unidade da quantidade (m², m, lote, %)
+    quantidade: Optional[float] = None
+    quantidade_fmt: Optional[str] = None
+    custo_unitario: Optional[float] = None
+    custo_unitario_fmt: Optional[str] = None
+    subtotal: Optional[float] = None
+    subtotal_fmt: Optional[str] = None
+    preenchido: bool = False
+    aviso: Optional[str] = None
+
+
+class CustoInfraOut(BaseModel):
+    padrao: str
+    padrao_rotulo: str
+    cobertura: str  # COMPLETA | PARCIAL | INDISPONIVEL
+    disciplinas: list[DisciplinaCustoOut] = []
+    subtotal_direto: Optional[float] = None
+    subtotal_direto_fmt: Optional[str] = None
+    bdi_pct: float = 0.0
+    bdi_valor: Optional[float] = None
+    bdi_valor_fmt: Optional[str] = None
+    total: Optional[float] = None
+    total_fmt: Optional[str] = None
+    custo_por_lote: Optional[float] = None
+    custo_por_lote_fmt: Optional[str] = None
+    custo_por_m2: Optional[float] = None
+    custo_por_m2_fmt: Optional[str] = None
+    n_lotes: Optional[int] = None
+    area_urbanizada_m2: Optional[float] = None
+    proveniencia: str = ""
+    avisos: list[str] = []
