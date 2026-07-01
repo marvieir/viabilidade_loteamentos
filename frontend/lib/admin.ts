@@ -43,3 +43,29 @@ export async function obterMetricas(): Promise<AdminMetricas> {
 export async function listarClientes(): Promise<AdminCliente[]> {
   return apiFetch("/api/admin/clientes").then(jsonOrThrow);
 }
+
+// Custo real de LLM medido (tokens de verdade), por análise/dimensão/modelo.
+export interface CustoLinha {
+  chave: string;
+  rotulo: string | null;
+  chamadas: number;
+  custo_usd: number;
+  custo_brl: number;
+  detalhe: Record<string, number>;
+}
+export interface AdminCustos {
+  n_registros: number;
+  total_usd: number;
+  total_brl: number;
+  usd_brl: number;
+  modelo_nao_tabelado: number;
+  por_modelo: CustoLinha[];
+  por_dimensao: CustoLinha[];
+  por_analise: CustoLinha[];
+  luos_por_municipio: CustoLinha[];
+  avisos: string[];
+}
+
+export async function obterCustos(): Promise<AdminCustos> {
+  return apiFetch("/api/admin/custos").then(jsonOrThrow);
+}

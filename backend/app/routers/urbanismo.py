@@ -22,6 +22,7 @@ from shapely.ops import transform, unary_union
 from app.core import conexao as conexao_mod
 from app.core import urbanismo_geom as geom
 from app.core import urbanismo_medida as medida
+from app.core import uso_llm
 from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.declividade import FonteDEM, amostrar_declividade, get_fonte_dem
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
@@ -278,7 +279,10 @@ def propor(
         "municipio": getattr(registro["jurisdicao"], "municipio", None),
     }
     try:
-        prog = gerador.propor(contexto, body.tipo_loteamento, body.publico_alvo, body.overrides)
+        with uso_llm.contexto(
+            "urbanismo", analise_id=analise_id, usuario_id=str(registro.get("usuario_id", ""))
+        ):
+            prog = gerador.propor(contexto, body.tipo_loteamento, body.publico_alvo, body.overrides)
     except GeradorIndisponivel as exc:
         raise HTTPException(503, str(exc))
 

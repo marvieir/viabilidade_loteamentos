@@ -245,6 +245,11 @@ class ExtratorLUOSClaude:
                 "Revise manualmente."
             ) from exc
 
+        # Mede o custo real desta chamada (tokens de verdade), atribuído à análise/município.
+        from app.core import uso_llm
+
+        uso_llm.registrar(self.modelo, getattr(resp, "usage", None))
+
         # Saída estruturada: pega o bloco tool_use (já é dict). Fallback: JSON em texto.
         bruto = next(
             (b.input for b in resp.content if getattr(b, "type", None) == "tool_use"),

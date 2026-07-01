@@ -21,7 +21,9 @@ from app.core.extrator_luos import (
     get_extrator_luos,
 )
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
+from app.core import uso_llm
 from app.models import schemas
+from app.models.db_models import Usuario
 
 from app.core.auth import usuario_atual
 router = APIRouter(dependencies=[Depends(usuario_atual)])
@@ -60,6 +62,7 @@ async def extrair_perfil(
     municipio: str | None = None,
     uf: str | None = None,
     extrator: ExtratorLUOS | None = Depends(get_extrator_luos),
+    usuario: Usuario = Depends(usuario_atual),
 ):
     """Dispara a extração assistida (LLM lê o PDF e PROPÕE). Devolve um RASCUNHO
     (``status='proposto'``) — NÃO persiste e NÃO entra no cálculo até o PUT confirmar."""
@@ -73,9 +76,10 @@ async def extrair_perfil(
     if not conteudo:
         raise HTTPException(422, "PDF vazio.")
     try:
-        perfil = extrator.extrair(
-            conteudo, cod_ibge, municipio, uf, nome_arquivo=pdf.filename
-        )
+        with uso_llm.contexto("luos", cod_ibge=cod_ibge, usuario_id=str(usuario.id)):
+            perfil = extrator.extrair(
+                conteudo, cod_ibge, municipio, uf, nome_arquivo=pdf.filename
+            )
     except PdfIlegivel as exc:
         raise HTTPException(422, str(exc))
     except ExtratorIndisponivel as exc:

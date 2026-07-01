@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from app.core.uploads import ler_upload_limitado
 from app.core import juridico_documental as nucleo
 from app.core import juridico_checklist as checklist
+from app.core import uso_llm
 from app.core.alertas_geo import ProvedorAlertasGeo, get_provedor_alertas_geo
 from app.core.extrator_documento import (
     MEDIA_SUPORTADAS,
@@ -80,7 +81,7 @@ async def extrair_juridico(
     """Dispara a extração assistida (LLM lê o documento e PROPÕE). Aceita **PDF ou imagens**
     (JPEG/PNG/WEBP) e **múltiplos arquivos** (matrícula escaneada multipágina = N imagens de
     um mesmo documento). Devolve RASCUNHO (``status='proposto'``) — NÃO persiste até o PUT."""
-    _exige_analise(analise_id)
+    registro = _exige_analise(analise_id)
     if extrator is None:
         raise HTTPException(
             503,
@@ -104,7 +105,10 @@ async def extrair_juridico(
         raise HTTPException(422, "Documento vazio.")
     nome = documentos[0].filename if documentos else None
     try:
-        ficha = extrator.extrair(arquivos, tipo, nome_arquivo=nome)
+        with uso_llm.contexto(
+            "juridico", analise_id=analise_id, usuario_id=str(registro.get("usuario_id", ""))
+        ):
+            ficha = extrator.extrair(arquivos, tipo, nome_arquivo=nome)
     except PdfIlegivel as exc:
         raise HTTPException(422, str(exc))
     except ExtratorIndisponivel as exc:

@@ -9,8 +9,10 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   listarClientes,
+  obterCustos,
   obterMetricas,
   type AdminCliente,
+  type AdminCustos,
   type AdminMetricas,
 } from "@/lib/admin";
 
@@ -26,6 +28,7 @@ function PainelAdmin() {
   const { usuario, sair } = useAuth();
   const [metricas, setMetricas] = useState<AdminMetricas | null>(null);
   const [clientes, setClientes] = useState<AdminCliente[]>([]);
+  const [custos, setCustos] = useState<AdminCustos | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
 
@@ -38,9 +41,14 @@ function PainelAdmin() {
     }
     (async () => {
       try {
-        const [m, c] = await Promise.all([obterMetricas(), listarClientes()]);
+        const [m, c, cu] = await Promise.all([
+          obterMetricas(),
+          listarClientes(),
+          obterCustos(),
+        ]);
         setMetricas(m);
         setClientes(c);
+        setCustos(cu);
       } catch (e) {
         setErro(e instanceof Error ? e.message : "Falha ao carregar o painel.");
       } finally {
@@ -161,17 +169,139 @@ function PainelAdmin() {
             </section>
           </>
         )}
+
+        {custos && <SecaoCustos c={custos} />}
       </main>
     </div>
   );
 }
 
-function Cartao({ titulo, valor }: { titulo: string; valor: number }) {
+const brl = (v: number) =>
+  v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function SecaoCustos({ c }: { c: AdminCustos }) {
+  const custoMedio =
+    c.por_analise.length > 0
+      ? c.por_analise.reduce((s, l) => s + l.custo_brl, 0) / c.por_analise.length
+      : 0;
+  return (
+    <section className="space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h2 className="text-sm font-semibold text-slate-700">
+          Custo real de LLM (medido — tokens de verdade)
+        </h2>
+        <span className="text-[11px] text-slate-400">
+          câmbio US$ {c.usd_brl.toLocaleString("pt-BR")} · {c.n_registros} chamadas
+        </span>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Cartao titulo="Custo total (R$)" valor={c.total_brl} moeda />
+        <Cartao titulo="Análises medidas" valor={c.por_analise.length} />
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Custo médio por análise</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+            {brl(custoMedio)}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">Urbanismo IA + Jurídico</p>
+        </div>
+      </div>
+
+      {c.avisos.length > 0 && (
+        <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
+          {c.avisos.map((a) => (
+            <p key={a}>{a}</p>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TabelaCusto titulo="Por dimensão" linhas={c.por_dimensao} />
+        <TabelaCusto titulo="Por modelo" linhas={c.por_modelo} />
+      </div>
+
+      <TabelaCusto
+        titulo="Por análise (Urbanismo IA + Jurídico)"
+        linhas={c.por_analise}
+        larga
+      />
+      <TabelaCusto
+        titulo="LUOS por município (custo único, amortizado entre análises da cidade)"
+        linhas={c.luos_por_municipio}
+        larga
+      />
+    </section>
+  );
+}
+
+function TabelaCusto({
+  titulo,
+  linhas,
+  larga,
+}: {
+  titulo: string;
+  linhas: { chave: string; chamadas: number; custo_brl: number; custo_usd: number }[];
+  larga?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <h3 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+        {titulo}
+      </h3>
+      {linhas.length === 0 ? (
+        <p className="px-4 py-3 text-sm text-slate-400">Sem medições ainda.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-[11px] uppercase tracking-wide text-slate-400">
+              <tr>
+                <th className="px-4 py-2 font-medium">{larga ? "Chave" : "Item"}</th>
+                <th className="px-4 py-2 font-medium">Chamadas</th>
+                <th className="px-4 py-2 text-right font-medium">Custo (R$)</th>
+                <th className="px-4 py-2 text-right font-medium">US$</th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhas.map((l) => (
+                <tr key={l.chave} className="border-t border-slate-100">
+                  <td
+                    className={`px-4 py-2 text-slate-700 ${larga ? "font-mono text-xs" : ""}`}
+                  >
+                    {larga ? l.chave : l.chave}
+                  </td>
+                  <td className="px-4 py-2 text-slate-600">{l.chamadas}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-slate-900">
+                    {brl(l.custo_brl)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-slate-500">
+                    {l.custo_usd.toLocaleString("pt-BR", { maximumFractionDigits: 3 })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Cartao({
+  titulo,
+  valor,
+  moeda,
+}: {
+  titulo: string;
+  valor: number;
+  moeda?: boolean;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <p className="text-sm text-slate-500">{titulo}</p>
       <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-        {valor.toLocaleString("pt-BR")}
+        {moeda
+          ? valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+          : valor.toLocaleString("pt-BR")}
       </p>
     </div>
   );

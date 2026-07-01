@@ -7,6 +7,7 @@ Só leitura — o admin observa o uso da plataforma, não mexe em análise de cl
 
 from __future__ import annotations
 
+import os
 from collections import Counter
 from datetime import datetime, timezone
 
@@ -15,10 +16,96 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import requer_admin
 from app.core.db import get_db
+from app.core import uso_llm
 from app.models import schemas
 from app.models.db_models import Analise, Usuario
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _agrupar(registros: list[dict], chave: str, usd_brl: float) -> list[schemas.CustoLinhaOut]:
+    """Agrupa registros por uma chave (modelo/dimensao/analise_id/cod_ibge), recalculando o
+    custo com a tabela de preços ATUAL (não o custo gravado no passado)."""
+    acc: dict[str, dict] = {}
+    for r in registros:
+        k = str(r.get(chave) or "")
+        if not k:
+            continue
+        c_usd = uso_llm.custo_usd(
+            r.get("modelo", ""),
+            int(r.get("input_tokens", 0) or 0),
+            int(r.get("output_tokens", 0) or 0),
+            int(r.get("cache_read_tokens", 0) or 0),
+        )
+        a = acc.setdefault(k, {"chamadas": 0, "usd": 0.0, "det": {}})
+        a["chamadas"] += 1
+        a["usd"] += c_usd or 0.0
+        dim = str(r.get("dimensao") or "?")
+        a["det"][dim] = round(a["det"].get(dim, 0.0) + (c_usd or 0.0) * usd_brl, 4)
+    linhas = [
+        schemas.CustoLinhaOut(
+            chave=k,
+            chamadas=v["chamadas"],
+            custo_usd=round(v["usd"], 4),
+            custo_brl=round(v["usd"] * usd_brl, 2),
+            detalhe=v["det"],
+        )
+        for k, v in acc.items()
+    ]
+    return sorted(linhas, key=lambda x: x.custo_brl, reverse=True)
+
+
+@router.get("/custos", response_model=schemas.AdminCustosOut)
+def custos(_admin: Usuario = Depends(requer_admin)) -> schemas.AdminCustosOut:
+    """Custo REAL de LLM medido (tokens de verdade) — por análise, dimensão e modelo.
+
+    LUOS é por município (compartilhada entre análises da cidade) — sai numa seção própria.
+    Urbanismo + Jurídico são por análise. O custo é recalculado com a tabela de preços atual.
+    """
+    registros = uso_llm.ler_registros()
+    usd_brl = float(os.getenv("USD_BRL", "5.5") or 5.5)
+
+    total_usd = 0.0
+    nao_tabelado = 0
+    for r in registros:
+        c = uso_llm.custo_usd(
+            r.get("modelo", ""),
+            int(r.get("input_tokens", 0) or 0),
+            int(r.get("output_tokens", 0) or 0),
+            int(r.get("cache_read_tokens", 0) or 0),
+        )
+        if c is None:
+            nao_tabelado += 1
+        else:
+            total_usd += c
+
+    por_analise = [r for r in registros if r.get("dimensao") in ("urbanismo", "juridico")]
+    luos = [r for r in registros if r.get("dimensao") == "luos"]
+
+    avisos: list[str] = []
+    if not registros:
+        avisos.append(
+            "Nenhuma medição ainda — o custo é registrado quando você roda Urbanismo IA, "
+            "Jurídico (extração) ou extrai um perfil LUOS. Rode uma análise completa para popular."
+        )
+    if nao_tabelado:
+        avisos.append(
+            f"{nao_tabelado} chamada(s) com modelo fora da tabela de preços (ex.: fallback Gemini) "
+            "— não entram no custo em R$."
+        )
+
+    return schemas.AdminCustosOut(
+        n_registros=len(registros),
+        total_usd=round(total_usd, 4),
+        total_brl=round(total_usd * usd_brl, 2),
+        usd_brl=usd_brl,
+        modelo_nao_tabelado=nao_tabelado,
+        por_modelo=_agrupar(registros, "modelo", usd_brl),
+        por_dimensao=_agrupar(registros, "dimensao", usd_brl),
+        por_analise=_agrupar(por_analise, "analise_id", usd_brl),
+        luos_por_municipio=_agrupar(luos, "cod_ibge", usd_brl),
+        avisos=avisos,
+    )
 
 
 @router.get("/metricas", response_model=schemas.AdminMetricasOut)

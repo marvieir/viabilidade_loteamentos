@@ -408,6 +408,10 @@ class GeradorProgramaClaude:
             if ultimo_erro is not None:
                 raise ultimo_erro  # compositor decide: próximo provedor ou preset
             return None
+        # Mede o custo real desta chamada (tokens de verdade), atribuído à análise.
+        from app.core import uso_llm
+
+        uso_llm.registrar(self.modelo_usado, getattr(resp, "usage", None))
         bruto = next(
             (b.input for b in resp.content if getattr(b, "type", None) == "tool_use"), None
         )

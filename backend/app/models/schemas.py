@@ -1687,3 +1687,26 @@ class CustoInfraOut(BaseModel):
     area_urbanizada_m2: Optional[float] = None
     proveniencia: str = ""
     avisos: list[str] = []
+
+
+# ===== Admin — custo real de LLM por análise (instrumentação uso_llm) =====
+class CustoLinhaOut(BaseModel):
+    chave: str  # analise_id | cod_ibge | modelo | dimensao
+    rotulo: Optional[str] = None
+    chamadas: int = 0
+    custo_usd: float = 0.0
+    custo_brl: float = 0.0
+    detalhe: dict = {}  # ex.: {"urbanismo": {...}, "juridico": {...}}
+
+
+class AdminCustosOut(BaseModel):
+    n_registros: int = 0
+    total_usd: float = 0.0
+    total_brl: float = 0.0
+    usd_brl: float = 5.5
+    modelo_nao_tabelado: int = 0  # chamadas sem preço na tabela (ex.: Gemini)
+    por_modelo: list[CustoLinhaOut] = []
+    por_dimensao: list[CustoLinhaOut] = []
+    por_analise: list[CustoLinhaOut] = []  # urbanismo + jurídico, por análise
+    luos_por_municipio: list[CustoLinhaOut] = []
+    avisos: list[str] = []
