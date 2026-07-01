@@ -1570,6 +1570,9 @@ class AnaliseResumoOut(BaseModel):
     area_ha: Optional[float] = None
     criada_em: str
     atualizada_em: str
+    # Contorno da gleba normalizado (viewBox 0..100, y invertido) p/ a miniatura do card —
+    # calculado no backend (§2: o front só desenha os pontos).
+    silhueta: Optional[list[list[list[float]]]] = None
 
 
 class AnaliseDetalheOut(AnaliseResumoOut):

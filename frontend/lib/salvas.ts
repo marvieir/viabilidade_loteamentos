@@ -13,6 +13,8 @@ export interface AnaliseResumo {
   area_ha: number | null;
   criada_em: string;
   atualizada_em: string;
+  // Contorno da gleba normalizado (0..100, pronto p/ SVG) — vem do backend; o front só desenha.
+  silhueta?: number[][][] | null;
 }
 
 export interface AnaliseDetalhe extends AnaliseResumo {

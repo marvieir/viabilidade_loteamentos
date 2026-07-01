@@ -243,6 +243,7 @@ export default function Home() {
       <TopBar
         analise={analise}
         onNova={() => onAnalise(null)}
+        onMinhas={() => onAnalise(null)}
         onAnalisarTudo={analisarTudo}
         analisando={analisandoTudo}
         onLaudo={onLaudo}
@@ -444,30 +445,34 @@ function UploadHero({
   recarregar: number;
 }) {
   return (
-    <main className="mx-auto grid max-w-3xl gap-8 px-4 py-16 sm:py-24">
-      <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
-          <IconMap width={28} height={28} />
+    <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 sm:py-10">
+      {/* Faixa de nova análise — CTA claro, sem ocupar a tela toda */}
+      <div className="flex flex-col items-center gap-5 rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm sm:flex-row sm:text-left">
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+          <IconMap width={24} height={24} />
         </div>
-        <h1 className="mt-5 text-2xl font-bold tracking-tight">
-          Pré-Viabilidade de Loteamento
-        </h1>
-        <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">
-          Envie o KMZ da gleba para uma triagem determinística: geometria, ambiental,
-          área verde, declividade e aproveitamento — cada número com proveniência. Não
-          decide aprovação municipal.
-        </p>
-        <div className="mt-6 flex justify-center">
+        <div className="min-w-0 flex-1">
+          <h1 className="text-lg font-bold tracking-tight">Analisar uma nova gleba</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Envie o KMZ para a triagem determinística — geometria, ambiental, declividade,
+            aproveitamento, urbanismo e financeiro, cada número com proveniência.{" "}
+            <span className="text-slate-400">
+              2+ KMZ vizinhos = projeto único (união geométrica).
+            </span>
+          </p>
+        </div>
+        <div className="shrink-0">
           <UploadKmz onAnalise={onAnalise} />
         </div>
       </div>
 
       <section className="w-full">
-        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Minhas análises
-        </h2>
         <MinhasAnalises onCarregar={onCarregar} recarregar={recarregar} />
       </section>
+
+      <p className="text-center text-[11px] text-slate-400">
+        Ferramenta de pré-viabilidade/triagem — não decide aprovação municipal.
+      </p>
     </main>
   );
 }

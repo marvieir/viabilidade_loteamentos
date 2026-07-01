@@ -20,6 +20,7 @@ from app.core.db import get_db
 from app.core.auth import usuario_atual
 from app.core.jurisdicao import FonteMalha, get_fonte_malha, resolver_jurisdicao
 from app.core.juridico_store import FonteJuridica, get_fonte_juridica
+from app.core.silhueta import silhueta
 from app.core.store import STORE
 from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
 from app.models import schemas
@@ -39,6 +40,7 @@ def _resumo(a: Analise) -> schemas.AnaliseResumoOut:
         area_ha=a.area_ha,
         criada_em=a.criada_em.isoformat(),
         atualizada_em=a.atualizada_em.isoformat(),
+        silhueta=silhueta(a.gleba_geojson),
     )
 
 

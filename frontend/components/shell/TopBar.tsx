@@ -16,6 +16,7 @@ const ROTULO_COBERTURA: Record<string, string> = {
 export function TopBar({
   analise,
   onNova,
+  onMinhas,
   onAnalisarTudo,
   analisando,
   onLaudo,
@@ -28,6 +29,7 @@ export function TopBar({
 }: {
   analise: Analise | null;
   onNova: () => void;
+  onMinhas?: () => void; // volta ao workspace (lista de análises salvas)
   onAnalisarTudo: () => void;
   analisando?: boolean;
   onLaudo?: () => void;
@@ -54,14 +56,21 @@ export function TopBar({
 
   return (
     <header className="sticky top-0 z-[1100] flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-5">
-      {/* Marca */}
+      {/* Marca — clicável: volta ao workspace (padrão de produto) */}
       <div className="flex min-w-0 items-center gap-2.5">
-        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
-          <IconMap width={17} height={17} />
-        </div>
-        <p className="truncate text-sm font-bold tracking-tight">
-          Pré-Viabilidade <span className="hidden font-medium text-slate-400 md:inline">· Loteamento</span>
-        </p>
+        <button
+          type="button"
+          onClick={onMinhas}
+          title="Ir para Minhas análises"
+          className="flex min-w-0 items-center gap-2.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-slate-50"
+        >
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+            <IconMap width={17} height={17} />
+          </div>
+          <p className="truncate text-sm font-bold tracking-tight">
+            Pré-Viabilidade <span className="hidden font-medium text-slate-400 md:inline">· Loteamento</span>
+          </p>
+        </button>
         {/* Contexto da análise (gleba atual) */}
         {analise && (
           <div className="ml-1 hidden min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 lg:flex">
@@ -81,6 +90,12 @@ export function TopBar({
       <div className="flex shrink-0 items-center gap-2">
         {analise && (
           <>
+            {onMinhas && (
+              <Button variant="ghost" onClick={onMinhas} title="Voltar para a lista de análises salvas">
+                <span className="hidden sm:inline">Minhas análises</span>
+                <span className="sm:hidden">☰</span>
+              </Button>
+            )}
             <Button variant="secondary" onClick={onAnalisarTudo} disabled={analisando}>
               <IconPlay width={14} height={14} />
               <span className="hidden sm:inline">{analisando ? "Analisando…" : "Analisar tudo"}</span>
