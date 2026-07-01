@@ -14,6 +14,7 @@ Python puro. A Fase 9 NÃO altera nenhuma dimensão anterior (cenário aditivo).
 
 from __future__ import annotations
 
+import os
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -244,6 +245,17 @@ def propor(
             503,
             "Geração de estudo de massa indisponível (sem credencial de IA). "
             "Configure ANTHROPIC_API_KEY ou use o endpoint /medir com um layout pronto.",
+        )
+
+    # Cap suave de fair-use: cada geração é uma chamada de IA (custo + fila/rate-limit da org,
+    # compartilhada entre TODOS os usuários). Limite generoso por análise — o uso normal (ajustar
+    # lote_max algumas vezes) nunca encosta nele; barra loop/abuso. Não é cobrança, é proteção.
+    _max = int(os.getenv("URBANISMO_MAX_GERACOES", "30"))
+    if _max > 0 and len(fonte_urb.listar(analise_id)) >= _max:
+        raise HTTPException(
+            429,
+            f"Limite de regenerações do estudo de massa desta análise atingido ({_max}). "
+            "Reutilize um layout já gerado (ele fica salvo) ou fale com o suporte se precisar de mais.",
         )
 
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   proporUrbanismo,
+  listarUrbanismo,
   type ChaveOverlay,
   type ConformidadeLegal,
   type Declividade,
@@ -103,6 +104,28 @@ export function CardUrbanismo({
     if (!zona && zonas.length > 0) setZona(zonas[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil]);
+
+  // Ao abrir a análise, recarrega o ÚLTIMO layout já gerado (snapshot salvo no backend) —
+  // SEM chamar a IA. Só o botão "Regenerar" consome token. Evita refazer à toa (economia real).
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const lista = await listarUrbanismo(analiseId);
+        if (vivo && lista.length > 0) {
+          const ultima = lista[lista.length - 1];
+          setProposta(ultima);
+          onData?.(ultima);
+        }
+      } catch {
+        /* sem snapshot salvo → começa vazio, sem erro */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analiseId]);
 
   async function gerar() {
     setCarregando(true);
@@ -248,9 +271,19 @@ export function CardUrbanismo({
             className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
           />
           <Button onClick={gerar} disabled={carregando}>
-            {carregando ? "Gerando…" : "Gerar estudo de massa (IA)"}
+            {carregando
+              ? "Gerando…"
+              : proposta
+              ? "Regenerar (consome IA)"
+              : "Gerar estudo de massa (IA)"}
           </Button>
         </div>
+        {proposta && !carregando && (
+          <p className="-mt-1 text-[11px] text-slate-400">
+            Layout carregado do último salvo — não consumiu IA. Clique em “Regenerar” só se quiser
+            um novo traçado (aí sim consome).
+          </p>
+        )}
 
         {/* Fase 11.12 — VOCAÇÃO do terreno: a app sugere o perfil pela topografia e avisa conflito. */}
         {vocacao && (
