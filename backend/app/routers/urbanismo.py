@@ -327,6 +327,7 @@ def propor(
     # entrada — o motor põe a portaria no contato via-interna↔borda mais perto dele. Sem via/sem rede
     # → ``None`` e o motor usa o fallback (miolo loteado). Determinístico.
     acesso_externo_m = None
+    avisos_vias: list[str] = []
     if fonte_vias is not None:
         try:
             cob_vias = fonte_vias.vias(registro["poly"])
@@ -335,8 +336,20 @@ def propor(
                 gleba_m = transform(to_local, registro["poly"])
                 from shapely.ops import nearest_points
                 acesso_externo_m = nearest_points(gleba_m.boundary, vias_m)[0]
-        except Exception:  # noqa: BLE001 — vias são um PLUS; falha não derruba o urbanismo
+            else:
+                avisos_vias = list(cob_vias.avisos)
+        except Exception as exc:  # noqa: BLE001 — vias são um PLUS; falha não derruba o urbanismo
             acesso_externo_m = None
+            avisos_vias = [f"Vias do entorno indisponíveis ({type(exc).__name__})."]
+    if acesso_externo_m is None:
+        # NUNCA silencioso: sem via ancorada o pórtico usa o fallback (miolo loteado) e o usuário
+        # precisa saber que a posição não está de frente à via lindeira — e que regenerar resolve
+        # quando o OSM voltar (com o cache, a via fica gravada na 1ª consulta que responder).
+        avisos_vias.append(
+            "PÓRTICO SEM VIA ANCORADA: a via lindeira não foi obtida nesta geração "
+            "(OSM/Overpass indisponível ou sem via mapeada) — a portaria foi posicionada pelo "
+            "miolo do loteamento. Regenere o estudo para tentar ancorar à via de acesso real."
+        )
 
     layout = geom.gerar_layout(
         aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao, diretrizes=diretrizes,
@@ -391,6 +404,7 @@ def propor(
     proposta_id = f"u_{analise_id[:8]}_{versao:03d}"
     conformidade = _conformidade_programa(prog)
     avisos = [
+        *avisos_vias,
         *medida.AVISOS_1A,
         *layout.avisos,
         "Fidelidade: o quadro de áreas converge para o programa quando a gleba comporta; "

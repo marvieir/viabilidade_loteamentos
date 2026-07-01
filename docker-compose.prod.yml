@@ -45,6 +45,8 @@ services:
       USO_LLM_LOG: "/data/perfis/uso_llm/uso.jsonl"
       PERFIL_CUSTOS_DIR: "/data/perfis/custos"
       URBANISMO_DIR: "/data/perfis/urbanismo"
+      # Cache de vias OSM por gleba (pórtico) — persiste: 1 consulta por gleba, para sempre.
+      VIAS_CACHE_DIR: "/data/perfis/vias"
       FINANCEIRA_DIR: "/data/perfis/financeira"
       ECONOMICA_DIR: "/data/perfis/economica"
     volumes:

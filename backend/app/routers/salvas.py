@@ -19,7 +19,9 @@ from app.core import geometria
 from app.core.db import get_db
 from app.core.auth import usuario_atual
 from app.core.jurisdicao import FonteMalha, get_fonte_malha, resolver_jurisdicao
+from app.core.juridico_store import FonteJuridica, get_fonte_juridica
 from app.core.store import STORE
+from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
 from app.models import schemas
 from app.models.db_models import Analise, Usuario
 from app.routers.analises import _NS_ANALISE, _jurisdicao_to_schema
@@ -161,6 +163,8 @@ def carregar(
     usuario: Usuario = Depends(usuario_atual),
     db: Session = Depends(get_db),
     fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
+    fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
+    fonte_jur: FonteJuridica = Depends(get_fonte_juridica),
 ) -> schemas.AnaliseOut:
     """Reidrata a gleba no STORE (mesmo registro do upload) e devolve o shape de AnaliseOut,
     para o front recolocar a análise na tela. A partir daí o pipeline de dimensões funciona
@@ -180,11 +184,15 @@ def carregar(
     jur = resolver_jurisdicao(poly, fonte_malha)
     # Reidrata sob o MESMO id em que o trabalho foi feito (salvo no snapshot) — assim jurídico,
     # urbanismo, custos e financeira (stores por analise_id) reaparecem sem reprocessar. Análises
-    # antigas (sem o id salvo) caem no id derivado do a.id (comportamento anterior).
+    # antigas (sem o id salvo) caem no id derivado do a.id (comportamento anterior) — e o id usado
+    # é gravado de volta no registro (backfill), estabilizando os carregamentos futuros.
     origem = (a.resultados or {}).get("_analise_id") if isinstance(a.resultados, dict) else None
     novo_id = origem or str(
         uuid.uuid5(_NS_ANALISE, hashlib.sha256(a.id.encode("utf-8")).hexdigest())
     )
+    if not origem:
+        a.resultados = {**(a.resultados or {}), "_analise_id": novo_id}
+        db.commit()
     STORE[novo_id] = {
         "poly": poly,
         "area_m2": area,
@@ -192,6 +200,29 @@ def carregar(
         "jurisdicao": jur,
         "usuario_id": usuario.id,  # Fase 13 — registro do STORE escopado ao dono (guarda de acesso)
     }
+
+    # DIAGNÓSTICO VISÍVEL (nunca falhar mudo): conta o que existe vinculado a este id.
+    # Se a salva é antiga (sem vínculo) e não há dados, orienta a recuperação em vez de
+    # deixar o usuário achando que perdeu o trabalho / reprocessar pagando IA de novo.
+    avisos: list[str] = []
+    try:
+        n_urb = len(fonte_urb.listar(novo_id))
+        n_fichas = len(fonte_jur.carregar(novo_id))
+        if n_urb or n_fichas:
+            avisos.append(
+                f"Análise restaurada: {n_urb} estudo(s) de urbanismo e {n_fichas} ficha(s) "
+                "jurídica(s) revinculados — nada precisa ser reprocessado."
+            )
+        elif not origem:
+            avisos.append(
+                "ATENÇÃO: esta análise foi salva antes da atualização de persistência e o "
+                "urbanismo/jurídico feitos à época não estão vinculados a ela. Para recuperá-los "
+                "SEM reprocessar: re-suba o(s) mesmo(s) KMZ (Nova análise) — o trabalho anterior "
+                "reaparece — e clique em Atualizar para revincular esta salva."
+            )
+    except Exception:  # noqa: BLE001 — diagnóstico é informativo; falha não bloqueia o carregar
+        pass
+
     return schemas.AnaliseOut(
         analise_id=novo_id,
         geometria=schemas.GeometriaOut(
@@ -205,5 +236,5 @@ def carregar(
             rota="POLYGON_DIRETO",
             descricao=f"reidratada da análise salva '{a.titulo}'",
         ),
-        avisos=[],
+        avisos=avisos,
     )

@@ -128,9 +128,67 @@ class FonteViasOSM:
         )
 
 
+class FonteViasComCache:
+    """CACHE persistente por gleba em volta da fonte OSM. O Overpass público limita por IP (429) —
+    em sessões com muitas regenerações ele cai e o pórtico ia pro fallback 'aleatório'. Agora: a
+    PRIMEIRA consulta bem-sucedida é gravada em disco (chave = hash do WKB da gleba) e as demais
+    leem do cache — determinístico, rápido e imune a quedas do Overpass. Falhou e não tem cache →
+    degrada honesto (o chamador avisa)."""
+
+    def __init__(self, interna: FonteVias, diretorio: str | os.PathLike):
+        self.interna = interna
+        self.diretorio = diretorio
+
+    def _caminho(self, gleba: BaseGeometry):
+        import hashlib
+        from pathlib import Path
+
+        chave = hashlib.sha256(gleba.wkb).hexdigest()[:24]
+        return Path(self.diretorio) / f"{chave}.json"
+
+    def vias(self, gleba: BaseGeometry) -> CoberturaVias:
+        from shapely.geometry import mapping, shape
+
+        caminho = self._caminho(gleba)
+        if caminho.exists():
+            try:
+                d = json.loads(caminho.read_text(encoding="utf-8"))
+                return CoberturaVias(
+                    geometria=shape(d["geometria"]) if d.get("geometria") else None,
+                    fonte=(d.get("fonte") or "OSM") + " · cache",
+                    data_referencia=d.get("data_referencia"),
+                    avisos=list(d.get("avisos") or []),
+                )
+            except Exception:  # noqa: BLE001 — cache corrompido → reconsulta
+                pass
+        cob = self.interna.vias(gleba)
+        # Só cacheia consulta RESPONDIDA (com geometria ou "sem via mapeada" confirmado);
+        # falha de rede NÃO é cacheada — a próxima geração tenta de novo.
+        if cob.fonte is not None:
+            try:
+                caminho.parent.mkdir(parents=True, exist_ok=True)
+                caminho.write_text(
+                    json.dumps(
+                        {
+                            "geometria": mapping(cob.geometria) if cob.geometria is not None else None,
+                            "fonte": cob.fonte,
+                            "data_referencia": cob.data_referencia,
+                            "avisos": cob.avisos,
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+            except Exception:  # noqa: BLE001 — cache é otimização; falha não derruba
+                pass
+        return cob
+
+
 def get_fonte_vias() -> Optional[FonteVias]:
-    """Fonte de vias p/ o pórtico. PADRÃO = OSM automático (qualquer gleba, sem config). Desligável
-    com ``VIAS_OSM_AUTO=0`` (ex.: egress fechado / testes) → motor usa o fallback do miolo loteado."""
+    """Fonte de vias p/ o pórtico. PADRÃO = OSM automático com CACHE persistente por gleba.
+    Desligável com ``VIAS_OSM_AUTO=0`` (ex.: egress fechado / testes) → fallback do miolo loteado."""
     if os.getenv("VIAS_OSM_AUTO", "1").strip().lower() in ("0", "false", "no", "off"):
         return None
-    return FonteViasOSM()
+    from pathlib import Path
+
+    padrao = Path(__file__).resolve().parent.parent / "perfis" / "vias"
+    return FonteViasComCache(FonteViasOSM(), os.getenv("VIAS_CACHE_DIR", str(padrao)))
