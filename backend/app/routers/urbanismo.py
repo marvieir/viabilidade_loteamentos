@@ -247,10 +247,11 @@ def propor(
             "Configure ANTHROPIC_API_KEY ou use o endpoint /medir com um layout pronto.",
         )
 
-    # Cap suave de fair-use: cada geração é uma chamada de IA (custo + fila/rate-limit da org,
-    # compartilhada entre TODOS os usuários). Limite generoso por análise — o uso normal (ajustar
-    # lote_max algumas vezes) nunca encosta nele; barra loop/abuso. Não é cobrança, é proteção.
-    _max = int(os.getenv("URBANISMO_MAX_GERACOES", "30"))
+    # Cap de fair-use POR ANÁLISE (por vida, não por dia): cada geração é uma chamada de IA
+    # (custo + fila/rate-limit da org, compartilhada entre TODOS os usuários). 15 mudanças de
+    # layout já são mais que suficientes para uma gleba — não é ferramenta de gerar em massa.
+    # Barra loop/abuso; não é cobrança, é proteção.
+    _max = int(os.getenv("URBANISMO_MAX_GERACOES", "15"))
     if _max > 0 and len(fonte_urb.listar(analise_id)) >= _max:
         raise HTTPException(
             429,
