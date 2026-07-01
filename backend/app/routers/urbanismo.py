@@ -335,7 +335,22 @@ def propor(
                 vias_m = transform(to_local, cob_vias.geometria)
                 gleba_m = transform(to_local, registro["poly"])
                 from shapely.ops import nearest_points
-                acesso_externo_m = nearest_points(gleba_m.boundary, vias_m)[0]
+
+                # VIA LINDEIRA de verdade: prioriza vias que correm JUNTO à divisa (até
+                # VIAS_LINDEIRA_MAX_M). Só se nenhuma margeia o terreno usa a mais próxima —
+                # e nesse caso DIZ a distância (transparência; pode ser acesso por servidão).
+                borda = gleba_m.boundary
+                lindeira_max = float(os.getenv("VIAS_LINDEIRA_MAX_M", "80"))
+                lindeiras = vias_m.intersection(borda.buffer(lindeira_max))
+                alvo_vias = lindeiras if not lindeiras.is_empty else vias_m
+                acesso_externo_m = nearest_points(borda, alvo_vias)[0]
+                dist_via = acesso_externo_m.distance(alvo_vias)
+                if lindeiras.is_empty:
+                    avisos_vias.append(
+                        "Nenhuma via pública margeia a divisa (OSM): a via mais próxima está a "
+                        f"~{dist_via:,.0f} m do terreno — o pórtico foi ancorado no ponto da divisa "
+                        "mais perto dela. Confirme o acesso real (servidão/estrada não mapeada)."
+                    )
             else:
                 avisos_vias = list(cob_vias.avisos)
         except Exception as exc:  # noqa: BLE001 — vias são um PLUS; falha não derruba o urbanismo

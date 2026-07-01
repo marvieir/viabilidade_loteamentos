@@ -21,11 +21,23 @@ from shapely.geometry import LineString
 from shapely.geometry.base import BaseGeometry
 from shapely.ops import unary_union
 
-# Tipos de via DIRIGÍVEIS (acesso de veículo) — exclui trilha/calçada/ciclovia/escada.
-OSM_HIGHWAYS = (
+# Tipos de via PÚBLICOS que qualificam uma ENTRADA de loteamento. NÃO inclui ``track``
+# (trilha/estrada interna de fazenda), ``service`` (acesso de serviço/estacionamento) nem
+# ``road`` (não classificada): uma trilha de pasto que encosta na divisa era escolhida como
+# "via mais próxima" e mandava o pórtico pro meio do nada. Override: env VIAS_OSM_HIGHWAYS.
+_HIGHWAYS_PADRAO = (
     "motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|"
-    "service|track|road|motorway_link|trunk_link|primary_link|secondary_link|tertiary_link"
+    "motorway_link|trunk_link|primary_link|secondary_link|tertiary_link"
 )
+
+
+def _highways() -> str:
+    bruto = (os.getenv("VIAS_OSM_HIGHWAYS") or "").strip()
+    return bruto if bruto else _HIGHWAYS_PADRAO
+
+
+# Compat: nome antigo ainda exportado (valor efetivo no boot).
+OSM_HIGHWAYS = _highways()
 # Endpoints Overpass (espelhos). O serviço público é gratuito e INSTÁVEL (limita/cai) — um único
 # host fazia o pórtico cair no fallback toda vez que ele estava fora. Tenta em ordem até um responder.
 # Override por env: VIAS_OVERPASS_URLS (lista separada por vírgula) ou VIAS_OVERPASS_URL (1 só).
@@ -79,7 +91,7 @@ class FonteViasOSM:
         bbox = f"{miny - b},{minx - b},{maxy + b},{maxx + b}"  # S,W,N,E (ordem do Overpass)
         ql = (
             f'[out:json][timeout:{_TIMEOUT}];'
-            f'way["highway"~"^({OSM_HIGHWAYS})$"]({bbox});out geom;'
+            f'way["highway"~"^({_highways()})$"]({bbox});out geom;'
         )
         # Falha-e-passa-pro-próximo: tenta cada espelho (com retry) até um responder. Só degrada
         # honesto se TODOS falharem — assim um Overpass fora não joga mais o pórtico no fallback.
@@ -137,7 +149,7 @@ class FonteViasOhsome:
         minx, miny, maxx, maxy = gleba.bounds
         b = BUFFER_GRAUS
         url = os.getenv("VIAS_OHSOME_URL", "https://api.ohsome.org/v1/elements/geometry")
-        tipos = OSM_HIGHWAYS.replace("|", ", ")
+        tipos = _highways().replace("|", ", ")
         corpo = urllib.parse.urlencode(
             {
                 "bboxes": f"{minx - b},{miny - b},{maxx + b},{maxy + b}",  # W,S,E,N (ordem Ohsome)
@@ -221,7 +233,9 @@ class FonteViasComCache:
         import hashlib
         from pathlib import Path
 
-        chave = hashlib.sha256(gleba.wkb).hexdigest()[:24]
+        # Chave = gleba + FILTRO de vias: mudar o critério (ex.: tirar `track`) invalida o
+        # cache antigo sozinho — ninguém fica preso a uma âncora errada gravada em disco.
+        chave = hashlib.sha256(gleba.wkb + _highways().encode()).hexdigest()[:24]
         return Path(self.diretorio) / f"{chave}.json"
 
     def vias(self, gleba: BaseGeometry) -> CoberturaVias:

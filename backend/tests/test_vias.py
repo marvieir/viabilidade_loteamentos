@@ -73,3 +73,24 @@ def test_cache_nao_grava_falha(tmp_path):
     fonte = FonteViasComCache(_Falha(), tmp_path)
     fonte.vias(_gleba(dx=5))
     assert list(tmp_path.glob("*.json")) == []  # falha de rede não é cacheada (tenta de novo)
+
+
+def test_filtro_padrao_exclui_trilha_de_fazenda():
+    # Regressão do pórtico 'no meio do nada': `track` (trilha de pasto), `service` e `road`
+    # NÃO qualificam entrada de loteamento — só via pública de verdade.
+    from app.core.vias import _highways
+
+    tipos = _highways().split("|")
+    assert "track" not in tipos and "service" not in tipos and "road" not in tipos
+    assert "residential" in tipos and "unclassified" in tipos and "tertiary" in tipos
+
+
+def test_cache_invalida_quando_filtro_muda(tmp_path, monkeypatch):
+    # Cache antigo (gravado com trilhas) não pode prender a âncora errada: mudar o filtro
+    # muda a chave → reconsulta.
+    interna = _Responde()
+    fonte = FonteViasComCache(interna, tmp_path)
+    fonte.vias(_gleba())
+    monkeypatch.setenv("VIAS_OSM_HIGHWAYS", "residential")
+    fonte.vias(_gleba())
+    assert interna.chamadas == 2  # chave nova → não leu o cache antigo
