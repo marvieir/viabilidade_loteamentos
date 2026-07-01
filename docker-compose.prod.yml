@@ -39,9 +39,18 @@ services:
       # para ~/viabilidade_loteamentos/backend/app/perfis/malha_ibge.geojson (scp) ANTES de subir;
       # se o arquivo não existir no host, o bind mount abaixo cria um diretório e quebra o boot.
       MALHA_IBGE_PATH: "/data/malha_ibge.geojson"
+      # Dados do operador/análise que precisam SOBREVIVER a deploys (volume abaixo):
+      # log de custo de LLM (monitoramento), perfil de custos, snapshots de urbanismo
+      # (o reload depende deles), fluxos financeira/econômica.
+      USO_LLM_LOG: "/data/perfis/uso_llm/uso.jsonl"
+      PERFIL_CUSTOS_DIR: "/data/perfis/custos"
+      URBANISMO_DIR: "/data/perfis/urbanismo"
+      FINANCEIRA_DIR: "/data/perfis/financeira"
+      ECONOMICA_DIR: "/data/perfis/economica"
     volumes:
       - perfis_municipais:/data/perfis-municipais
       - juridico:/data/juridico
+      - perfis_dados:/data/perfis
       # Dados ambientais (CAR/Mata Atlântica/etc.) — coloque os .gpkg em ./dados-ambientais (ou
       # aponte DADOS_AMBIENTAIS) e os AMBIENTAL_*_PATH no backend/.env.
       - ${DADOS_AMBIENTAIS:-./dados-ambientais}:/data/ambiental:ro
@@ -85,3 +94,4 @@ volumes:
   caddy_config:
   perfis_municipais:
   juridico:
+  perfis_dados:

@@ -55,3 +55,6 @@ backend/certs/
 # Fase 12 — banco de dev/teste (SQLite local). Produção usa Postgres em volume.
 backend/dev.db
 backend/*.db
+
+# Dados de custo/uso + perfis do operador (dev bind mount)
+backend/app/perfis/_dados/
