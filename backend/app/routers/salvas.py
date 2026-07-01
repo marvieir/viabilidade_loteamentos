@@ -55,6 +55,17 @@ def _buscar_do_dono(db: Session, analise_id: str, usuario: Usuario) -> Analise:
     return a
 
 
+def _resultados_com_origem(resultados: dict | None, analise_id: str | None) -> dict | None:
+    """Injeta o id de trabalho no snapshot (chave reservada) para o carregar reidratar sob ele.
+    Assim jurídico/urbanismo/custos/financeira (stores por analise_id) sobrevivem ao salvar."""
+    if not resultados and not analise_id:
+        return None
+    saida = dict(resultados or {})
+    if analise_id:
+        saida["_analise_id"] = analise_id
+    return saida
+
+
 @router.get("", response_model=list[schemas.AnaliseResumoOut])
 def listar(
     usuario: Usuario = Depends(usuario_atual), db: Session = Depends(get_db)
@@ -84,7 +95,7 @@ def salvar(
         cidade=body.cidade,
         uf=body.uf,
         area_ha=body.area_ha,
-        resultados=body.resultados,
+        resultados=_resultados_com_origem(body.resultados, body.analise_id),
     )
     db.add(a)
     db.commit()
@@ -122,8 +133,12 @@ def atualizar(
         a.uf = body.uf
     if body.area_ha is not None:
         a.area_ha = body.area_ha
-    if body.resultados is not None:
-        a.resultados = body.resultados
+    if body.resultados is not None or body.analise_id is not None:
+        novo = dict(body.resultados) if body.resultados is not None else dict(a.resultados or {})
+        origem = body.analise_id or (a.resultados or {}).get("_analise_id")
+        if origem:
+            novo["_analise_id"] = origem
+        a.resultados = novo or None
     db.commit()
     db.refresh(a)
     return _detalhe(a)
@@ -163,7 +178,11 @@ def carregar(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc))
 
     jur = resolver_jurisdicao(poly, fonte_malha)
-    novo_id = str(
+    # Reidrata sob o MESMO id em que o trabalho foi feito (salvo no snapshot) — assim jurídico,
+    # urbanismo, custos e financeira (stores por analise_id) reaparecem sem reprocessar. Análises
+    # antigas (sem o id salvo) caem no id derivado do a.id (comportamento anterior).
+    origem = (a.resultados or {}).get("_analise_id") if isinstance(a.resultados, dict) else None
+    novo_id = origem or str(
         uuid.uuid5(_NS_ANALISE, hashlib.sha256(a.id.encode("utf-8")).hexdigest())
     )
     STORE[novo_id] = {

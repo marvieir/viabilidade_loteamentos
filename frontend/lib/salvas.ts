@@ -28,6 +28,9 @@ export interface SalvarPayload {
   uf?: string | null;
   area_ha?: number | null;
   resultados?: Record<string, unknown> | null;
+  // id de trabalho atual — o backend guarda p/ o carregar reidratar sob o MESMO id
+  // (jurídico/urbanismo/custos/financeira sobrevivem ao salvar→carregar).
+  analise_id?: string | null;
 }
 
 async function jsonOrThrow(res: Response) {

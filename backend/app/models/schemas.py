@@ -1556,6 +1556,9 @@ class AnaliseSalvarIn(BaseModel):
     uf: Optional[str] = None
     area_ha: Optional[float] = None
     resultados: Optional[dict] = None
+    # id de trabalho atual — persiste no snapshot p/ o carregar reidratar sob o MESMO id
+    # (jurídico/urbanismo/custos/financeira ficam sob esse id e sobrevivem ao salvar→carregar).
+    analise_id: Optional[str] = None
 
 
 class AnaliseResumoOut(BaseModel):

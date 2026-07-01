@@ -183,6 +183,7 @@ export default function Home() {
         uf: analise.jurisdicao.uf,
         area_ha: analise.geometria.area_ha,
         resultados: snapshotResultados(),
+        analise_id: analise.analise_id, // reidrata sob o mesmo id ao carregar (não reprocessa IA)
       };
       const salva = salvaId
         ? await atualizarAnalise(salvaId, payload)
