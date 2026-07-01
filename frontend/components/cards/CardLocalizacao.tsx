@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -51,7 +52,10 @@ export function CardLocalizacao({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Localização</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Localização</span>
+          <StatusChip className="ml-auto" estado={data ? "ok" : "pendente"} />
+        </CardTitle>
         <CardDescription>
           Contexto socioeconômico do município (IBGE — Censo 2022/2010, PIB dos Municípios;
           déficit da FJP quando disponível). Enriquecimento{" "}

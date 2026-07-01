@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import { Notas } from "@/components/ui/notas";
 import {
   Card,
@@ -61,7 +62,21 @@ export function CardAmbiental({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Ambiental</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Ambiental</span>
+          {data ? (
+            (() => {
+              const n = data.alertas.filter((a) => a.severidade === "ALERTA").length;
+              return n > 0 ? (
+                <StatusChip className="ml-auto" estado="alerta" rotulo={`${n} alerta${n > 1 ? "s" : ""}`} />
+              ) : (
+                <StatusChip className="ml-auto" estado="ok" rotulo="sem incidência" />
+              );
+            })()
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Overlays vetoriais (hidrografia/APP, unidades de conservação, mineração)
           por interseção espacial. Cálculo no backend; cada alerta traz a fonte e a

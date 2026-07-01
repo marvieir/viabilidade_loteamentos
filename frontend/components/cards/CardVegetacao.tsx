@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -75,7 +76,18 @@ export function CardVegetacao({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Área verde</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Área verde</span>
+          {data ? (
+            (data.severidade?.restricao_dura.area_m2 ?? 0) > 0 ? (
+              <StatusChip className="ml-auto" estado="atencao" rotulo="restrição dura" />
+            ) : (
+              <StatusChip className="ml-auto" estado="ok" />
+            )
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Identifica a cobertura vegetal da gleba e a desconta da área aproveitável.
           Triagem conservadora — não classifica mata nativa/removível (isso é laudo de

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -77,7 +78,18 @@ export function CardDeclividade({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Declividade</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Declividade</span>
+          {data ? (
+            data.flag_vedacao ? (
+              <StatusChip className="ml-auto" estado="alerta" rotulo="vedação ≥30%" />
+            ) : (
+              <StatusChip className="ml-auto" estado="ok" />
+            )
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Declividade do terreno a partir do DEM (Copernicus GLO-30, sem chave). Faixas
           suave/média/alta e a <span className="font-medium">vedação legal ≥30%</span>{" "}

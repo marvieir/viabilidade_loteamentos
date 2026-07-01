@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import { Notas } from "@/components/ui/notas";
 import {
   Card,
@@ -157,7 +158,20 @@ export function CardJuridico({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Jurídico — pré-análise documental</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Jurídico — pré-análise documental</span>
+          {resultado ? (
+            resultado.sintese_risco.nivel === "alto" ? (
+              <StatusChip className="ml-auto" estado="alerta" rotulo="risco alto" />
+            ) : resultado.sintese_risco.nivel === "medio" ? (
+              <StatusChip className="ml-auto" estado="atencao" rotulo="risco médio" />
+            ) : (
+              <StatusChip className="ml-auto" estado="ok" rotulo="risco baixo" />
+            )
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Lê matrícula/certidões (LLM propõe com a referência ao ato) e sinaliza ônus,
           averbações e divergência de área. <strong>Pré-análise, não parecer</strong> — nada

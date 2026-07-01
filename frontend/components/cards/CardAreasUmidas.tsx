@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -65,7 +66,18 @@ export function CardAreasUmidas({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Áreas úmidas / alagadas</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Áreas úmidas / alagadas</span>
+          {data ? (
+            data.area_umida_m2 != null && data.area_umida_m2 > 0 ? (
+              <StatusChip className="ml-auto" estado="atencao" rotulo="área úmida detectada" />
+            ) : (
+              <StatusChip className="ml-auto" estado="ok" rotulo="sem incidência" />
+            )
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Identifica área úmida/alagável (campo alagado, brejo, banhado, várzea) sobre a
           gleba — restrição não-edificável candidata (APP, Código Florestal art. 4º). Triagem

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -123,7 +124,10 @@ export function CardAproveitamento({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Aproveitamento</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Aproveitamento</span>
+          <StatusChip className="ml-auto" estado={res ? "ok" : "pendente"} />
+        </CardTitle>
         <CardDescription>
           Triagem: área aproveitável = área total − (mata ∪ APP ∪ faixas
           não-edificáveis). Vias e doação NÃO entram aqui — dependem do projeto

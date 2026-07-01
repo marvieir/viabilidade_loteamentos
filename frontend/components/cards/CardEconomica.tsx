@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import { Notas } from "@/components/ui/notas";
 import {
   Card,
@@ -72,7 +73,18 @@ export function CardEconomica({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Econômica — VPL · TIR · payback</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Econômica — VPL · TIR · payback</span>
+          {dados ? (
+            dados.vpl.valor < 0 ? (
+              <StatusChip className="ml-auto" estado="alerta" rotulo="VPL negativo" />
+            ) : (
+              <StatusChip className="ml-auto" estado="ok" rotulo="avaliada" />
+            )
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Avalia o fluxo que a Financeira montou, descontado pela sua TMA{" "}
           <strong>real</strong> (acima do IPCA). Rode a Financeira primeiro; os

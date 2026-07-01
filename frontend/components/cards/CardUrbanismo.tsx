@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import { Notas } from "@/components/ui/notas";
 import dynamic from "next/dynamic";
 import {
@@ -210,6 +211,11 @@ export function CardUrbanismo({
           <span className="rounded-full bg-amber-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-900">
             Esquemático
           </span>
+          {proposta ? (
+            <StatusChip className="ml-auto" estado="ok" rotulo={`gerado · v${proposta.versao}`} />
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
         </CardTitle>
         <CardDescription>
           A IA propõe o <strong>programa</strong> (lote-alvo, viário, % de lazer) sob o

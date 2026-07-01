@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import { Notas } from "@/components/ui/notas";
 import {
   Card,
@@ -161,7 +162,20 @@ export function CardCustoInfra({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Custo de Infraestrutura</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Custo de Infraestrutura</span>
+          {resultado ? (
+            resultado.cobertura === "COMPLETA" ? (
+              <StatusChip className="ml-auto" estado="ok" rotulo="calculado" />
+            ) : resultado.cobertura === "PARCIAL" ? (
+              <StatusChip className="ml-auto" estado="atencao" rotulo="parcial" />
+            ) : (
+              <StatusChip className="ml-auto" estado="atencao" rotulo="sem custos" />
+            )
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Estimativa paramétrica por disciplina: as <span className="font-medium">quantidades</span>{" "}
           vêm do layout de Urbanismo e os <span className="font-medium">custos unitários</span> vêm

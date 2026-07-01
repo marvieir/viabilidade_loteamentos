@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import { Notas } from "@/components/ui/notas";
 import {
   Card,
@@ -165,7 +166,10 @@ export function CardFinanceira({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Financeira — análise guiada</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Financeira — análise guiada</span>
+          <StatusChip className="ml-auto" estado={prev ? "ok" : "pendente"} rotulo={prev ? "fluxo montado" : undefined} />
+        </CardTitle>
         <CardDescription>
           Seis passos, uma pergunta de negócio por vez. Cada campo tem ajuda; os defaults vêm
           pré-preenchidos e rotulados <em>(edite)</em>. No fim, o painel com a divisão
@@ -179,26 +183,55 @@ export function CardFinanceira({
           </p>
         )}
 
-        {/* Barra de progresso */}
-        <div className="flex flex-wrap gap-1">
+        {/* Stepper — numerado com conector; passo feito vira check e é clicável p/ voltar */}
+        <ol className="flex items-center">
           {PASSOS.map((nome, i) => {
             const n = i + 1;
+            const feito = n < passo;
+            const atual = n === passo;
             return (
-              <button
-                key={nome}
-                onClick={() => n < passo && setPasso(n)}
-                disabled={n > passo}
-                className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium ${
-                  n === passo ? "bg-slate-900 text-white"
-                  : n < passo ? "bg-emerald-100 text-emerald-800"
-                  : "bg-slate-100 text-slate-400"
-                }`}
-              >
-                {n}. {nome}
-              </button>
+              <li key={nome} className={`flex items-center ${n < PASSOS.length ? "flex-1" : ""}`}>
+                <button
+                  type="button"
+                  onClick={() => feito && setPasso(n)}
+                  disabled={n > passo}
+                  title={nome}
+                  className={`group flex shrink-0 items-center gap-1.5 ${feito ? "cursor-pointer" : ""}`}
+                >
+                  <span
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors ${
+                      atual
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : feito
+                          ? "bg-emerald-500 text-white group-hover:bg-emerald-600"
+                          : "border border-slate-200 bg-white text-slate-400"
+                    }`}
+                  >
+                    {feito ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    ) : (
+                      n
+                    )}
+                  </span>
+                  <span
+                    className={`hidden whitespace-nowrap text-[11px] font-medium lg:block ${
+                      atual ? "text-slate-900" : feito ? "text-slate-600" : "text-slate-400"
+                    }`}
+                  >
+                    {nome}
+                  </span>
+                </button>
+                {n < PASSOS.length && (
+                  <span
+                    className={`mx-2 h-px min-w-3 flex-1 ${feito ? "bg-emerald-300" : "bg-slate-200"}`}
+                  />
+                )}
+              </li>
             );
           })}
-        </div>
+        </ol>
 
         {erro && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>}
 
@@ -349,7 +382,9 @@ export function CardFinanceira({
 
         {/* Navegação */}
         <div className="flex items-center justify-between pt-1">
-          <button onClick={() => setPasso((s) => Math.max(1, s - 1))} disabled={passo === 1} className="text-sm text-slate-500 hover:text-slate-800 disabled:opacity-40">← Voltar</button>
+          <Button variant="ghost" onClick={() => setPasso((s) => Math.max(1, s - 1))} disabled={passo === 1}>
+            ← Voltar
+          </Button>
           {passo < 6 ? (
             <Button onClick={avancar} disabled={carregando || !temContexto || (inadAlta && passo === 5 && !confirmarInad)}>
               {carregando ? "Calculando…" : "Próximo →"}
@@ -383,7 +418,7 @@ function Campo({
       <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
         {rotulo} {badge && <Badge>default — edite</Badge>}
       </p>
-      <input type="number" step="any" value={valor} onChange={(e) => on(parseFloat(e.target.value) || 0)} className="w-full rounded-lg border border-slate-200 px-2 py-2 text-sm" />
+      <input type="number" step="any" value={valor} onChange={(e) => on(parseFloat(e.target.value) || 0)} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm shadow-sm outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
       <p className="mt-0.5 text-[11px] text-slate-400">{ajuda}</p>
     </div>
   );

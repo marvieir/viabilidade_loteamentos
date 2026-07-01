@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -78,7 +79,21 @@ export function CardConformidade({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Conformidade urbanística</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Conformidade urbanística</span>
+          {data && data.avaliada ? (
+            (() => {
+              const n = data.itens.filter((i) => i.status === "atencao").length;
+              return n > 0 ? (
+                <StatusChip className="ml-auto" estado="atencao" rotulo={`${n} ponto${n > 1 ? "s" : ""} de atenção`} />
+              ) : (
+                <StatusChip className="ml-auto" estado="ok" />
+              );
+            })()
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           Confronta a gleba com os índices da LUOS extraídos e confirmados (Fase 1.8) que
           não entram no número — frente mínima, CA, taxa de ocupação, repartição da doação.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { StatusChip } from "@/components/ui/status";
 import {
   Card,
   CardContent,
@@ -142,7 +143,16 @@ export function CardPerfilLuos({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Diretriz municipal (LUOS) · Fase 1.8</CardTitle>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          <span>Diretriz municipal (LUOS)</span>
+          {confirmado ? (
+            <StatusChip className="ml-auto" estado="ok" rotulo="confirmada" />
+          ) : perfil ? (
+            <StatusChip className="ml-auto" estado="atencao" rotulo="aguarda confirmação" />
+          ) : (
+            <StatusChip className="ml-auto" estado="pendente" />
+          )}
+        </CardTitle>
         <CardDescription>
           O assistente <strong>lê o PDF e propõe</strong> os índices por zona, cada um com a
           citação ao lado. Nada entra no cálculo sem a sua confirmação. Determinismo e
