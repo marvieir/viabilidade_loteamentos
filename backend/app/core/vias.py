@@ -128,6 +128,84 @@ class FonteViasOSM:
         )
 
 
+class FonteViasOhsome:
+    """BACKUP do Overpass: a Ohsome API (HeiGIT/Universidade de Heidelberg) serve os MESMOS dados
+    OSM por uma infraestrutura independente, gratuita e sem chave. Mesma verdade (malha viária do
+    OSM), outro provedor, outros limites — quando o Overpass rate-limita (429), esta responde."""
+
+    def vias(self, gleba: BaseGeometry) -> CoberturaVias:
+        minx, miny, maxx, maxy = gleba.bounds
+        b = BUFFER_GRAUS
+        url = os.getenv("VIAS_OHSOME_URL", "https://api.ohsome.org/v1/elements/geometry")
+        tipos = OSM_HIGHWAYS.replace("|", ", ")
+        corpo = urllib.parse.urlencode(
+            {
+                "bboxes": f"{minx - b},{miny - b},{maxx + b},{maxy + b}",  # W,S,E,N (ordem Ohsome)
+                "filter": f"highway in ({tipos}) and geometry:line",
+                "properties": "",
+                "clipGeometry": "true",
+            }
+        ).encode()
+        try:
+            req = urllib.request.Request(
+                url,
+                data=corpo,
+                headers={
+                    "User-Agent": "viabilidade-loteamentos/0.2",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=_TIMEOUT + 5) as resp:  # noqa: S310 (URL de config)
+                d = json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 — backup falhou → degrada honesto
+            host = urllib.parse.urlparse(url).netloc or url
+            return CoberturaVias(avisos=[f"Backup de vias (Ohsome {host}) falhou ({type(exc).__name__})."])
+
+        linhas = []
+        for feat in d.get("features", []):
+            g = feat.get("geometry") or {}
+            if g.get("type") == "LineString":
+                pts = [(c[0], c[1]) for c in (g.get("coordinates") or []) if len(c) >= 2]
+                if len(pts) >= 2:
+                    linhas.append(LineString(pts))
+            elif g.get("type") == "MultiLineString":
+                for parte in g.get("coordinates") or []:
+                    pts = [(c[0], c[1]) for c in parte if len(c) >= 2]
+                    if len(pts) >= 2:
+                        linhas.append(LineString(pts))
+        if not linhas:
+            return CoberturaVias(
+                fonte="OpenStreetMap (Ohsome/HeiGIT)",
+                data_referencia=date.today().isoformat(),
+                avisos=["Nenhuma via mapeada no entorno da gleba (OSM via Ohsome)."],
+            )
+        return CoberturaVias(
+            geometria=unary_union(linhas),
+            fonte="OpenStreetMap (Ohsome/HeiGIT)",
+            data_referencia=date.today().isoformat(),
+        )
+
+
+class FonteViasEncadeada:
+    """CADEIA de provedores: tenta cada fonte em ordem e devolve a PRIMEIRA que RESPONDER
+    (``fonte`` preenchida — inclui o 'sem via mapeada' confirmado, que é resposta válida da
+    mesma base OSM e não deve cair pro próximo). Só degrada se TODAS falharem, agregando os
+    motivos nos avisos (nada de falha silenciosa)."""
+
+    def __init__(self, fontes: list[FonteVias]):
+        self.fontes = fontes
+
+    def vias(self, gleba: BaseGeometry) -> CoberturaVias:
+        avisos: list[str] = []
+        for fonte in self.fontes:
+            cob = fonte.vias(gleba)
+            if cob.fonte is not None:
+                cob.avisos = avisos + cob.avisos if avisos else cob.avisos
+                return cob
+            avisos.extend(cob.avisos)
+        return CoberturaVias(avisos=avisos or ["Nenhuma fonte de vias respondeu."])
+
+
 class FonteViasComCache:
     """CACHE persistente por gleba em volta da fonte OSM. O Overpass público limita por IP (429) —
     em sessões com muitas regenerações ele cai e o pórtico ia pro fallback 'aleatório'. Agora: a
@@ -184,11 +262,16 @@ class FonteViasComCache:
 
 
 def get_fonte_vias() -> Optional[FonteVias]:
-    """Fonte de vias p/ o pórtico. PADRÃO = OSM automático com CACHE persistente por gleba.
-    Desligável com ``VIAS_OSM_AUTO=0`` (ex.: egress fechado / testes) → fallback do miolo loteado."""
+    """Fonte de vias p/ o pórtico. PADRÃO = cache persistente por gleba → Overpass (4 espelhos)
+    → BACKUP Ohsome/HeiGIT (mesma base OSM, infra independente). Só degrada (fallback do miolo,
+    com aviso) se cache, 4 espelhos E o backup falharem. Desligável com ``VIAS_OSM_AUTO=0``;
+    backup desligável com ``VIAS_BACKUP=0``."""
     if os.getenv("VIAS_OSM_AUTO", "1").strip().lower() in ("0", "false", "no", "off"):
         return None
     from pathlib import Path
 
+    fontes: list[FonteVias] = [FonteViasOSM()]
+    if os.getenv("VIAS_BACKUP", "1").strip().lower() not in ("0", "false", "no", "off"):
+        fontes.append(FonteViasOhsome())
     padrao = Path(__file__).resolve().parent.parent / "perfis" / "vias"
-    return FonteViasComCache(FonteViasOSM(), os.getenv("VIAS_CACHE_DIR", str(padrao)))
+    return FonteViasComCache(FonteViasEncadeada(fontes), os.getenv("VIAS_CACHE_DIR", str(padrao)))
