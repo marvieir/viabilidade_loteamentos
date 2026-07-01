@@ -61,3 +61,13 @@ def test_registrar_usage_none_nao_quebra(tmp_path, monkeypatch):
     with uso_llm.contexto("urbanismo", analise_id="A2"):
         uso_llm.registrar("claude-opus-4-8", None)  # não deve levantar nem gravar
     assert uso_llm.ler_registros() == []
+
+
+def test_meta_grava_tipo_loteamento(tmp_path, monkeypatch):
+    monkeypatch.setenv("USO_LLM_LOG", str(tmp_path / "uso.jsonl"))
+    with uso_llm.contexto(
+        "urbanismo", analise_id="A3", meta={"tipo_loteamento": "aberto"}
+    ):
+        uso_llm.registrar("claude-opus-4-8", _Usage(6_000, 4_000))
+    r = uso_llm.ler_registros()[0]
+    assert r["tipo_loteamento"] == "aberto" and r["dimensao"] == "urbanismo"

@@ -56,17 +56,28 @@ def _agrupar(registros: list[dict], chave: str, usd_brl: float) -> list[schemas.
 
 
 @router.get("/custos", response_model=schemas.AdminCustosOut)
-def custos(_admin: Usuario = Depends(requer_admin)) -> schemas.AdminCustosOut:
-    """Custo REAL de LLM medido (tokens de verdade) — por análise, dimensão e modelo.
+def custos(
+    _admin: Usuario = Depends(requer_admin), db: Session = Depends(get_db)
+) -> schemas.AdminCustosOut:
+    """Custo REAL de LLM medido (tokens de verdade) — por cliente, análise, dimensão e modelo,
+    + métricas de USO (regenerações de urbanismo, matrículas, perfil de loteamento mais usado).
 
     LUOS é por município (compartilhada entre análises da cidade) — sai numa seção própria.
     Urbanismo + Jurídico são por análise. O custo é recalculado com a tabela de preços atual.
     """
     registros = uso_llm.ler_registros()
     usd_brl = float(os.getenv("USD_BRL", "5.5") or 5.5)
+    usuarios = {str(u.id): u for u in db.query(Usuario).all()}
 
     total_usd = 0.0
     nao_tabelado = 0
+    # Agregações por cliente + uso da plataforma.
+    cli: dict[str, dict] = {}
+    perfil_ct: Counter = Counter()
+    urb_por_analise: Counter = Counter()
+    jur_por_analise: Counter = Counter()
+    total_regen = 0
+    total_matr = 0
     for r in registros:
         c = uso_llm.custo_usd(
             r.get("modelo", ""),
@@ -78,6 +89,49 @@ def custos(_admin: Usuario = Depends(requer_admin)) -> schemas.AdminCustosOut:
             nao_tabelado += 1
         else:
             total_usd += c
+        dim = r.get("dimensao")
+        aid = str(r.get("analise_id") or "")
+        uid = str(r.get("usuario_id") or "")
+        a = cli.setdefault(uid, {"analises": set(), "regen": 0, "matr": 0, "chamadas": 0, "usd": 0.0})
+        a["chamadas"] += 1
+        a["usd"] += c or 0.0
+        if aid:
+            a["analises"].add(aid)
+        if dim == "urbanismo":
+            total_regen += 1
+            a["regen"] += 1
+            if aid:
+                urb_por_analise[aid] += 1
+            tl = r.get("tipo_loteamento")
+            if tl:
+                perfil_ct[str(tl)] += 1
+        elif dim == "juridico":
+            total_matr += 1
+            a["matr"] += 1
+            if aid:
+                jur_por_analise[aid] += 1
+
+    por_cliente = sorted(
+        (
+            schemas.CustoClienteOut(
+                usuario_id=uid,
+                email=(usuarios[uid].email if uid in usuarios else ""),
+                nome=(usuarios[uid].nome if uid in usuarios else None),
+                n_analises_ia=len(a["analises"]),
+                n_regeneracoes=a["regen"],
+                n_matriculas=a["matr"],
+                chamadas=a["chamadas"],
+                custo_usd=round(a["usd"], 4),
+                custo_brl=round(a["usd"] * usd_brl, 2),
+            )
+            for uid, a in cli.items()
+        ),
+        key=lambda x: x.custo_brl,
+        reverse=True,
+    )
+    perfil_uso = [schemas.ContagemOut(rotulo=k, n=v) for k, v in perfil_ct.most_common()]
+    media_regen = round(total_regen / len(urb_por_analise), 2) if urb_por_analise else 0.0
+    media_matr = round(total_matr / len(jur_por_analise), 2) if jur_por_analise else 0.0
 
     por_analise = [r for r in registros if r.get("dimensao") in ("urbanismo", "juridico")]
     luos = [r for r in registros if r.get("dimensao") == "luos"]
@@ -100,6 +154,12 @@ def custos(_admin: Usuario = Depends(requer_admin)) -> schemas.AdminCustosOut:
         total_brl=round(total_usd * usd_brl, 2),
         usd_brl=usd_brl,
         modelo_nao_tabelado=nao_tabelado,
+        total_regeneracoes=total_regen,
+        total_matriculas=total_matr,
+        media_regeneracoes_por_analise=media_regen,
+        media_matriculas_por_analise=media_matr,
+        perfil_uso=perfil_uso,
+        por_cliente=por_cliente,
         por_modelo=_agrupar(registros, "modelo", usd_brl),
         por_dimensao=_agrupar(registros, "dimensao", usd_brl),
         por_analise=_agrupar(por_analise, "analise_id", usd_brl),

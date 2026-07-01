@@ -215,6 +215,88 @@ function SecaoCustos({ c }: { c: AdminCustos }) {
         </div>
       )}
 
+      {/* Uso da plataforma */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Regenerações de urbanismo</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+            {c.total_regeneracoes.toLocaleString("pt-BR")}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            média {c.media_regeneracoes_por_analise.toLocaleString("pt-BR")} por análise
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Matrículas processadas</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+            {c.total_matriculas.toLocaleString("pt-BR")}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            média {c.media_matriculas_por_analise.toLocaleString("pt-BR")} por KMZ/análise
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="mb-2 text-sm font-semibold text-slate-700">
+            Perfil de loteamento mais usado
+          </p>
+          {c.perfil_uso.length === 0 ? (
+            <p className="text-sm text-slate-400">Sem dados ainda.</p>
+          ) : (
+            <ul className="space-y-1">
+              {c.perfil_uso.map((p) => (
+                <li key={p.rotulo} className="flex justify-between text-sm">
+                  <span className="text-slate-600">{p.rotulo}</span>
+                  <span className="font-semibold text-slate-900">{p.n}×</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {/* Custo e uso por cliente */}
+      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <h3 className="border-b border-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+          Custo e uso por cliente
+        </h3>
+        {c.por_cliente.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-slate-400">Sem medições ainda.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[11px] uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-4 py-2 font-medium">Cliente</th>
+                  <th className="px-4 py-2 font-medium">Análises c/ IA</th>
+                  <th className="px-4 py-2 font-medium">Regen. urbanismo</th>
+                  <th className="px-4 py-2 font-medium">Matrículas</th>
+                  <th className="px-4 py-2 text-right font-medium">Custo (R$)</th>
+                  <th className="px-4 py-2 text-right font-medium">R$/análise</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.por_cliente.map((cl) => (
+                  <tr key={cl.usuario_id} className="border-t border-slate-100">
+                    <td className="px-4 py-2 text-slate-700">
+                      {cl.email || cl.usuario_id.slice(0, 8)}
+                    </td>
+                    <td className="px-4 py-2 text-slate-600">{cl.n_analises_ia}</td>
+                    <td className="px-4 py-2 text-slate-600">{cl.n_regeneracoes}</td>
+                    <td className="px-4 py-2 text-slate-600">{cl.n_matriculas}</td>
+                    <td className="px-4 py-2 text-right font-semibold text-slate-900">
+                      {brl(cl.custo_brl)}
+                    </td>
+                    <td className="px-4 py-2 text-right text-slate-500">
+                      {brl(cl.n_analises_ia > 0 ? cl.custo_brl / cl.n_analises_ia : 0)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2">
         <TabelaCusto titulo="Por dimensão" linhas={c.por_dimensao} />
         <TabelaCusto titulo="Por modelo" linhas={c.por_modelo} />

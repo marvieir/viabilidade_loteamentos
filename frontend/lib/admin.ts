@@ -53,12 +53,33 @@ export interface CustoLinha {
   custo_brl: number;
   detalhe: Record<string, number>;
 }
+export interface ContagemUso {
+  rotulo: string;
+  n: number;
+}
+export interface CustoCliente {
+  usuario_id: string;
+  email: string;
+  nome: string | null;
+  n_analises_ia: number;
+  n_regeneracoes: number;
+  n_matriculas: number;
+  chamadas: number;
+  custo_usd: number;
+  custo_brl: number;
+}
 export interface AdminCustos {
   n_registros: number;
   total_usd: number;
   total_brl: number;
   usd_brl: number;
   modelo_nao_tabelado: number;
+  total_regeneracoes: number;
+  total_matriculas: number;
+  media_regeneracoes_por_analise: number;
+  media_matriculas_por_analise: number;
+  perfil_uso: ContagemUso[];
+  por_cliente: CustoCliente[];
   por_modelo: CustoLinha[];
   por_dimensao: CustoLinha[];
   por_analise: CustoLinha[];

@@ -1699,12 +1699,36 @@ class CustoLinhaOut(BaseModel):
     detalhe: dict = {}  # ex.: {"urbanismo": {...}, "juridico": {...}}
 
 
+class ContagemOut(BaseModel):
+    rotulo: str
+    n: int = 0
+
+
+class CustoClienteOut(BaseModel):
+    usuario_id: str
+    email: str = ""
+    nome: Optional[str] = None
+    n_analises_ia: int = 0  # análises distintas que usaram IA (urbanismo/jurídico)
+    n_regeneracoes: int = 0  # chamadas de urbanismo (cada uma = 1 mudança de layout)
+    n_matriculas: int = 0  # chamadas de extração jurídica (≈ matrículas processadas)
+    chamadas: int = 0
+    custo_usd: float = 0.0
+    custo_brl: float = 0.0
+
+
 class AdminCustosOut(BaseModel):
     n_registros: int = 0
     total_usd: float = 0.0
     total_brl: float = 0.0
     usd_brl: float = 5.5
     modelo_nao_tabelado: int = 0  # chamadas sem preço na tabela (ex.: Gemini)
+    # Uso agregado da plataforma
+    total_regeneracoes: int = 0
+    total_matriculas: int = 0
+    media_regeneracoes_por_analise: float = 0.0
+    media_matriculas_por_analise: float = 0.0
+    perfil_uso: list[ContagemOut] = []  # perfil de loteamento mais usado (urbanismo)
+    por_cliente: list[CustoClienteOut] = []
     por_modelo: list[CustoLinhaOut] = []
     por_dimensao: list[CustoLinhaOut] = []
     por_analise: list[CustoLinhaOut] = []  # urbanismo + jurídico, por análise

@@ -57,14 +57,17 @@ def contexto(
     analise_id: str = "",
     cod_ibge: str = "",
     usuario_id: str = "",
+    meta: Optional[dict] = None,
 ):
-    """Marca a análise/dimensão em curso; o ``registrar`` seguinte atribui o custo a ela."""
+    """Marca a análise/dimensão em curso; o ``registrar`` seguinte atribui o custo a ela.
+    ``meta`` grava atributos extras no registro (ex.: tipo_loteamento) para as métricas de uso."""
     token = _CTX.set(
         {
             "dimensao": dimensao,
             "analise_id": analise_id or "",
             "cod_ibge": cod_ibge or "",
             "usuario_id": usuario_id or "",
+            "meta": meta or {},
         }
     )
     try:
@@ -109,6 +112,10 @@ def registrar(modelo: str, usage, fonte=None) -> None:
             "custo_usd": c_usd,
             "custo_brl": (round(c_usd * _usd_brl(), 4) if c_usd is not None else None),
         }
+        # Atributos extras de uso (ex.: tipo_loteamento), sem sobrescrever os campos-núcleo.
+        for k, v in (ctx.get("meta") or {}).items():
+            if k not in registro:
+                registro[k] = v
         (fonte or _gravar)(registro)
     except Exception:  # noqa: BLE001 — logar custo nunca pode derrubar a extração
         pass

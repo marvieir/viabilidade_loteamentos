@@ -293,7 +293,13 @@ def propor(
     }
     try:
         with uso_llm.contexto(
-            "urbanismo", analise_id=analise_id, usuario_id=str(registro.get("usuario_id", ""))
+            "urbanismo",
+            analise_id=analise_id,
+            usuario_id=str(registro.get("usuario_id", "")),
+            meta={
+                "tipo_loteamento": str(body.tipo_loteamento),
+                "publico_alvo": str(body.publico_alvo) if body.publico_alvo else "",
+            },
         ):
             prog = gerador.propor(contexto, body.tipo_loteamento, body.publico_alvo, body.overrides)
     except GeradorIndisponivel as exc:
