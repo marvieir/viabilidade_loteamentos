@@ -27,6 +27,19 @@ Só **3 pontos** chamam a IA; todas as outras dimensões (ambiental, declividade
 econômica, custo de infra, malha fundiária, bacia, bioma, localização, conformidade) são **Python puro
 = R$ 0 de LLM**.
 
+> ### ✅ MEDIDO (não estimado) — São Roque/SP, tudo em Opus 4.8, painel admin
+> | Item | Custo real |
+> |---|---|
+> | Urbanismo IA (1 chamada) | **R$ 0,22** (US$ 0,04) |
+> | Jurídico (2 matrículas) | **R$ 1,74** (US$ 0,32) |
+> | **Análise completa (Urbanismo + Jurídico)** | **R$ 1,96** |
+> | LUOS (1× por município, amortizada) | **R$ 1,16** (US$ 0,21) |
+> | **1ª análise de um município novo (com LUOS)** | **R$ 3,11** |
+>
+> **Regime normal (município já perfilado): ~R$ 2/análise.** As estimativas abaixo ficaram 2–6× ACIMA
+> do real (superestimei o tamanho dos PDFs). O custo de compute é **desprezível** — margem >99% em
+> qualquer preço de mercado. Não vale otimizar modelo; manter Opus 4.8 pela qualidade.
+
 > **Correção importante:** o **Fable 5 NÃO é usado** (não está disponível na org) — a cadeia cai para
 > **Opus 4.8 hoje, em TODAS as 3 chamadas**. E o custo marginal por análise é **só o LLM**; a infra do
 > Lightsail é **custo fixo** (§4), não entra no marginal.
