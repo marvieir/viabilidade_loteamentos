@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Notas } from "@/components/ui/notas";
 import {
   Card,
   CardContent,
@@ -487,9 +488,7 @@ function Dashboard({ d, econ }: { d: Financeira; econ?: Economica | null }) {
         </ul>
       </details>
 
-      <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-        {d.avisos.map((a) => <p key={a}>• {a}</p>)}
-      </div>
+      <Notas itens={d.avisos} />
     </div>
   );
 }

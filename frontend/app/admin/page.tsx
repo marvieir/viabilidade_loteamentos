@@ -78,22 +78,27 @@ function PainelAdmin() {
 
   return (
     <div className="min-h-screen">
-      <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-5 backdrop-blur">
-        <div>
-          <p className="text-sm font-bold">Painel do administrador</p>
-          <p className="text-[11px] text-slate-500">{usuario?.email}</p>
+      <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur">
+        <div className="flex items-center gap-2.5">
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-sm">
+            A
+          </div>
+          <div className="leading-tight">
+            <p className="text-sm font-bold tracking-tight">Painel do administrador</p>
+            <p className="text-[11px] text-slate-500">{usuario?.email}</p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
           >
-            App
+            Voltar ao app
           </Link>
           <button
             type="button"
             onClick={sair}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex h-9 items-center rounded-lg border border-transparent px-3.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100"
           >
             Sair
           </button>

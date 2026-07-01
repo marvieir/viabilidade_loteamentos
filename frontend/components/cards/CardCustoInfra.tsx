@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Notas } from "@/components/ui/notas";
 import {
   Card,
   CardContent,
@@ -418,11 +419,7 @@ function Resultado({ r }: { r: CustoInfra }) {
       )}
 
       <p className="text-xs text-slate-500">{r.proveniencia}</p>
-      {r.avisos.map((a) => (
-        <p key={a} className="text-xs text-slate-400">
-          {a}
-        </p>
-      ))}
+      <Notas itens={r.avisos} />
     </div>
   );
 }

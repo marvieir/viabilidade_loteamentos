@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Notas } from "@/components/ui/notas";
 import dynamic from "next/dynamic";
 import {
   Card,
@@ -842,11 +843,7 @@ export function CardUrbanismo({
 
             <p className="text-xs text-slate-500">{proposta.proveniencia}</p>
 
-            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-              {proposta.avisos.map((a) => (
-                <p key={a}>• {a}</p>
-              ))}
-            </div>
+            <Notas itens={proposta.avisos} />
           </>
         )}
       </CardContent>

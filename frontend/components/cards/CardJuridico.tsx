@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Notas } from "@/components/ui/notas";
 import {
   Card,
   CardContent,
@@ -841,11 +842,7 @@ function Resultado({
         </div>
       )}
 
-      <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-        {r.avisos.map((a) => (
-          <p key={a}>• {a}</p>
-        ))}
-      </div>
+      <Notas itens={r.avisos} />
     </div>
   );
 }

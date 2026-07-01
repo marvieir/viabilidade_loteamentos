@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Notas } from "@/components/ui/notas";
 import {
   Card,
   CardContent,
@@ -209,13 +210,7 @@ export function CardAmbiental({
                 </div>
               )}
 
-            {data.avisos.length > 0 && (
-              <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
-                {data.avisos.map((a) => (
-                  <p key={a}>{a}</p>
-                ))}
-              </div>
-            )}
+            <Notas itens={data.avisos} />
           </>
         )}
       </CardContent>
