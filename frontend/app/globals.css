@@ -12,6 +12,20 @@ body {
   margin: 0;
   font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, Helvetica, Arial, sans-serif;
+  font-feature-settings: "cv11", "ss01"; /* Inter: formas alternativas mais legíveis */
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Números tabulares em tabelas e KPIs — colunas de valores alinham (padrão de produto). */
+table,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Seleção com a cor da marca (detalhe que separa MVP de produto). */
+::selection {
+  background: #e0e7ff;
+  color: #1e1b4b;
 }
 
 /* Scrollbar discreta (estética de produto) */

@@ -266,7 +266,7 @@ export default function Home() {
             statusSec={statusSec}
           />
 
-          <main className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-5">
+          <main className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:p-5">
             {analise.agrupamento && (
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
                 <p className="font-semibold">
@@ -279,30 +279,6 @@ export default function Home() {
                 </p>
               </div>
             )}
-            <KpiRow
-              analise={analise}
-              aprov={dadosAprov}
-              amb={dadosAmb}
-              verde={dadosVerde}
-              decliv={dadosDecliv}
-              juridico={dadosJuridico}
-            />
-
-            <MapHero
-              analise={analise}
-              overlays={overlays}
-              ocultos={ocultos}
-              onToggle={toggleOculto}
-              badge={
-                <BadgeCobertura
-                  jurisdicao={analise.jurisdicao}
-                  analiseId={analise.analise_id}
-                  onJurisdicao={(j) =>
-                    setAnalise((prev) => (prev ? { ...prev, jurisdicao: j } : prev))
-                  }
-                />
-              }
-            />
 
             {/* Navegação por seção no mobile (a sidebar cobre o desktop) */}
             <div className="-mx-4 flex gap-1 overflow-x-auto px-4 md:hidden">
@@ -322,8 +298,33 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Painéis: todos montados (estado preservado); só o ativo é exibido. */}
-            <div className={secao === "visao" ? "" : "hidden"}>
+            {/* Painéis: todos montados (estado preservado); só o ativo é exibido.
+                Progressive disclosure: KPIs + mapa-herói vivem SÓ na Visão geral —
+                cada seção abre direto no seu conteúdo (sem rolar por blocos repetidos). */}
+            <div className={secao === "visao" ? "space-y-4" : "hidden"}>
+              <KpiRow
+                analise={analise}
+                aprov={dadosAprov}
+                amb={dadosAmb}
+                verde={dadosVerde}
+                decliv={dadosDecliv}
+                juridico={dadosJuridico}
+              />
+              <MapHero
+                analise={analise}
+                overlays={overlays}
+                ocultos={ocultos}
+                onToggle={toggleOculto}
+                badge={
+                  <BadgeCobertura
+                    jurisdicao={analise.jurisdicao}
+                    analiseId={analise.analise_id}
+                    onJurisdicao={(j) =>
+                      setAnalise((prev) => (prev ? { ...prev, jurisdicao: j } : prev))
+                    }
+                  />
+                }
+              />
               <VisaoGeral
                 analise={analise}
                 amb={dadosAmb}

@@ -145,15 +145,17 @@ function Stat({
   tom?: keyof typeof TONS;
 }) {
   return (
-    <div className={`rounded-2xl border p-4 shadow-sm ${TONS[tom]}`}>
-      <p className={`text-xs font-medium ${TONS_ROTULO[tom]}`}>{rotulo}</p>
-      <p className="mt-1 text-2xl font-bold tracking-tight">
+    <div className={`rounded-xl border px-3.5 py-3 shadow-sm ${TONS[tom]}`}>
+      <p className={`text-[11px] font-medium uppercase tracking-wide ${TONS_ROTULO[tom]}`}>
+        {rotulo}
+      </p>
+      <p className="mt-0.5 text-xl font-bold tracking-tight">
         {valor}
         {unidade ? (
-          <span className="text-base font-semibold opacity-50"> {unidade}</span>
+          <span className="text-sm font-semibold opacity-50"> {unidade}</span>
         ) : null}
       </p>
-      {sub ? <p className="mt-1 text-[11px] opacity-70">{sub}</p> : null}
+      {sub ? <p className="mt-0.5 truncate text-[11px] opacity-70" title={sub}>{sub}</p> : null}
     </div>
   );
 }

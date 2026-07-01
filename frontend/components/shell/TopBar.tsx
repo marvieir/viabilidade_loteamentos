@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { IconDownload, IconMap, IconPlay, IconPlus } from "@/components/Icons";
+import { IconDownload, IconMap, IconPlay, IconPlus, IconChevron } from "@/components/Icons";
+import { Button } from "@/components/ui/button";
+import { Menu, MenuDivisor, MenuItem, MenuLabel } from "@/components/ui/menu";
 import { useAuth } from "@/components/auth/AuthProvider";
 import type { Analise } from "@/lib/api";
 
@@ -42,112 +44,114 @@ export function TopBar({
     jur?.municipio && jur?.uf
       ? `${jur.municipio} / ${jur.uf}`
       : jur?.uf || "Jurisdição federal";
+  const exportando = gerandoLaudo || gerandoExcel;
+  const iniciais = (usuario?.nome || usuario?.email || "?")
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
 
   return (
-    <header className="sticky top-0 z-[1100] flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-4 backdrop-blur sm:px-5">
-      <div className="flex items-center gap-3">
-        <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
-          <IconMap width={20} height={20} />
+    <header className="sticky top-0 z-[1100] flex h-14 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-5">
+      {/* Marca */}
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+          <IconMap width={17} height={17} />
         </div>
-        <div className="leading-tight">
-          <p className="text-sm font-bold">Pré-Viabilidade de Loteamento</p>
-          <p className="hidden text-[11px] text-slate-500 sm:block">
-            Triagem determinística · cada número com proveniência
-          </p>
-        </div>
+        <p className="truncate text-sm font-bold tracking-tight">
+          Pré-Viabilidade <span className="hidden font-medium text-slate-400 md:inline">· Loteamento</span>
+        </p>
+        {/* Contexto da análise (gleba atual) */}
+        {analise && (
+          <div className="ml-1 hidden min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 lg:flex">
+            <span className="truncate text-xs font-semibold text-slate-700">{local}</span>
+            <span className="h-3 w-px shrink-0 bg-slate-300" />
+            <span className="shrink-0 text-xs text-slate-500">
+              {analise.geometria.area_ha.toLocaleString("pt-BR")} ha
+            </span>
+            <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">
+              {ROTULO_COBERTURA[analise.jurisdicao.cobertura] ?? "—"}
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* Toolbar — botões uniformes (design system); ações de exportação agrupadas */}
+      <div className="flex shrink-0 items-center gap-2">
         {analise && (
           <>
-            <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 lg:flex">
-              <span className="text-sm font-semibold">{local}</span>
-              <span className="h-3.5 w-px bg-slate-300" />
-              <span className="text-sm text-slate-600">
-                {analise.geometria.area_ha.toLocaleString("pt-BR")} ha
-              </span>
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                {ROTULO_COBERTURA[analise.jurisdicao.cobertura] ?? "—"}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={onAnalisarTudo}
-              disabled={analisando}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              <IconPlay width={15} height={15} />
-              {analisando ? "Analisando…" : "Analisar tudo"}
-            </button>
+            <Button variant="secondary" onClick={onAnalisarTudo} disabled={analisando}>
+              <IconPlay width={14} height={14} />
+              <span className="hidden sm:inline">{analisando ? "Analisando…" : "Analisar tudo"}</span>
+            </Button>
             {onSalvar && (
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 onClick={onSalvar}
                 disabled={salvando}
                 title="Salva esta análise em 'Minhas análises' (geometria + resultados)"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                {salvando ? "Salvando…" : jaSalva ? "Atualizar" : "Salvar análise"}
-              </button>
+                {salvando ? "Salvando…" : jaSalva ? "Atualizar" : "Salvar"}
+              </Button>
             )}
-            {onLaudo && (
-              <button
-                type="button"
-                onClick={onLaudo}
-                disabled={gerandoLaudo}
-                title="Gera o laudo de triagem em PDF (composição das dimensões já analisadas)"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            {(onLaudo || onExcel) && (
+              <Menu
+                botao={
+                  <Button variant="secondary" disabled={exportando}>
+                    <IconDownload width={14} height={14} />
+                    <span className="hidden sm:inline">
+                      {exportando ? "Gerando…" : "Exportar"}
+                    </span>
+                    <IconChevron width={12} height={12} className="opacity-50" />
+                  </Button>
+                }
               >
-                <IconDownload width={15} height={15} />
-                {gerandoLaudo ? "Gerando…" : "Gerar laudo (PDF)"}
-              </button>
-            )}
-            {onExcel && (
-              <button
-                type="button"
-                onClick={onExcel}
-                disabled={gerandoExcel}
-                title="Exporta as dimensões já analisadas em Excel (.xlsx)"
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-              >
-                <IconDownload width={15} height={15} />
-                {gerandoExcel ? "Gerando…" : "Excel"}
-              </button>
+                {onLaudo && (
+                  <MenuItem onClick={onLaudo} disabled={gerandoLaudo}>
+                    <IconDownload width={14} height={14} className="text-slate-400" />
+                    Laudo de triagem (PDF)
+                  </MenuItem>
+                )}
+                {onExcel && (
+                  <MenuItem onClick={onExcel} disabled={gerandoExcel}>
+                    <IconDownload width={14} height={14} className="text-slate-400" />
+                    Planilha (Excel)
+                  </MenuItem>
+                )}
+              </Menu>
             )}
           </>
         )}
-        <button
-          type="button"
-          onClick={onNova}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          <IconPlus width={15} height={15} />
-          Nova análise
-        </button>
+        <Button onClick={onNova}>
+          <IconPlus width={14} height={14} />
+          <span className="hidden sm:inline">Nova análise</span>
+        </Button>
+
+        {/* Menu do usuário (avatar) — e-mail/admin/sair saem da barra, entram no menu */}
         {usuario && (
-          <div className="ml-1 flex items-center gap-2 border-l border-slate-200 pl-2">
-            {usuario.papel === "admin" && (
-              <Link
-                href="/admin"
-                className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+          <Menu
+            botao={
+              <button
+                type="button"
+                title={usuario.email}
+                className="ml-1 grid h-9 w-9 place-items-center rounded-full border border-slate-200 bg-slate-100 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200"
               >
-                Admin
+                {iniciais || "?"}
+              </button>
+            }
+          >
+            <MenuLabel>{usuario.email}</MenuLabel>
+            {usuario.papel === "admin" && (
+              <Link href="/admin" className="block">
+                <MenuItem>Painel do administrador</MenuItem>
               </Link>
             )}
-            <span
-              className="hidden max-w-[14rem] truncate text-sm text-slate-600 sm:block"
-              title={usuario.email}
-            >
-              {usuario.email}
-            </span>
-            <button
-              type="button"
-              onClick={sair}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
+            <MenuDivisor />
+            <MenuItem onClick={sair} destaque>
               Sair
-            </button>
-          </div>
+            </MenuItem>
+          </Menu>
         )}
       </div>
     </header>
