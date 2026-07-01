@@ -16,7 +16,7 @@
 | **Aquisição (marketing/CAC)** | Ads, conteúdo, parcerias, vendas | **Variável por cliente** — tende a dominar tudo |
 | **Seu tempo** | Suporte, confirmação de perfil LUOS, manutenção | Custo oculto, real |
 
-**Insight central:** o custo de **compute por análise é baixíssimo** (estimado R$ 11–17). O custo
+**Insight central:** o custo de **compute por análise é baixíssimo** (marginal estimado ~R$ 2–6). O custo
 que vai pesar de verdade é **aquisição de cliente (CAC)** — a precificação tem que mirar LTV, não COGS.
 
 ---
@@ -27,40 +27,56 @@ Só **3 pontos** chamam a IA; todas as outras dimensões (ambiental, declividade
 econômica, custo de infra, malha fundiária, bacia, bioma, localização, conformidade) são **Python puro
 = R$ 0 de LLM**.
 
-| Chamada | Modelo | Input estimado | Output estimado | Custo estimado | Frequência |
-|---|---|---|---|---|---|
-| **Extração LUOS** | Opus 4.8 | ~160k tok (PDF ~80 págs) | ~16k tok | **~US$ 1,20** | **1× por município** (reutilizada!) |
-| **Urbanismo IA** | Fable 5 | ~6k tok | ~4k tok (×2 gerações) | **~US$ 0,52** | por análise (mais se regenerar) |
-| **Extração Jurídica** | Opus 4.8 | ~15k tok/matrícula | ~6k tok/matrícula | **~US$ 0,68** (3 matrículas) | por análise |
+> **Correção importante:** o **Fable 5 NÃO é usado** (não está disponível na org) — a cadeia cai para
+> **Opus 4.8 hoje, em TODAS as 3 chamadas**. E o custo marginal por análise é **só o LLM**; a infra do
+> Lightsail é **custo fixo** (§4), não entra no marginal.
 
-### Custo por análise completa
-- **Regime estável** (município já tem perfil LUOS): Urbanismo + Jurídico ≈ **US$ 1,20 ≈ R$ 6,6** de LLM.
-- **Primeira análise de um município novo**: + a extração LUOS (US$ 1,20) ≈ **US$ 2,40 ≈ R$ 13** de LLM.
+### Cenário HOJE (tudo em Opus 4.8, US$ 5/25)
+| Chamada | Input estimado | Output estimado | Custo estimado | Frequência |
+|---|---|---|---|---|
+| **Extração LUOS** | ~160k tok (PDF ~80 págs) | ~16k tok | ~US$ 1,20 | **1× por município** (amortizada!) |
+| **Urbanismo IA** | ~6k tok | ~4k tok (×~2 gerações) | ~US$ 0,20 | por análise |
+| **Extração Jurídica** | ~15k tok/matrícula | ~6k tok/matrícula | ~US$ 0,68 (3 matrículas) | por análise |
 
-### + Infra diluída
-Lightsail ~US$ 40/mês. Diluído: 50 análises/mês → US$ 0,80/análise; 200/mês → US$ 0,20.
+- **Marginal por análise (município já perfilado):** Urbanismo + Jurídico ≈ **US$ 0,88 ≈ R$ 5**.
+- LUOS amortizada: US$ 1,20 ÷ (nº de análises na cidade). Com 10 análises/cidade → +US$ 0,12/análise.
+- **Total marginal ≈ US$ 1,00 ≈ R$ 5,5 por análise completa.**
 
-### COGS marginal por análise completa
-| Cenário | LLM | Infra (50/mês) | **Total ≈** |
-|---|---|---|---|
-| Município já perfilado | US$ 1,20 | US$ 0,80 | **US$ 2,00 ≈ R$ 11** |
-| Município novo (1ª vez) | US$ 2,40 | US$ 0,80 | **US$ 3,20 ≈ R$ 17** |
+### Cenário OTIMIZADO (Sonnet 5 no LUOS + Jurídico; Opus 4.8 só no Urbanismo)
+Sonnet 5 = US$ 3/15 (promo US$ 2/10 até 31/08/2026). Extração é tarefa estruturada — Sonnet dá conta.
+| Chamada | Modelo | Custo estimado |
+|---|---|---|
+| Urbanismo IA | Opus 4.8 | ~US$ 0,20 |
+| Extração Jurídica (3 matrículas) | Sonnet 5 | ~US$ 0,40 |
+| Extração LUOS (amortizada) | Sonnet 5 | ~US$ 0,07 |
 
-> Mesmo com regeneração intensa de urbanismo (cada nova geração +US$ 0,26) e mais matrículas, o COGS
-> dificilmente passa de **R$ 25/análise**. Para um produto cujo objeto vale milhões, é desprezível.
+- **Total marginal ≈ US$ 0,67 ≈ R$ 3,7 por análise** (≈ **R$ 2,5** com preço promo do Sonnet).
+- Ainda mais agressivo: **Haiku 4.5** (US$ 1/5) no Jurídico levaria o marginal a **~R$ 2**, se a acurácia
+  da extração se sustentar (validar com valores-ouro antes).
+
+### Resumo do custo marginal
+| Cenário | Marginal por análise completa |
+|---|---|
+| Hoje (tudo Opus 4.8) | **~R$ 5–6** |
+| Otimizado (Sonnet extração) | **~R$ 3–4** |
+| Agressivo (Haiku no jurídico) | **~R$ 2** |
+
+> O R$ 25 do brainstorm anterior estava **errado** — inflado por (a) precificar Fable 5, (b) somar infra
+> fixa no marginal, (c) estimativas conservadoras. O custo real de mais uma análise é **poucos reais**.
 
 ---
 
 ## 3. Alavancas de custo (se quiser baixar o COGS)
 
-1. **Urbanismo IA usa Fable 5 (US$ 10/50 — o mais caro).** Trocar por **Opus 4.8** (US$ 5/25) corta
-   o custo do urbanismo pela metade; **Sonnet 5** (US$ 3/15, promo US$ 2/10) corta ~70%. Tradeoff de
-   qualidade do traçado — testar antes. É a maior alavanca isolada.
-2. **Prompt caching** no system prompt do urbanismo (estável entre gerações da mesma análise) →
+1. **LUOS + Jurídico em Sonnet 5** (US$ 3/15) em vez de Opus 4.8 — extração é tarefa estruturada;
+   mantém qualidade a ~40–60% do custo. **É só trocar 2 envs** (`LUOS_EXTRATOR_MODELO`,
+   `JURIDICO_EXTRATOR_MODELO=claude-sonnet-5`), sem mexer em código. Validar acurácia com valores-ouro.
+2. **Urbanismo fica em Opus 4.8** (o Fable nem está disponível). Se quiser cortar mais, testar
+   Sonnet 5 também no traçado — mas aqui a qualidade importa mais, então avaliar com cuidado.
+3. **Prompt caching** no system prompt do urbanismo (estável entre gerações da mesma análise) →
    ~90% de desconto no prefixo relido. Ganho real quando há múltiplas regenerações.
-3. **LUOS/Jurídico em Sonnet 5** em vez de Opus 4.8 para PDFs — extração é tarefa estruturada; pode
-   manter qualidade a ~60% do custo. Validar acurácia com valores-ouro antes.
-4. **LUOS é amortizada** — quanto mais análises por cidade, mais barato o custo médio. Concentrar
+4. **Haiku 4.5** (US$ 1/5) no Jurídico — a mais agressiva; validar acurácia antes.
+5. **LUOS é amortizada** — quanto mais análises por cidade, mais barato o custo médio. Concentrar
    vendas por região aproveita isso.
 
 ---
@@ -88,7 +104,7 @@ O seu COGS está **concentrado nas 3 features de IA** (LUOS, Urbanismo, Jurídic
 - **Tier Pro (pago) = features de IA + custo** (Urbanismo IA, Jurídico/cadeia dominial, Conformidade
   LUOS, Custo de infraestrutura). É onde está o seu diferencial caro e defensável.
 
-Isso é melhor que "2 análises completas grátis" (que custariam ~R$ 22–34 por usuário, mesmo quem nunca
+Isso é melhor que "2 análises completas grátis" (que custariam ~R$ 4–12 por usuário, mesmo quem nunca
 converte). Aqui o **free é quase de graça pra você** e ainda demonstra qualidade.
 
 **Estrutura sugerida:**
@@ -98,8 +114,8 @@ converte). Aqui o **free é quase de graça pra você** e ainda demonstra qualid
 | **Pro mensal** | R$ 199–499/mês | N análises Pro completas/mês + excedente R$ 49–99 |
 | **Créditos avulsos** | R$ 99–199/análise Pro | Para quem usa esporádico, sem assinar |
 
-> Margem bruta no compute: **>90%** em qualquer cenário (COGS R$ 11–25 vs. preço R$ 99–499). O gargalo
-> de lucro não é custo — é **CAC e conversão**.
+> Margem bruta no compute: **>95%** (custo marginal R$ 2–6 vs. preço R$ 99–499). O gargalo de lucro
+> não é custo — é **CAC e conversão**.
 
 ---
 
@@ -115,7 +131,7 @@ Não dá pra cravar números sem seus canais, mas o desenho:
   provavelmente o de melhor CAC para esse público B2B.
 - **Vendas diretas:** loteadoras médias/grandes — ticket alto, ciclo longo, mas LTV grande.
 
-**Regra de ouro:** mire **LTV ≥ 3× CAC**. Com COGS de R$ 11–25 e preço de R$ 199–499/mês, o LTV é
+**Regra de ouro:** mire **LTV ≥ 3× CAC**. Com custo marginal de R$ 2–6 e preço de R$ 199–499/mês, o LTV é
 alto; o que precisa ser controlado é o CAC e o churn.
 
 ---
@@ -134,11 +150,12 @@ agregado por análise/mês no painel admin que já existe. Vira a base factual d
 
 ## 8. Resumo executivo
 
-- **Custo por análise completa:** ~**R$ 11** (município já perfilado) a ~**R$ 17** (1ª vez na cidade);
-  teto realista ~R$ 25. Compute é barato.
+- **Custo MARGINAL por análise completa:** **~R$ 5–6 hoje** (tudo Opus 4.8), **~R$ 3–4 otimizado**
+  (Sonnet na extração), **~R$ 2 agressivo** (Haiku no jurídico). Infra do Lightsail é **fixa** (~R$ 220/mês),
+  não por análise. O R$ 25 anterior estava errado.
 - **Custo está em 3 features de IA**; o resto é R$ 0 de LLM.
 - **Cobrança recomendada:** freemium com **gate por feature** (free = determinístico ilimitado; Pro =
-  IA) + assinatura mensal com cota + créditos avulsos.
-- **Maior alavanca de custo:** trocar o modelo do Urbanismo IA (Fable 5 → Opus/Sonnet).
+  IA) + assinatura mensal com cota + créditos avulsos. Margem no compute **>95%**.
+- **Maior alavanca de custo:** LUOS + Jurídico em Sonnet 5 (só trocar 2 envs, sem código).
 - **O que decide o lucro não é o COGS — é o CAC e a conversão free→pago.**
 - **Antes de cravar preço:** instrumentar o custo real por análise (§7).
