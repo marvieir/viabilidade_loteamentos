@@ -27,8 +27,8 @@ import {
   type ValorPosicional,
 } from "@/lib/api";
 import {
-  CORES_FAIXA,
   CORES_OVERLAY,
+  CORES_QUINTIL,
   ESTILO_OVERLAY,
   ROTULO_OVERLAY,
 } from "@/components/mapa/overlays";
@@ -499,14 +499,14 @@ export function CardUrbanismo({
                 </div>
                 {temFeatures && (
                   <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-                    <span>Cor do lote = score:</span>
-                    {Object.entries(CORES_FAIXA).map(([faixa, cor]) => (
-                      <span key={faixa} className="inline-flex items-center gap-1">
+                    <span>Cor do lote = valorização relativa (quintis):</span>
+                    {([1, 2, 3, 4, 5] as const).map((q) => (
+                      <span key={q} className="inline-flex items-center gap-1">
                         <span
                           className="inline-block h-2.5 w-2.5 rounded-sm"
-                          style={{ backgroundColor: cor }}
+                          style={{ backgroundColor: CORES_QUINTIL[q] }}
                         />
-                        {faixa}
+                        {q === 1 ? "menos valorizados" : q === 5 ? "mais valorizados" : `Q${q}`}
                       </span>
                     ))}
                   </div>

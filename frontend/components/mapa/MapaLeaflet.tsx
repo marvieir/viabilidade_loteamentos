@@ -7,7 +7,7 @@ import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap, useMapEvents } 
 import type { Feature, GeoJsonObject } from "geojson";
 import L from "leaflet";
 import type { ChaveOverlay } from "@/lib/api";
-import { CORES_FAIXA, CORES_FINA, CORES_OVERLAY, ESTILO_OVERLAY } from "@/components/mapa/overlays";
+import { CORES_FAIXA, CORES_FINA, CORES_OVERLAY, CORES_QUINTIL, ESTILO_OVERLAY } from "@/components/mapa/overlays";
 
 // O front apenas RENDERIZA o GeoJSON que veio do backend. Nenhuma geo-matemática
 // aqui — fitBounds/invalidateSize são só enquadramento de tela, não cálculo de viabilidade.
@@ -168,11 +168,15 @@ export default function MapaLeaflet({
           key={`lotes-${lotesFeatures.features.length}`}
           data={lotesFeatures as GeoJsonObject}
           style={(f?: Feature) => {
+            // U1 — cor primária = QUINTIL de valorização relativo (backend); snapshot antigo
+            // sem quintil cai na faixa absoluta de score (compat).
+            const quintil = f?.properties?.quintil_valor as number | undefined;
             const faixa = (f?.properties?.faixa_score as string) ?? "";
             return {
               color: "#374151", // borda escura por lote → parcelamento legível
               weight: 0.8,
-              fillColor: CORES_FAIXA[faixa] ?? "#9ca3af",
+              fillColor:
+                (quintil != null ? CORES_QUINTIL[quintil] : CORES_FAIXA[faixa]) ?? "#9ca3af",
               fillOpacity: 0.5,
             };
           }}

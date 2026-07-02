@@ -1445,6 +1445,9 @@ class LoteScoreOut(BaseModel):
     # Opcionais p/ compatibilidade com propostas salvas antes da U1.
     fatores: dict[str, float] = {}
     multiplicador: Optional[float] = None
+    # Quintil de valorização RELATIVO à proposta (1 = 20% menos … 5 = 20% mais valorizados) —
+    # é o que o mapa pinta (o score absoluto raramente encosta em 0/10).
+    quintil_valor: Optional[int] = None
 
 
 class HeatmapOut(BaseModel):

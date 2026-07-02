@@ -105,7 +105,9 @@ def test_heatmap_determinismo_e_estrutura():
     # Sem preço absoluto nos dados por lote — score v2 (U1): fatores 0–1 rotulados +
     # multiplicador posicional; o R$ continua sendo input do usuário (/urbanismo/valor).
     for p in h1["por_lote"]:
-        assert set(p.keys()) == {"lote_id", "score", "area_m2", "fatores", "multiplicador"}
+        assert set(p.keys()) == {
+            "lote_id", "score", "area_m2", "fatores", "multiplicador", "quintil_valor"
+        }
         assert all(0.0 <= v <= 1.0 for v in p["fatores"].values())
     assert h1["versao_score"] == 2
 

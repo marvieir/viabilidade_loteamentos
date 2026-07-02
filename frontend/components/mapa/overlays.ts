@@ -137,3 +137,21 @@ export const CORES_FAIXA: Record<string, string> = {
   "7-9": "#f03b20",
   "9-10": "#bd0026", // score alto (escuro/quente)
 };
+
+// U1 — QUINTIL de valorização relativo à proposta (1 = 20% menos … 5 = 20% mais valorizados).
+// É a cor primária do lote: o score absoluto raramente encosta em 0/10, então só as faixas
+// absolutas "achatavam" o mapa; o quintil (do backend) garante o espectro completo sempre.
+export const CORES_QUINTIL: Record<number, string> = {
+  1: "#ffffb2",
+  2: "#fecc5c",
+  3: "#fd8d3c",
+  4: "#f03b20",
+  5: "#bd0026",
+};
+export const ROTULO_QUINTIL: Record<number, string> = {
+  1: "20% menos valorizados",
+  2: "2º quintil",
+  3: "3º quintil",
+  4: "4º quintil",
+  5: "20% mais valorizados",
+};

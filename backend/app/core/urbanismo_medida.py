@@ -431,6 +431,21 @@ def pontuar(
             max(0.5, 1.0 + amplitude * (p["score"] - media_exata) / 10.0), 4
         )
 
+    # QUINTIL de valorização RELATIVO à proposta (1 = 20% menos valorizados … 5 = 20% mais):
+    # é o que o MAPA pinta. O score absoluto raramente encosta em 0 ou 10 (exigiria perfeição
+    # em todos os fatores), então as faixas absolutas sozinhas "achatavam" o heatmap — o
+    # quintil garante o espectro completo em qualquer layout. Empate de score → mesmo quintil
+    # (determinístico); layout sem variação → todos no quintil 3 (neutro, não finge ranking).
+    ordenados = sorted(scores)
+    n_sc = len(ordenados)
+    if ordenados[0] == ordenados[-1]:
+        for p in por_lote:
+            p["quintil_valor"] = 3
+    else:
+        cortes = [ordenados[min(int(q * n_sc), n_sc - 1)] for q in (0.2, 0.4, 0.6, 0.8)]
+        for p in por_lote:
+            p["quintil_valor"] = 1 + sum(1 for c in cortes if p["score"] > c)
+
     faixas = []
     n = len(scores)
     anterior = -0.01
@@ -544,6 +559,8 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
                 # p/ o popup do mapa explicar POR QUE o lote vale mais/menos (o front só exibe).
                 "multiplicador": pl.get("multiplicador"),
                 "fatores": pl.get("fatores"),
+                # quintil RELATIVO (1..5) — é a cor do lote no mapa (espectro completo sempre)
+                "quintil_valor": pl.get("quintil_valor"),
                 "declividade_pct": (
                     declividade_por_lote[i] if i < len(declividade_por_lote) else None
                 ),

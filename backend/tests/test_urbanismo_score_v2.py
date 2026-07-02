@@ -137,6 +137,22 @@ def test_dispersao_cresce_com_a_renda():
     assert spread["baixa"] < spread["alta"]
 
 
+def test_quintil_relativo_cobre_o_espectro():
+    """O MAPA pinta por quintil RELATIVO (1..5): num layout variado os extremos existem
+    sempre (o melhor lote é quintil 5 / o pior é 1), mesmo com scores absolutos ~5–8.
+    Sem variação de score → todos no quintil 3 (não finge ranking)."""
+    lotes, verde, portico = _layout_variado()
+    h = medida.pontuar(lotes, verde, portico=portico)
+    quintis = [p["quintil_valor"] for p in h["por_lote"]]
+    assert min(quintis) == 1 and max(quintis) == 5
+    melhor = max(h["por_lote"], key=lambda p: p["score"])
+    pior = min(h["por_lote"], key=lambda p: p["score"])
+    assert melhor["quintil_valor"] == 5 and pior["quintil_valor"] == 1
+    # sem variação de score (1 lote) → quintil neutro 3, não finge ranking
+    h1 = medida.pontuar([box(0.0, 0.0, 14.0, 30.0)])
+    assert h1["por_lote"][0]["quintil_valor"] == 3
+
+
 def test_score_v2_deterministico_e_desacoplado_do_tamanho():
     """Mesma entrada → mesmo heatmap; lote GRANDE mal-posicionado não ganha do pequeno
     bem-posicionado (o tamanho não entra no score — Fase 9.3 §3)."""

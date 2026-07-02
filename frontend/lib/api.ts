@@ -1398,6 +1398,8 @@ export interface LoteScore {
   // Opcionais: propostas salvas antes da U1 não os têm.
   fatores?: Record<string, number>;
   multiplicador?: number | null;
+  // Quintil de valorização relativo à proposta (1..5) — cor do lote no mapa.
+  quintil_valor?: number | null;
 }
 export interface HeatmapUrb {
   score_medio: number | null;
