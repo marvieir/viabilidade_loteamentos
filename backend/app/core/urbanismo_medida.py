@@ -90,6 +90,9 @@ class Layout:
     # Fase 11.3 — PÓRTICO/ENTRADA: marcador do acesso único do loteamento (alto padrão) p/ o mapa
     # desenhar o componente, não só contar no diagnóstico. Ponto/disco no arruamento junto à borda.
     portico: Optional[BaseGeometry] = None
+    # Fase U3 (futuro) — lâmina d'água criada (lago/parque linear). Hoje o motor não gera água;
+    # o campo existe para o score v2 já saber pontuar quando a U3 materializar (fator "agua").
+    agua: Optional[BaseGeometry] = None
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -138,8 +141,11 @@ class Medicao:
     heatmap: dict
 
 
-def medir(layout: Layout) -> Medicao:
-    """Quadro de áreas + indicadores + heatmap a partir do ``Layout`` métrico (PURO)."""
+def medir(layout: Layout, publico_alvo: Optional[str] = None) -> Medicao:
+    """Quadro de áreas + indicadores + heatmap a partir do ``Layout`` métrico (PURO).
+
+    ``publico_alvo`` (baixa/media/alta) escolhe os PESOS do score de valor v2 (Fase U1);
+    ausente → perfil "media" (rotulado na proveniência do heatmap)."""
     lotes = [g for g in layout.lotes if g is not None and not g.is_empty]
     vendavel = round(sum(_area(g) for g in lotes), 2)
     verdes = round(_area(layout.areas_verdes), 2)
@@ -157,7 +163,8 @@ def medir(layout: Layout) -> Medicao:
     for g in (layout.arruamento, layout.areas_verdes, layout.sistema_lazer, layout.institucional):
         if g is not None and not g.is_empty:
             todas.append(g)
-    area_liquida = round(_area(_uniao(todas)), 2) if todas else 0.0
+    uni_todas = _uniao(todas) if todas else None
+    area_liquida = round(_area(uni_todas), 2) if todas else 0.0
 
     def _uso(m2: float) -> dict:
         pct = round(m2 / area_liquida, 4) if area_liquida else 0.0
@@ -207,61 +214,218 @@ def medir(layout: Layout) -> Medicao:
         "calcadas_m2": calcadas,
     }
 
-    heatmap = pontuar(lotes, layout.areas_verdes, layout.arruamento)
+    # Score v2 (Fase U1): o verde-AMENIDADE inclui a restrição preservada (bosque/mata) — fundo
+    # p/ mata é prêmio (pesquisa §1); a borda externa filtra falso "bolsão" no fim da malha.
+    verde_amenidade = _uniao(
+        [g for g in (layout.areas_verdes, layout.restricao_recortada) if g is not None]
+    )
+    heatmap = pontuar(
+        lotes,
+        verde_amenidade,
+        layout.arruamento,
+        lazer=layout.sistema_lazer,
+        agua=layout.agua,
+        portico=layout.portico,
+        eixos=layout.eixos_malha,
+        borda_externa=uni_todas.boundary if uni_todas is not None else None,
+        publico_alvo=publico_alvo or "media",
+    )
     return Medicao(quadro=quadro, indicadores=indicadores, heatmap=heatmap)
 
 
-# ----------------------------- heatmap (scoring geométrico puro) -----------------------------
+# ------------------------- heatmap (score de valor v2 — Fase U1) -------------------------
 # Faixas de score (limites superiores inclusivos): 0–3, 3–5, 5–7, 7–9, 9–10.
 _FAIXAS = [("0-3", 3.0), ("3-5", 5.0), ("5-7", 7.0), ("7-9", 9.0), ("9-10", 10.01)]
 _PROX_VERDE_M = 8.0  # lote "de fundo contra verde" se a borda está a ≤ 8 m da área verde
+# Âncoras da pesquisa (docs/pesquisa-motor-urbanismo.md §1-§2): anel de valorização ~274 m ao
+# redor de amenidade verde/água; lazer acessível a ~5 min a pé (~400 m) de qualquer lote.
+RAIO_ANEL_VALOR_M = 274.0
+RAIO_CAMINHADA_M = 400.0
+RAIO_CULDESAC_M = 30.0  # lote "no bolsão" se está a ≤30 m do fim de uma via sem saída
+VERSAO_SCORE = 2
+
+# Pesos por perfil (publico_alvo) — quanto cada fator pesa no score 0–10. A pesquisa (§1)
+# mostra que os prêmios posicionais CRESCEM com a renda (água/privacidade/bolsão valem mais
+# no alto padrão; no econômico o lazer acessível pesa mais que o sossego).
+PESOS_PERFIL: dict[str, dict[str, float]] = {
+    "baixa": {"verde": 1.0, "agua": 1.0, "lazer": 1.5, "culdesac": 0.5,
+              "privacidade": 0.5, "orientacao": 1.0, "sossego": 0.5},
+    "media": {"verde": 2.0, "agua": 2.0, "lazer": 1.5, "culdesac": 1.0,
+              "privacidade": 1.0, "orientacao": 1.0, "sossego": 1.0},
+    "alta": {"verde": 2.5, "agua": 3.0, "lazer": 1.0, "culdesac": 2.0,
+             "privacidade": 2.0, "orientacao": 0.5, "sossego": 2.0},
+}
+# Amplitude do multiplicador posicional (± em torno de 1,0) — dispersão de preço dentro do
+# MESMO loteamento cresce com a renda (prêmios da §1: cul-de-sac até +29%, água +15%…).
+AMPLITUDE_PERFIL = {"baixa": 0.12, "media": 0.20, "alta": 0.30}
+_FATORES = ("verde", "agua", "lazer", "culdesac", "privacidade", "orientacao", "sossego")
 
 
-def _score_lote(
-    lote: BaseGeometry,
-    area_max: float,
-    verde: Optional[BaseGeometry],
-    centro,
-    raio_max: float,
-) -> float:
-    """Score 0–10 por POSIÇÃO (cota/verde/lazer/ruído) — DESACOPLADO do tamanho (Fase 9.3 §3:
-    o valor da posição vai para o R$/m², não para a área). Sem preço. Determinístico."""
-    s = 5.0
-    # fundo contra verde (privacidade/vista) — +3
+def _grad_anel(dist: float, raio: float = RAIO_ANEL_VALOR_M) -> float:
+    """1,0 em contato (≤8 m) decaindo linearmente até 0 na borda do anel de valorização."""
+    if dist <= _PROX_VERDE_M:
+        return 1.0
+    if dist >= raio:
+        return 0.0
+    return round(1.0 - (dist - _PROX_VERDE_M) / (raio - _PROX_VERDE_M), 4)
+
+
+def _orientacao_ns(poly: BaseGeometry) -> float:
+    """|cos| do azimute do eixo de PROFUNDIDADE do lote vs Norte — 1,0 quando frente/fundo
+    olham N-S (insolação de quintal, pesquisa §3); 0,0 quando o eixo corre L-O."""
+    try:
+        mrr = poly.minimum_rotated_rectangle
+        pts = list(mrr.exterior.coords)[:-1]
+    except Exception:  # noqa: BLE001 — geometria degenerada → neutro
+        return 0.5
+    if len(pts) < 4:
+        return 0.5
+    e1 = (pts[1][0] - pts[0][0], pts[1][1] - pts[0][1])
+    e2 = (pts[2][0] - pts[1][0], pts[2][1] - pts[1][1])
+    dx, dy = e1 if math.hypot(*e1) >= math.hypot(*e2) else e2
+    n = math.hypot(dx, dy)
+    return round(abs(dy) / n, 4) if n > 0 else 0.5
+
+
+def _privacidade(lote: BaseGeometry, verde, arruamento) -> Optional[float]:
+    """Fundo protegido = 1,0 (encosta em verde/mata); frente única = 0,6; esquina/dupla
+    frente = 0,2 (exposição). CATEGÓRICO e invariante à escala — a frente exposta é medida
+    contra a PRÓPRIA testada do lote (razão frente/perímetro premiaria lote fundo = maior e
+    acoplaria tamanho ao score, quebrando a Fase 9.3 §3). ``None`` quando não há via nem
+    verde para avaliar (fator ausente, não zero)."""
     if verde is not None and not verde.is_empty and lote.distance(verde) <= _PROX_VERDE_M:
-        s += 3.0
-    # afastamento do centro/entrada (sossego, menos ruído da via) — até +2
-    if raio_max > 0 and centro is not None:
-        s += 2.0 * min(lote.centroid.distance(centro) / raio_max, 1.0)
-    return round(max(0.0, min(10.0, s)), 2)
+        return 1.0
+    if arruamento is None or arruamento.is_empty:
+        return None
+    try:
+        frente = lote.boundary.intersection(arruamento.buffer(0.5)).length
+    except Exception:  # noqa: BLE001 — interseção degenerada → neutro
+        return 0.6
+    if frente <= 0.1:
+        return 0.6  # miolo sem via encostada — neutro
+    testada, _prof = _lados_mrr(lote)
+    return 0.2 if frente > max(testada, 0.1) * 1.3 else 0.6
+
+
+def _fins_de_via(eixos, borda_externa, portico) -> list:
+    """Pontas de via SEM SAÍDA (grau 1 no grafo dos eixos) que são bolsão de verdade: descarta
+    fim de malha na divisa (a via só acabou no limite) e a própria entrada/pórtico."""
+    from collections import Counter
+
+    from shapely.geometry import Point
+
+    cont: Counter = Counter()
+    coords_por_chave: dict = {}
+    for e in eixos or []:
+        try:
+            coords = list(e.coords)
+        except Exception:  # noqa: BLE001 — eixo não-linear (multiparte) → ignora
+            continue
+        if len(coords) < 2:
+            continue
+        for xy in (coords[0], coords[-1]):
+            chave = (round(xy[0], 1), round(xy[1], 1))
+            cont[chave] += 1
+            coords_por_chave[chave] = xy
+    fins = []
+    for chave, grau in cont.items():
+        if grau != 1:
+            continue
+        p = Point(coords_por_chave[chave])
+        # Ponta que ENCOSTA no meio de outro eixo é junção (T), não bolsão.
+        toques = sum(1 for e in eixos or [] if e.distance(p) <= 0.5)
+        if toques >= 2:
+            continue
+        if borda_externa is not None and not borda_externa.is_empty \
+                and p.distance(borda_externa) <= 12.0:
+            continue
+        if portico is not None and not portico.is_empty and p.distance(portico) <= 30.0:
+            continue
+        fins.append(p)
+    return fins
 
 
 def pontuar(
     lotes: Sequence[BaseGeometry],
     verde: Optional[BaseGeometry] = None,
     arruamento: Optional[BaseGeometry] = None,
+    *,
+    lazer: Optional[BaseGeometry] = None,
+    agua: Optional[BaseGeometry] = None,
+    portico: Optional[BaseGeometry] = None,
+    eixos: Optional[Sequence[BaseGeometry]] = None,
+    borda_externa: Optional[BaseGeometry] = None,
+    publico_alvo: str = "media",
 ) -> dict:
-    """Heatmap de valorização: score por lote + distribuição em faixas. Sem preço absoluto —
-    ordena QUALIDADE relativa; o R$/m² por faixa é input do usuário (não inventado)."""
+    """Heatmap de valorização v2: score 0–10 por POSIÇÃO (nunca por tamanho — Fase 9.3 §3) com
+    fatores rotulados por lote + MULTIPLICADOR posicional normalizado (média = 1,0): redistribui
+    o VGV entre os lotes, não o infla. Fator sem camada no layout fica AUSENTE (fora da média),
+    nunca vale zero em silêncio. Sem preço absoluto — o R$ é input do operador (/urbanismo/valor).
+    Determinístico."""
     lotes = [g for g in lotes if g is not None and not g.is_empty]
+    pesos_perfil = PESOS_PERFIL.get(publico_alvo, PESOS_PERFIL["media"])
+    amplitude = AMPLITUDE_PERFIL.get(publico_alvo, AMPLITUDE_PERFIL["media"])
     if not lotes:
-        return {"score_medio": None, "faixas": [], "por_lote": [], "proveniencia": _PROV_HEATMAP}
-    area_max = max(g.area for g in lotes)
+        return {
+            "score_medio": None, "faixas": [], "por_lote": [],
+            "versao_score": VERSAO_SCORE, "perfil": publico_alvo, "pesos": dict(pesos_perfil),
+            "amplitude": amplitude, "fatores_ausentes": list(_FATORES),
+            "proveniencia": _PROV_HEATMAP,
+        }
+
+    def _tem(g) -> bool:
+        return g is not None and not g.is_empty
+
     uni = _uniao(lotes)
     centro = uni.centroid if uni is not None else lotes[0].centroid
-    raio_max = max(g.centroid.distance(centro) for g in lotes) or 1.0
+    entrada = portico.centroid if _tem(portico) else centro
+    raio_max = max(g.centroid.distance(entrada) for g in lotes) or 1.0
+    fins = _fins_de_via(eixos, borda_externa, portico)
+    priv_avaliavel = _tem(arruamento) or _tem(verde)
 
     por_lote = []
     for i, g in enumerate(lotes, start=1):
+        fatores: dict[str, float] = {}
+        # DESACOPLAMENTO do tamanho (Fase 9.3 §3): o CONTATO usa a borda do lote (semântica de
+        # "fundo p/ verde"), mas o GRADIENTE do anel usa o CENTRÓIDE — senão lote maior fica
+        # geometricamente "mais perto" de tudo e o tamanho vaza para o score.
+        if _tem(verde):
+            fatores["verde"] = (
+                1.0 if g.distance(verde) <= _PROX_VERDE_M
+                else _grad_anel(g.centroid.distance(verde))
+            )
+        if _tem(agua):
+            fatores["agua"] = (
+                1.0 if g.distance(agua) <= _PROX_VERDE_M
+                else _grad_anel(g.centroid.distance(agua))
+            )
+        if _tem(lazer):
+            fatores["lazer"] = round(
+                max(0.0, 1.0 - g.centroid.distance(lazer) / RAIO_CAMINHADA_M), 4
+            )
+        if fins:
+            fatores["culdesac"] = 1.0 if min(g.distance(p) for p in fins) <= RAIO_CULDESAC_M else 0.0
+        if priv_avaliavel:
+            priv = _privacidade(g, verde, arruamento)
+            if priv is not None:
+                fatores["privacidade"] = priv
+        fatores["orientacao"] = _orientacao_ns(g)
+        fatores["sossego"] = round(min(g.centroid.distance(entrada) / raio_max, 1.0), 4)
+
+        soma_pesos = sum(pesos_perfil[f] for f in fatores) or 1.0
+        score = round(10.0 * sum(pesos_perfil[f] * v for f, v in fatores.items()) / soma_pesos, 2)
         por_lote.append(
-            {
-                "lote_id": f"L{i:03d}",
-                "score": _score_lote(g, area_max, verde, centro, raio_max),
-                "area_m2": round(g.area, 2),
-            }
+            {"lote_id": f"L{i:03d}", "score": score, "area_m2": round(g.area, 2),
+             "fatores": fatores}
         )
+
     scores = [p["score"] for p in por_lote]
     score_medio = round(sum(scores) / len(scores), 2)
+    media_exata = sum(scores) / len(scores)
+    for p in por_lote:
+        p["multiplicador"] = round(
+            max(0.5, 1.0 + amplitude * (p["score"] - media_exata) / 10.0), 4
+        )
 
     faixas = []
     n = len(scores)
@@ -271,17 +435,27 @@ def pontuar(
         anterior = teto
         if cont:
             faixas.append({"faixa": rotulo, "n": cont, "pct": round(cont / n, 4)})
+
+    presentes = set().union(*(p["fatores"].keys() for p in por_lote))
     return {
         "score_medio": score_medio,
         "faixas": faixas,
         "por_lote": por_lote,
+        "versao_score": VERSAO_SCORE,
+        "perfil": publico_alvo,
+        "pesos": {f: pesos_perfil[f] for f in _FATORES if f in presentes},
+        "amplitude": amplitude,
+        "fatores_ausentes": [f for f in _FATORES if f not in presentes],
         "proveniencia": _PROV_HEATMAP,
     }
 
 
 _PROV_HEATMAP = (
-    "Score geométrico relativo por lote (área, fundo contra verde, afastamento) — ordena "
-    "qualidade, NÃO é preço; o R$/m² por faixa é input do usuário."
+    "Score de valor v2 (0–10) por POSIÇÃO do lote — fatores determinísticos (verde/água/lazer/"
+    "bolsão/privacidade/orientação/sossego) ponderados pelo perfil do público-alvo; âncoras de "
+    "prêmio na pesquisa do motor (docs/pesquisa-motor-urbanismo.md §1–§3). O multiplicador "
+    "posicional tem média 1,0 (redistribui o VGV, não o infla). NÃO é preço: o R$ entra pelo "
+    "preço médio do operador em /urbanismo/valor."
 )
 
 
@@ -362,6 +536,10 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
                 "profundidade_m": p,
                 "quadra_id": layout.lote_quadra[i] if i < len(layout.lote_quadra) else None,
                 "faixa_score": _faixa_de_score(score),
+                # Fase U1 — score v2: multiplicador posicional (média 1,0) + fatores rotulados,
+                # p/ o popup do mapa explicar POR QUE o lote vale mais/menos (o front só exibe).
+                "multiplicador": pl.get("multiplicador"),
+                "fatores": pl.get("fatores"),
                 "declividade_pct": (
                     declividade_por_lote[i] if i < len(declividade_por_lote) else None
                 ),

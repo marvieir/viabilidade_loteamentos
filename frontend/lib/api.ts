@@ -1394,12 +1394,49 @@ export interface LoteScore {
   lote_id: string;
   score: number;
   area_m2: number;
+  // Fase U1 (score v2) — fatores 0–1 rotulados + multiplicador posicional (média 1,0).
+  // Opcionais: propostas salvas antes da U1 não os têm.
+  fatores?: Record<string, number>;
+  multiplicador?: number | null;
 }
 export interface HeatmapUrb {
   score_medio: number | null;
   faixas: FaixaHeatmap[];
   por_lote: LoteScore[];
+  // Fase U1 (score v2) — transparência: perfil/pesos/amplitude usados + fatores ausentes.
+  versao_score?: number | null;
+  perfil?: string | null;
+  pesos?: Record<string, number>;
+  amplitude?: number | null;
+  fatores_ausentes?: string[];
   proveniencia: string;
+}
+
+// ---- Fase U1 — valor posicional (preço do operador × multiplicador do score v2) ----
+export interface LoteValor {
+  lote_id: string;
+  area_m2: number;
+  score: number;
+  multiplicador: number;
+  preco: number;
+  preco_fmt: string;
+}
+export interface ValorPosicional {
+  proposta_id: string;
+  versao: number;
+  perfil: string | null;
+  base: "por_lote" | "por_m2";
+  preco_base: number;
+  n_lotes: number;
+  vgv: number;
+  vgv_fmt: string;
+  preco_medio: number;
+  preco_medio_fmt: string;
+  lote_max: LoteValor | null;
+  lote_min: LoteValor | null;
+  por_lote: LoteValor[];
+  proveniencia: string;
+  avisos: string[];
 }
 
 export interface GeometriaUrb {
@@ -1656,6 +1693,21 @@ export async function proporUrbanismo(
       }),
     }
   );
+  return jsonOrThrow(res);
+}
+
+// Fase U1 — valor posicional: preço médio do OPERADOR × multiplicador salvo na proposta.
+// Sem LLM e fora do cap de regenerações (não gera nada novo). Exatamente um preço.
+export async function valorPosicionalUrbanismo(
+  analiseId: string,
+  preco: { preco_lote_medio?: number; preco_m2_medio?: number },
+  versao?: number | null
+): Promise<ValorPosicional> {
+  const res = await apiFetch(`/api/analises/${analiseId}/urbanismo/valor`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...preco, ...(versao ? { versao } : {}) }),
+  });
   return jsonOrThrow(res);
 }
 

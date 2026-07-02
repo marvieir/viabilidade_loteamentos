@@ -1441,12 +1441,23 @@ class LoteScoreOut(BaseModel):
     lote_id: str
     score: float
     area_m2: float
+    # Fase U1 (score v2) — fatores rotulados (0–1) e multiplicador posicional (média 1,0).
+    # Opcionais p/ compatibilidade com propostas salvas antes da U1.
+    fatores: dict[str, float] = {}
+    multiplicador: Optional[float] = None
 
 
 class HeatmapOut(BaseModel):
     score_medio: Optional[float] = None
     faixas: list[FaixaHeatmapOut] = []
     por_lote: list[LoteScoreOut] = []
+    # Fase U1 (score v2) — transparência do cálculo: perfil/pesos/amplitude usados e quais
+    # fatores NÃO existiam neste layout (ausente ≠ zero). Opcionais p/ snapshots antigos.
+    versao_score: Optional[int] = None
+    perfil: Optional[str] = None
+    pesos: dict[str, float] = {}
+    amplitude: Optional[float] = None
+    fatores_ausentes: list[str] = []
     proveniencia: str = ""
 
 
@@ -1459,6 +1470,42 @@ class MedicaoUrbOut(BaseModel):
     indicadores: IndicadoresUrbOut
     heatmap: HeatmapOut
     avisos: list[str]
+
+
+# --------- Fase U1 — função de VALOR posicional (preço do operador × multiplicador) ---------
+class ValorPosicionalIn(BaseModel):
+    """Preço médio do OPERADOR (nunca inventado): por lote OU por m² — exatamente um."""
+
+    preco_lote_medio: Optional[float] = None  # R$ por lote (posição pura, ignora a área)
+    preco_m2_medio: Optional[float] = None    # R$/m² (posição × área do lote)
+    versao: Optional[int] = None              # proposta salva a valorar (default: a última)
+
+
+class LoteValorOut(BaseModel):
+    lote_id: str
+    area_m2: float
+    score: float
+    multiplicador: float
+    preco: float
+    preco_fmt: str
+
+
+class ValorPosicionalOut(BaseModel):
+    proposta_id: str
+    versao: int
+    perfil: Optional[str] = None
+    base: Literal["por_lote", "por_m2"]
+    preco_base: float
+    n_lotes: int
+    vgv: float
+    vgv_fmt: str
+    preco_medio: float
+    preco_medio_fmt: str
+    lote_max: Optional[LoteValorOut] = None
+    lote_min: Optional[LoteValorOut] = None
+    por_lote: list[LoteValorOut] = []
+    proveniencia: str
+    avisos: list[str] = []
 
 
 class ItemConformidadePrograma(BaseModel):

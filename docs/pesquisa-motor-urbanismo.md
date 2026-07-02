@@ -137,6 +137,8 @@ do operador (ver §6/roadmap U5).
 - **U1 — Score de valor v2 (fundação, barato):** fatores água/verde/cul-de-sac/privacidade
   (fundo p/ lote × fundo p/ verde)/orientação/ruído da entrada, pesos por perfil; vira R$ ao
   cruzar com o preço por faixa da Financeira. *Entrega: heatmap fiel + função de valor.*
+  **✔ IMPLEMENTADA (2026-07-02)** — `pontuar()` v2 com 7 fatores + multiplicador média-1,0 +
+  `POST /urbanismo/valor`; ver a entrada U1 no log do `ARCHITECTURE.md`.
 - **U2 — Lazer distribuído + amenidades materializadas:** hub central dimensionado por perfil
   (com **programa interno rotulado**: piscina/quadras/academia/salão como sub-parcelas) +
   pocket parks até cobrir raio de 400 m; amenidades do LLM passam a mapear para a biblioteca.

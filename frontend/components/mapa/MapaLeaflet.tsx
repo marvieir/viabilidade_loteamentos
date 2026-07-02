@@ -160,8 +160,24 @@ export default function MapaLeaflet({
             // DSM 30 m). Só exibe se houver DEM; sem dado, omite a parcela (não inventa).
             const decliv =
               typeof p.declividade_pct === "number" ? ` · decliv. ${p.declividade_pct}%` : "";
+            // Fase U1 — score v2: multiplicador posicional + fatores (o backend calculou; só exibe).
+            const mult =
+              typeof p.multiplicador === "number"
+                ? ` · valor ×${p.multiplicador.toFixed(2)}`
+                : "";
+            const NOMES_FATOR: Record<string, string> = {
+              verde: "verde", agua: "água", lazer: "lazer", culdesac: "bolsão",
+              privacidade: "privacidade", orientacao: "orientação", sossego: "sossego",
+            };
+            const fatores =
+              p.fatores && typeof p.fatores === "object"
+                ? Object.entries(p.fatores as Record<string, number>)
+                    .map(([k, v]) => `${NOMES_FATOR[k] ?? k} ${v.toFixed(2)}`)
+                    .join(" · ")
+                : "";
             layer.bindPopup(
-              `Lote ${p.lote_id ?? "—"} · ${area} m² · score ${score} · quadra ${p.quadra_id ?? "—"}${decliv}`
+              `Lote ${p.lote_id ?? "—"} · ${area} m² · score ${score} · quadra ${p.quadra_id ?? "—"}${decliv}${mult}` +
+                (fatores ? `<br/><span style="font-size:11px;color:#6b7280">${fatores}</span>` : "")
             );
           }}
         />

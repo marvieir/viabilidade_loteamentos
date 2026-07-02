@@ -389,7 +389,8 @@ def propor(
     )
     layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
     layout.restricao_origem = restr_origem
-    med = medida.medir(layout)
+    # Fase U1 — o perfil do público-alvo escolhe os PESOS do score de valor v2.
+    med = medida.medir(layout, publico_alvo=body.publico_alvo)
     quadro, indicadores, heatmap = _medicao_dicts(med)
 
     # Fase 11.13 — declividade média por lote (orientativa, DSM 30 m): amostra o DEM nos lotes
@@ -500,6 +501,98 @@ def _conformidade_programa(prog) -> list[schemas.ItemConformidadePrograma]:
 
 
 # --------------------------------- GET (snapshots) ---------------------------------
+# --------------------------------- /valor (Fase U1 — sem LLM) ---------------------------------
+@router.post(
+    "/analises/{analise_id}/urbanismo/valor", response_model=schemas.ValorPosicionalOut
+)
+def valor_posicional(
+    analise_id: str,
+    body: schemas.ValorPosicionalIn,
+    fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
+):
+    """FUNÇÃO DE VALOR posicional: preço MÉDIO do operador × multiplicador do score v2 (já salvo
+    na proposta). Determinístico, sem LLM e fora do cap de regenerações (não gera nada novo).
+    O preço nunca é inventado — sem input do operador não há R$."""
+    if STORE.get(analise_id) is None:
+        raise HTTPException(404, "Análise não encontrada.")
+    if (body.preco_lote_medio is None) == (body.preco_m2_medio is None):
+        raise HTTPException(
+            422, "Informe exatamente um preço: 'preco_lote_medio' OU 'preco_m2_medio'."
+        )
+    base = "por_lote" if body.preco_lote_medio is not None else "por_m2"
+    preco_base = float(body.preco_lote_medio if base == "por_lote" else body.preco_m2_medio)
+    if preco_base <= 0:
+        raise HTTPException(422, "O preço médio deve ser maior que zero.")
+
+    propostas = fonte_urb.listar(analise_id)
+    if not propostas:
+        raise HTTPException(
+            404, "Nenhum estudo de massa nesta análise — gere o urbanismo antes de valorar."
+        )
+    if body.versao is not None:
+        alvo = next((p for p in propostas if p.get("versao") == body.versao), None)
+        if alvo is None:
+            raise HTTPException(404, f"Versão {body.versao} não encontrada nesta análise.")
+    else:
+        alvo = propostas[-1]
+
+    por_lote = (alvo.get("heatmap") or {}).get("por_lote") or []
+    com_mult = [p for p in por_lote if p.get("multiplicador") is not None]
+    if not com_mult:
+        raise HTTPException(
+            409,
+            "Esta proposta foi salva antes do score de valor v2 (sem multiplicador posicional) — "
+            "regenere o estudo de massa para habilitar o valor por lote.",
+        )
+
+    from app.core.financeira import brl
+
+    lotes_out: list[schemas.LoteValorOut] = []
+    for p in com_mult:
+        mult = float(p["multiplicador"])
+        area = float(p.get("area_m2") or 0.0)
+        preco = preco_base * mult if base == "por_lote" else preco_base * area * mult
+        lotes_out.append(
+            schemas.LoteValorOut(
+                lote_id=str(p.get("lote_id", "")), area_m2=area,
+                score=float(p.get("score", 0.0)), multiplicador=mult,
+                preco=round(preco, 2), preco_fmt=brl(preco),
+            )
+        )
+    vgv = round(sum(item.preco for item in lotes_out), 2)
+    preco_medio = round(vgv / len(lotes_out), 2)
+    unidade = "/lote" if base == "por_lote" else "/m²"
+    avisos = [
+        "Estimativa POSICIONAL de triagem — não é avaliação de mercado; o preço médio é input "
+        "do operador (pesquisa de preços local).",
+        "O multiplicador tem média 1,0: redistribui o VGV entre os lotes conforme a posição, "
+        "não infla o total." if base == "por_lote" else
+        "Base por m²: o preço do lote = R$/m² × área × multiplicador (posição E tamanho).",
+    ]
+    return schemas.ValorPosicionalOut(
+        proposta_id=str(alvo.get("proposta_id", "")),
+        versao=int(alvo.get("versao", 0)),
+        perfil=(alvo.get("heatmap") or {}).get("perfil"),
+        base=base,
+        preco_base=preco_base,
+        n_lotes=len(lotes_out),
+        vgv=vgv,
+        vgv_fmt=brl(vgv),
+        preco_medio=preco_medio,
+        preco_medio_fmt=brl(preco_medio),
+        lote_max=max(lotes_out, key=lambda item: item.preco),
+        lote_min=min(lotes_out, key=lambda item: item.preco),
+        por_lote=lotes_out,
+        proveniencia=(
+            f"Preço médio do operador ({brl(preco_base)}{unidade}) × multiplicador posicional "
+            f"do score v2 (média 1,0) da proposta {alvo.get('proposta_id')} v{alvo.get('versao')} "
+            f"— calculado em {date.today().isoformat()}. Âncoras dos pesos: "
+            "docs/pesquisa-motor-urbanismo.md §1–§3."
+        ),
+        avisos=avisos,
+    )
+
+
 @router.get("/analises/{analise_id}/urbanismo")
 def listar(analise_id: str, fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo)):
     if STORE.get(analise_id) is None:

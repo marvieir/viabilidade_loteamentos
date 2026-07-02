@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import {
   proporUrbanismo,
   listarUrbanismo,
+  valorPosicionalUrbanismo,
   type ChaveOverlay,
   type ConformidadeLegal,
   type Declividade,
@@ -23,6 +24,7 @@ import {
   type PropostaUrbanistica,
   type PublicoAlvo,
   type TipoLoteamento,
+  type ValorPosicional,
 } from "@/lib/api";
 import {
   CORES_OVERLAY,
@@ -51,6 +53,17 @@ const PUBLICOS: { v: PublicoAlvo; r: string }[] = [
   { v: "media", r: "Média renda (equilíbrio)" },
   { v: "alta", r: "Alta renda (exclusividade)" },
 ];
+
+// Fase U1 — rótulos pt-BR dos fatores do score v2 (chaves vêm do backend).
+const ROTULO_FATOR: Record<string, string> = {
+  verde: "verde",
+  agua: "água",
+  lazer: "lazer",
+  culdesac: "bolsão (cul-de-sac)",
+  privacidade: "privacidade",
+  orientacao: "orientação solar",
+  sossego: "sossego",
+};
 
 // Linha do quadro de áreas: rótulo + m² (fmt do backend) + % (fmt do backend).
 function LinhaArea({
@@ -105,6 +118,12 @@ export function CardUrbanismo({
   // (prioridade sobre o OSM; zona rural tem via mal mapeada). Persiste entre regenerações.
   const [acessoPonto, setAcessoPonto] = useState<[number, number] | null>(null);
   const [marcandoAcesso, setMarcandoAcesso] = useState(false);
+  // Fase U1 — valor posicional: preço médio do OPERADOR × multiplicador do score v2 (backend).
+  const [valorBase, setValorBase] = useState<"por_lote" | "por_m2">("por_lote");
+  const [valorPreco, setValorPreco] = useState<string>("");
+  const [valor, setValor] = useState<ValorPosicional | null>(null);
+  const [valorErro, setValorErro] = useState<string | null>(null);
+  const [valorCarregando, setValorCarregando] = useState(false);
 
   useEffect(() => {
     if (!zona && zonas.length > 0) setZona(zonas[0]);
@@ -145,10 +164,36 @@ export function CardUrbanismo({
       );
       setProposta(p);
       onData?.(p);
+      setValor(null); // valor posicional era da proposta anterior — recalcular sob demanda
+      setValorErro(null);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao gerar o estudo de massa.");
     } finally {
       setCarregando(false);
+    }
+  }
+
+  // Fase U1 — cruza o preço médio do operador com o multiplicador posicional salvo na
+  // proposta (endpoint /urbanismo/valor: sem LLM, fora do cap). O front só exibe o retorno.
+  async function calcularValor() {
+    const preco = Number(valorPreco.replace(",", "."));
+    if (!preco || preco <= 0) {
+      setValorErro("Informe um preço médio maior que zero.");
+      return;
+    }
+    setValorCarregando(true);
+    setValorErro(null);
+    try {
+      const v = await valorPosicionalUrbanismo(
+        analiseId,
+        valorBase === "por_lote" ? { preco_lote_medio: preco } : { preco_m2_medio: preco },
+        proposta?.versao ?? null
+      );
+      setValor(v);
+    } catch (e) {
+      setValorErro(e instanceof Error ? e.message : "Falha ao calcular o valor posicional.");
+    } finally {
+      setValorCarregando(false);
     }
   }
 
@@ -841,12 +886,14 @@ export function CardUrbanismo({
               </div>
             )}
 
-            {/* Heatmap de valorização (qualidade relativa, sem preço) */}
+            {/* Heatmap de valorização — score v2 (U1): fatores rotulados + pesos do perfil */}
             {proposta.heatmap.score_medio != null && (
               <div className="rounded-xl border border-slate-200 p-4">
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Heatmap de score por lote — médio {proposta.heatmap.score_medio} (qualidade
-                  relativa; o R$/m² por faixa é seu)
+                  Score de valor por lote — médio {proposta.heatmap.score_medio}
+                  {proposta.heatmap.versao_score === 2 && proposta.heatmap.perfil
+                    ? ` (pesos do perfil "${proposta.heatmap.perfil}")`
+                    : " (qualidade relativa; o R$/m² por faixa é seu)"}
                 </p>
                 <div className="space-y-1">
                   {proposta.heatmap.faixas.map((f) => (
@@ -864,6 +911,106 @@ export function CardUrbanismo({
                     </div>
                   ))}
                 </div>
+                {proposta.heatmap.versao_score === 2 && proposta.heatmap.pesos && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {Object.entries(proposta.heatmap.pesos).map(([f, w]) => (
+                      <span
+                        key={f}
+                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600"
+                        title="peso do fator no score (perfil do público-alvo)"
+                      >
+                        {ROTULO_FATOR[f] ?? f} ×{w}
+                      </span>
+                    ))}
+                    {(proposta.heatmap.fatores_ausentes ?? []).map((f) => (
+                      <span
+                        key={f}
+                        className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] text-slate-400"
+                        title="fator sem camada neste layout — fora da média (não vale zero)"
+                      >
+                        {ROTULO_FATOR[f] ?? f}: ausente
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fase U1 — VALOR POSICIONAL: preço médio do operador × multiplicador (média 1,0).
+                Todo número vem do backend (/urbanismo/valor); o front não calcula nada. */}
+            {proposta.heatmap.versao_score === 2 && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Valor posicional (seu preço médio × posição do lote)
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={valorBase}
+                    onChange={(e) => setValorBase(e.target.value as "por_lote" | "por_m2")}
+                    className="h-9 rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                  >
+                    <option value="por_lote">R$ por lote (médio)</option>
+                    <option value="por_m2">R$ por m² (médio)</option>
+                  </select>
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    placeholder={valorBase === "por_lote" ? "ex.: 100000" : "ex.: 350"}
+                    value={valorPreco}
+                    onChange={(e) => setValorPreco(e.target.value)}
+                    className="h-9 w-36 rounded-lg border border-slate-300 px-2 text-sm tabular-nums"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={calcularValor}
+                    disabled={valorCarregando}
+                  >
+                    {valorCarregando ? "Calculando…" : "Calcular valor"}
+                  </Button>
+                </div>
+                {valorErro && <p className="mt-2 text-sm text-red-600">{valorErro}</p>}
+                {valor && (
+                  <div className="mt-3 space-y-2">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <div className="rounded-lg bg-slate-50 p-2">
+                        <p className="text-[11px] text-slate-500">VGV posicional</p>
+                        <p className="text-sm font-semibold tabular-nums text-slate-900">
+                          {valor.vgv_fmt}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-slate-50 p-2">
+                        <p className="text-[11px] text-slate-500">Preço médio</p>
+                        <p className="text-sm font-semibold tabular-nums text-slate-900">
+                          {valor.preco_medio_fmt}
+                        </p>
+                      </div>
+                      {valor.lote_max && (
+                        <div className="rounded-lg bg-emerald-50 p-2">
+                          <p className="text-[11px] text-emerald-700">
+                            Mais valorizado · {valor.lote_max.lote_id}
+                          </p>
+                          <p className="text-sm font-semibold tabular-nums text-emerald-900">
+                            {valor.lote_max.preco_fmt}
+                          </p>
+                        </div>
+                      )}
+                      {valor.lote_min && (
+                        <div className="rounded-lg bg-amber-50 p-2">
+                          <p className="text-[11px] text-amber-700">
+                            Menos valorizado · {valor.lote_min.lote_id}
+                          </p>
+                          <p className="text-sm font-semibold tabular-nums text-amber-900">
+                            {valor.lote_min.preco_fmt}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500">{valor.proveniencia}</p>
+                    <Notas itens={valor.avisos} />
+                  </div>
+                )}
               </div>
             )}
 
