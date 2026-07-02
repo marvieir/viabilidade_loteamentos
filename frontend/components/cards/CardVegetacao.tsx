@@ -32,35 +32,40 @@ export function CardVegetacao({
   onOverlaysVerde,
   onData,
   sinal,
+  inicial,
 }: {
   analiseId: string;
   onOverlaysVerde?: (o: OverlaysVerde) => void;
   onData?: (d: Vegetacao) => void;
   sinal?: number;
+  inicial?: Vegetacao | null; // snapshot salvo — reidrata sem reprocessar
 }) {
   const [data, setData] = useState<Vegetacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
+  function adotar(r: Vegetacao) {
+    setData(r);
+    onData?.(r);
+    // Empurra a(s) mancha(s) pro mapa. Com severidade: dois baldes (dura/a verificar);
+    // sem severidade: o verde total. Só renderiza — a geometria veio do backend.
+    const ov: OverlaysVerde = {};
+    if (r.severidade) {
+      if (ehGeom(r.severidade.restricao_dura.geojson))
+        ov.verde_dura = r.severidade.restricao_dura.geojson;
+      if (ehGeom(r.severidade.a_verificar.geojson))
+        ov.verde_verificar = r.severidade.a_verificar.geojson;
+    } else if (ehGeom(r.geojson_verde)) {
+      ov.verde = r.geojson_verde;
+    }
+    onOverlaysVerde?.(ov);
+  }
+
   async function analisar() {
     setCarregando(true);
     setErro(null);
     try {
-      const r = await buscarVegetacao(analiseId);
-      setData(r);
-      onData?.(r);
-      // Empurra a(s) mancha(s) pro mapa. Com severidade: dois baldes (dura/a verificar);
-      // sem severidade: o verde total. Só renderiza — a geometria veio do backend.
-      const ov: OverlaysVerde = {};
-      if (r.severidade) {
-        if (ehGeom(r.severidade.restricao_dura.geojson))
-          ov.verde_dura = r.severidade.restricao_dura.geojson;
-        if (ehGeom(r.severidade.a_verificar.geojson))
-          ov.verde_verificar = r.severidade.a_verificar.geojson;
-      } else if (ehGeom(r.geojson_verde)) {
-        ov.verde = r.geojson_verde;
-      }
-      onOverlaysVerde?.(ov);
+      adotar(await buscarVegetacao(analiseId));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");
     } finally {
@@ -72,6 +77,13 @@ export function CardVegetacao({
     if (sinal) analisar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sinal]);
+
+  // Reidrata do snapshot salvo ("Abrir análise"): mostra o resultado anterior sem reprocessar.
+  useEffect(() => {
+    if (inicial && !data) adotar(inicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
+
 
   return (
     <Card>

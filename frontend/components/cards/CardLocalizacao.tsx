@@ -21,10 +21,12 @@ export function CardLocalizacao({
   analiseId,
   onData,
   sinal,
+  inicial,
 }: {
   analiseId: string;
   onData?: (d: Localizacao | null) => void;
   sinal?: number;
+  inicial?: Localizacao | null; // snapshot salvo — reidrata sem reprocessar
 }) {
   const [data, setData] = useState<Localizacao | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -43,6 +45,15 @@ export function CardLocalizacao({
       setCarregando(false);
     }
   }
+
+  // Reidrata do snapshot salvo ("Abrir análise"): contexto anterior sem reprocessar.
+  useEffect(() => {
+    if (inicial && !data) {
+      setData(inicial);
+      onData?.(inicial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
 
   useEffect(() => {
     if (sinal) carregar();

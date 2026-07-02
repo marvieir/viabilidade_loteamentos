@@ -4,7 +4,7 @@ import { useState } from "react";
 import { UploadKmz } from "@/components/UploadKmz";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { MinhasAnalises } from "@/components/cliente/MinhasAnalises";
-import { salvarAnalise, atualizarAnalise } from "@/lib/salvas";
+import { salvarAnalise, atualizarAnalise, obterSalva } from "@/lib/salvas";
 import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/shell/Sidebar";
@@ -71,6 +71,8 @@ export default function Home() {
   const [gerandoExcel, setGerandoExcel] = useState(false);
   // Fase 12.2 — "Minhas análises": id da análise salva carregada (PUT vs POST) + salvando.
   const [salvaId, setSalvaId] = useState<string | null>(null);
+  // Snapshot dos RESULTADOS da salva aberta — reidrata os cards sem reprocessar.
+  const [snap, setSnap] = useState<Record<string, unknown> | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [recarregarSalvas, setRecarregarSalvas] = useState(0);
   // #3 — progresso por seção: cada card reporta "analisando"/"ok"/"erro"; o botão e a sidebar leem.
@@ -202,6 +204,11 @@ export default function Home() {
   function onCarregarSalva(a: Analise, idSalva: string) {
     onAnalise(a);
     setSalvaId(idSalva);
+    // Reidrata os RESULTADOS salvos: os cards determinísticos (ambiental, declividade,
+    // aproveitamento, financeira…) voltam preenchidos sem reprocessar nada.
+    obterSalva(idSalva)
+      .then((d) => setSnap((d.resultados as Record<string, unknown>) ?? null))
+      .catch(() => setSnap(null));
   }
 
   function onAnalise(a: Analise | null) {
@@ -224,6 +231,7 @@ export default function Home() {
     setDadosLocalizacao(null);
     setSinal(0);
     setStatusSec({});
+    setSnap(null);
   }
 
   function toggleOculto(k: ChaveOverlay) {
@@ -338,6 +346,7 @@ export default function Home() {
             <div className={secao === "ambiental" ? "space-y-4" : "hidden"}>
               <CardAmbiental
                 analiseId={analise.analise_id}
+                inicial={snap?.ambiental as Ambiental | null}
                 onOverlays={setOverlaysAmb}
                 onData={(d) => { setDadosAmb(d); marcar("ambiental")("ok"); }}
                 sinal={sinal}
@@ -351,6 +360,7 @@ export default function Home() {
             <div className={secao === "verde" ? "" : "hidden"}>
               <CardVegetacao
                 analiseId={analise.analise_id}
+                inicial={snap?.vegetacao as Vegetacao | null}
                 onOverlaysVerde={setOverlaysVerde}
                 onData={(d) => { setDadosVerde(d); marcar("verde")("ok"); }}
                 sinal={sinal}
@@ -359,6 +369,7 @@ export default function Home() {
             <div className={secao === "declividade" ? "" : "hidden"}>
               <CardDeclividade
                 analiseId={analise.analise_id}
+                inicial={snap?.declividade as Declividade | null}
                 onOverlaysDecliv={setOverlaysDecliv}
                 onData={(d) => { setDadosDecliv(d); marcar("declividade")("ok"); }}
                 sinal={sinal}
@@ -367,6 +378,7 @@ export default function Home() {
             <div className={secao === "aproveitamento" ? "" : "hidden"}>
               <CardAproveitamento
                 analiseId={analise.analise_id}
+                inicial={snap?.aproveitamento as Aproveitamento | null}
                 perfil={perfil}
                 onData={(d) => { setDadosAprov(d); marcar("aproveitamento")("ok"); }}
                 sinal={sinal}
@@ -400,6 +412,7 @@ export default function Home() {
             <div className={secao === "financeira" ? "" : "hidden"}>
               <CardFinanceira
                 analiseId={analise.analise_id}
+                inicial={snap?.financeira as Financeira | null}
                 aprov={dadosAprov}
                 onData={(d) => { setDadosFinanceira(d); marcar("financeira")("ok"); }}
                 sinal={sinal}
@@ -409,12 +422,14 @@ export default function Home() {
             <div className={secao === "economica" ? "" : "hidden"}>
               <CardEconomica
                 analiseId={analise.analise_id}
+                inicial={snap?.economica as Economica | null}
                 onData={setDadosEconomica}
               />
             </div>
             <div className={secao === "localizacao" ? "" : "hidden"}>
               <CardLocalizacao
                 analiseId={analise.analise_id}
+                inicial={snap?.localizacao as Localizacao | null}
                 onData={(d) => { setDadosLocalizacao(d); marcar("localizacao")("ok"); }}
                 sinal={sinal}
               />

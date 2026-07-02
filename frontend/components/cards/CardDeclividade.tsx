@@ -38,31 +38,36 @@ export function CardDeclividade({
   onOverlaysDecliv,
   onData,
   sinal,
+  inicial,
 }: {
   analiseId: string;
   onOverlaysDecliv?: (o: OverlaysDecliv) => void;
   onData?: (d: Declividade) => void;
   sinal?: number;
+  inicial?: Declividade | null; // snapshot salvo — reidrata sem reprocessar
 }) {
   const [data, setData] = useState<Declividade | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
+  function adotar(r: Declividade) {
+    setData(r);
+    onData?.(r);
+    // Empurra a mancha vedada (≥30%) pro mapa. Só renderiza — geometria veio do backend.
+    const ov: OverlaysDecliv = {};
+    if (r.flag_vedacao && ehGeom(r.flag_vedacao.geojson))
+      ov.declividade_vedada = r.flag_vedacao.geojson;
+    // Camada colorida das faixas (FeatureCollection) — toggle separado da ≥30%.
+    if (r.geojson_faixas && "type" in r.geojson_faixas)
+      ov.declividade_faixas = r.geojson_faixas as unknown as GeoJSON.Geometry;
+    onOverlaysDecliv?.(ov);
+  }
+
   async function analisar() {
     setCarregando(true);
     setErro(null);
     try {
-      const r = await buscarDeclividade(analiseId);
-      setData(r);
-      onData?.(r);
-      // Empurra a mancha vedada (≥30%) pro mapa. Só renderiza — geometria veio do backend.
-      const ov: OverlaysDecliv = {};
-      if (r.flag_vedacao && ehGeom(r.flag_vedacao.geojson))
-        ov.declividade_vedada = r.flag_vedacao.geojson;
-      // Camada colorida das faixas (FeatureCollection) — toggle separado da ≥30%.
-      if (r.geojson_faixas && "type" in r.geojson_faixas)
-        ov.declividade_faixas = r.geojson_faixas as unknown as GeoJSON.Geometry;
-      onOverlaysDecliv?.(ov);
+      adotar(await buscarDeclividade(analiseId));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");
     } finally {
@@ -74,6 +79,13 @@ export function CardDeclividade({
     if (sinal) analisar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sinal]);
+
+  // Reidrata do snapshot salvo ("Abrir análise"): mostra o resultado anterior sem reprocessar.
+  useEffect(() => {
+    if (inicial && !data) adotar(inicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
+
 
   return (
     <Card>

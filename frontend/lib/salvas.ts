@@ -53,6 +53,11 @@ export async function listarSalvas(): Promise<AnaliseResumo[]> {
   return apiFetch("/api/salvas").then(jsonOrThrow);
 }
 
+// Detalhe de uma salva (inclui o snapshot `resultados` p/ reidratar os cards no Abrir).
+export async function obterSalva(id: string): Promise<AnaliseDetalhe> {
+  return apiFetch(`/api/salvas/${id}`).then(jsonOrThrow);
+}
+
 export async function salvarAnalise(p: SalvarPayload): Promise<AnaliseDetalhe> {
   return apiFetch("/api/salvas", {
     method: "POST",

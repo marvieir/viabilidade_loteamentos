@@ -26,6 +26,7 @@ export function CardAmbiental({
   onOverlays,
   onData,
   sinal,
+  inicial,
 }: {
   analiseId: string;
   onOverlays?: (
@@ -33,20 +34,24 @@ export function CardAmbiental({
   ) => void;
   onData?: (d: Ambiental) => void;
   sinal?: number; // "Analisar tudo": dispara a análise quando muda
+  inicial?: Ambiental | null; // snapshot salvo — reidrata sem reprocessar
 }) {
   const [data, setData] = useState<Ambiental | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
 
+  function adotar(r: Ambiental) {
+    setData(r);
+    onData?.(r);
+    // Empurra todos os overlays; a visibilidade é controlada no painel do mapa-herói.
+    onOverlays?.(r.geojson_overlays);
+  }
+
   async function analisar() {
     setCarregando(true);
     setErro(null);
     try {
-      const r = await buscarAmbiental(analiseId);
-      setData(r);
-      onData?.(r);
-      // Empurra todos os overlays; a visibilidade é controlada no painel do mapa-herói.
-      onOverlays?.(r.geojson_overlays);
+      adotar(await buscarAmbiental(analiseId));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao analisar.");
     } finally {
@@ -58,6 +63,13 @@ export function CardAmbiental({
     if (sinal) analisar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sinal]);
+
+  // Reidrata do snapshot salvo ("Abrir análise"): mostra o resultado anterior sem reprocessar.
+  useEffect(() => {
+    if (inicial && !data) adotar(inicial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
+
 
   return (
     <Card>

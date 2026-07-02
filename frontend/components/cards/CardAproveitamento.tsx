@@ -62,11 +62,13 @@ export function CardAproveitamento({
   perfil,
   onData,
   sinal,
+  inicial,
 }: {
   analiseId: string;
   perfil?: PerfilMunicipal | null;
   onData?: (d: Aproveitamento) => void;
   sinal?: number;
+  inicial?: Aproveitamento | null; // snapshot salvo — reidrata sem reprocessar
 }) {
   const [regime, setRegime] = useState<Regime>("URBANO");
   const [modalidade, setModalidade] =
@@ -113,6 +115,15 @@ export function CardAproveitamento({
       setCarregando(false);
     }
   }
+
+  // Reidrata do snapshot salvo ("Abrir análise"): resultado anterior sem reprocessar.
+  useEffect(() => {
+    if (inicial && !res) {
+      setRes(inicial);
+      onData?.(inicial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
 
   useEffect(() => {
     if (sinal) calcular();

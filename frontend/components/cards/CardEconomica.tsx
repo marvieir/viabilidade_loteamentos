@@ -25,13 +25,24 @@ import {
 export function CardEconomica({
   analiseId,
   onData,
+  inicial,
 }: {
   analiseId: string;
   onData?: (d: Economica | null) => void;
+  inicial?: Economica | null; // snapshot salvo — reidrata sem reavaliar
 }) {
   const [tmaPct, setTmaPct] = useState<string>(""); // % a.a. real — vazio = não declarada
   const [dados, setDados] = useState<Economica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  // Reidrata do snapshot salvo ("Abrir análise"): avaliação anterior sem reprocessar.
+  useEffect(() => {
+    if (inicial && !dados) {
+      setDados(inicial);
+      onData?.(inicial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
   const [carregando, setCarregando] = useState(false);
 
   // Avaliação persistida (se houver) — recarrega ao trocar de análise.

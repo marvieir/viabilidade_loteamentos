@@ -78,13 +78,14 @@ const MESA_PADRAO: LinhaMesa[] = [
 const PASSOS = ["Lotes & Preço", "Parceria", "Venda", "Custos", "Tributos", "Resultado"];
 
 export function CardFinanceira({
-  analiseId, aprov, onData, sinal, econ,
+  analiseId, aprov, onData, sinal, econ, inicial,
 }: {
   analiseId: string;
   aprov?: Aproveitamento | null;
   onData?: (d: Financeira) => void;
   sinal?: number;
   econ?: Economica | null; // Fase 5: preenche os slots vpl/tir/payback do semáforo
+  inicial?: Financeira | null; // snapshot salvo — reidrata direto no Resultado
 }) {
   const [f, setF] = useState<Form>(PADRAO);
   const [mesa, setMesa] = useState<LinhaMesa[]>(MESA_PADRAO);
@@ -162,6 +163,16 @@ export function CardFinanceira({
     if (sinal && temContexto) { recalc().then(() => setPasso(6)); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sinal]);
+
+  // Reidrata do snapshot salvo ("Abrir análise"): mostra o Resultado anterior sem recalcular.
+  useEffect(() => {
+    if (inicial && !prev) {
+      setPrev(inicial);
+      onData?.(inicial);
+      setPasso(6);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inicial]);
 
   return (
     <Card>
