@@ -27,6 +27,7 @@ import {
   type ValorPosicional,
 } from "@/lib/api";
 import {
+  CORES_FAIXA,
   CORES_OVERLAY,
   ESTILO_OVERLAY,
   ROTULO_OVERLAY,
@@ -499,13 +500,7 @@ export function CardUrbanismo({
                 {temFeatures && (
                   <div className="flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
                     <span>Cor do lote = score:</span>
-                    {[
-                      ["0-3", "#2563eb"],
-                      ["3-5", "#06b6d4"],
-                      ["5-7", "#84cc16"],
-                      ["7-9", "#f59e0b"],
-                      ["9-10", "#ef4444"],
-                    ].map(([faixa, cor]) => (
+                    {Object.entries(CORES_FAIXA).map(([faixa, cor]) => (
                       <span key={faixa} className="inline-flex items-center gap-1">
                         <span
                           className="inline-block h-2.5 w-2.5 rounded-sm"

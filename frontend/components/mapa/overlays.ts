@@ -125,11 +125,15 @@ export const CORES_FINA: Record<string, string> = {
   "47-100%": "#7f1d1d",
 };
 
-// Fase 9.5 — cores das faixas de score (frio→quente) p/ colorir cada LOTE no mapa (heatmap real).
+// Fase 9.5/U1 — cores das faixas de score p/ colorir cada LOTE no mapa (heatmap real).
+// Rampa SEQUENCIAL de um matiz (YlOrRd claro→escuro): score é MAGNITUDE, não categoria.
+// Escolhida para NÃO colidir com as camadas temáticas (o azul/ciano antigo da faixa 3-5 era
+// idêntico ao "Sistema de lazer/clube" — com o score v2 centrando em ~5, o mapa enchia de
+// lotes ciano que pareciam clube). Validada p/ daltonismo (ΔE adjacente ≥13).
 export const CORES_FAIXA: Record<string, string> = {
-  "0-3": "#2563eb", // frio
-  "3-5": "#06b6d4",
-  "5-7": "#84cc16",
-  "7-9": "#f59e0b",
-  "9-10": "#ef4444", // quente
+  "0-3": "#ffffb2", // score baixo (claro)
+  "3-5": "#fecc5c",
+  "5-7": "#fd8d3c",
+  "7-9": "#f03b20",
+  "9-10": "#bd0026", // score alto (escuro/quente)
 };
