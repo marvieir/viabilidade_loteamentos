@@ -175,11 +175,19 @@ export default function MapaLeaflet({
       <AjustarEEnquadrar geojson={geojson} />
       {aoClicar && <CapturaClique aoClicar={aoClicar} />}
       {marcador && (
-        <CircleMarker
+        <>
+          {/* ALVO do operador (acesso marcado) — estilo distinto do disco rosa do pórtico */}
+          <CircleMarker
           center={marcador}
-          radius={9}
-          pathOptions={{ color: "#be185d", fillColor: "#ec4899", fillOpacity: 0.9, weight: 3 }}
+          radius={11}
+          pathOptions={{ color: "#312e81", fillColor: "#ffffff", fillOpacity: 0.85, weight: 3, dashArray: "5 4" }}
         />
+          <CircleMarker
+            center={marcador}
+            radius={3}
+            pathOptions={{ color: "#312e81", fillColor: "#4f46e5", fillOpacity: 1, weight: 2 }}
+          />
+        </>
       )}
     </MapContainer>
   );

@@ -45,6 +45,8 @@ FRENTE_MIN_M = 5.0
 # Fase 11.3/11.4 — raio do disco do PÓRTICO (marcador da portaria no mapa). Também é a folga mínima
 # da boca de entrada à mata reservada: a portaria não pode invadir a área preservada.
 RAIO_PORTICO_M = 12.0
+# Alcance máx. da via de acesso ao ponto de entrada (malha→ponto marcado/via real).
+VIA_ACESSO_MAX_M = 400.0
 
 # ---- Fase 9.7: MALHA VIÁRIA + QUADRAS COMO FACES (a inversão da geração, §0 da spec) ----
 # Largura do TRONCO/coletora (hierarquia legal ≥21 m) — os eixos da IA viram via principal.
@@ -1297,6 +1299,30 @@ def gerar_layout(
         if ponte is not None and not ponte.is_empty:
             ruas_reg = _uniao_segura([ruas_reg, ponte])
         # (a SOLDA final da malha — _conectar_malha — roda como ÚLTIMO passo, após o contorno, abaixo)
+
+    # Fase 11.15 — VIA DE ACESSO até o ponto de entrada (operador/OSM): quando o acesso fica
+    # LONGE da malha (ex.: a única via pública do outro lado do bosque preservado), materializa
+    # a ligação malha→ponto na mesma caixa da via-tronco. Via PODE cruzar preservado/restrição
+    # (art. 3º Lei 6.766 veda LOTE, não via); as quadras abaixo já a descontam. Sem isto, marcar
+    # o acesso numa via sem rua interna perto NÃO tinha efeito (o contato não existia) — e o
+    # pórtico é FORÇADO no ponto de entrada (é a entrada; não se rediscute).
+    portico_forcado = None
+    if (acesso_externo is not None and not acesso_externo.is_empty
+            and ruas_reg is not None and not ruas_reg.is_empty):
+        ac_orig = (acesso_externo if isinstance(acesso_externo, Point)
+                   else acesso_externo.representative_point())
+        ac_reg = rotate(ac_orig, -ang_deg, origin=cen) if ang_deg else ac_orig
+        alvo_rua = nearest_points(ac_reg, ruas_reg)[1]
+        dist_ac = ac_reg.distance(alvo_rua)
+        if 2.0 < dist_ac <= VIA_ACESSO_MAX_M:
+            via_ac = _valido(
+                LineString([(ac_reg.x, ac_reg.y), (alvo_rua.x, alvo_rua.y)])
+                .buffer(conexao_mod.CAIXA_TRONCO_M / 2.0, cap_style=2, join_style=2)
+            )
+            if via_ac is not None and not via_ac.is_empty:
+                ruas_reg = _uniao_segura([ruas_reg, via_ac])
+                portico_forcado = ac_orig
+
     # REGRA B — porção ISOLADA (sem borda livre): suas faces não viram lote, viram verde (honesto).
     isoladas_reg = _uniao_segura([p["geom"] for p in porcoes_info if not p["conectada"]])
 
@@ -1492,8 +1518,15 @@ def gerar_layout(
     # entrada); arborização viária (tag — na faixa de serviço da calçada, NÃO muda área de lote).
     portico_pt = None
     inst_na_entrada = False
-    if arruamento is not None and not arruamento.is_empty:
-        gminx, gminy, gmaxx, gmaxy = aprov.bounds
+    gminx, gminy, gmaxx, gmaxy = aprov.bounds
+    if portico_forcado is not None:
+        # Via de acesso materializada até o ponto de entrada → a portaria é ALI (dado do
+        # operador/via real), não no contato mais conveniente da malha.
+        portico_pt = portico_forcado
+        if inst is not None and not inst.is_empty:
+            diag_gleba = math.hypot(gmaxx - gminx, gmaxy - gminy)
+            inst_na_entrada = inst.distance(portico_pt) <= 0.35 * max(diag_gleba, 1.0)
+    elif arruamento is not None and not arruamento.is_empty:
         # Fase 11.4 — ENTRADA = onde a VIA toca a BORDA da gleba (a via sai p/ a estrada externa ali).
         # A via de CONTORNO corre RENTE à mata preservada/não-edificável e gera o MAIOR contato de
         # borda — justo onde a portaria NÃO pode cair (gate encravado no meio da reserva). Por isso o
@@ -1530,7 +1563,11 @@ def gerar_layout(
         # o pórtico nasce de frente à via mais próxima. Sem via mapeada → cai no FALLBACK: centróide
         # dos LOTES (serve o miolo, nunca uma saída remota de contorno). Comprimento mín. já filtra
         # arranhões. NÃO usa "o mais longo" (premiava a ponta isolada de frente p/ mata/fundo).
-        nucleo = unary_union(lotes).centroid if lotes else aprov.centroid
+        # _uniao_segura, não unary_union cru: lotes recém-subdivididos podem ter arestas
+        # quase-coincidentes que estouram TopologyException (side location conflict) — o
+        # helper valida e une incremental (o 500 de produção nasceu exatamente aqui).
+        _uni_lotes = _uniao_segura(lotes) if lotes else None
+        nucleo = _uni_lotes.centroid if _uni_lotes is not None else aprov.centroid
         alvo = (
             acesso_externo
             if (acesso_externo is not None and not acesso_externo.is_empty)
