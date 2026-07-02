@@ -68,6 +68,30 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# NUNCA 500 mudo: exceção não tratada em qualquer rota → loga o TRACEBACK completo no
+# servidor e devolve o tipo+mensagem no `detail` (o front exibe). Diagnóstico direto na
+# tela do operador, sem SSH — princípio da plataforma: nada falha em silêncio.
+import logging as _logging
+
+_log_app = _logging.getLogger("app.erros")
+
+
+@app.exception_handler(Exception)
+async def _erro_nao_tratado(request, exc):
+    from fastapi.responses import JSONResponse
+
+    _log_app.exception("Erro não tratado em %s", request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": (
+                f"Erro interno — {type(exc).__name__}: {exc} "
+                f"(rota {request.url.path}). Detalhe completo no log do servidor."
+            )
+        },
+    )
+
+
 # Fase 13 — security headers (defesa contra clickjacking / MIME sniffing; HSTS só em HTTPS/prod).
 class _SecurityHeaders(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
