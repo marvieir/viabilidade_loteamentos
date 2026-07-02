@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 
 import { useEffect } from "react";
-import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
+import { CircleMarker, GeoJSON, MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import type { Feature, GeoJsonObject } from "geojson";
 import L from "leaflet";
 import type { ChaveOverlay } from "@/lib/api";
@@ -39,11 +39,20 @@ function AjustarEEnquadrar({ geojson }: { geojson: GeoJSON.Polygon }) {
   return null;
 }
 
+// Captura o clique do usuário (ex.: marcar o ponto de acesso) — só repassa a coordenada;
+// nenhuma geo-matemática aqui (§2).
+function CapturaClique({ aoClicar }: { aoClicar: (p: { lat: number; lng: number }) => void }) {
+  useMapEvents({ click: (e) => aoClicar(e.latlng) });
+  return null;
+}
+
 export default function MapaLeaflet({
   geojson,
   overlays,
   lotesFeatures,
   quadras,
+  aoClicar,
+  marcador,
 }: {
   geojson: GeoJSON.Polygon;
   overlays?: Partial<Record<ChaveOverlay, GeoJSON.Geometry>>;
@@ -51,13 +60,16 @@ export default function MapaLeaflet({
   lotesFeatures?: GeoJSON.FeatureCollection | null;
   // Fase 9.7 — quadras como FACES da malha: contorno tracejado por baixo dos lotes.
   quadras?: GeoJSON.FeatureCollection | null;
+  // Modo "marcar no mapa": callback de clique + marcador [lat, lng] do ponto escolhido.
+  aoClicar?: (p: { lat: number; lng: number }) => void;
+  marcador?: [number, number] | null;
 }) {
   return (
     <MapContainer
       center={[-15.78, -47.93]}
       zoom={4}
       scrollWheelZoom
-      style={{ height: "100%", width: "100%" }}
+      style={{ height: "100%", width: "100%", cursor: aoClicar ? "crosshair" : undefined }}
     >
       <TileLayer
         attribution="Tiles &copy; Esri"
@@ -161,6 +173,14 @@ export default function MapaLeaflet({
         style={{ color: "#f59e0b", weight: 2, fill: false }}
       />
       <AjustarEEnquadrar geojson={geojson} />
+      {aoClicar && <CapturaClique aoClicar={aoClicar} />}
+      {marcador && (
+        <CircleMarker
+          center={marcador}
+          radius={9}
+          pathOptions={{ color: "#be185d", fillColor: "#ec4899", fillOpacity: 0.9, weight: 3 }}
+        />
+      )}
     </MapContainer>
   );
 }

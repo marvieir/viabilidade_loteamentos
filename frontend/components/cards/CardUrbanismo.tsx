@@ -101,6 +101,10 @@ export function CardUrbanismo({
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [mapaExpandido, setMapaExpandido] = useState(false); // Fase 9.6 — mapa maior
+  // Acesso marcado pelo operador no mapa ([lat, lng]) — âncora DEFINITIVA do pórtico
+  // (prioridade sobre o OSM; zona rural tem via mal mapeada). Persiste entre regenerações.
+  const [acessoPonto, setAcessoPonto] = useState<[number, number] | null>(null);
+  const [marcandoAcesso, setMarcandoAcesso] = useState(false);
 
   useEffect(() => {
     if (!zona && zonas.length > 0) setZona(zonas[0]);
@@ -136,7 +140,8 @@ export function CardUrbanismo({
       const loteMaxNum = loteMax.trim() ? Number(loteMax) : null;
       const p = await proporUrbanismo(
         analiseId, tipo, publico, zona || null, undefined,
-        loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null
+        loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null,
+        acessoPonto ? [acessoPonto[1], acessoPonto[0]] : null
       );
       setProposta(p);
       onData?.(p);
@@ -291,6 +296,12 @@ export function CardUrbanismo({
             um novo traçado (aí sim consome).
           </p>
         )}
+        {acessoPonto && (
+          <p className="-mt-1 text-[11px] font-medium text-emerald-700">
+            📍 Acesso marcado no mapa — na próxima geração o pórtico será ancorado nesse ponto
+            (independe do OSM).
+          </p>
+        )}
 
         {/* Fase 11.12 — VOCAÇÃO do terreno: a app sugere o perfil pela topografia e avisa conflito. */}
         {vocacao && (
@@ -370,13 +381,39 @@ export function CardUrbanismo({
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
                   Parcelamento esquemático
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setMapaExpandido((v) => !v)}
-                  className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
-                >
-                  {mapaExpandido ? "Recolher mapa" : "Expandir mapa"}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (acessoPonto && !marcandoAcesso) {
+                        setAcessoPonto(null); // limpar
+                      } else {
+                        setMarcandoAcesso((v) => !v);
+                      }
+                    }}
+                    className={`rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                      marcandoAcesso
+                        ? "border-pink-300 bg-pink-50 text-pink-700"
+                        : acessoPonto
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                    }`}
+                    title="Marque no mapa onde é o acesso real do terreno — o pórtico será ancorado nele (prioridade sobre o OSM)."
+                  >
+                    {marcandoAcesso
+                      ? "Clique no mapa onde é o acesso…"
+                      : acessoPonto
+                        ? "✓ Acesso marcado — limpar"
+                        : "📍 Marcar acesso"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMapaExpandido((v) => !v)}
+                    className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+                  >
+                    {mapaExpandido ? "Recolher mapa" : "Expandir mapa"}
+                  </button>
+                </div>
               </div>
               <div className={`w-full ${mapaExpandido ? "h-[680px]" : "h-[440px]"}`}>
                 <MapaLeaflet
@@ -384,6 +421,15 @@ export function CardUrbanismo({
                   overlays={overlays}
                   lotesFeatures={lotesFeatures}
                   quadras={proposta?.geometria.quadras ?? null}
+                  aoClicar={
+                    marcandoAcesso
+                      ? (p) => {
+                          setAcessoPonto([p.lat, p.lng]);
+                          setMarcandoAcesso(false);
+                        }
+                      : undefined
+                  }
+                  marcador={acessoPonto}
                 />
               </div>
               <div className="space-y-1.5 bg-slate-50 px-3 py-2">

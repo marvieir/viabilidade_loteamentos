@@ -328,7 +328,18 @@ def propor(
     # → ``None`` e o motor usa o fallback (miolo loteado). Determinístico.
     acesso_externo_m = None
     avisos_vias: list[str] = []
-    if fonte_vias is not None:
+    if body.acesso_ponto and len(body.acesso_ponto) == 2:
+        # Dado do OPERADOR (clique no mapa) — âncora definitiva; não consulta OSM.
+        from shapely.geometry import Point as _Ponto
+
+        acesso_externo_m = transform(
+            to_local, _Ponto(float(body.acesso_ponto[0]), float(body.acesso_ponto[1]))
+        )
+        avisos_vias.append(
+            "Entrada ancorada no ponto de acesso marcado pelo operador no mapa "
+            "(prioridade sobre o OSM)."
+        )
+    elif fonte_vias is not None:
         try:
             cob_vias = fonte_vias.vias(registro["poly"])
             if cob_vias.geometria is not None and not cob_vias.geometria.is_empty:

@@ -1306,6 +1306,9 @@ class ProporUrbanismoIn(BaseModel):
     # Fase 11.8 — teto de lote recomendado pelo operador (m²): sobrepõe o teto de mercado do perfil
     # (nunca abaixo do piso legal). Vazio = padrão do perfil.
     lote_max_m2: Optional[float] = None
+    # Acesso marcado PELO OPERADOR no mapa ([lon, lat] WGS84): âncora DEFINITIVA do pórtico —
+    # tem prioridade sobre o OSM (zona rural tem via mal mapeada; o dado do operador vence).
+    acesso_ponto: Optional[list[float]] = None
 
 
 class MedirUrbanismoIn(BaseModel):
