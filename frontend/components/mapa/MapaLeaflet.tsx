@@ -51,6 +51,7 @@ export default function MapaLeaflet({
   overlays,
   lotesFeatures,
   quadras,
+  lazerFeatures,
   aoClicar,
   marcador,
 }: {
@@ -60,6 +61,8 @@ export default function MapaLeaflet({
   lotesFeatures?: GeoJSON.FeatureCollection | null;
   // Fase 9.7 — quadras como FACES da malha: contorno tracejado por baixo dos lotes.
   quadras?: GeoJSON.FeatureCollection | null;
+  // Fase U2 — lazer rotulado: sub-parcelas do hub + praças de bolso (tooltip por rótulo).
+  lazerFeatures?: GeoJSON.FeatureCollection | null;
   // Modo "marcar no mapa": callback de clique + marcador [lat, lng] do ponto escolhido.
   aoClicar?: (p: { lat: number; lng: number }) => void;
   marcador?: [number, number] | null;
@@ -134,6 +137,27 @@ export default function MapaLeaflet({
             const p = (f.properties ?? {}) as Record<string, unknown>;
             const area = typeof p.area_m2 === "number" ? Math.round(p.area_m2) : "—";
             layer.bindPopup(`Quadra ${p.quadra_id ?? "—"} · ${area} m²`);
+          }}
+        />
+      )}
+
+      {/* Fase U2 — LAZER ROTULADO: sub-parcelas do hub (piscina/quadra/salão…) e praças de
+          bolso, com tooltip do backend (rótulo + área formatada). Desenhado sobre a mancha
+          do sistema de lazer (overlay urb_lazer) para detalhar o programa. */}
+      {lazerFeatures && lazerFeatures.features.length > 0 && (
+        <GeoJSON
+          key={`lazer-${lazerFeatures.features.length}`}
+          data={lazerFeatures as GeoJsonObject}
+          style={(f?: Feature) => {
+            const tipo = (f?.properties?.tipo as string) ?? "hub";
+            return tipo === "praca"
+              ? { color: "#15803d", weight: 1.5, fillColor: "#22c55e", fillOpacity: 0.45 }
+              : { color: "#0f766e", weight: 1, fillColor: "#2dd4bf", fillOpacity: 0.4, dashArray: "3 3" };
+          }}
+          onEachFeature={(f, layer) => {
+            const p = (f.properties ?? {}) as Record<string, unknown>;
+            const area = typeof p.area_fmt === "string" ? ` · ${p.area_fmt} m²` : "";
+            layer.bindTooltip(`${p.rotulo ?? "Lazer"}${area}`, { sticky: true });
           }}
         />
       )}

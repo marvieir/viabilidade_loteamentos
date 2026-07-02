@@ -26,8 +26,9 @@ from shapely.geometry.base import BaseGeometry
 from shapely.ops import nearest_points, polygonize, unary_union
 
 from app.core import conexao as conexao_mod
+from app.core import urbanismo_amenidades as amen
 from app.core import urbanismo_tracado as trac
-from app.core.urbanismo_medida import Layout, _lados_mrr
+from app.core.urbanismo_medida import RAIO_CAMINHADA_M, Layout, _lados_mrr
 from app.core.urbanismo_programa import PERFIL_LOTE, Programa
 
 # Convergência: |medido − alvo| ≤ tol → "atendido" (spec §4.1).
@@ -36,6 +37,12 @@ TOL_CONVERGENCIA_PP = 0.03
 MIN_LOTES_RESERVA = 8
 # Fração da reserva de lazer destinada ao clube central (resto = áreas verdes ao redor).
 LAZER_CLUBE_FRAC = 0.40
+# Fase U2 — lazer DISTRIBUÍDO (pesquisa §2: espaço aberto a ≤400 m/5 min a pé de qualquer
+# lote): teto do orçamento de lazer que pode virar praça de BOLSO (o resto segue verde);
+# praça de bolso é quadra PEQUENA (acima disso é parque, não bolso); nº máx de praças.
+LAZER_PRACAS_FRAC = 0.35
+PRACA_MAX_M2 = 2500.0
+PRACAS_MAX_N = 6
 ARQUETIPO_GRELHA = "grelha_eficiente"
 # Via LOCAL (rua de quadra) — separa as quadras na grelha. A via PRINCIPAL (esqueleto) usa a
 # largura do programa; ruas locais são estreitas (~8 m), o que mantém o viário realista.
@@ -825,6 +832,57 @@ def clube_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeomet
     return q, {"forma": "quadra", "frente_via_m": round(fr, 2)}
 
 
+def _selecionar_pracas(
+    pool: Sequence[BaseGeometry],
+    ruas: Optional[BaseGeometry],
+    hub: Optional[BaseGeometry],
+    budget: float,
+    raio: float = RAIO_CAMINHADA_M,
+):
+    """Fase U2 — praças de BOLSO por COBERTURA de caminhada: enquanto houver quadra a mais de
+    ``raio`` (400 m — pesquisa §2) do lazer já reservado, converte em praça a MENOR quadra com
+    frente para via que cubra a região mais descoberta (dentro do orçamento). Nunca consome a
+    última face (lotes são prioridade). Devolve ``(pracas, pool_restante)``. Determinístico."""
+    pracas: list[BaseGeometry] = []
+    pool = list(pool)
+    gasto = 0.0
+    if budget <= 0.0 or hub is None and not pool:
+        return pracas, pool
+    while len(pool) > 1 and len(pracas) < PRACAS_MAX_N:
+        lazer_atual = [g for g in (hub, *pracas) if g is not None and not g.is_empty]
+        if lazer_atual:
+            descobertas = [
+                q for q in pool
+                if min(q.centroid.distance(g) for g in lazer_atual) > raio
+            ]
+        else:
+            descobertas = list(pool)  # sem hub materializado → tudo é descoberto
+        if not descobertas:
+            break  # cobertura completa
+        # A quadra MAIS LONGE do lazer define a região a cobrir nesta rodada.
+        alvo_q = max(
+            descobertas,
+            key=lambda q: min((q.centroid.distance(g) for g in lazer_atual), default=1e12),
+        )
+        cands = []
+        for q in pool:
+            if q.area > min(PRACA_MAX_M2, budget - gasto) + 1e-6:
+                continue
+            if q.centroid.distance(alvo_q.centroid) > raio:
+                continue  # não cobre a região descoberta
+            fr, _pr = _lados_mrr(q)
+            toca = bool(ruas is not None and not ruas.is_empty and q.distance(ruas) < 0.6)
+            if fr >= INST_FRENTE_MIN_M and toca:
+                cands.append(q)
+        if not cands:
+            break  # região sem quadra que caiba no orçamento → degrada honesto (sem praça)
+        p = min(cands, key=lambda q: q.area)  # a MENOR que cobre — preserva lotes
+        pracas.append(p)
+        gasto += p.area
+        pool = [q for q in pool if q is not p]
+    return pracas, pool
+
+
 # Fração de uma face coberta por declividade >20% a partir da qual ela é considerada ÍNGREME
 # (vai p/ verde antes das planas). Calibrado p/ não marcar faces de borda quase planas.
 FRAC_FACE_INGREME = 0.25
@@ -1380,8 +1438,19 @@ def gerar_layout(
         clube_reg, clube_diag = None, {}
     pool = [q for q in pool if clube_reg is None or q is not clube_reg]
 
+    # 4.b2 PRAÇAS DE BOLSO (Fase U2 — pesquisa §2: lazer a ≤400 m de caminhada de qualquer
+    # lote): parte do orçamento de lazer vira praças pequenas onde o hub não alcança. O que
+    # as praças não gastarem segue para o verde (4.c) — o TOTAL de lazer não muda.
+    clube_m2 = clube_reg.area if clube_reg is not None else 0.0
+    pracas_budget = max(min(LAZER_PRACAS_FRAC * lazer_area, lazer_area - clube_m2), 0.0)
+    pracas_reg, pool = (
+        _selecionar_pracas(pool, ruas_reg, clube_reg, pracas_budget)
+        if _pode_reservar(pool) else ([], pool)
+    )
+    pracas_m2 = sum(p.area for p in pracas_reg)
+
     # 4.c VERDE: quadras verdes formadas até o orçamento de lazer — sempre deixando ≥1 p/ lotes.
-    verde_budget = max(lazer_area - (clube_reg.area if clube_reg is not None else 0.0), 0.0)
+    verde_budget = max(lazer_area - clube_m2 - pracas_m2, 0.0)
     verdes_reg, pool = (
         _selecionar_verde(pool, verde_budget, ingreme_reg) if _pode_reservar(pool) else ([], pool)
     )
@@ -1490,6 +1559,10 @@ def gerar_layout(
     if travessia_viavel and arruamento is not None and not arruamento.is_empty:
         arruamento = _conectar_malha(arruamento, conexao_mod.CAIXA_TRONCO_M) or arruamento
     clube = _back(clube_reg)
+    pracas = [r for r in (_back(p) for p in pracas_reg) if r is not None]
+    # Fase U2 — o SISTEMA DE LAZER passa a ser hub ∪ praças de bolso (o quadro mede a união;
+    # a conformidade verde+lazer não muda: as praças saíram do mesmo orçamento).
+    lazer_total = _uniao_segura([g for g in (clube, *pracas) if g is not None])
     inst = _back(inst_reg)
     verde_reservado = _back(verde_reservado_reg)
     verde = _back(verde_total_reg)
@@ -1668,20 +1741,54 @@ def gerar_layout(
                    and eixos_curvos else "")),
     }
 
-    # Fase 11.9 — a fidelidade de LAZER mede só o lazer REAL (clube + verde de programa), NÃO a
-    # faixa ≥30% preservada que o 10.8b dobrou no verde_reservado (senão "lazer 17%" quando o
-    # programa pediu 5% — assustando: o ≥30% é vedação legal, não amenidade de lazer).
+    # Fase 11.9 — a fidelidade de LAZER mede só o lazer REAL (clube + praças + verde de
+    # programa), NÃO a faixa ≥30% preservada que o 10.8b dobrou no verde_reservado (senão
+    # "lazer 17%" quando o programa pediu 5% — o ≥30% é vedação legal, não amenidade).
     nao_edif_m2 = sum(g.area for g in nao_edif_reg if g is not None and not g.is_empty)
     lazer_reservado_m2 = max(sum(
-        g.area for g in (clube, verde_reservado) if g is not None and not g.is_empty
+        g.area for g in (clube, *pracas, verde_reservado)
+        if g is not None and not g.is_empty
     ) - nao_edif_m2, 0.0)
     retalho_m2 = 0.0  # a sobra foi destinada à área pública (sem retalho perdido)
+
+    # Fase U2 — PROGRAMA DO HUB (amenidades da IA materializadas pela biblioteca) + cobertura
+    # de caminhada. Tudo MEDIDO da geometria (§2); o que não coube/não materializa é rotulado.
+    hub_features, hub_diag = amen.programa_hub(clube, programa.publico_alvo, programa.amenidades)
+    lazer_features: list[dict] = [*hub_features]
+    for i, p in enumerate(pracas, start=1):
+        lazer_features.append({
+            "chave": "praca_bolso", "rotulo": f"Praça de bolso {i}", "tipo": "praca",
+            "area_m2": round(p.area, 2), "geom": p,
+        })
+    lazer_geoms = [g for g in (clube, *pracas) if g is not None and not g.is_empty]
+    cobertura_400 = None
+    if lotes and lazer_geoms:
+        cobertos = sum(
+            1 for l in lotes
+            if min(l.centroid.distance(g) for g in lazer_geoms) <= RAIO_CAMINHADA_M
+        )
+        cobertura_400 = round(cobertos / len(lotes), 4)
+    clube_diag = {
+        **clube_diag, **hub_diag,
+        "n_pracas": len(pracas),
+        "pracas_m2": round(sum(p.area for p in pracas), 2),
+        "cobertura_400m_pct": cobertura_400,
+        # formatado no BACKEND (o front exibe, não reformata — §2)
+        "cobertura_400m_fmt": (f"{cobertura_400 * 100:.0f}%".replace(".", ",")
+                               if cobertura_400 is not None else None),
+    }
 
     avisos: list[str] = []
     if not lotes:
         avisos.append(
             "A subdivisão não acomodou lotes na área aproveitável "
             "(gleba pequena/irregular para o perfil)."
+        )
+    if pracas:
+        avisos.append(
+            f"Lazer distribuído (U2): {len(pracas)} praça(s) de bolso reservada(s) para "
+            "aproximar o lazer dos lotes (raio de caminhada de 400 m — pesquisa §2); "
+            "o orçamento total de lazer do programa não mudou."
         )
 
     meta = {
@@ -1720,7 +1827,7 @@ def gerar_layout(
         areas_verdes=verde,  # TOTAL (reservado ∪ sobra) — quadro/conformidade usam este
         areas_verdes_reservada=verde_reservado,  # 9.6/9.7 — quadras verdes formadas (mapa)
         sobra_ponta=sobra_ponta,
-        sistema_lazer=clube,
+        sistema_lazer=lazer_total,  # U2 — hub ∪ praças de bolso (união medida no quadro)
         institucional=inst,
         centerlines=curvas_ia,  # 9.9 — curvas (IA ou fallback) usadas; [] na grelha
         via_largura_m=via,
@@ -1733,6 +1840,7 @@ def gerar_layout(
         viario_diagnostico=viario_diag,
         institucional_diagnostico=inst_diag,
         sistema_lazer_diagnostico=clube_diag,
+        lazer_features=lazer_features,  # U2 — sub-parcelas do hub + praças (rotuladas)
         portico=portico_geom,  # 11.3 — marcador da entrada/portaria p/ o mapa
     )
 

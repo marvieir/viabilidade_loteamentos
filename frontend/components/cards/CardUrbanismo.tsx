@@ -466,6 +466,7 @@ export function CardUrbanismo({
                   overlays={overlays}
                   lotesFeatures={lotesFeatures}
                   quadras={proposta?.geometria.quadras ?? null}
+                  lazerFeatures={proposta?.geometria.sistema_lazer_features ?? null}
                   aoClicar={
                     marcandoAcesso
                       ? (p) => {
@@ -885,6 +886,55 @@ export function CardUrbanismo({
                 </ul>
               </div>
             )}
+
+            {/* Fase U2 — PROGRAMA DE LAZER: hub rotulado + praças de bolso + cobertura 400 m.
+                Tudo medido pelo backend; o front só exibe (§2). */}
+            {proposta.geometria.lazer_diagnostico &&
+              (proposta.geometria.lazer_diagnostico.programa_hub?.length ||
+                (proposta.geometria.lazer_diagnostico.n_pracas ?? 0) > 0) && (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Programa de lazer (U2 — hub + praças de bolso)
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(proposta.geometria.lazer_diagnostico.programa_hub ?? []).map((a) => (
+                      <span
+                        key={a.rotulo}
+                        className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] text-teal-800"
+                        title="sub-parcela do hub (dimensão típica de mercado — verificar com urbanista)"
+                      >
+                        {a.rotulo}
+                        {a.area_fmt ? ` · ${a.area_fmt} m²` : ""}
+                      </span>
+                    ))}
+                    {(proposta.geometria.lazer_diagnostico.n_pracas ?? 0) > 0 && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-800">
+                        {proposta.geometria.lazer_diagnostico.n_pracas} praça(s) de bolso
+                      </span>
+                    )}
+                    {proposta.geometria.lazer_diagnostico.cobertura_400m_fmt && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-700">
+                        {proposta.geometria.lazer_diagnostico.cobertura_400m_fmt} dos lotes a
+                        ≤400 m do lazer
+                      </span>
+                    )}
+                  </div>
+                  {((proposta.geometria.lazer_diagnostico.nao_coube ?? []).length > 0 ||
+                    (proposta.geometria.lazer_diagnostico.amenidades_fora_do_hub ?? [])
+                      .length > 0) && (
+                    <ul className="mt-2 space-y-0.5 text-[11px] text-slate-500">
+                      {(proposta.geometria.lazer_diagnostico.nao_coube ?? []).map((r) => (
+                        <li key={r}>• não coube no hub: {r}</li>
+                      ))}
+                      {(proposta.geometria.lazer_diagnostico.amenidades_fora_do_hub ?? []).map(
+                        (r) => (
+                          <li key={r}>• {r}</li>
+                        )
+                      )}
+                    </ul>
+                  )}
+                </div>
+              )}
 
             {/* Heatmap de valorização — score v2 (U1): fatores rotulados + pesos do perfil */}
             {proposta.heatmap.score_medio != null && (

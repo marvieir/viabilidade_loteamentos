@@ -142,6 +142,8 @@ do operador (ver §6/roadmap U5).
 - **U2 — Lazer distribuído + amenidades materializadas:** hub central dimensionado por perfil
   (com **programa interno rotulado**: piscina/quadras/academia/salão como sub-parcelas) +
   pocket parks até cobrir raio de 400 m; amenidades do LLM passam a mapear para a biblioteca.
+  **✔ IMPLEMENTADA (2026-07-02)** — `urbanismo_amenidades.py` (biblioteca + programa do hub) +
+  `_selecionar_pracas` (cobertura 400 m); ver a entrada U2 no log do `ARCHITECTURE.md`.
 - **U3 — Lago/parque linear opcional:** ponto baixo do DEM + linha de drenagem → lago
   multiuso com orla-parque pública; lotes do anel de 274 m puxados para premium; custo do
   lago entra no Custo de Infra; prêmio entra no score v2. Toggle do operador.

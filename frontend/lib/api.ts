@@ -1460,6 +1460,24 @@ export interface GeometriaUrb {
   areas_verdes_sobra: GeoJSON.Geometry | null;
   // Fase 9.7 — clube como figura formada (forma=quadra); institucional como quadra (qualifica_legal).
   sistema_lazer: (GeoJSON.Geometry & { forma?: string; frente_via_m?: number | null }) | null;
+  // Fase U2 — lazer DISTRIBUÍDO e rotulado: sub-parcelas do hub + praças de bolso
+  // (props: chave, rotulo, tipo hub|praca, area_m2, area_fmt) + diagnóstico completo.
+  sistema_lazer_features?: GeoJSON.FeatureCollection | null;
+  lazer_diagnostico?: {
+    forma?: string;
+    frente_via_m?: number | null;
+    n_pracas?: number;
+    pracas_m2?: number;
+    cobertura_400m_pct?: number | null;
+    cobertura_400m_fmt?: string | null;
+    hub_area_m2?: number;
+    hub_area_livre_m2?: number;
+    programa_hub?: { rotulo: string; area_m2: number; area_fmt?: string }[];
+    nao_coube?: string[];
+    amenidades_fora_do_hub?: string[];
+    amenidades_sem_correspondencia?: string[];
+    proveniencia_programa?: string;
+  } | null;
   institucional:
     | (GeoJSON.Geometry & {
         frente_via_m?: number | null;

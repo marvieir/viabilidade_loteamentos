@@ -93,6 +93,10 @@ class Layout:
     # Fase U3 (futuro) — lâmina d'água criada (lago/parque linear). Hoje o motor não gera água;
     # o campo existe para o score v2 já saber pontuar quando a U3 materializar (fator "agua").
     agua: Optional[BaseGeometry] = None
+    # Fase U2 — lazer DISTRIBUÍDO e rotulado: sub-parcelas do hub (programa da biblioteca de
+    # amenidades) + praças de bolso. Cada item: {chave, rotulo, tipo: hub|praca, area_m2, geom}.
+    # ``sistema_lazer`` (acima) segue sendo a UNIÃO (o quadro mede a união; aqui é o detalhe).
+    lazer_features: list[dict] = field(default_factory=list)
 
 
 # ----------------------------- medição (pura) -----------------------------
@@ -576,6 +580,26 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
         lazer_gj = {**lazer_gj, "forma": cdiag.get("forma", "quadra"),
                     "frente_via_m": cdiag.get("frente_via_m")}
 
+    # Fase U2 — lazer ROTULADO p/ o mapa: sub-parcelas do hub + praças de bolso, cada uma com
+    # rótulo e área formatada pelo BACKEND (o front não reformata números — §2).
+    lazer_feats = []
+    for item in layout.lazer_features or []:
+        g = item.get("geom")
+        if g is None or g.is_empty:
+            continue
+        area_m2 = item.get("area_m2")
+        lazer_feats.append({
+            "type": "Feature",
+            "geometry": mapping(transform(to_wgs, g)),
+            "properties": {
+                "chave": item.get("chave"),
+                "rotulo": item.get("rotulo"),
+                "tipo": item.get("tipo"),
+                "area_m2": area_m2,
+                "area_fmt": _fmt(area_m2, 0) if isinstance(area_m2, (int, float)) else None,
+            },
+        })
+
     return {
         "rotulo": "esquemático",
         "lotes_features": {"type": "FeatureCollection", "features": feats},  # 9.5 — lote a lote
@@ -588,6 +612,10 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
         "areas_verdes_reservada": _gj(layout.areas_verdes_reservada),
         "areas_verdes_sobra": _gj(layout.sobra_ponta),
         "sistema_lazer": lazer_gj,  # 9.7 — figura formada (forma=quadra), não círculo
+        # Fase U2 — detalhe do lazer: sub-parcelas do hub + praças de bolso (rotuladas) e o
+        # diagnóstico completo (programa do hub, cobertura 400 m, não-materializadas).
+        "sistema_lazer_features": {"type": "FeatureCollection", "features": lazer_feats},
+        "lazer_diagnostico": cdiag or None,
         "institucional": inst_gj,  # 9.7 — quadra formada (qualifica_legal + checks)
         "portico": _gj(layout.portico),  # 11.3 — marcador da entrada/portaria
         "viario_diagnostico": vdiag,
