@@ -1475,6 +1475,28 @@ class MedicaoUrbOut(BaseModel):
     avisos: list[str]
 
 
+# --------- Fase U4 — K variantes + otimizador (padrão Delve/Forma na nossa escala) ---------
+class VarianteUrbOut(BaseModel):
+    """Resumo de UMA variante do estudo — o motor gerou K estratégias determinísticas e a
+    função de valor escolheu; as alternativas ficam disponíveis sem custo de IA."""
+
+    variante_id: str
+    rotulo: str
+    n_lotes: int
+    # Índice de valor posicional: Σ(área × multiplicador do score v2), base 100 = a melhor.
+    valor_indice: Optional[float] = None
+    score_medio: Optional[float] = None
+    cobertura_400m_pct: Optional[float] = None
+    escolhida: bool = False
+
+
+class VarianteUrbIn(BaseModel):
+    """Materializa uma variante ALTERNATIVA de uma proposta já gerada (sem LLM, fora do cap)."""
+
+    variante_id: str
+    versao: Optional[int] = None  # proposta base (default: a última gerada com IA)
+
+
 # --------- Fase U1 — função de VALOR posicional (preço do operador × multiplicador) ---------
 class ValorPosicionalIn(BaseModel):
     """Preço médio do OPERADOR (nunca inventado): por lote OU por m² — exatamente um."""
@@ -1567,6 +1589,9 @@ class PropostaUrbanisticaOut(BaseModel):
     esqueleto_ignorado: list[str] = []
     # Fase 10 (Parte 1) — a líquida CANÔNICA (mesma das abas Ambiental/Aproveitamento).
     areas_canonicas: Optional[AreasCanonicasOut] = None
+    # Fase U4 — resumo das K variantes geradas (a escolhida é esta proposta); alternativas
+    # materializáveis via POST /urbanismo/variante (sem LLM, fora do cap).
+    variantes: list[VarianteUrbOut] = []
     proveniencia: str
     avisos: list[str]
 

@@ -1683,8 +1683,22 @@ export interface PropostaUrbanistica {
   reconciliacao?: ReconciliacaoUrbanismo | null; // Fase 9.10 — ponte (estudo × teto regulatório)
   esqueleto_ignorado: string[];
   areas_canonicas?: AreasCanonicas | null; // Fase 10 (Parte 1) — líquida canônica (mesma das abas)
+  // Fase U4 — resumo das K variantes geradas (a escolhida é esta proposta); alternativas
+  // abrem via materializarVariante (sem IA, fora do cap de gerações).
+  variantes?: VarianteUrb[];
   proveniencia: string;
   avisos: string[];
+}
+
+// Fase U4 — uma variante do otimizador: índice de valor posicional (100 = a melhor).
+export interface VarianteUrb {
+  variante_id: string;
+  rotulo: string;
+  n_lotes: number;
+  valor_indice: number | null;
+  score_medio: number | null;
+  cobertura_400m_pct: number | null;
+  escolhida: boolean;
 }
 
 // IA propõe o programa; o backend gera+mede e devolve o snapshot versionado.
@@ -1713,6 +1727,21 @@ export async function proporUrbanismo(
       }),
     }
   );
+  return jsonOrThrow(res);
+}
+
+// Fase U4 — materializa uma variante ALTERNATIVA da proposta (geometria pura no backend):
+// zero chamada de IA e fora do cap de gerações.
+export async function materializarVariante(
+  analiseId: string,
+  varianteId: string,
+  versao?: number | null
+): Promise<PropostaUrbanistica> {
+  const res = await apiFetch(`/api/analises/${analiseId}/urbanismo/variante`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ variante_id: varianteId, ...(versao ? { versao } : {}) }),
+  });
   return jsonOrThrow(res);
 }
 

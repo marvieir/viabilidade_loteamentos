@@ -14,6 +14,8 @@ Python puro. A Fase 9 NÃO altera nenhuma dimensão anterior (cenário aditivo).
 
 from __future__ import annotations
 
+import dataclasses
+import math
 import os
 from datetime import date
 
@@ -32,6 +34,7 @@ from app.core.urbanismo_diretrizes import resolver_diretrizes
 from app.core.urbanismo_programa import (
     GeradorIndisponivel,
     GeradorPrograma,
+    Programa,
     get_gerador_programa,
 )
 from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
@@ -222,6 +225,20 @@ def _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem):
     return aprov, restr_full, origem, decliv_lote
 
 
+# Fase U4 — as K variantes DETERMINÍSTICAS geradas por chamada de IA (1 chamada → K layouts):
+# estratégia de posição do hub + rotação extra da grelha. Mesma variante → mesmo layout.
+VARIANTES_U4: list[dict] = [
+    {"id": "V1", "rotulo": "Base — topografia + hub por área",
+     "orientacao_extra_rad": 0.0, "hub_estrategia": "area"},
+    {"id": "V2", "rotulo": "Hub junto à entrada",
+     "orientacao_extra_rad": 0.0, "hub_estrategia": "entrada"},
+    {"id": "V3", "rotulo": "Hub central",
+     "orientacao_extra_rad": 0.0, "hub_estrategia": "centro"},
+    {"id": "V4", "rotulo": "Grelha girada 15°",
+     "orientacao_extra_rad": math.radians(15.0), "hub_estrategia": "area"},
+]
+
+
 @router.post(
     "/analises/{analise_id}/urbanismo/propor",
     response_model=schemas.PropostaUrbanisticaOut,
@@ -250,15 +267,47 @@ def propor(
     # Cap de fair-use POR ANÁLISE (por vida, não por dia): cada geração é uma chamada de IA
     # (custo + fila/rate-limit da org, compartilhada entre TODOS os usuários). 15 mudanças de
     # layout já são mais que suficientes para uma gleba — não é ferramenta de gerar em massa.
-    # Barra loop/abuso; não é cobrança, é proteção.
+    # Barra loop/abuso; não é cobrança, é proteção. Fase U4: só GERAÇÕES COM IA contam —
+    # materializar uma variante alternativa (geometria pura) não consome o cap.
     _max = int(os.getenv("URBANISMO_MAX_GERACOES", "15"))
-    if _max > 0 and len(fonte_urb.listar(analise_id)) >= _max:
+    geracoes_ia = [
+        p for p in fonte_urb.listar(analise_id)
+        if (p.get("origem_geracao") or "llm") == "llm"
+    ]
+    if _max > 0 and len(geracoes_ia) >= _max:
         raise HTTPException(
             429,
             f"Limite de regenerações do estudo de massa desta análise atingido ({_max}). "
             "Reutilize um layout já gerado (ele fica salvo) ou fale com o suporte se precisar de mais.",
         )
 
+    return _propor_impl(
+        analise_id, body, registro,
+        fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
+        fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
+        gerador=gerador,
+    )
+
+
+def _propor_impl(
+    analise_id: str,
+    body: schemas.ProporUrbanismoIn,
+    registro: dict,
+    *,
+    fonte_urb: FonteUrbanismo,
+    fonte_veg: FonteVegetacao | None,
+    fonte_camadas: FonteCamadas | None,
+    fonte_dem: FonteDEM | None,
+    fonte_perfil: FontePerfilMunicipal | None,
+    fonte_vias: FonteVias | None,
+    gerador: GeradorPrograma | None = None,
+    prog=None,
+    variante_unica: dict | None = None,
+    origem_geracao: str = "llm",
+) -> schemas.PropostaUrbanisticaOut:
+    """Pipeline completo do estudo de massa (Fase U4): com ``prog`` fornecido NÃO chama a IA
+    (materialização de variante); ``variante_unica`` restringe a UMA estratégia (senão gera as
+    K de ``VARIANTES_U4`` e a função de valor escolhe). Determinístico dado o mesmo programa."""
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
     # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
     aprov_wgs, restr_wgs, restr_origem, decliv_wgs = _aproveitavel_wgs(
@@ -286,24 +335,28 @@ def propor(
         except Exception:  # noqa: BLE001 — DEM indisponível → sem orientação (degrada honesto)
             dem_recorte, orientacao = None, 0.0
 
-    # 2) BORDA: o LLM propõe o PROGRAMA (estratégia), nunca a geometria/número.
-    contexto = {
-        "area_aproveitavel_m2": round(aprov_m.area, 2),
-        "municipio": getattr(registro["jurisdicao"], "municipio", None),
-    }
-    try:
-        with uso_llm.contexto(
-            "urbanismo",
-            analise_id=analise_id,
-            usuario_id=str(registro.get("usuario_id", "")),
-            meta={
-                "tipo_loteamento": str(body.tipo_loteamento),
-                "publico_alvo": str(body.publico_alvo) if body.publico_alvo else "",
-            },
-        ):
-            prog = gerador.propor(contexto, body.tipo_loteamento, body.publico_alvo, body.overrides)
-    except GeradorIndisponivel as exc:
-        raise HTTPException(503, str(exc))
+    # 2) BORDA: o LLM propõe o PROGRAMA (estratégia), nunca a geometria/número. Fase U4: na
+    # materialização de variante o programa JÁ EXISTE (veio salvo) — zero chamada de IA.
+    if prog is None:
+        contexto = {
+            "area_aproveitavel_m2": round(aprov_m.area, 2),
+            "municipio": getattr(registro["jurisdicao"], "municipio", None),
+        }
+        try:
+            with uso_llm.contexto(
+                "urbanismo",
+                analise_id=analise_id,
+                usuario_id=str(registro.get("usuario_id", "")),
+                meta={
+                    "tipo_loteamento": str(body.tipo_loteamento),
+                    "publico_alvo": str(body.publico_alvo) if body.publico_alvo else "",
+                },
+            ):
+                prog = gerador.propor(
+                    contexto, body.tipo_loteamento, body.publico_alvo, body.overrides
+                )
+        except GeradorIndisponivel as exc:
+            raise HTTPException(503, str(exc))
 
     # 2b) DIRETRIZES (Fase 9.4): hierarquia LUOS(1.8)→mercado→federal. Lei vence o mercado.
     jur = registro["jurisdicao"]
@@ -377,20 +430,50 @@ def propor(
             "miolo do loteamento. Regenere o estudo para tentar ancorar à via de acesso real."
         )
 
-    layout = geom.gerar_layout(
-        aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao, diretrizes=diretrizes,
-        travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
-        declividade_acentuada=decliv_acentuada_m,
-        # Fase 11.4 — a restrição (mata/APP/≥30%) é um BURACO na aproveitável; passa p/ o motor vetar
-        # a portaria na frente da mata preservada (a via de contorno corre rente a essa borda).
-        restricao_externa=restr_m,
-        # Fase 11.5 — alvo da entrada = via de acesso mais próxima (OSM); None → fallback miolo.
-        acesso_externo=acesso_externo_m,
+    # Fase U4 — K VARIANTES determinísticas por chamada de IA: o motor gera as estratégias e a
+    # FUNÇÃO DE VALOR (Σ área×multiplicador do score v2 — proxy de VGV posicional) escolhe a
+    # melhor; as alternativas ficam materializáveis depois SEM IA (POST /urbanismo/variante).
+    candidatas = [variante_unica] if variante_unica is not None else VARIANTES_U4
+    geradas: list[tuple[dict, object, object, float]] = []
+    for var in candidatas:
+        layout_v = geom.gerar_layout(
+            aprov_m, prog, restricoes=decliv_lote_m, orientacao_rad=orientacao,
+            diretrizes=diretrizes,
+            travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
+            declividade_acentuada=decliv_acentuada_m,
+            # Fase 11.4 — a restrição (mata/APP/≥30%) é um BURACO na aproveitável; passa p/ o
+            # motor vetar a portaria na frente da mata preservada.
+            restricao_externa=restr_m,
+            # Fase 11.5 — alvo da entrada = via de acesso mais próxima (OSM); None → fallback.
+            acesso_externo=acesso_externo_m,
+            variante=var,
+        )
+        layout_v.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular (não recalcula)
+        layout_v.restricao_origem = restr_origem
+        # Fase U1 — o perfil do público-alvo escolhe os PESOS do score de valor v2.
+        med_v = medida.medir(layout_v, publico_alvo=body.publico_alvo)
+        valor_v = sum(
+            (p.get("area_m2") or 0.0) * (p.get("multiplicador") or 1.0)
+            for p in med_v.heatmap.get("por_lote", [])
+        )
+        geradas.append((var, layout_v, med_v, valor_v))
+
+    # Escolha: maior valor posicional; empate → mais lotes (yield). Determinístico.
+    variante_escolhida, layout, med, valor_melhor = max(
+        geradas, key=lambda t: (t[3], len(t[1].lotes))
     )
-    layout.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular a restrição (não recalcula)
-    layout.restricao_origem = restr_origem
-    # Fase U1 — o perfil do público-alvo escolhe os PESOS do score de valor v2.
-    med = medida.medir(layout, publico_alvo=body.publico_alvo)
+    variantes_out = [
+        schemas.VarianteUrbOut(
+            variante_id=str(var["id"]),
+            rotulo=str(var["rotulo"]),
+            n_lotes=len(lay.lotes),
+            valor_indice=(round(100.0 * val / valor_melhor, 1) if valor_melhor > 0 else None),
+            score_medio=m.heatmap.get("score_medio"),
+            cobertura_400m_pct=(lay.sistema_lazer_diagnostico or {}).get("cobertura_400m_pct"),
+            escolhida=(var is variante_escolhida),
+        )
+        for var, lay, m, val in geradas
+    ]
     quadro, indicadores, heatmap = _medicao_dicts(med)
 
     # Fase 11.13 — declividade média por lote (orientativa, DSM 30 m): amostra o DEM nos lotes
@@ -430,7 +513,17 @@ def propor(
     versao = fonte_urb.proxima_versao(analise_id)
     proposta_id = f"u_{analise_id[:8]}_{versao:03d}"
     conformidade = _conformidade_programa(prog)
+    aviso_variantes = (
+        f"Otimizador (U4): {len(geradas)} variante(s) gerada(s) com UMA proposta de IA; "
+        f"escolhida “{variante_escolhida['rotulo']}” pela função de valor posicional "
+        "(Σ área × multiplicador do score v2). As alternativas podem ser abertas sem "
+        "custo de IA e sem consumir o limite de gerações."
+        if len(geradas) > 1 else
+        f"Variante “{variante_escolhida['rotulo']}” materializada da proposta salva — "
+        "sem chamada de IA e fora do limite de gerações."
+    )
     avisos = [
+        aviso_variantes,
         *avisos_vias,
         *medida.AVISOS_1A,
         *layout.avisos,
@@ -467,14 +560,29 @@ def propor(
         areas_canonicas=schemas.AreasCanonicasOut(
             **_garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem).__dict__
         ),
+        variantes=variantes_out,  # Fase U4 — resumo das K estratégias (esta = a escolhida)
         proveniencia=(
             f"Programa proposto por IA ({prog.origem}, perfil '{body.publico_alvo}') + "
-            "geometria e medidas GERADAS/MEDIDAS em Python sobre a área aproveitável "
-            f"(gerado em {date.today().isoformat()})."
+            "geometria e medidas GERADAS/MEDIDAS em Python sobre a área aproveitável; "
+            f"variante '{variante_escolhida['rotulo']}' escolhida pela função de valor entre "
+            f"{len(geradas)} geradas (gerado em {date.today().isoformat()})."
         ),
         avisos=avisos,
     )
-    fonte_urb.salvar(analise_id, out.model_dump())
+    # Persistência: além do payload, guarda o PROGRAMA do motor e o contexto do pedido para
+    # rematerializar QUALQUER variante depois sem IA (chaves privadas "_" — uso interno).
+    salvo = out.model_dump()
+    salvo["origem_geracao"] = origem_geracao
+    salvo["_programa_motor"] = dataclasses.asdict(prog)
+    salvo["_contexto_variantes"] = {
+        "tipo_loteamento": body.tipo_loteamento,
+        "publico_alvo": body.publico_alvo,
+        "zona": body.zona,
+        "modalidade": body.modalidade,
+        "lote_max_m2": body.lote_max_m2,
+        "acesso_ponto": body.acesso_ponto,
+    }
+    fonte_urb.salvar(analise_id, salvo)
     return out
 
 
@@ -501,6 +609,58 @@ def _conformidade_programa(prog) -> list[schemas.ItemConformidadePrograma]:
 
 
 # --------------------------------- GET (snapshots) ---------------------------------
+# ------------------------------- /variante (Fase U4 — sem LLM) -------------------------------
+@router.post(
+    "/analises/{analise_id}/urbanismo/variante",
+    response_model=schemas.PropostaUrbanisticaOut,
+)
+def materializar_variante(
+    analise_id: str,
+    body: schemas.VarianteUrbIn,
+    fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
+    fonte_veg: FonteVegetacao | None = Depends(get_fonte_vegetacao),
+    fonte_camadas: FonteCamadas | None = Depends(get_fonte_camadas),
+    fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
+    fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
+    fonte_vias: FonteVias | None = Depends(get_fonte_vias),
+):
+    """Materializa uma VARIANTE alternativa de uma proposta já gerada: reusa o programa salvo
+    (zero chamada de IA, FORA do cap de gerações) e roda só a geometria determinística."""
+    registro = STORE.get(analise_id)
+    if registro is None:
+        raise HTTPException(404, "Análise não encontrada.")
+    var = next((v for v in VARIANTES_U4 if v["id"] == body.variante_id), None)
+    if var is None:
+        raise HTTPException(404, f"Variante '{body.variante_id}' não existe.")
+
+    propostas = fonte_urb.listar(analise_id)
+    if body.versao is not None:
+        base = next((p for p in propostas if p.get("versao") == body.versao), None)
+        if base is None:
+            raise HTTPException(404, f"Versão {body.versao} não encontrada nesta análise.")
+    else:
+        base = next(
+            (p for p in reversed(propostas) if p.get("_programa_motor")), None
+        )
+    if base is None or not base.get("_programa_motor"):
+        raise HTTPException(
+            409,
+            "Esta análise não tem proposta com programa salvo (gerada antes da U4) — "
+            "regenere o estudo de massa para habilitar as variantes.",
+        )
+
+    campos = {f.name for f in dataclasses.fields(Programa)}
+    prog = Programa(**{k: v for k, v in base["_programa_motor"].items() if k in campos})
+    ctx = base.get("_contexto_variantes") or {}
+    body_base = schemas.ProporUrbanismoIn(**{k: v for k, v in ctx.items() if v is not None})
+    return _propor_impl(
+        analise_id, body_base, registro,
+        fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
+        fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
+        prog=prog, variante_unica=var, origem_geracao="variante",
+    )
+
+
 # --------------------------------- /valor (Fase U1 — sem LLM) ---------------------------------
 @router.post(
     "/analises/{analise_id}/urbanismo/valor", response_model=schemas.ValorPosicionalOut

@@ -150,6 +150,9 @@ do operador (ver §6/roadmap U5).
 - **U4 — K variantes + otimizador:** gerar 3–5 variantes determinísticas (sementes de
   parâmetros: arquétipo, posição do hub, mix) → pontuar pela função de valor → apresentar a
   melhor com as alternativas. É o padrão Delve/Forma, na nossa escala.
+  **✔ IMPLEMENTADA (2026-07-03)** — 4 variantes/chamada de IA (base, hub-entrada, hub-centro,
+  grelha 15°) + `POST /urbanismo/variante` (sem IA, fora do cap); ver a entrada U4 no
+  `ARCHITECTURE.md`.
 - **U5 — Memória/aprendizado:** rating + edits do operador por proposta persistidos →
   (a) recuperação dos melhores programas da região/perfil como few-shot para o LLM;
   (b) ajuste dos pesos do score por feedback. Determinístico, auditável, sem "ML caixa-preta".

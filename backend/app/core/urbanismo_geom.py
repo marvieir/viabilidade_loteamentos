@@ -816,9 +816,17 @@ def institucional_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[Ba
     return q, diag
 
 
-def clube_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeometry], alvo: float):
+def clube_como_quadra(
+    quadras: Sequence[BaseGeometry],
+    ruas: Optional[BaseGeometry],
+    alvo: float,
+    preferencia=None,
+):
     """Clube/lazer como FIGURA FORMADA com frente para via (não o disco central da v1).
-    Escolhe a face com frente ≥10 m mais próxima do ``alvo`` de área. Devolve ``(geom, diag)``."""
+    Escolhe a face com frente ≥10 m mais próxima do ``alvo`` de área. Fase U4: com
+    ``preferencia`` (ponto), entre as faces com área na janela [0,5·alvo, 1,5·alvo] vence a
+    mais PRÓXIMA do ponto (estratégia de posição da variante); sem janela → regra da área
+    (compat). Devolve ``(geom, diag)``."""
     cands = []
     for q in quadras:
         fr, pr = _lados_mrr(q)
@@ -828,6 +836,14 @@ def clube_como_quadra(quadras: Sequence[BaseGeometry], ruas: Optional[BaseGeomet
     if not cands or alvo <= 0:
         return None, {}
     alvo = max(alvo, 1.0)
+    if preferencia is not None:
+        # POSIÇÃO é o critério primário da variante: entre TODAS as faces viáveis como hub
+        # (área ≥ 0,35·alvo e ≤ 1,5·alvo — o teto do orçamento de lazer), vence a mais perto
+        # do ponto de preferência. Sem face viável → regra da área (compat/degrada).
+        janela = [c for c in cands if 0.35 * alvo <= c[0].area <= 1.5 * alvo]
+        if janela:
+            q, fr, pr = min(janela, key=lambda c: c[0].centroid.distance(preferencia))
+            return q, {"forma": "quadra", "frente_via_m": round(fr, 2)}
     q, fr, pr = min(cands, key=lambda c: abs(c[0].area - alvo))
     return q, {"forma": "quadra", "frente_via_m": round(fr, 2)}
 
@@ -1121,15 +1137,23 @@ def gerar_layout(
     declividade_acentuada: Optional[BaseGeometry] = None,
     restricao_externa: Optional[BaseGeometry] = None,
     acesso_externo: Optional[BaseGeometry] = None,
+    variante: Optional[dict] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
-    cai nas faixas de mercado do perfil. ``orientacao_rad`` gira a grelha (topografia 9.1)."""
+    cai nas faixas de mercado do perfil. ``orientacao_rad`` gira a grelha (topografia 9.1).
+
+    Fase U4 — ``variante`` = knobs DETERMINÍSTICOS de estratégia (mesma variante → mesmo
+    layout): ``orientacao_extra_rad`` gira a grelha além da topografia; ``hub_estrategia``
+    ("area" compat | "entrada" | "centro") escolhe ONDE o clube/hub cai."""
     # Diretrizes: piso/teto LEGAL do lote + reservas mínimas (lei vence o mercado). Sem 1.8 →
     # piso federal + mercado (rotulado pelo chamador).
     if diretrizes is None:
         from app.core.urbanismo_diretrizes import resolver_diretrizes
         diretrizes = resolver_diretrizes(None, None, None, programa.publico_alvo)
+    variante = dict(variante or {})
+    orientacao_rad = float(orientacao_rad) + float(variante.get("orientacao_extra_rad", 0.0))
+    hub_estrategia = str(variante.get("hub_estrategia", "area"))
 
     canvas = aproveitavel
     # Fase 10.8 — ≥30% veda LOTE, não VIA (Lei 6.766 art. 3º: parcelamento, não estrada). A malha
@@ -1429,9 +1453,24 @@ def gerar_layout(
     pool = [q for q in miolos if inst_reg is None or q is not inst_reg]
 
     # 4.b CLUBE: figura formada com frente para via (não círculo). Verde de lazer = quadras verdes.
+    # Fase U4 — a VARIANTE escolhe a estratégia de POSIÇÃO do hub (frame rotacionado):
+    # "entrada" ancora no ponto de acesso (ou na base da gleba, o fallback do pórtico);
+    # "centro" no centróide; "area" (default) mantém a regra por área (compat).
+    hub_pref = None
+    if hub_estrategia == "centro":
+        hub_pref = reg.centroid
+    elif hub_estrategia == "entrada":
+        if acesso_externo is not None and not acesso_externo.is_empty:
+            _ac = (acesso_externo if isinstance(acesso_externo, Point)
+                   else acesso_externo.representative_point())
+            hub_pref = rotate(_ac, -ang_deg, origin=cen) if ang_deg else _ac
+        else:
+            _rb = reg.bounds
+            hub_pref = Point((_rb[0] + _rb[2]) / 2.0, _rb[1])
     clube_target = LAZER_CLUBE_FRAC * lazer_area
     clube_reg, clube_diag = (
-        clube_como_quadra(pool, ruas_reg, clube_target) if _pode_reservar(pool) else (None, {})
+        clube_como_quadra(pool, ruas_reg, clube_target, preferencia=hub_pref)
+        if _pode_reservar(pool) else (None, {})
     )
     # só materializa o clube se couber no orçamento de lazer (degradação: gleba não comporta).
     if clube_reg is not None and clube_reg.area > lazer_area * 1.5 + 1e-6:
@@ -1819,6 +1858,15 @@ def gerar_layout(
         "teto_lote_m2": round(teto_lote, 2),
         "faixa_lote_m2": [round(piso_lote, 2), round(teto_lote, 2)],
         "lote_alvo_origem": programa.lote_alvo_origem,
+        # Fase U4 — que variante gerou este layout (proveniência da estratégia).
+        "variante": {
+            "id": str(variante.get("id", "V1")),
+            "rotulo": str(variante.get("rotulo", "base")),
+            "hub_estrategia": hub_estrategia,
+            "orientacao_extra_deg": round(
+                math.degrees(float(variante.get("orientacao_extra_rad", 0.0))), 1
+            ),
+        },
     }
 
     return Layout(
