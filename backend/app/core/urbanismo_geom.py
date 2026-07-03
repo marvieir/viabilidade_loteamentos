@@ -1762,6 +1762,64 @@ def gerar_layout(
     # Fase 9.14 — regra D: o que virou LOTE/ via de contorno (recuperado) sai da sobra-verde (cai).
     if lotes_rec_reg or contorno_mat_reg:
         sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura([*lotes_rec_reg, *contorno_mat_reg]))
+
+    # U6a REGRA E — CAÇA À SOBRA (benchmark do operador: vendável 45–49%): bloco de sobra
+    # ≥ MIN_QUADRA com FRENTE para via existente é terra LOTEÁVEL desperdiçada — loteia
+    # direto (clamp legal intacto). Só entram lotes que de fato ENCOSTAM na via e com
+    # testada mínima; o resto volta à sobra. Depois, o VERDE MÍNIMO do estilo é completado
+    # com as maiores peças da sobra (a lei come da sobra, nunca de lote já formado).
+    if usa_paisagem and sobra_reg is not None and not sobra_reg.is_empty:
+        restante_e: list[BaseGeometry] = []
+        n_lotes_e = 0
+        for bloco in _componentes(sobra_reg):
+            loteou = False
+            if (bloco.area >= MIN_QUADRA_M2 and ruas_reg is not None
+                    and not ruas_reg.is_empty and bloco.distance(ruas_reg) < 0.6):
+                sub, _res_e = _lotear_face(
+                    bloco, testada_alvo, prof, alvo_area, piso_lote, teto_lote
+                )
+                aceitos = []
+                for lote_e in sub:
+                    v = _valido(lote_e)
+                    if v is None or v.is_empty:
+                        continue
+                    fr_e, _pr_e = _lados_mrr(v)
+                    if v.distance(ruas_reg) < 0.6 and fr_e >= FRENTE_MIN_M:
+                        aceitos.append(v)
+                if aceitos:
+                    for v in aceitos:
+                        lotes_reg.append(v)
+                        lote_quadra.append("Qe")
+                    n_lotes_e += len(aceitos)
+                    resto_b = _diferenca_segura(bloco, _uniao_segura(aceitos))
+                    if resto_b is not None and not resto_b.is_empty:
+                        restante_e.extend(_componentes(resto_b))
+                    loteou = True
+            if not loteou:
+                restante_e.append(bloco)
+        sobra_reg = _uniao_segura(restante_e)
+        if n_lotes_e:
+            lotes_recuperados += n_lotes_e
+
+    # U6a — VERDE MÍNIMO do estilo (lei local): completa a reserva com as MAIORES peças
+    # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
+    alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if usa_paisagem else 0.0
+    if alvo_verde_pct > 0 and sobra_reg is not None and not sobra_reg.is_empty:
+        verde_atual = (verde_reservado_reg.area if verde_reservado_reg is not None else 0.0) + (
+            cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
+        )
+        deficit = alvo_verde_pct * aprov_area - verde_atual
+        if deficit > 0:
+            promovidas = []
+            for peca in sorted(_componentes(sobra_reg), key=lambda g: -g.area):
+                if deficit <= 0:
+                    break
+                promovidas.append(peca)
+                deficit -= peca.area
+            if promovidas:
+                verde_reservado_reg = _uniao_segura([verde_reservado_reg, *promovidas])
+                sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura(promovidas))
+
     verde_total_reg = _uniao_segura([verde_reservado_reg, sobra_reg])
     verde_reserva_m2 = verde_reservado_reg.area if verde_reservado_reg is not None else 0.0
     verde_sobra_m2 = sobra_reg.area if sobra_reg is not None else 0.0

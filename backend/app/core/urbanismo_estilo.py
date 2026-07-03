@@ -64,12 +64,13 @@ ESTILO_DEFAULT: dict[str, dict] = {
         "arquetipo": "loops_paisagem",
         "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
+        "verde_min_pct": 0.20,
     },
 }
 
 _CHAVES_NUM = ("pracas_por_quadras", "lazer_pracas_frac", "lago_frac_aproveitavel",
                "lago_max_m2", "hub_fracao_livre", "cinturao_verde_m",
-               "paisagem_area_min_m2")
+               "paisagem_area_min_m2", "verde_min_pct")
 
 
 def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:
