@@ -16,6 +16,8 @@ import {
   proporUrbanismo,
   listarUrbanismo,
   materializarVariante,
+  avaliarUrbanismo,
+  listarAvaliacoesUrbanismo,
   valorPosicionalUrbanismo,
   type ChaveOverlay,
   type ConformidadeLegal,
@@ -123,6 +125,9 @@ export function CardUrbanismo({
   const [marcandoAcesso, setMarcandoAcesso] = useState(false);
   // Fase U4 — troca de variante (materializada no backend, sem IA e fora do cap).
   const [varianteCarregando, setVarianteCarregando] = useState<string | null>(null);
+  // Fase U5 — memória: rating do operador p/ a proposta exibida (≥4★ vira few-shot).
+  const [avaliacao, setAvaliacao] = useState<number | null>(null);
+  const [avaliando, setAvaliando] = useState(false);
   // Fase U1 — valor posicional: preço médio do OPERADOR × multiplicador do score v2 (backend).
   const [valorBase, setValorBase] = useState<"por_lote" | "por_m2">("por_lote");
   const [valorPreco, setValorPreco] = useState<string>("");
@@ -176,6 +181,40 @@ export function CardUrbanismo({
       setErro(e instanceof Error ? e.message : "Falha ao gerar o estudo de massa.");
     } finally {
       setCarregando(false);
+    }
+  }
+
+  // Fase U5 — carrega o rating já dado à proposta exibida (memória persistida no backend).
+  useEffect(() => {
+    let vivo = true;
+    setAvaliacao(null);
+    if (!proposta) return;
+    (async () => {
+      try {
+        const lista = await listarAvaliacoesUrbanismo(analiseId);
+        const minha = [...lista].reverse().find((a) => a.versao === proposta.versao);
+        if (vivo && minha) setAvaliacao(minha.rating);
+      } catch {
+        /* memória indisponível → sem estrelas pré-marcadas */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analiseId, proposta?.versao]);
+
+  // Fase U5 — envia o rating (1–5); ≥4★ entra como referência nas próximas gerações.
+  async function avaliar(rating: number) {
+    if (!proposta) return;
+    setAvaliando(true);
+    try {
+      await avaliarUrbanismo(analiseId, proposta.versao, rating);
+      setAvaliacao(rating);
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao registrar a avaliação.");
+    } finally {
+      setAvaliando(false);
     }
   }
 
@@ -1169,6 +1208,38 @@ export function CardUrbanismo({
                 ))}
               </div>
             )}
+
+            {/* Fase U5 — MEMÓRIA: avalie o estudo; ≥4★ vira referência (few-shot) nas
+                próximas gerações da mesma região/perfil. */}
+            <div className="flex items-center gap-2 rounded-xl border border-slate-200 p-3">
+              <span className="text-sm text-slate-600">
+                Avalie este estudo (alimenta a memória do gerador):
+              </span>
+              <div className="flex">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => avaliar(n)}
+                    disabled={avaliando}
+                    title={`${n} estrela${n > 1 ? "s" : ""}${n >= 4 ? " — vira referência p/ próximas gerações" : ""}`}
+                    className={`px-0.5 text-xl transition ${
+                      avaliacao != null && n <= avaliacao
+                        ? "text-amber-400"
+                        : "text-slate-300 hover:text-amber-300"
+                    }`}
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+              {avaliacao != null && (
+                <span className="text-xs text-slate-500">
+                  {avaliacao >= 4
+                    ? "obrigado — este programa vira referência na região ✓"
+                    : "registrado ✓"}
+                </span>
+              )}
+            </div>
 
             <p className="text-xs text-slate-500">{proposta.proveniencia}</p>
 

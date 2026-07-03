@@ -37,6 +37,7 @@ from app.core.urbanismo_programa import (
     Programa,
     get_gerador_programa,
 )
+from app.core.urbanismo_memoria import FonteMemoriaUrbanismo, get_fonte_memoria_urbanismo
 from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
 from app.core.vias import FonteVias, get_fonte_vias
 from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
@@ -253,6 +254,7 @@ def propor(
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
     fonte_vias: FonteVias | None = Depends(get_fonte_vias),
+    fonte_memoria: FonteMemoriaUrbanismo | None = Depends(get_fonte_memoria_urbanismo),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -285,7 +287,7 @@ def propor(
         analise_id, body, registro,
         fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
         fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
-        gerador=gerador,
+        gerador=gerador, fonte_memoria=fonte_memoria,
     )
 
 
@@ -304,10 +306,12 @@ def _propor_impl(
     prog=None,
     variante_unica: dict | None = None,
     origem_geracao: str = "llm",
+    fonte_memoria: FonteMemoriaUrbanismo | None = None,
 ) -> schemas.PropostaUrbanisticaOut:
     """Pipeline completo do estudo de massa (Fase U4): com ``prog`` fornecido NÃO chama a IA
     (materialização de variante); ``variante_unica`` restringe a UMA estratégia (senão gera as
     K de ``VARIANTES_U4`` e a função de valor escolhe). Determinístico dado o mesmo programa."""
+    referencia: list = []  # U5 — programas bem avaliados usados como few-shot (p/ o aviso)
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
     # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
     aprov_wgs, restr_wgs, restr_origem, decliv_wgs = _aproveitavel_wgs(
@@ -342,6 +346,18 @@ def _propor_impl(
             "area_aproveitavel_m2": round(aprov_m.area, 2),
             "municipio": getattr(registro["jurisdicao"], "municipio", None),
         }
+        # Fase U5 — MEMÓRIA: programas bem avaliados (≥4★) da mesma região/perfil entram
+        # como referência (few-shot) no prompt. A IA calibra a ESTRATÉGIA; o Python segue
+        # medindo tudo (nenhum número vem da memória). Falha na leitura nunca derruba.
+        try:
+            referencia = (
+                fonte_memoria.melhores(contexto["municipio"], str(body.publico_alvo))
+                if fonte_memoria is not None else []
+            )
+        except Exception:  # noqa: BLE001 — memória é um plus
+            referencia = []
+        if referencia:
+            contexto["programas_bem_avaliados"] = referencia
         try:
             with uso_llm.contexto(
                 "urbanismo",
@@ -562,6 +578,9 @@ def _propor_impl(
     )
     avisos = [
         aviso_variantes,
+        *([f"Memória (U5): a proposta foi calibrada por {len(referencia)} programa(s) "
+           "bem avaliado(s) pelo operador na mesma região/perfil (few-shot no gerador — "
+           "os números continuam medidos pelo motor)."] if referencia else []),
         *avisos_vias,
         *medida.AVISOS_1A,
         *layout.avisos,
@@ -648,6 +667,70 @@ def _conformidade_programa(prog) -> list[schemas.ItemConformidadePrograma]:
 
 
 # --------------------------------- GET (snapshots) ---------------------------------
+# ------------------------------ /avaliar (Fase U5 — memória) ------------------------------
+@router.post(
+    "/analises/{analise_id}/urbanismo/avaliar",
+    response_model=schemas.AvaliacaoUrbanismoOut,
+)
+def avaliar_proposta(
+    analise_id: str,
+    body: schemas.AvaliarUrbanismoIn,
+    fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
+    fonte_memoria: FonteMemoriaUrbanismo = Depends(get_fonte_memoria_urbanismo),
+):
+    """Rating do OPERADOR (1–5) para um estudo de massa. Ratings ≥4 viram REFERÊNCIA
+    (few-shot) nas próximas gerações da mesma região/perfil — aprendizado auditável."""
+    registro = STORE.get(analise_id)
+    if registro is None:
+        raise HTTPException(404, "Análise não encontrada.")
+    alvo = next(
+        (p for p in fonte_urb.listar(analise_id) if p.get("versao") == body.versao), None
+    )
+    if alvo is None:
+        raise HTTPException(404, f"Versão {body.versao} não encontrada nesta análise.")
+
+    programa = alvo.get("programa") or {}
+    perfil_prop = alvo.get("perfil") or {}
+    reg = {
+        "analise_id": analise_id,
+        "versao": int(body.versao),
+        "proposta_id": str(alvo.get("proposta_id", "")),
+        "rating": int(body.rating),
+        "comentario": body.comentario,
+        "municipio": getattr(registro["jurisdicao"], "municipio", None),
+        "uf": getattr(registro["jurisdicao"], "uf", None),
+        "publico_alvo": perfil_prop.get("publico_alvo"),
+        "tipo_loteamento": perfil_prop.get("tipo_loteamento"),
+        # RESUMO do programa (estratégia, nunca medida — §2) que vira few-shot.
+        "programa_resumo": {
+            "lote_alvo_m2": programa.get("lote_alvo_m2"),
+            "pct_lazer": programa.get("pct_lazer"),
+            "arquetipo_viario": programa.get("arquetipo_viario"),
+            "amenidades": programa.get("amenidades"),
+            "largura_via_m": programa.get("largura_via_m"),
+            "testada_m": programa.get("testada_m"),
+            "profundidade_m": programa.get("profundidade_m"),
+        },
+        "data": date.today().isoformat(),
+    }
+    fonte_memoria.avaliar(reg)
+    return schemas.AvaliacaoUrbanismoOut(
+        analise_id=analise_id, versao=reg["versao"], proposta_id=reg["proposta_id"],
+        rating=reg["rating"], comentario=reg["comentario"], municipio=reg["municipio"],
+        publico_alvo=reg["publico_alvo"], data=reg["data"],
+    )
+
+
+@router.get("/analises/{analise_id}/urbanismo-avaliacoes")
+def listar_avaliacoes(
+    analise_id: str,
+    fonte_memoria: FonteMemoriaUrbanismo = Depends(get_fonte_memoria_urbanismo),
+):
+    if STORE.get(analise_id) is None:
+        raise HTTPException(404, "Análise não encontrada.")
+    return fonte_memoria.avaliacoes(analise_id)
+
+
 # ------------------------------- /variante (Fase U4 — sem LLM) -------------------------------
 @router.post(
     "/analises/{analise_id}/urbanismo/variante",

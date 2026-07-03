@@ -147,6 +147,8 @@ do operador (ver §6/roadmap U5).
 - **U3 — Lago/parque linear opcional:** ponto baixo do DEM + linha de drenagem → lago
   multiuso com orla-parque pública; lotes do anel de 274 m puxados para premium; custo do
   lago entra no Custo de Infra; prêmio entra no score v2. Toggle do operador.
+  **✔ IMPLEMENTADA (2026-07-03)** — checkbox "Criar lago" + grade determinística no DEM +
+  disciplina condicional no Custo de Infra; ver a entrada U3 no `ARCHITECTURE.md`.
 - **U4 — K variantes + otimizador:** gerar 3–5 variantes determinísticas (sementes de
   parâmetros: arquétipo, posição do hub, mix) → pontuar pela função de valor → apresentar a
   melhor com as alternativas. É o padrão Delve/Forma, na nossa escala.
@@ -156,6 +158,9 @@ do operador (ver §6/roadmap U5).
 - **U5 — Memória/aprendizado:** rating + edits do operador por proposta persistidos →
   (a) recuperação dos melhores programas da região/perfil como few-shot para o LLM;
   (b) ajuste dos pesos do score por feedback. Determinístico, auditável, sem "ML caixa-preta".
+  **✔ IMPLEMENTADA (2026-07-03)** — (a) completo: rating 1–5 no card → memória JSONL →
+  few-shot por região/perfil no gerador; (b) ajuste de pesos: adiado (registrado como
+  evolução — exige calibração cuidadosa p/ não viciar o score). Ver U5 no `ARCHITECTURE.md`.
 
 *Ordem recomendada: U1 → U2 → U4 → U3 → U5 (U3 é a maior obra geométrica; U4 multiplica o
 valor de tudo que vier antes).*

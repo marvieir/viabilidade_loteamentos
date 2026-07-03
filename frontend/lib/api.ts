@@ -1737,6 +1737,38 @@ export async function proporUrbanismo(
   return jsonOrThrow(res);
 }
 
+// Fase U5 — memória: rating do operador (1–5). Ratings ≥4 viram referência (few-shot)
+// nas próximas gerações da mesma região/perfil.
+export interface AvaliacaoUrbanismo {
+  analise_id: string;
+  versao: number;
+  proposta_id: string;
+  rating: number;
+  comentario?: string | null;
+  municipio?: string | null;
+  publico_alvo?: string | null;
+  data: string;
+}
+export async function avaliarUrbanismo(
+  analiseId: string,
+  versao: number,
+  rating: number,
+  comentario?: string
+): Promise<AvaliacaoUrbanismo> {
+  const res = await apiFetch(`/api/analises/${analiseId}/urbanismo/avaliar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ versao, rating, ...(comentario ? { comentario } : {}) }),
+  });
+  return jsonOrThrow(res);
+}
+export async function listarAvaliacoesUrbanismo(
+  analiseId: string
+): Promise<AvaliacaoUrbanismo[]> {
+  const res = await apiFetch(`/api/analises/${analiseId}/urbanismo-avaliacoes`);
+  return jsonOrThrow(res);
+}
+
 // Fase U4 — materializa uma variante ALTERNATIVA da proposta (geometria pura no backend):
 // zero chamada de IA e fora do cap de gerações.
 export async function materializarVariante(

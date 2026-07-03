@@ -321,12 +321,25 @@ _FERRAMENTA = {
 
 
 def _prompt_usuario(contexto: dict, tipo_loteamento: str, publico_alvo: str) -> str:
-    """Prompt do usuário (idêntico p/ todos os provedores — a proposta deve ser estável)."""
-    return (
+    """Prompt do usuário (idêntico p/ todos os provedores — a proposta deve ser estável).
+
+    Fase U5 — se o contexto traz ``programas_bem_avaliados`` (memória do operador), eles
+    entram como REFERÊNCIA destacada: calibram lote-alvo/arquétipo/amenidades que a região
+    aprovou, sem virar cópia (e sem nenhum número de medida — §2)."""
+    referencia = contexto.get("programas_bem_avaliados") or []
+    ctx = {k: v for k, v in contexto.items() if k != "programas_bem_avaliados"}
+    prompt = (
         f"Gleba: público-alvo '{publico_alvo}', tipo '{tipo_loteamento}'. "
-        f"Contexto medido pelo motor (NÃO recalcule): {contexto}. "
+        f"Contexto medido pelo motor (NÃO recalcule): {ctx}. "
         "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
     )
+    if referencia:
+        prompt += (
+            " REFERÊNCIA (memória do operador — programas anteriores BEM AVALIADOS na mesma "
+            f"região/perfil): {referencia}. Use como calibração do lote-alvo, arquétipo e "
+            "amenidades que agradaram; adapte à gleba atual, não copie cegamente."
+        )
+    return prompt
 
 
 # Chaves que o LLM PODE propor e o preset funde (mesma lista p/ Claude e Gemini — contrato §2).

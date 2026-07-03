@@ -1503,6 +1503,27 @@ class VarianteUrbIn(BaseModel):
     versao: Optional[int] = None  # proposta base (default: a última gerada com IA)
 
 
+# --------- Fase U5 — memória: avaliação do operador → few-shot no gerador ---------
+class AvaliarUrbanismoIn(BaseModel):
+    """Rating do OPERADOR para um estudo de massa (1–5). Ratings ≥4 viram referência
+    (few-shot) nas próximas gerações da mesma região/perfil."""
+
+    versao: int
+    rating: int = Field(ge=1, le=5)
+    comentario: Optional[str] = None
+
+
+class AvaliacaoUrbanismoOut(BaseModel):
+    analise_id: str
+    versao: int
+    proposta_id: str
+    rating: int
+    comentario: Optional[str] = None
+    municipio: Optional[str] = None
+    publico_alvo: Optional[str] = None
+    data: str
+
+
 # --------- Fase U1 — função de VALOR posicional (preço do operador × multiplicador) ---------
 class ValorPosicionalIn(BaseModel):
     """Preço médio do OPERADOR (nunca inventado): por lote OU por m² — exatamente um."""

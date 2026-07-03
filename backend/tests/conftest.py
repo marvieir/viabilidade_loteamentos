@@ -7,8 +7,11 @@ import zipfile
 
 # Fase 12 — o banco multi-tenant usa DATABASE_URL. Nos testes aponta para um SQLite
 # temporário (fora do repo), criado antes de importar `app` (db.py lê a env no import).
+# ÚNICO POR PROCESSO (pid): dois pytest simultâneos num arquivo compartilhado corrompem a
+# sessão um do outro (401/KeyError intermitentes tarde na suíte — achado da U4/U5).
 os.environ.setdefault(
-    "DATABASE_URL", "sqlite:///" + os.path.join(tempfile.gettempdir(), "viab_test.db")
+    "DATABASE_URL",
+    "sqlite:///" + os.path.join(tempfile.gettempdir(), f"viab_test_{os.getpid()}.db"),
 )
 
 import pytest
