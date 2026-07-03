@@ -28,6 +28,18 @@ Ordem de camadas — **paisagem primeiro, lotes por último** (inversão do moto
 6. **Amenidades SEMEADAS ao longo da rede** (Mov.1 já dá a biblioteca): estações pequenas
    nos bulbos, nos encontros de anéis e na orla — além do clube âncora.
 
+### 1.1 Dois MODOS de traçado, escolhidos pela FORMA da gleba (2ª leva de referências)
+
+- **"Anéis" (cebola)** — gleba COMPACTA (elongação < ~2,2): anéis aninhados de fitas
+  curvas em volta da armadura (Lagoon-PR, Lake Side-RS, Verano); gleba grande pode
+  partir em 2 células com via de costura.
+- **"Folha" (espinha + nervuras)** — gleba ALONGADA/triangular (elongação ≥ ~2,2):
+  espinha central no eixo longo + nervuras curvas diagonais (fitas duplas) morrendo em
+  cul-de-sac (Ribeira-PB; SMA-PR é o caso linear). Seleção determinística pela razão
+  dos lados do MRR da aproveitável; o operador pode forçar pelo estilo.
+- A armadura pode ser MÚLTIPLAS células (verdes preservados + lago — SR-SP): os loops
+  abraçam cada célula e os corredores as conectam.
+
 ## 2. Contrato da fase
 
 - Novo arquétipo viário `"loops_paisagem"` no motor (ao lado de `grelha_eficiente`/
