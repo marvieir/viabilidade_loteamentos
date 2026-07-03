@@ -1,5 +1,9 @@
 # Fase U6 — Arquétipo de COMPOSIÇÃO PAISAGÍSTICA (loops/pods, padrão das referências)
 
+> **U6a IMPLEMENTADA (2026-07-03)** — ver a entrada U6a no log do `ARCHITECTURE.md`.
+> Knob extra: `paisagem_area_min_m2` (default 80.000 — gleba menor degrada rotulado).
+> U6b (dedos d'água) segue como extensão futura.
+
 > Spec derivada de 4 master plans de referência enviados pelo operador (Solido: Isla,
 > Verano; + 2 planos com lagoas) e das 2 imagens Urbia anteriores. Objetivo: o estudo de
 > massa do perfil ALTO deixar de "amontoar lotes em grelha" e compor como os escritórios
