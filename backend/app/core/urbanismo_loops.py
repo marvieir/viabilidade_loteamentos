@@ -151,15 +151,16 @@ def eixos_paisagem(
     passo_anel: float,
     via_local: float,
     via_tronco: float,
-) -> tuple[list[tuple[LineString, float]], str]:
+) -> tuple[list[tuple[LineString, float]], str, dict]:
     """Eixos do arquétipo ``loops_paisagem`` para UMA ilha. ``passo_anel`` = profundidade
-    da fita dupla (2×prof do lote + via). Devolve ``(eixos, modo)``; eixos vazios → o
-    chamador degrada para a grade axial (nunca quebra a geração)."""
+    da fita dupla (2×prof do lote + via). Devolve ``(eixos, modo, extras)`` — extras traz
+    ``nucleo``/``ang_entrada`` no modo anéis (p/ os cortes radiais dos corredores); eixos
+    vazios → o chamador degrada para a grade axial (nunca quebra a geração)."""
     _c, _ul, _uc, comp_l, comp_c = _mrr_eixos(reg)
     elong = comp_l / max(comp_c, 1.0)
     if elong >= ELONGACAO_FOLHA:
         eixos = _folha(reg, passo_anel, via_local, via_tronco)
-        return eixos, "folha"
+        return eixos, "folha", {}
     # núcleo dos anéis = maior célula da ARMADURA dentro da ilha; sem armadura → disco
     # central (o "coração" verde que os anéis abraçam — Verano).
     nucleo = None
@@ -173,7 +174,14 @@ def eixos_paisagem(
     if nucleo is None:
         nucleo = reg.centroid.buffer(passo_anel * 0.8, quad_segs=8)
     eixos = _aneis(reg, nucleo, passo_anel, via_local, via_tronco, entrada)
-    return eixos, "aneis"
+    # extras p/ os CORTES radiais (corredores verdes) do chamador — mesmo ângulo das radiais
+    cen = nucleo.centroid
+    if entrada is not None and not entrada.is_empty:
+        alvo = entrada if isinstance(entrada, Point) else entrada.representative_point()
+    else:
+        alvo = Point(cen.x, reg.bounds[1])
+    ang = math.atan2(alvo.y - cen.y, alvo.x - cen.x)
+    return eixos, "aneis", {"nucleo": nucleo, "ang_entrada": ang}
 
 
 def cinturao_perimetral(aprov: BaseGeometry, largura: float):
@@ -203,3 +211,109 @@ def armadura_de(restricao: Optional[BaseGeometry], agua: Optional[BaseGeometry],
             if c.area >= minimo_m2:
                 partes.append(c)
     return unary_union(partes) if partes else None
+
+
+def fatiar_pods(faces: Sequence[BaseGeometry], pod_len: float, corredor_m: float,
+                area_min_pedaco: float = 400.0):
+    """Fase U6a P4 — corta as FITAS em PODS (~``pod_len`` m) separados por CORREDORES
+    verdes transversais (largura ``corredor_m``): os "bairrinhos" das referências. Os
+    corredores ligam via↔via (rede de pedestres) e entram na doação como verde. Face
+    curta não fatia. Devolve ``(pods, corredores)``. Determinístico."""
+    if corredor_m <= 0 or pod_len <= 0:
+        return list(faces), []
+    pods: list[BaseGeometry] = []
+    corredores: list[BaseGeometry] = []
+    for f in faces:
+        try:
+            (cx, cy), ul, uc, comp_l, comp_c = _mrr_eixos(f)
+        except Exception:  # noqa: BLE001 — face degenerada → intacta
+            pods.append(f)
+            continue
+        if comp_l <= pod_len * 1.5:
+            pods.append(f)
+            continue
+        cortes = []
+        n = int(comp_l // pod_len)
+        for i in range(1, n + 1):
+            d = i * pod_len - comp_l / 2.0
+            if d >= comp_l / 2.0 - pod_len * 0.4:
+                break  # não deixa ponta órfã menor que meio pod
+            centro = (cx + ul[0] * d, cy + ul[1] * d)
+            p1 = (centro[0] - uc[0] * comp_c, centro[1] - uc[1] * comp_c)
+            p2 = (centro[0] + uc[0] * comp_c, centro[1] + uc[1] * comp_c)
+            cortes.append(LineString([p1, p2]).buffer(corredor_m / 2.0, cap_style=2))
+        if not cortes:
+            pods.append(f)
+            continue
+        blocao = unary_union(cortes)
+        resto = f.difference(blocao)
+        pedacos = [g for g in getattr(resto, "geoms", [resto])
+                   if g is not None and not g.is_empty and g.area >= area_min_pedaco]
+        if len(pedacos) <= 1:
+            pods.append(f)
+            continue
+        pods.extend(pedacos)
+        inter = f.intersection(blocao)
+        corredores.extend([
+            g for g in getattr(inter, "geoms", [inter])
+            if g is not None and not g.is_empty and g.area >= 20.0
+        ])
+    return pods, corredores
+
+
+def cortes_radiais(nucleo, reg: BaseGeometry, pod_len: float, corredor_m: float,
+                   ang_evitar: float) -> list[BaseGeometry]:
+    """Fase U6a P4 (anéis) — faixas de corte RADIAIS do núcleo até a borda: fatiam as
+    fitas curvas em pods de arco ~``pod_len`` e viram os corredores verdes que ligam a
+    armadura ao cinturão (padrão das referências). Evita as duas radiais VIÁRIAS
+    (``ang_evitar`` e oposta). Determinístico."""
+    if corredor_m <= 0 or pod_len <= 0:
+        return []
+    cen = nucleo.centroid
+    minx, miny, maxx, maxy = reg.bounds
+    diag = math.hypot(maxx - minx, maxy - miny)
+    r_medio = max(diag / 3.0, pod_len)
+    passo_ang = max(pod_len / r_medio, math.radians(18.0))
+    cortes: list[BaseGeometry] = []
+    a = ang_evitar + passo_ang / 2.0
+    while a < ang_evitar + 2.0 * math.pi - passo_ang / 4.0:
+        # não corta em cima das radiais viárias (folga de ~14°)
+        d1 = abs((a - ang_evitar + math.pi) % (2.0 * math.pi) - math.pi)
+        d2 = abs((a - ang_evitar - math.pi + math.pi) % (2.0 * math.pi) - math.pi)
+        if min(d1, d2) >= math.radians(14.0):
+            faixa = LineString([
+                (cen.x, cen.y),
+                (cen.x + diag * math.cos(a), cen.y + diag * math.sin(a)),
+            ]).buffer(corredor_m / 2.0, cap_style=2)
+            cortes.append(faixa)
+        a += passo_ang
+    return cortes
+
+
+def aplicar_cortes(faces: Sequence[BaseGeometry], cortes: Sequence[BaseGeometry],
+                   area_min_pedaco: float = 400.0):
+    """Aplica faixas de corte às faces: pedaços viram PODS; a interseção vira CORREDOR
+    verde. Face que o corte não parte fica intacta. Devolve ``(pods, corredores)``."""
+    if not cortes:
+        return list(faces), []
+    blocao = unary_union([c for c in cortes if c is not None and not c.is_empty])
+    pods: list[BaseGeometry] = []
+    corredores: list[BaseGeometry] = []
+    for f in faces:
+        try:
+            resto = f.difference(blocao)
+        except Exception:  # noqa: BLE001 — geometria capenga → intacta
+            pods.append(f)
+            continue
+        pedacos = [g for g in getattr(resto, "geoms", [resto])
+                   if g is not None and not g.is_empty and g.area >= area_min_pedaco]
+        if len(pedacos) <= 1:
+            pods.append(f)
+            continue
+        pods.extend(pedacos)
+        inter = f.intersection(blocao)
+        corredores.extend([
+            g for g in getattr(inter, "geoms", [inter])
+            if g is not None and not g.is_empty and g.area >= 20.0
+        ])
+    return pods, corredores

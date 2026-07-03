@@ -856,6 +856,49 @@ def clube_como_quadra(
     return q, {"forma": "quadra", "frente_via_m": round(fr, 2)}
 
 
+# U6a — praça esculpida na PONTA do pod quando o piso do perfil está pendente e nenhuma
+# quadra inteira cabe no orçamento (nas fitas dos anéis/folha as faces são grandes).
+PRACA_ALVO_CARVE_M2 = 1200.0
+
+
+def _carvar_praca(pool, alvo_q, ruas, teto_area: float):
+    """Esculpe ~1.200 m² da ponta (com frente p/ via) do pod mais próximo da região carente.
+    Devolve ``(praca, pedacos_restantes, pod_original)`` ou ``None`` (degrada honesto)."""
+    from app.core.urbanismo_loops import _mrr_eixos
+
+    alvo_area = min(PRACA_ALVO_CARVE_M2, teto_area)
+    if alvo_area < 300.0:
+        return None
+    cands = sorted(
+        (q for q in pool if q.area >= alvo_area * 2.5),
+        key=lambda q: q.centroid.distance(alvo_q.centroid),
+    )[:5]
+    for q in cands:
+        try:
+            (cx, cy), ul, uc, comp_l, comp_c = _mrr_eixos(q)
+        except Exception:  # noqa: BLE001 — pod degenerado → tenta o próximo
+            continue
+        w = alvo_area / max(comp_c, 1.0)
+        p_neg = Point(cx - ul[0] * comp_l / 2.0, cy - ul[1] * comp_l / 2.0)
+        p_pos = Point(cx + ul[0] * comp_l / 2.0, cy + ul[1] * comp_l / 2.0)
+        sinal = -1.0 if p_neg.distance(alvo_q.centroid) <= p_pos.distance(alvo_q.centroid) else 1.0
+        cf = (cx + sinal * ul[0] * (comp_l / 2.0 - w / 2.0),
+              cy + sinal * ul[1] * (comp_l / 2.0 - w / 2.0))
+        faixa = LineString([
+            (cf[0] - uc[0] * comp_c, cf[1] - uc[1] * comp_c),
+            (cf[0] + uc[0] * comp_c, cf[1] + uc[1] * comp_c),
+        ]).buffer(w / 2.0, cap_style=2)
+        praca = _valido(q.intersection(faixa))
+        if praca is None or praca.is_empty or praca.area < alvo_area * 0.5:
+            continue
+        if ruas is None or ruas.is_empty or praca.distance(ruas) > 0.6:
+            continue  # praça sem frente de via não vale (art. 6º Lei 6.766)
+        pedacos = [g for g in _componentes(_diferenca_segura(q, faixa))
+                   if g is not None and g.area >= MIN_QUADRA_M2]
+        return praca, pedacos, q
+    return None
+
+
 def _selecionar_pracas(
     pool: Sequence[BaseGeometry],
     ruas: Optional[BaseGeometry],
@@ -904,7 +947,18 @@ def _selecionar_pracas(
             if fr >= INST_FRENTE_MIN_M and toca:
                 cands.append(q)
         if not cands:
-            break  # sem quadra que caiba no orçamento → degrada honesto (sem praça)
+            if descobertas:
+                break  # cobertura sem quadra que caiba → degrada honesto (sem praça)
+            # U6a — piso do perfil nas FITAS (faces grandes): esculpe a praça na ponta
+            # do pod mais próximo da região carente, devolvendo o resto ao pool.
+            esc = _carvar_praca(pool, alvo_q, ruas, min(PRACA_MAX_M2, budget - gasto))
+            if esc is None:
+                break
+            praca, pedacos, original = esc
+            pracas.append(praca)
+            gasto += praca.area
+            pool = [q for q in pool if q is not original] + pedacos
+            continue
         # a MENOR entre as 5 mais próximas da região carente — preserva lotes E espalha
         proximas = sorted(cands, key=lambda q: q.centroid.distance(alvo_q.centroid))[:5]
         p = min(proximas, key=lambda q: q.area)
@@ -1295,6 +1349,7 @@ def gerar_layout(
     contorno_reg: list[BaseGeometry] = []
     porcoes_info: list[dict] = []
     modos_paisagem: list[str] = []  # U6a — modo do traçado paisagístico por ilha
+    corredores_reg: list[BaseGeometry] = []  # U6a P4 — corredores verdes entre pods
     ilhas = _componentes(reg)
     for idx, ilha in enumerate(ilhas):
         # Fase 9.11 — GRADE ADAPTATIVA: o lado do quarteirão é função do tamanho DESTA ilha (com
@@ -1332,7 +1387,7 @@ def gerar_layout(
                 _acp = (acesso_externo if isinstance(acesso_externo, Point)
                         else acesso_externo.representative_point())
                 _ac_pais = rotate(_acp, -ang_deg, origin=cen) if ang_deg else _acp
-            eixos_pais, modo_pais = paisagem.eixos_paisagem(
+            eixos_pais, modo_pais, extras_pais = paisagem.eixos_paisagem(
                 ilha, None, _ac_pais, bh_i, via_local, via_tronco
             )
             if eixos_pais:
@@ -1343,6 +1398,21 @@ def gerar_layout(
             ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True,
             eixos_prontos=eixos_pais,
         )
+        # Fase U6a P4 — fitas → PODS de ~pod_lotes_max lotes separados por CORREDORES
+        # verdes (os "bairrinhos"): nos ANÉIS o corte é RADIAL (a banda é curva — e o
+        # corredor liga armadura↔cinturão, como nas referências); na FOLHA, transversal.
+        if eixos_pais:
+            pod_len = float(estilo.get("pod_lotes_max", 24.0)) / 2.0 * testada_alvo
+            corredor_m = float(estilo.get("corredor_verde_m", 12.0))
+            if extras_pais.get("nucleo") is not None:
+                cortes = paisagem.cortes_radiais(
+                    extras_pais["nucleo"], ilha, pod_len, corredor_m,
+                    float(extras_pais.get("ang_entrada", 0.0)),
+                )
+                fcs, corr_i = paisagem.aplicar_cortes(fcs, cortes)
+            else:
+                fcs, corr_i = paisagem.fatiar_pods(fcs, pod_len, corredor_m)
+            corredores_reg.extend(corr_i)
         faces.extend(fcs)
         eixos_reg.extend(eix_i)
         stubs_podados += n_stub
@@ -1665,7 +1735,8 @@ def gerar_layout(
     # Fase 10.8 — o ≥30% preservado é verde LEGÍTIMO (não-edificável por lei), não "sobra a reduzir":
     # entra no verde RESERVADO, fora da sobra. (Idealmente ganha linha própria "não-edificável" no
     # quadro; por ora soma ao verde de reserva/doação, que é o destino honesto.)
-    verde_reservado_reg = _uniao_segura([*verdes_reg, *nao_edif_reg])
+    # U6a P4 — corredores verdes entre pods são doação verde legítima (rede de pedestres).
+    verde_reservado_reg = _uniao_segura([*verdes_reg, *nao_edif_reg, *corredores_reg])
     sobra_reg = _uniao_segura([*residuais_reg, *verdes_min])
     # Fase 9.14 — regra D: o que virou LOTE/ via de contorno (recuperado) sai da sobra-verde (cai).
     if lotes_rec_reg or contorno_mat_reg:
@@ -2012,6 +2083,8 @@ def gerar_layout(
         "paisagem": ({
             "modos": modos_paisagem,
             "cinturao_m2": round(cinturao_orig.area, 1) if cinturao_orig is not None else 0.0,
+            "corredores_m2": round(sum(c.area for c in corredores_reg), 1),
+            "n_corredores": len(corredores_reg),
         } if usa_paisagem else None),
         # Fase U4 — que variante gerou este layout (proveniência da estratégia).
         "variante": {
