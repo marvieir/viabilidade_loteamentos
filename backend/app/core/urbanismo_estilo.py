@@ -59,14 +59,17 @@ ESTILO_DEFAULT: dict[str, dict] = {
         "lago_frac_aproveitavel": 0.03,
         "lago_max_m2": 12000.0,
         "hub_fracao_livre": 0.25,
-        # Fase U6a — composição paisagística (anéis/folha + cinturão) é o default do alto.
+        # Fase U6a — composição paisagística (anéis/folha + cinturão) é o default do alto;
+        # exige gleba mínima (referências são 15–100 ha) — abaixo degrada p/ o clássico.
         "arquetipo": "loops_paisagem",
         "cinturao_verde_m": 15.0,
+        "paisagem_area_min_m2": 80000.0,
     },
 }
 
 _CHAVES_NUM = ("pracas_por_quadras", "lazer_pracas_frac", "lago_frac_aproveitavel",
-               "lago_max_m2", "hub_fracao_livre", "cinturao_verde_m")
+               "lago_max_m2", "hub_fracao_livre", "cinturao_verde_m",
+               "paisagem_area_min_m2")
 
 
 def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:

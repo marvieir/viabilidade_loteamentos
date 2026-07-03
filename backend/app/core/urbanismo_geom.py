@@ -1231,8 +1231,16 @@ def gerar_layout(
         from app.core.urbanismo_estilo import carregar_estilo
         estilo, _ = carregar_estilo(programa.publico_alvo)
     # Fase U6a — arquétipo de COMPOSIÇÃO PAISAGÍSTICA (spec fase-U6-pods.md): paisagem
-    # estrutura, lotes preenchem. Liga pelo perfil de estilo (default: alto padrão).
-    usa_paisagem = str(estilo.get("arquetipo", "")) == "loops_paisagem"
+    # estrutura, lotes preenchem. Liga pelo perfil de estilo (default: alto padrão) e SÓ
+    # em gleba que comporta a composição (cinturão + anéis/folha + clube): abaixo do
+    # mínimo (~8 ha, knob do estilo) degrada ROTULADO para o traçado clássico do perfil —
+    # as referências do padrão são glebas de 15–100 ha; espremer a gramática numa gleba
+    # pequena mata o lazer e o yield (achado do golden de São Roque, 5,9 ha).
+    paisagem_min = float(estilo.get("paisagem_area_min_m2", 80000.0))
+    usa_paisagem = (str(estilo.get("arquetipo", "")) == "loops_paisagem"
+                    and aproveitavel.area >= paisagem_min)
+    paisagem_degradou = (str(estilo.get("arquetipo", "")) == "loops_paisagem"
+                         and not usa_paisagem)
     from app.core import urbanismo_loops as paisagem
 
     canvas = aproveitavel
@@ -1721,6 +1729,12 @@ def gerar_layout(
     # Fase 9.12 — TODO LOTE COM FRENTE PARA VIA (definição legal): valida a testada de cada lote;
     # encravado é fundido LATERALMENTE a vizinho com via (soma testada, mantém prof) ou vira VERDE.
     # Roda no frame ROTACIONADO (lotes_reg/ruas_reg axiais) — antes do _back. Clamp 9.4 preservado.
+    # U6a — as fitas CURVAS podem gerar lote com anel inválido (TopologyException no GEOS a
+    # jusante — mesmo bug do 500 em produção): valida TODOS os lotes preservando o pareamento
+    # com lote_quadra antes do frente-via (que faz uniões sem proteção).
+    _san = [( _valido(l), q) for l, q in zip(lotes_reg, lote_quadra)]
+    lotes_reg = [l for l, _q in _san if l is not None and not l.is_empty]
+    lote_quadra = [q for l, q in _san if l is not None and not l.is_empty]
     lotes_reg, lote_quadra, encravados_verde, frente_stats = garantir_frente_via(
         lotes_reg, lote_quadra, ruas_reg, piso_lote, teto_lote, FRENTE_MIN_M
     )
@@ -1957,10 +1971,15 @@ def gerar_layout(
     # programa), NÃO a faixa ≥30% preservada que o 10.8b dobrou no verde_reservado (senão
     # "lazer 17%" quando o programa pediu 5% — o ≥30% é vedação legal, não amenidade).
     nao_edif_m2 = sum(g.area for g in nao_edif_reg if g is not None and not g.is_empty)
+    # U6a — verde ESTRUTURAL (cinturão + corredores) é doação, não "lazer do programa":
+    # sai da fidelidade como o ≥30% sai (senão "lazer 30%" quando o programa pediu 15%).
+    estrutural_m2 = sum(c.area for c in corredores_reg) + (
+        cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
+    )
     lazer_reservado_m2 = max(sum(
         g.area for g in (clube, *pracas, verde_reservado)
         if g is not None and not g.is_empty
-    ) - nao_edif_m2, 0.0)
+    ) - nao_edif_m2 - estrutural_m2, 0.0)
     retalho_m2 = 0.0  # a sobra foi destinada à área pública (sem retalho perdido)
 
     # Fase U2 — PROGRAMA DO HUB (amenidades da IA materializadas pela biblioteca) + cobertura
@@ -2024,6 +2043,12 @@ def gerar_layout(
             f"Arquétipo PAISAGÍSTICO (U6a): traçado '{'/'.join(sorted(set(modos_paisagem)))}' "
             "com cinturão verde perimetral — a paisagem estrutura, os lotes preenchem "
             "(spec fase-U6-pods.md, padrão das referências do operador)."
+        )
+    elif paisagem_degradou:
+        avisos.append(
+            "Arquétipo paisagístico NÃO aplicado: a gleba é menor que o mínimo da composição "
+            f"(~{paisagem_min / 10000:.0f} ha úteis) — cinturão+anéis/folha esmagariam o lazer "
+            "e o aproveitamento. Traçado clássico do perfil mantido (rotulado, não silencioso)."
         )
     if pracas:
         avisos.append(
