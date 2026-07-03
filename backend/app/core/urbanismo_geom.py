@@ -1138,6 +1138,7 @@ def gerar_layout(
     restricao_externa: Optional[BaseGeometry] = None,
     acesso_externo: Optional[BaseGeometry] = None,
     variante: Optional[dict] = None,
+    lago: Optional[dict] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1445,6 +1446,30 @@ def gerar_layout(
     def _pode_reservar(pool):
         return len(pool) > 1
 
+    # Fase U3 — LAGO no ponto baixo do DEM (amenidade valorizadora — pesquisa §1: pond criado
+    # junto com o empreendimento premia o entorno; bacia "pelada" DESVALORIZA → o lago nasce
+    # como PARQUE: corpo d'água + orla pública). A face que contém o ponto baixo vira
+    # lago+orla; o fator "agua" do score v2 (anel 274 m) liga sozinho.
+    lago_reg = None
+    orla_reg = None
+    lago_cota = None
+    if lago and lago.get("ponto") and len(miolos) > 1:
+        lg_pt = Point(float(lago["ponto"][0]), float(lago["ponto"][1]))
+        lg_reg_pt = rotate(lg_pt, -ang_deg, origin=cen) if ang_deg else lg_pt
+        lago_alvo = max(float(lago.get("area_m2", 6000.0)), 500.0)
+        lago_cota = lago.get("cota_m")
+        cands_lago = [f for f in miolos if f.area >= lago_alvo * 1.2]
+        if cands_lago:
+            face_lago = min(cands_lago, key=lambda f: f.distance(lg_reg_pt))
+            centro_lago = (lg_reg_pt if face_lago.contains(lg_reg_pt)
+                           else face_lago.representative_point())
+            corpo = _valido(centro_lago.buffer(math.sqrt(lago_alvo / math.pi), quad_segs=24))
+            corpo = _valido(corpo.intersection(face_lago)) if corpo is not None else None
+            if corpo is not None and not corpo.is_empty and corpo.area >= lago_alvo * 0.5:
+                lago_reg = corpo
+                orla_reg = _diferenca_segura(face_lago, corpo)  # orla-parque pública
+                miolos = [f for f in miolos if f is not face_lago]
+
     # 4.a INSTITUCIONAL: uma quadra com frente para via que satisfaça os 4 checks legais (borda).
     inst_reg, inst_diag = (
         institucional_como_quadra(miolos, ruas_reg, reg, inst_area, declividade_pct)
@@ -1599,9 +1624,12 @@ def gerar_layout(
         arruamento = _conectar_malha(arruamento, conexao_mod.CAIXA_TRONCO_M) or arruamento
     clube = _back(clube_reg)
     pracas = [r for r in (_back(p) for p in pracas_reg) if r is not None]
-    # Fase U2 — o SISTEMA DE LAZER passa a ser hub ∪ praças de bolso (o quadro mede a união;
-    # a conformidade verde+lazer não muda: as praças saíram do mesmo orçamento).
-    lazer_total = _uniao_segura([g for g in (clube, *pracas) if g is not None])
+    # Fase U3 — lago (lâmina d'água) + orla-parque no frame original.
+    agua = _back(lago_reg)
+    orla = _back(orla_reg)
+    # Fase U2/U3 — o SISTEMA DE LAZER é hub ∪ praças ∪ orla do lago (o quadro mede a união;
+    # a conformidade verde+lazer não muda: praças saem do orçamento, a orla é ADITIVA rotulada).
+    lazer_total = _uniao_segura([g for g in (clube, *pracas, orla) if g is not None])
     inst = _back(inst_reg)
     verde_reservado = _back(verde_reservado_reg)
     verde = _back(verde_total_reg)
@@ -1799,7 +1827,17 @@ def gerar_layout(
             "chave": "praca_bolso", "rotulo": f"Praça de bolso {i}", "tipo": "praca",
             "area_m2": round(p.area, 2), "geom": p,
         })
-    lazer_geoms = [g for g in (clube, *pracas) if g is not None and not g.is_empty]
+    if agua is not None and not agua.is_empty:
+        lazer_features.append({
+            "chave": "lago", "rotulo": "Lago / espelho d'água", "tipo": "agua",
+            "area_m2": round(agua.area, 2), "geom": agua,
+        })
+    if orla is not None and not orla.is_empty:
+        lazer_features.append({
+            "chave": "orla_lago", "rotulo": "Orla do lago (parque)", "tipo": "orla",
+            "area_m2": round(orla.area, 2), "geom": orla,
+        })
+    lazer_geoms = [g for g in (clube, *pracas, orla) if g is not None and not g.is_empty]
     cobertura_400 = None
     if lotes and lazer_geoms:
         cobertos = sum(
@@ -1811,6 +1849,10 @@ def gerar_layout(
         **clube_diag, **hub_diag,
         "n_pracas": len(pracas),
         "pracas_m2": round(sum(p.area for p in pracas), 2),
+        # Fase U3 — lago sintetizado (None sem lago; cota do ponto baixo quando o DEM deu).
+        "lago_m2": round(agua.area, 2) if agua is not None and not agua.is_empty else None,
+        "orla_m2": round(orla.area, 2) if orla is not None and not orla.is_empty else None,
+        "lago_cota_m": lago_cota,
         "cobertura_400m_pct": cobertura_400,
         # formatado no BACKEND (o front exibe, não reformata — §2)
         "cobertura_400m_fmt": (f"{cobertura_400 * 100:.0f}%".replace(".", ",")
@@ -1828,6 +1870,21 @@ def gerar_layout(
             f"Lazer distribuído (U2): {len(pracas)} praça(s) de bolso reservada(s) para "
             "aproximar o lazer dos lotes (raio de caminhada de 400 m — pesquisa §2); "
             "o orçamento total de lazer do programa não mudou."
+        )
+    if agua is not None and not agua.is_empty:
+        avisos.append(
+            "LAGO SINTETIZADO (U3) no ponto baixo do terreno, desenhado como PARQUE (corpo "
+            "d'água + orla pública — pesquisa §1: pond criado junto ao empreendimento premia o "
+            "entorno; bacia sem paisagismo desvaloriza). A lâmina d'água NÃO foi contada na "
+            "doação de área verde (aceitação é municipal — verificar na prefeitura); custo de "
+            "implantação: disciplina 'Lago / paisagismo da orla' no Custo de Infra. Estudo "
+            "esquemático — projeto hidráulico/outorga são do projetista (§1-A)."
+        )
+    elif lago and lago.get("ponto") and lago_reg is None:
+        avisos.append(
+            "LAGO NÃO SINTETIZADO: nenhuma quadra comporta o corpo d'água pedido sem "
+            "sacrificar o parcelamento (lotes são prioridade) — reduza a área do lago ou "
+            "regenere com outro perfil."
         )
 
     meta = {
@@ -1890,6 +1947,7 @@ def gerar_layout(
         sistema_lazer_diagnostico=clube_diag,
         lazer_features=lazer_features,  # U2 — sub-parcelas do hub + praças (rotuladas)
         portico=portico_geom,  # 11.3 — marcador da entrada/portaria p/ o mapa
+        agua=agua,  # U3 — lago/espelho d'água (liga o fator "agua" do score v2)
     )
 
 

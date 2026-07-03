@@ -37,6 +37,8 @@ def _quantidades(analise_id: str, registro: dict, fonte_urb: FonteUrbanismo) -> 
         q.leito_carrocavel_m2 = ind.get("leito_carrocavel_m2")
         q.comprimento_vias_m = ind.get("comprimento_vias_m")
         q.n_lotes = ind.get("n_lotes")
+        # U3 — lâmina d'água do lago (None sem lago → a disciplina fica de fora do cálculo).
+        q.lamina_dagua_m2 = (quadro.get("lamina_dagua") or {}).get("m2")
     return q
 
 

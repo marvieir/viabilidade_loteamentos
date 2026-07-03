@@ -443,6 +443,7 @@ export type ChaveOverlay =
   | "urb_lazer"
   | "urb_institucional"
   | "urb_portico"
+  | "urb_agua"
   | "urb_restricao";
 
 export interface BaciaHidrografica {
@@ -1372,6 +1373,8 @@ export interface QuadroAreas {
   sistema_lazer: UsoArea;
   institucional: UsoArea;
   arruamento: UsoArea;
+  // Fase U3 — lago criado: linha própria, fora da doação verde (aviso rotula).
+  lamina_dagua?: UsoArea | null;
 }
 
 export interface IndicadoresUrb {
@@ -1490,6 +1493,8 @@ export interface GeometriaUrb {
     | null;
   // Fase 11.3 — pórtico/entrada: marcador do acesso único (alto padrão) p/ o mapa.
   portico?: GeoJSON.Geometry | null;
+  // Fase U3 — lago/espelho d'água criado (null sem lago).
+  agua?: GeoJSON.Geometry | null;
   // Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").
   restricao_recortada?:
     | (GeoJSON.Geometry & { origem?: string[]; rotulo?: string; estilo_sugerido?: string })
@@ -1710,7 +1715,8 @@ export async function proporUrbanismo(
   zona?: string | null,
   overrides?: Record<string, unknown>,
   loteMaxM2?: number | null, // Fase 11.8 — teto de lote recomendado pelo operador (m²)
-  acessoPonto?: [number, number] | null // [lon, lat] — acesso marcado no mapa (âncora do pórtico)
+  acessoPonto?: [number, number] | null, // [lon, lat] — acesso marcado no mapa (âncora do pórtico)
+  criarLago?: boolean // Fase U3 — sintetizar lago no ponto baixo do DEM
 ): Promise<PropostaUrbanistica> {
   const res = await apiFetch(
     `/api/analises/${analiseId}/urbanismo/propor`,
@@ -1724,6 +1730,7 @@ export async function proporUrbanismo(
         ...(overrides ? { overrides } : {}),
         ...(loteMaxM2 ? { lote_max_m2: loteMaxM2 } : {}),
         ...(acessoPonto ? { acesso_ponto: acessoPonto } : {}),
+        ...(criarLago ? { criar_lago: true } : {}),
       }),
     }
   );

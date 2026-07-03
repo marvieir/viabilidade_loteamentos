@@ -112,6 +112,7 @@ export function CardUrbanismo({
   const [publico, setPublico] = useState<PublicoAlvo>("media");
   const [zona, setZona] = useState<string>("");
   const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
+  const [criarLago, setCriarLago] = useState(false); // Fase U3 — lago no ponto baixo do DEM
   const [proposta, setProposta] = useState<PropostaUrbanistica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -164,7 +165,8 @@ export function CardUrbanismo({
       const p = await proporUrbanismo(
         analiseId, tipo, publico, zona || null, undefined,
         loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null,
-        acessoPonto ? [acessoPonto[1], acessoPonto[0]] : null
+        acessoPonto ? [acessoPonto[1], acessoPonto[0]] : null,
+        criarLago
       );
       setProposta(p);
       onData?.(p);
@@ -234,6 +236,7 @@ export function CardUrbanismo({
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
     if (g.portico) overlays.urb_portico = g.portico; // Fase 11.3 — marcador da entrada/portaria
+    if (g.agua) overlays.urb_agua = g.agua; // U3 — lago/espelho d'água criado
     // Fase 9.8 — restrição recortada (mata/declividade/APP): demarcada e rotulada (não "clarão").
     if (g.restricao_recortada) overlays.urb_restricao = g.restricao_recortada;
     // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback
@@ -349,6 +352,18 @@ export function CardUrbanismo({
             title="Tamanho máximo de lote recomendado (m²). Vazio = padrão do perfil. Nunca abaixo do piso legal."
             className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
           />
+          <label
+            className="flex items-center gap-1.5 text-sm text-slate-600"
+            title="Sintetiza um lago paisagístico no ponto baixo do terreno (DEM) com orla-parque — amenidade valorizadora (pesquisa §1). Sem DEM, degrada com aviso."
+          >
+            <input
+              type="checkbox"
+              checked={criarLago}
+              onChange={(e) => setCriarLago(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            Criar lago 💧
+          </label>
           <Button onClick={gerar} disabled={carregando}>
             {carregando
               ? "Gerando…"
@@ -696,6 +711,13 @@ export function CardUrbanismo({
                         rotulo="Sobra geométrica ⚠️ (meta: reduzir)"
                         m2={q.sobra_geometrica.m2_fmt}
                         pct={q.sobra_geometrica.pct_fmt}
+                      />
+                    )}
+                    {q.lamina_dagua && q.lamina_dagua.m2 > 0 && (
+                      <LinhaArea
+                        rotulo="Lâmina d'água (lago criado) 💧"
+                        m2={q.lamina_dagua.m2_fmt}
+                        pct={q.lamina_dagua.pct_fmt}
                       />
                     )}
                     {q.sistema_lazer.m2 > 0 && (

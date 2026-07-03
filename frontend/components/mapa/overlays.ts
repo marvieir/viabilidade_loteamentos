@@ -37,6 +37,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_lazer: "#06b6d4", // cor de equipamento
   urb_institucional: "#f59e0b",
   urb_portico: "#db2777", // Fase 11.3 — pórtico/entrada: rosa/magenta (cor ÚNICA, não clasha c/ lote)
+  urb_agua: "#0369a1", // U3 — lago criado: azul-água (profundo, distinto do ciano do lazer)
   urb_restricao: "#14532d", // Fase 11.6 — bosque preservado: verde-FLORESTA bem escuro (o mais escuro)
 };
 
@@ -69,6 +70,7 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // Fase 11.3 — PÓRTICO/ENTRADA: marcador ROSA/MAGENTA forte (cor única no mapa, borda grossa) —
   // lê como o componente "portaria" no acesso único, achável sobre o satélite e os lotes.
   urb_portico: { color: "#831843", weight: 3, fillColor: "#ec4899", fillOpacity: 0.95 },
+  urb_agua: { color: "#075985", weight: 1.5, fillColor: "#38bdf8", fillOpacity: 0.75 },
   // Fase 10.2 — não-edificável (mata/≥30%/APP) = BOSQUE/ÁREA VERDE PRESERVADA, não um buraco. Verde
   // mata visível (textura pontilhada = natural/preservado), distinto do verde-parque reservado
   // (#22c55e, manicured) e do verde-sobra (pálido). Não compete com os lotes (fica ao fundo), mas
@@ -110,6 +112,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_lazer: "Sistema de lazer / clube",
   urb_institucional: "Institucional",
   urb_portico: "Pórtico / entrada",
+  urb_agua: "Lago / espelho d'água (criado)",
   urb_restricao: "Bosque/área verde preservada (não-edif.: mata/≥30%/APP)",
 };
 

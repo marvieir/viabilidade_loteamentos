@@ -30,6 +30,7 @@ BASES: dict[str, tuple[str, str]] = {
     "por_m_via": ("R$/m de via", "m"),
     "por_lote": ("R$/lote", "lote"),
     "por_m_perimetro": ("R$/m de perímetro", "m"),
+    "por_m2_lamina": ("R$/m² de lâmina d'água", "m²"),  # U3 — lago criado no estudo
     "percentual_subtotal": ("% do subtotal direto", "%"),
 }
 
@@ -44,6 +45,10 @@ DISCIPLINAS_DEFAULT: list[tuple[str, str, str, str, tuple[str, ...]]] = [
     ("energia_iluminacao", "Energia + iluminação", "por_lote", "concessionária", ("por_lote", "por_m_via")),
     ("reservatorios", "Reservatórios", "por_lote", "SINAPI", ("por_lote",)),
     ("cercamento", "Cercamento / muros", "por_m_perimetro", "SINAPI", ("por_m_perimetro",)),
+    # U3 — lago paisagístico (escavação/impermeabilização + orla). Só entra no cálculo quando
+    # o estudo de massa TEM lâmina d'água; sem lago a disciplina nem aparece (não polui a cobertura).
+    ("lago_paisagismo", "Lago / paisagismo da orla", "por_m2_lamina", "composição própria",
+     ("por_m2_lamina",)),
     ("canteiro", "Canteiro / mobilização", "percentual_subtotal", "SINAPI", ("percentual_subtotal",)),
 ]
 
@@ -59,6 +64,7 @@ class Quantidades:
     comprimento_vias_m: Optional[float] = None
     n_lotes: Optional[int] = None
     perimetro_m: Optional[float] = None
+    lamina_dagua_m2: Optional[float] = None  # U3 — lago criado (None sem lago)
 
 
 def _brl(v: float) -> str:
@@ -80,6 +86,8 @@ def _quantidade(base: str, q: Quantidades) -> Optional[float]:
         return float(q.n_lotes) if q.n_lotes is not None else None
     if base == "por_m_perimetro":
         return q.perimetro_m
+    if base == "por_m2_lamina":
+        return q.lamina_dagua_m2  # U3 — None sem lago
     return None  # percentual_subtotal não tem quantidade física
 
 
@@ -173,6 +181,10 @@ def calcular(q: Quantidades, perfil: Optional[dict], padrao: str) -> schemas.Cus
     for chave, rotulo, base_def, ancora, _alt in DISCIPLINAS_DEFAULT:
         if chave == "canteiro":
             continue
+        # U3 — sem lago no estudo, a disciplina do lago nem aparece (não vira aviso nem
+        # rebaixa a cobertura de quem não pediu lago).
+        if chave == "lago_paisagismo" and q.lamina_dagua_m2 is None:
+            continue
         salva = discs_salvas.get(chave) or {}
         base = salva.get("base") or base_def
         unidade = BASES.get(base, ("", ""))[1]
@@ -234,8 +246,8 @@ def calcular(q: Quantidades, perfil: Optional[dict], padrao: str) -> schemas.Cus
     bdi_valor = subtotal_direto * bdi_pct / 100.0 if bdi_pct else 0.0
     total = subtotal_direto + bdi_valor
 
-    # Cobertura honesta.
-    total_disciplinas = len(DISCIPLINAS_DEFAULT)
+    # Cobertura honesta. (U3: sem lago, a disciplina do lago sai do denominador.)
+    total_disciplinas = len(DISCIPLINAS_DEFAULT) - (1 if q.lamina_dagua_m2 is None else 0)
     if n_aplicaveis == 0:
         cobertura = "INDISPONIVEL"
         avisos.insert(

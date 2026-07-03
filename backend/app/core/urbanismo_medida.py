@@ -161,10 +161,12 @@ def medir(layout: Layout, publico_alvo: Optional[str] = None) -> Medicao:
     lazer = round(_area(layout.sistema_lazer), 2)
     inst = round(_area(layout.institucional), 2)
     arru = round(_area(layout.arruamento), 2)
+    agua_m2 = round(_area(layout.agua), 2)  # Fase U3 — lâmina d'água criada (lago)
 
     # Área líquida = área da UNIÃO de todas as camadas (robusto se houver encosto/folga).
     todas = [*lotes]
-    for g in (layout.arruamento, layout.areas_verdes, layout.sistema_lazer, layout.institucional):
+    for g in (layout.arruamento, layout.areas_verdes, layout.sistema_lazer,
+              layout.institucional, layout.agua):
         if g is not None and not g.is_empty:
             todas.append(g)
     uni_todas = _uniao(todas) if todas else None
@@ -185,6 +187,8 @@ def medir(layout: Layout, publico_alvo: Optional[str] = None) -> Medicao:
         "sistema_lazer": _uso(lazer),
         "institucional": _uso(inst),
         "arruamento": _uso(arru),
+        # Fase U3 — linha PRÓPRIA do lago (fora da doação verde; aviso rotula a aceitação).
+        "lamina_dagua": _uso(agua_m2) if agua_m2 > 0 else None,
     }
 
     n = len(lotes)
@@ -635,6 +639,7 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
         "lazer_diagnostico": cdiag or None,
         "institucional": inst_gj,  # 9.7 — quadra formada (qualifica_legal + checks)
         "portico": _gj(layout.portico),  # 11.3 — marcador da entrada/portaria
+        "agua": _gj(layout.agua),  # U3 — lago/espelho d'água criado (None sem lago)
         "viario_diagnostico": vdiag,
         "institucional_diagnostico": idiag,
         # Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").

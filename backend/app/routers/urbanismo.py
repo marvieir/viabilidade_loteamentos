@@ -430,6 +430,43 @@ def _propor_impl(
             "miolo do loteamento. Regenere o estudo para tentar ancorar à via de acesso real."
         )
 
+    # Fase U3 — LAGO no ponto baixo do DEM (opt-in do operador): amostra a cota numa grade
+    # determinística sobre a aproveitável (interior, longe da borda) e passa o ponto+área ao
+    # motor. Sem DEM → degrada com aviso (não inventamos relevo).
+    lago_param = None
+    if body.criar_lago:
+        cota = _cota_sampler(fonte_dem, registro["poly"], to_wgs)
+        if cota is None:
+            avisos_vias.append(
+                "LAGO NÃO SINTETIZADO: DEM indisponível — o ponto baixo do terreno não pôde "
+                "ser identificado (não inventamos relevo). Tente regenerar mais tarde."
+            )
+        else:
+            from shapely.geometry import Point as _PontoLago
+
+            minx, miny, maxx, maxy = aprov_m.bounds
+            interior = aprov_m.buffer(-25.0)
+            if interior.is_empty:
+                interior = aprov_m
+            melhor = None
+            _N = 28  # grade fixa → determinístico (mesma gleba → mesmo ponto baixo)
+            for i in range(_N):
+                for j in range(_N):
+                    x = minx + (i + 0.5) * (maxx - minx) / _N
+                    y = miny + (j + 0.5) * (maxy - miny) / _N
+                    if not interior.contains(_PontoLago(x, y)):
+                        continue
+                    z = cota(x, y)
+                    if melhor is None or z < melhor[0]:
+                        melhor = (z, x, y)
+            if melhor is not None:
+                lago_param = {
+                    "ponto": (melhor[1], melhor[2]),
+                    # lago paisagístico de triagem: ~3% da aproveitável, entre 1.500 e 12.000 m²
+                    "area_m2": max(min(0.03 * aprov_m.area, 12000.0), 1500.0),
+                    "cota_m": round(melhor[0], 1),
+                }
+
     # Fase U4 — K VARIANTES determinísticas por chamada de IA: o motor gera as estratégias e a
     # FUNÇÃO DE VALOR (Σ área×multiplicador do score v2 — proxy de VGV posicional) escolhe a
     # melhor; as alternativas ficam materializáveis depois SEM IA (POST /urbanismo/variante).
@@ -447,6 +484,7 @@ def _propor_impl(
             # Fase 11.5 — alvo da entrada = via de acesso mais próxima (OSM); None → fallback.
             acesso_externo=acesso_externo_m,
             variante=var,
+            lago=lago_param,  # U3 — ponto baixo do DEM (None sem opt-in/DEM)
         )
         layout_v.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular (não recalcula)
         layout_v.restricao_origem = restr_origem
@@ -581,6 +619,7 @@ def _propor_impl(
         "modalidade": body.modalidade,
         "lote_max_m2": body.lote_max_m2,
         "acesso_ponto": body.acesso_ponto,
+        "criar_lago": body.criar_lago,  # U3 — a variante rematerializa com o mesmo lago
     }
     fonte_urb.salvar(analise_id, salvo)
     return out
