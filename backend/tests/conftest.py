@@ -13,6 +13,11 @@ os.environ.setdefault(
     "DATABASE_URL",
     "sqlite:///" + os.path.join(tempfile.gettempdir(), f"viab_test_{os.getpid()}.db"),
 )
+# Token de teste com TTL LONGO (auth.py lê a env no import): com as K variantes da U4 o
+# /propor ficou ~4× mais pesado e os testes de cliente mais longos estouravam os 30 min do
+# token DENTRO do teste na suíte completa → 401 "Token inválido ou expirado" intermitente
+# (só na suíte, nunca isolado). Não afeta produção — é só o relógio dos testes.
+os.environ.setdefault("JWT_ACCESS_TTL_MIN", "720")
 
 import pytest
 from fastapi.testclient import TestClient
