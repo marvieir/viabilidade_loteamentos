@@ -854,15 +854,17 @@ def _selecionar_pracas(
     hub: Optional[BaseGeometry],
     budget: float,
     raio: float = RAIO_CAMINHADA_M,
+    n_min: int = 0,
 ):
-    """Fase U2 — praças de BOLSO por COBERTURA de caminhada: enquanto houver quadra a mais de
-    ``raio`` (400 m — pesquisa §2) do lazer já reservado, converte em praça a MENOR quadra com
-    frente para via que cubra a região mais descoberta (dentro do orçamento). Nunca consome a
-    última face (lotes são prioridade). Devolve ``(pracas, pool_restante)``. Determinístico."""
+    """Fase U2/Mov.1 — praças de BOLSO em duas regras somadas: (1) COBERTURA — enquanto houver
+    quadra a mais de ``raio`` (400 m — pesquisa §2) do lazer reservado; (2) PISO DO PERFIL —
+    ``n_min`` praças mesmo com cobertura ok (alto padrão ESPALHA lazer, não só cobre — é o
+    padrão dos master plans de referência). Sempre a MENOR quadra com frente para via da
+    região mais carente, dentro do orçamento; nunca a última face. Determinístico."""
     pracas: list[BaseGeometry] = []
     pool = list(pool)
     gasto = 0.0
-    if budget <= 0.0 or hub is None and not pool:
+    if budget <= 0.0 or (hub is None and not pool):
         return pracas, pool
     while len(pool) > 1 and len(pracas) < PRACAS_MAX_N:
         lazer_atual = [g for g in (hub, *pracas) if g is not None and not g.is_empty]
@@ -873,26 +875,31 @@ def _selecionar_pracas(
             ]
         else:
             descobertas = list(pool)  # sem hub materializado → tudo é descoberto
-        if not descobertas:
-            break  # cobertura completa
-        # A quadra MAIS LONGE do lazer define a região a cobrir nesta rodada.
+        piso_pendente = len(pracas) < n_min
+        if not descobertas and not piso_pendente:
+            break  # cobertura completa E piso do perfil atendido
+        # A quadra mais CARENTE (mais longe do lazer atual) define a região desta rodada —
+        # vale para a cobertura e para o piso do perfil (espalha, não amontoa).
+        universo = descobertas or pool
         alvo_q = max(
-            descobertas,
+            universo,
             key=lambda q: min((q.centroid.distance(g) for g in lazer_atual), default=1e12),
         )
         cands = []
         for q in pool:
             if q.area > min(PRACA_MAX_M2, budget - gasto) + 1e-6:
                 continue
-            if q.centroid.distance(alvo_q.centroid) > raio:
-                continue  # não cobre a região descoberta
+            if descobertas and q.centroid.distance(alvo_q.centroid) > raio:
+                continue  # na regra de cobertura, a praça precisa COBRIR a região descoberta
             fr, _pr = _lados_mrr(q)
             toca = bool(ruas is not None and not ruas.is_empty and q.distance(ruas) < 0.6)
             if fr >= INST_FRENTE_MIN_M and toca:
                 cands.append(q)
         if not cands:
-            break  # região sem quadra que caiba no orçamento → degrada honesto (sem praça)
-        p = min(cands, key=lambda q: q.area)  # a MENOR que cobre — preserva lotes
+            break  # sem quadra que caiba no orçamento → degrada honesto (sem praça)
+        # a MENOR entre as 5 mais próximas da região carente — preserva lotes E espalha
+        proximas = sorted(cands, key=lambda q: q.centroid.distance(alvo_q.centroid))[:5]
+        p = min(proximas, key=lambda q: q.area)
         pracas.append(p)
         gasto += p.area
         pool = [q for q in pool if q is not p]
@@ -1453,14 +1460,26 @@ def gerar_layout(
     lago_reg = None
     orla_reg = None
     lago_cota = None
+    lago_redimensionado = False
     if lago and lago.get("ponto") and len(miolos) > 1:
         lg_pt = Point(float(lago["ponto"][0]), float(lago["ponto"][1]))
         lg_reg_pt = rotate(lg_pt, -ang_deg, origin=cen) if ang_deg else lg_pt
         lago_alvo = max(float(lago.get("area_m2", 6000.0)), 500.0)
         lago_cota = lago.get("cota_m")
+        # Movimento 1 — ALTO PADRÃO: o lago tem PRIORIDADE sobre lotes (o prêmio do anel de
+        # 274 m paga o sacrifício — pesquisa §1). Sem face que comporte o alvo, usa a MAIOR
+        # face perto do ponto baixo e REDIMENSIONA o corpo d'água para ela (com orla).
+        prioridade_lago = programa.publico_alvo == "alta"
         cands_lago = [f for f in miolos if f.area >= lago_alvo * 1.2]
+        face_lago = None
         if cands_lago:
             face_lago = min(cands_lago, key=lambda f: f.distance(lg_reg_pt))
+        elif prioridade_lago:
+            vizinhas = sorted(miolos, key=lambda f: f.distance(lg_reg_pt))[:3]
+            face_lago = max(vizinhas, key=lambda f: f.area)
+            lago_alvo = min(lago_alvo, face_lago.area / 1.5)  # corpo + orla cabem na face
+            lago_redimensionado = True
+        if face_lago is not None and lago_alvo >= 300.0:
             centro_lago = (lg_reg_pt if face_lago.contains(lg_reg_pt)
                            else face_lago.representative_point())
             corpo = _valido(centro_lago.buffer(math.sqrt(lago_alvo / math.pi), quad_segs=24))
@@ -1507,8 +1526,11 @@ def gerar_layout(
     # as praças não gastarem segue para o verde (4.c) — o TOTAL de lazer não muda.
     clube_m2 = clube_reg.area if clube_reg is not None else 0.0
     pracas_budget = max(min(LAZER_PRACAS_FRAC * lazer_area, lazer_area - clube_m2), 0.0)
+    # Movimento 1 — PISO de praças por perfil: o alto padrão ESPALHA lazer mesmo com a
+    # cobertura de 400 m ok (1 bolsão a cada ~10 quadras — padrão dos master plans).
+    n_min_pracas = max(1, len(pool) // 10) if programa.publico_alvo == "alta" else 0
     pracas_reg, pool = (
-        _selecionar_pracas(pool, ruas_reg, clube_reg, pracas_budget)
+        _selecionar_pracas(pool, ruas_reg, clube_reg, pracas_budget, n_min=n_min_pracas)
         if _pode_reservar(pool) else ([], pool)
     )
     pracas_m2 = sum(p.area for p in pracas_reg)
@@ -1822,9 +1844,15 @@ def gerar_layout(
     # de caminhada. Tudo MEDIDO da geometria (§2); o que não coube/não materializa é rotulado.
     hub_features, hub_diag = amen.programa_hub(clube, programa.publico_alvo, programa.amenidades)
     lazer_features: list[dict] = [*hub_features]
+    # Movimento 1 — cada praça ganha um PROGRAMA sugerido (esquemático) da biblioteca,
+    # ciclado por perfil: o lazer aparece ESPALHADO e nomeado no mapa, não só "praça".
+    sugestoes = amen.SUGESTOES_PRACA.get(
+        programa.publico_alvo, amen.SUGESTOES_PRACA["media"]
+    )
     for i, p in enumerate(pracas, start=1):
+        sug = sugestoes[(i - 1) % len(sugestoes)]
         lazer_features.append({
-            "chave": "praca_bolso", "rotulo": f"Praça de bolso {i}", "tipo": "praca",
+            "chave": "praca_bolso", "rotulo": f"Praça {i} — {sug}", "tipo": "praca",
             "area_m2": round(p.area, 2), "geom": p,
         })
     if agua is not None and not agua.is_empty:
@@ -1879,12 +1907,16 @@ def gerar_layout(
             "doação de área verde (aceitação é municipal — verificar na prefeitura); custo de "
             "implantação: disciplina 'Lago / paisagismo da orla' no Custo de Infra. Estudo "
             "esquemático — projeto hidráulico/outorga são do projetista (§1-A)."
+            + (" No ALTO PADRÃO o lago teve prioridade sobre lotes (o prêmio do entorno paga o "
+               "sacrifício) e foi dimensionado para a quadra disponível "
+               f"(~{agua.area:,.0f} m²)." if lago_redimensionado else "")
         )
     elif lago and lago.get("ponto") and lago_reg is None:
         avisos.append(
             "LAGO NÃO SINTETIZADO: nenhuma quadra comporta o corpo d'água pedido sem "
-            "sacrificar o parcelamento (lotes são prioridade) — reduza a área do lago ou "
-            "regenere com outro perfil."
+            "sacrificar o parcelamento (nos perfis econômico/médio os lotes têm prioridade; "
+            "no ALTO PADRÃO o lago é priorizado e redimensionado automaticamente) — reduza a "
+            "área do lago ou regenere com o perfil alta renda."
         )
 
     meta = {

@@ -346,6 +346,9 @@ def _propor_impl(
             "area_aproveitavel_m2": round(aprov_m.area, 2),
             "municipio": getattr(registro["jurisdicao"], "municipio", None),
         }
+        # Movimento 1 — diretrizes LIVRES do operador → seção prioritária no prompt.
+        if (body.instrucoes or "").strip():
+            contexto["instrucoes_do_operador"] = body.instrucoes.strip()
         # Fase U5 — MEMÓRIA: programas bem avaliados (≥4★) da mesma região/perfil entram
         # como referência (few-shot) no prompt. A IA calibra a ESTRATÉGIA; o Python segue
         # medindo tudo (nenhum número vem da memória). Falha na leitura nunca derruba.
@@ -639,6 +642,7 @@ def _propor_impl(
         "lote_max_m2": body.lote_max_m2,
         "acesso_ponto": body.acesso_ponto,
         "criar_lago": body.criar_lago,  # U3 — a variante rematerializa com o mesmo lago
+        "instrucoes": body.instrucoes,  # Mov.1 — proveniência do pedido do operador
     }
     fonte_urb.salvar(analise_id, salvo)
     return out

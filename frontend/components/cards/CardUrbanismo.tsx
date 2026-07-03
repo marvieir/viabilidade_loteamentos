@@ -115,6 +115,7 @@ export function CardUrbanismo({
   const [zona, setZona] = useState<string>("");
   const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
   const [criarLago, setCriarLago] = useState(false); // Fase U3 — lago no ponto baixo do DEM
+  const [instrucoes, setInstrucoes] = useState(""); // Mov.1 — diretrizes livres do operador
   const [proposta, setProposta] = useState<PropostaUrbanistica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -171,7 +172,8 @@ export function CardUrbanismo({
         analiseId, tipo, publico, zona || null, undefined,
         loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null,
         acessoPonto ? [acessoPonto[1], acessoPonto[0]] : null,
-        criarLago
+        criarLago,
+        instrucoes
       );
       setProposta(p);
       onData?.(p);
@@ -411,6 +413,16 @@ export function CardUrbanismo({
               : "Gerar estudo de massa (IA)"}
           </Button>
         </div>
+        {/* Mov.1 — DIRETRIZES do operador: texto livre que orienta o PROGRAMA da IA
+            ("inclua 3 quadras, academia, mirante, áreas de descanso..."). */}
+        <textarea
+          value={instrucoes}
+          onChange={(e) => setInstrucoes(e.target.value)}
+          maxLength={2000}
+          rows={2}
+          placeholder='Diretrizes para o gerador (opcional) — ex.: "inclua academia, 3 quadras, mirante e áreas de descanso espalhadas". O lago é pelo checkbox acima; números continuam medidos pelo motor.'
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-400"
+        />
         {proposta && !carregando && (
           <p className="-mt-1 text-[11px] text-slate-400">
             Layout carregado do último salvo — não consumiu IA. Clique em “Regenerar” só se quiser

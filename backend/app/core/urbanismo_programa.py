@@ -327,12 +327,20 @@ def _prompt_usuario(contexto: dict, tipo_loteamento: str, publico_alvo: str) -> 
     entram como REFERÊNCIA destacada: calibram lote-alvo/arquétipo/amenidades que a região
     aprovou, sem virar cópia (e sem nenhum número de medida — §2)."""
     referencia = contexto.get("programas_bem_avaliados") or []
-    ctx = {k: v for k, v in contexto.items() if k != "programas_bem_avaliados"}
+    instrucoes = (contexto.get("instrucoes_do_operador") or "").strip()
+    ctx = {k: v for k, v in contexto.items()
+           if k not in ("programas_bem_avaliados", "instrucoes_do_operador")}
     prompt = (
         f"Gleba: público-alvo '{publico_alvo}', tipo '{tipo_loteamento}'. "
         f"Contexto medido pelo motor (NÃO recalcule): {ctx}. "
         "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
     )
+    if instrucoes:
+        prompt += (
+            " DIRETRIZES DO OPERADOR (Movimento 1 — prioridade sobre os defaults do perfil, "
+            f"dentro dos limites legais): \"{instrucoes}\". Traduza-as no programa (amenidades/"
+            "arquétipo/heurísticas) — números e geometria continuam sendo do motor."
+        )
     if referencia:
         prompt += (
             " REFERÊNCIA (memória do operador — programas anteriores BEM AVALIADOS na mesma "

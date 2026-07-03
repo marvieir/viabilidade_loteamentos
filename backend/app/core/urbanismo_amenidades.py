@@ -55,7 +55,28 @@ BIBLIOTECA: tuple[Amenidade, ...] = (
               ("quadra de tenis", "tenis", "tênis", "beach tennis", "padel")),
     Amenidade("pet_place", "Pet place", 200.0, 8, ("media", "alta"),
               ("pet",)),
+    # Movimento 1 — amenidades "de bolso" (padrão dos master plans de referência: lazer
+    # ESPALHADO em pequenas estações, não só no clube).
+    Amenidade("quiosque", "Quiosque / apoio", 150.0, 9, ("baixa", "media", "alta"),
+              ("quiosque", "apoio")),
+    Amenidade("redario", "Redário / estar zen", 120.0, 10, ("media", "alta"),
+              ("redario", "redário", "estar zen", "zen", "descanso", "rede")),
+    Amenidade("horta_pomar", "Horta / pomar comunitário", 300.0, 11, ("media", "alta"),
+              ("horta", "pomar", "agrihood", "comunitaria", "comunitária")),
+    Amenidade("play_aventura", "Play aventura", 250.0, 12, ("alta",),
+              ("play aventura", "aventura", "arvorismo")),
+    Amenidade("mirante_estar", "Mirante / estar contemplativo", 200.0, 13, ("alta",),
+              ("mirante", "contemplativo", "deck", "vista")),
 )
+
+# Movimento 1 — programa SUGERIDO (esquemático) para as praças de bolso, ciclado por
+# perfil. Rotula o lazer espalhado no mapa; a posição fina é do projeto executivo (§1-A).
+SUGESTOES_PRACA: dict[str, tuple[str, ...]] = {
+    "baixa": ("playground", "campo / estar"),
+    "media": ("playground", "quiosque", "estar / redário"),
+    "alta": ("playground", "quiosque + redário", "estar zen", "horta / pomar",
+             "play aventura", "mirante / estar"),
+}
 
 # Amenidades que a IA costuma propor mas NÃO viram sub-parcela do hub nesta fase — rotuladas
 # com o destino honesto (nunca somem em silêncio).
@@ -66,7 +87,6 @@ FORA_DO_HUB: dict[str, str] = {
     "trilha": "trilha/pista de caminhada — linear (perímetro do verde), não sub-parcela do hub",
     "caminhada": "trilha/pista de caminhada — linear (perímetro do verde), não sub-parcela do hub",
     "ciclovia": "ciclovia — linear (faixa viária), não sub-parcela do hub",
-    "mirante": "mirante — depende de cota alta (DEM); não materializado nesta fase",
     "golfe": "golfe — âncora de grande porte fora do escopo do estudo de massa",
     "equestre": "centro equestre — âncora de grande porte fora do escopo do estudo de massa",
     "paisagismo": "paisagismo — difuso (área livre do hub e canteiros), não sub-parcela",

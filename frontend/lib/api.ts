@@ -1716,7 +1716,8 @@ export async function proporUrbanismo(
   overrides?: Record<string, unknown>,
   loteMaxM2?: number | null, // Fase 11.8 — teto de lote recomendado pelo operador (m²)
   acessoPonto?: [number, number] | null, // [lon, lat] — acesso marcado no mapa (âncora do pórtico)
-  criarLago?: boolean // Fase U3 — sintetizar lago no ponto baixo do DEM
+  criarLago?: boolean, // Fase U3 — sintetizar lago no ponto baixo do DEM
+  instrucoes?: string | null // Mov.1 — diretrizes livres do operador p/ o programa
 ): Promise<PropostaUrbanistica> {
   const res = await apiFetch(
     `/api/analises/${analiseId}/urbanismo/propor`,
@@ -1731,6 +1732,7 @@ export async function proporUrbanismo(
         ...(loteMaxM2 ? { lote_max_m2: loteMaxM2 } : {}),
         ...(acessoPonto ? { acesso_ponto: acessoPonto } : {}),
         ...(criarLago ? { criar_lago: true } : {}),
+        ...(instrucoes?.trim() ? { instrucoes: instrucoes.trim() } : {}),
       }),
     }
   );

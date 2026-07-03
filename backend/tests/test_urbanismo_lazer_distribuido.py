@@ -40,7 +40,8 @@ def test_mapeia_sinonimos_e_rotula_o_resto():
 def test_sem_proposta_usa_defaults_do_perfil():
     sel, _fora, _sem = amen.mapear_amenidades([], "baixa")
     chaves = {a.chave for a in sel}
-    assert chaves == {"playground", "salao_festas", "quadra_poliesportiva"}
+    # Mov.1 — a biblioteca cresceu: quiosque entrou como default de todos os perfis.
+    assert chaves == {"playground", "salao_festas", "quadra_poliesportiva", "quiosque"}
     # prioridade determinística: playground primeiro
     assert sel[0].chave == "playground"
 

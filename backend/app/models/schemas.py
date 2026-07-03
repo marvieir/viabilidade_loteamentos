@@ -1306,6 +1306,10 @@ class ProporUrbanismoIn(BaseModel):
     # Fase U3 — sintetizar LAGO no ponto baixo do DEM (amenidade valorizadora — pesquisa §1).
     # Sem DEM → degrada com aviso (não inventa relevo).
     criar_lago: bool = False
+    # Movimento 1 — DIRETRIZES do operador em texto livre ("inclua 3 quadras, academia,
+    # mirante, áreas de descanso..."): entram como seção prioritária no prompt do PROGRAMA.
+    # Só estratégia — números continuam medidos pelo motor (§2).
+    instrucoes: Optional[str] = Field(default=None, max_length=2000)
     # Fase 11.8 — teto de lote recomendado pelo operador (m²): sobrepõe o teto de mercado do perfil
     # (nunca abaixo do piso legal). Vazio = padrão do perfil.
     lote_max_m2: Optional[float] = None

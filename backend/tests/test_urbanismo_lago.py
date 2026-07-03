@@ -61,14 +61,20 @@ def test_fator_agua_liga_com_anel_274m():
     assert "agua" in med2.heatmap["fatores_ausentes"]
 
 
-def test_lago_deterministico_e_degrada_honesto():
+def test_lago_deterministico_e_prioridade_por_perfil():
     a = _layout(LAGO)
     b = _layout(LAGO)
     assert a.agua.wkt == b.agua.wkt
-    # lago maior que qualquer quadra → não materializa, avisa (lotes são prioridade)
-    grande = _layout({"ponto": (900.0, 110.0), "area_m2": 500000.0})
-    assert grande.agua is None or grande.agua.is_empty
-    assert any("LAGO NÃO SINTETIZADO" in a for a in grande.avisos)
+    # Mov.1 — ALTO PADRÃO: lago maior que as quadras → REDIMENSIONA e materializa (o lago
+    # tem prioridade sobre lotes; o prêmio do anel paga o sacrifício).
+    grande_alta = _layout({"ponto": (900.0, 110.0), "area_m2": 500000.0}, publico="alta")
+    assert grande_alta.agua is not None and not grande_alta.agua.is_empty
+    assert grande_alta.agua.area < 500000.0  # redimensionado p/ a quadra disponível
+    assert any("dimensionado para a quadra disponível" in a for a in grande_alta.avisos)
+    # médio/econômico: lotes seguem prioritários → degrada com aviso
+    grande_media = _layout({"ponto": (900.0, 110.0), "area_m2": 500000.0}, publico="media")
+    assert grande_media.agua is None or grande_media.agua.is_empty
+    assert any("LAGO NÃO SINTETIZADO" in a for a in grande_media.avisos)
 
 
 def test_custo_infra_disciplina_lago_condicional():
@@ -87,3 +93,44 @@ def test_custo_infra_disciplina_lago_condicional():
     r_com = custo_motor.calcular(q_com, perfil, "medio")
     linha = next(d for d in r_com.disciplinas if d.chave == "lago_paisagismo")
     assert linha.subtotal == 6000.0 * 120.0
+
+
+# ------------------------- Movimento 1 — lazer espalhado + instruções -------------------------
+def test_alta_renda_espalha_pracas_mesmo_com_cobertura_ok():
+    """Mov.1: no alto padrão há PISO de praças (1 a cada ~10 quadras) mesmo quando o hub já
+    cobre os 400 m — o lazer espalha (padrão dos master plans), não só cobre."""
+    from shapely.geometry import box as _box
+
+    compacta = _box(0.0, 0.0, 480.0, 300.0)  # tudo a <400 m do centro
+    lay_alta = geom.gerar_layout(compacta, programa_do_preset("alta", {"pct_lazer": 0.15}))
+    d = lay_alta.sistema_lazer_diagnostico
+    assert d.get("n_pracas", 0) >= 1  # piso do perfil (antes: 0, cobertura já ok)
+    # rótulo com PROGRAMA sugerido (esquemático) da biblioteca
+    pracas = [f for f in lay_alta.lazer_features if f["tipo"] == "praca"]
+    assert pracas and all("—" in p["rotulo"] for p in pracas)
+
+
+def test_instrucoes_do_operador_entram_no_prompt():
+    from app.core import urbanismo_programa as programa_mod
+
+    ctx = {"area_aproveitavel_m2": 100000.0}
+    sem = programa_mod._prompt_usuario(ctx, "aberto", "alta")
+    assert "DIRETRIZES DO OPERADOR" not in sem
+    com = programa_mod._prompt_usuario(
+        {**ctx, "instrucoes_do_operador": "inclua 3 quadras, academia e mirante"},
+        "aberto", "alta",
+    )
+    assert "DIRETRIZES DO OPERADOR" in com and "mirante" in com
+    assert "instrucoes_do_operador" not in com.split("DIRETRIZES")[0]  # sem duplicar no ctx
+
+
+def test_biblioteca_mapeia_amenidades_de_bolso():
+    from app.core import urbanismo_amenidades as amen
+
+    sel, fora, sem = amen.mapear_amenidades(
+        ["mirante com deck", "redário para descanso", "horta comunitária", "quiosques"],
+        "alta",
+    )
+    chaves = {a.chave for a in sel}
+    assert {"mirante_estar", "redario", "horta_pomar", "quiosque"} <= chaves
+    assert not sem  # tudo reconhecido (mirante saiu do fora_do_hub — agora materializa)
