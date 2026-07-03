@@ -312,6 +312,11 @@ def _propor_impl(
     (materialização de variante); ``variante_unica`` restringe a UMA estratégia (senão gera as
     K de ``VARIANTES_U4`` e a função de valor escolhe). Determinístico dado o mesmo programa."""
     referencia: list = []  # U5 — programas bem avaliados usados como few-shot (p/ o aviso)
+    # Movimento 2 — PERFIL DE ESTILO (regras por padrão, editáveis via ESTILO_URBANISMO_DIR):
+    # carregado UMA vez e usado no prompt (regras) e no motor (knobs de composição).
+    from app.core.urbanismo_estilo import carregar_estilo
+
+    estilo, aviso_estilo = carregar_estilo(str(body.publico_alvo))
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
     # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
     aprov_wgs, restr_wgs, restr_origem, decliv_wgs = _aproveitavel_wgs(
@@ -349,6 +354,9 @@ def _propor_impl(
         # Movimento 1 — diretrizes LIVRES do operador → seção prioritária no prompt.
         if (body.instrucoes or "").strip():
             contexto["instrucoes_do_operador"] = body.instrucoes.strip()
+        # Movimento 2 — regras de ESTILO do padrão entram em TODA proposta.
+        if estilo.get("prompt_regras"):
+            contexto["regras_de_estilo"] = estilo["prompt_regras"]
         # Fase U5 — MEMÓRIA: programas bem avaliados (≥4★) da mesma região/perfil entram
         # como referência (few-shot) no prompt. A IA calibra a ESTRATÉGIA; o Python segue
         # medindo tudo (nenhum número vem da memória). Falha na leitura nunca derruba.
@@ -479,10 +487,12 @@ def _propor_impl(
                     if melhor is None or z < melhor[0]:
                         melhor = (z, x, y)
             if melhor is not None:
+                # dimensão de triagem vem do PERFIL DE ESTILO (default ~3%, teto 12.000 m²)
+                frac = float(estilo.get("lago_frac_aproveitavel", 0.03))
+                teto = float(estilo.get("lago_max_m2", 12000.0))
                 lago_param = {
                     "ponto": (melhor[1], melhor[2]),
-                    # lago paisagístico de triagem: ~3% da aproveitável, entre 1.500 e 12.000 m²
-                    "area_m2": max(min(0.03 * aprov_m.area, 12000.0), 1500.0),
+                    "area_m2": max(min(frac * aprov_m.area, teto), 1500.0),
                     "cota_m": round(melhor[0], 1),
                 }
 
@@ -504,6 +514,7 @@ def _propor_impl(
             acesso_externo=acesso_externo_m,
             variante=var,
             lago=lago_param,  # U3 — ponto baixo do DEM (None sem opt-in/DEM)
+            estilo=estilo,  # Mov.2 — knobs de composição do perfil de estilo
         )
         layout_v.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular (não recalcula)
         layout_v.restricao_origem = restr_origem
@@ -581,6 +592,7 @@ def _propor_impl(
     )
     avisos = [
         aviso_variantes,
+        *([aviso_estilo] if aviso_estilo else []),
         *([f"Memória (U5): a proposta foi calibrada por {len(referencia)} programa(s) "
            "bem avaliado(s) pelo operador na mesma região/perfil (few-shot no gerador — "
            "os números continuam medidos pelo motor)."] if referencia else []),

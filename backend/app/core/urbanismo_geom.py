@@ -1146,6 +1146,7 @@ def gerar_layout(
     acesso_externo: Optional[BaseGeometry] = None,
     variante: Optional[dict] = None,
     lago: Optional[dict] = None,
+    estilo: Optional[dict] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1162,6 +1163,11 @@ def gerar_layout(
     variante = dict(variante or {})
     orientacao_rad = float(orientacao_rad) + float(variante.get("orientacao_extra_rad", 0.0))
     hub_estrategia = str(variante.get("hub_estrategia", "area"))
+    # Movimento 2 — PERFIL DE ESTILO: regras de composição por padrão (default embarcado =
+    # comportamento testado; override do operador via ESTILO_URBANISMO_DIR).
+    if estilo is None:
+        from app.core.urbanismo_estilo import carregar_estilo
+        estilo, _ = carregar_estilo(programa.publico_alvo)
 
     canvas = aproveitavel
     # Fase 10.8 — ≥30% veda LOTE, não VIA (Lei 6.766 art. 3º: parcelamento, não estrada). A malha
@@ -1466,10 +1472,10 @@ def gerar_layout(
         lg_reg_pt = rotate(lg_pt, -ang_deg, origin=cen) if ang_deg else lg_pt
         lago_alvo = max(float(lago.get("area_m2", 6000.0)), 500.0)
         lago_cota = lago.get("cota_m")
-        # Movimento 1 — ALTO PADRÃO: o lago tem PRIORIDADE sobre lotes (o prêmio do anel de
-        # 274 m paga o sacrifício — pesquisa §1). Sem face que comporte o alvo, usa a MAIOR
-        # face perto do ponto baixo e REDIMENSIONA o corpo d'água para ela (com orla).
-        prioridade_lago = programa.publico_alvo == "alta"
+        # Movimento 1/2 — prioridade do lago vem do PERFIL DE ESTILO (default: alto padrão
+        # sacrifica lotes — o prêmio do anel de 274 m paga; pesquisa §1). Sem face que
+        # comporte o alvo, usa a MAIOR face perto do ponto baixo e REDIMENSIONA o corpo.
+        prioridade_lago = bool(estilo.get("lago_prioritario"))
         cands_lago = [f for f in miolos if f.area >= lago_alvo * 1.2]
         face_lago = None
         if cands_lago:
@@ -1525,10 +1531,12 @@ def gerar_layout(
     # lote): parte do orçamento de lazer vira praças pequenas onde o hub não alcança. O que
     # as praças não gastarem segue para o verde (4.c) — o TOTAL de lazer não muda.
     clube_m2 = clube_reg.area if clube_reg is not None else 0.0
-    pracas_budget = max(min(LAZER_PRACAS_FRAC * lazer_area, lazer_area - clube_m2), 0.0)
-    # Movimento 1 — PISO de praças por perfil: o alto padrão ESPALHA lazer mesmo com a
-    # cobertura de 400 m ok (1 bolsão a cada ~10 quadras — padrão dos master plans).
-    n_min_pracas = max(1, len(pool) // 10) if programa.publico_alvo == "alta" else 0
+    pracas_frac = float(estilo.get("lazer_pracas_frac", LAZER_PRACAS_FRAC))
+    pracas_budget = max(min(pracas_frac * lazer_area, lazer_area - clube_m2), 0.0)
+    # Movimento 1/2 — PISO de praças vem do ESTILO: 1 bolsão a cada ``pracas_por_quadras``
+    # quadras mesmo com a cobertura de 400 m ok (espalha, não amontoa). 0 = só cobertura.
+    ppq = int(estilo.get("pracas_por_quadras") or 0)
+    n_min_pracas = max(1, len(pool) // ppq) if ppq > 0 else 0
     pracas_reg, pool = (
         _selecionar_pracas(pool, ruas_reg, clube_reg, pracas_budget, n_min=n_min_pracas)
         if _pode_reservar(pool) else ([], pool)
@@ -1842,7 +1850,10 @@ def gerar_layout(
 
     # Fase U2 — PROGRAMA DO HUB (amenidades da IA materializadas pela biblioteca) + cobertura
     # de caminhada. Tudo MEDIDO da geometria (§2); o que não coube/não materializa é rotulado.
-    hub_features, hub_diag = amen.programa_hub(clube, programa.publico_alvo, programa.amenidades)
+    hub_features, hub_diag = amen.programa_hub(
+        clube, programa.publico_alvo, programa.amenidades,
+        fracao_livre=float(estilo.get("hub_fracao_livre", amen.HUB_FRACAO_LIVRE_MIN)),
+    )
     lazer_features: list[dict] = [*hub_features]
     # Movimento 1 — cada praça ganha um PROGRAMA sugerido (esquemático) da biblioteca,
     # ciclado por perfil: o lazer aparece ESPALHADO e nomeado no mapa, não só "praça".

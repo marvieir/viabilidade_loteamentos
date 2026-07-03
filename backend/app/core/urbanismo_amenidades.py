@@ -155,7 +155,8 @@ def _frame_axial(hub: BaseGeometry):
 
 
 def programa_hub(
-    hub: Optional[BaseGeometry], publico_alvo: str, propostas: Sequence[str]
+    hub: Optional[BaseGeometry], publico_alvo: str, propostas: Sequence[str],
+    fracao_livre: Optional[float] = None,
 ) -> tuple[list[dict], dict]:
     """Fatia o hub em SUB-PARCELAS rotuladas (uma por amenidade selecionada), varrendo o eixo
     longo do hub por prioridade e preservando ≥``HUB_FRACAO_LIVRE_MIN`` de área livre.
@@ -167,7 +168,9 @@ def programa_hub(
     axial, ang, origem = _frame_axial(hub)
     minx, miny, maxx, maxy = axial.bounds
     altura = max(maxy - miny, 1e-6)
-    orcamento = hub.area * (1.0 - HUB_FRACAO_LIVRE_MIN)
+    # Mov.2 — a fração livre pode vir do perfil de estilo (default embarcado).
+    livre_min = HUB_FRACAO_LIVRE_MIN if fracao_livre is None else max(0.0, min(fracao_livre, 0.9))
+    orcamento = hub.area * (1.0 - livre_min)
 
     features: list[dict] = []
     nao_coube: list[str] = []

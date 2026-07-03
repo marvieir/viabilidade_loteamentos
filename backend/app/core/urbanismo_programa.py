@@ -328,13 +328,17 @@ def _prompt_usuario(contexto: dict, tipo_loteamento: str, publico_alvo: str) -> 
     aprovou, sem virar cópia (e sem nenhum número de medida — §2)."""
     referencia = contexto.get("programas_bem_avaliados") or []
     instrucoes = (contexto.get("instrucoes_do_operador") or "").strip()
+    estilo = (contexto.get("regras_de_estilo") or "").strip()
     ctx = {k: v for k, v in contexto.items()
-           if k not in ("programas_bem_avaliados", "instrucoes_do_operador")}
+           if k not in ("programas_bem_avaliados", "instrucoes_do_operador",
+                        "regras_de_estilo")}
     prompt = (
         f"Gleba: público-alvo '{publico_alvo}', tipo '{tipo_loteamento}'. "
         f"Contexto medido pelo motor (NÃO recalcule): {ctx}. "
         "Proponha o programa. Lembre: nada de nº de lotes nem áreas vendáveis."
     )
+    if estilo:
+        prompt += f" REGRAS DE ESTILO do padrão (Movimento 2 — siga sempre): {estilo}"
     if instrucoes:
         prompt += (
             " DIRETRIZES DO OPERADOR (Movimento 1 — prioridade sobre os defaults do perfil, "

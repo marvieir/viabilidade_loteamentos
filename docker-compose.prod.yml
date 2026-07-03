@@ -45,6 +45,10 @@ services:
       USO_LLM_LOG: "/data/perfis/uso_llm/uso.jsonl"
       PERFIL_CUSTOS_DIR: "/data/perfis/custos"
       URBANISMO_DIR: "/data/perfis/urbanismo"
+      # Mov.2 — perfil de ESTILO do urbanismo: o operador pode criar {perfil}.json
+      # neste diretório (volume) p/ sobrescrever regras/knobs sem rebuild.
+      ESTILO_URBANISMO_DIR: "/data/perfis/estilo-urbanismo"
+      MEMORIA_URBANISMO_DIR: "/data/perfis/memoria-urbanismo"
       # Cache de vias OSM por gleba (pórtico) — persiste: 1 consulta por gleba, para sempre.
       VIAS_CACHE_DIR: "/data/perfis/vias"
       FINANCEIRA_DIR: "/data/perfis/financeira"
