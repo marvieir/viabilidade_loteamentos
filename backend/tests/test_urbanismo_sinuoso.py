@@ -6,6 +6,8 @@ loteáveis (contorno do íngreme por construção). Fronteira §2: o LLM dá SÓ
 nenhum número/área vem dele. Calibrado nas glebas do diagnóstico, offline.
 """
 
+# U6a: estes goldens guardam a MECÂNICA do traçado clássico
+# (grelha/sinuoso/poda) — o arquétipo paisagístico tem goldens próprios; estilo={} fixa o clássico.
 import re
 
 from shapely.affinity import rotate
@@ -48,7 +50,7 @@ def _gleba_recortada():
 def _layout(aprov, overrides=None):
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
     prog = programa_do_preset("alta", {"pct_lazer": 0.2, **(overrides or {})})
-    layout = geom.gerar_layout(aprov, prog, diretrizes=dd)
+    layout = geom.gerar_layout(aprov, prog, diretrizes=dd, estilo={})
     return layout, medida.medir(layout)
 
 

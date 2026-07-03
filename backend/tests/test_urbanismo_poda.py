@@ -8,6 +8,8 @@ rede de fronteiras internas entre faces; trechos pendurados somem). A restriçã
 offline. A via-tronco da IA é preservada (a sinuosidade é a 9.9).
 """
 
+# U6a: estes goldens guardam a MECÂNICA do traçado clássico
+# (grelha/sinuoso/poda) — o arquétipo paisagístico tem goldens próprios; estilo={} fixa o clássico.
 import math
 
 from shapely.affinity import rotate
@@ -49,7 +51,7 @@ def _gleba_recortada():
 def _layout(aprov):
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
     prog = programa_do_preset("alta", {"pct_lazer": 0.2})
-    layout = geom.gerar_layout(aprov, prog, diretrizes=dd)
+    layout = geom.gerar_layout(aprov, prog, diretrizes=dd, estilo={})
     med = medida.medir(layout)
     return layout, med
 
@@ -167,7 +169,7 @@ def test_tronco_da_ia_preservado_da_poda():
     lotes não sentam sobre ela."""
     esq = [[[0.1, 0.5], [0.9, 0.5]]]  # eixo-tronco horizontal no meio
     prog = programa_do_preset("alta", {"pct_lazer": 0.1, "esqueleto": esq})
-    layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 200.0), prog)
+    layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 200.0), prog, estilo={})
     assert layout.meta["esqueleto_usado"] is True
     eixo = unary_union(layout.centerlines)
     corredor = eixo.buffer(prog.largura_via_m / 2.0)

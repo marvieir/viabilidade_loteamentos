@@ -11,6 +11,8 @@ mapa (apresentação). Dois ajustes curtos sobre a 9.12:
 Critério-âncora: São Roque REAL (fixture congelado, offline determinista). Tudo no Python (§2).
 """
 
+# U6a: estes goldens guardam a MECÂNICA do traçado clássico
+# (grelha/sinuoso/poda) — o arquétipo paisagístico tem goldens próprios; estilo={} fixa o clássico.
 import re
 
 from shapely.geometry import box
@@ -95,7 +97,7 @@ def test_fundo_e_fracao_pequena_do_total():
     """Critério 4 (integrado): a fusão de fundo é EXCEÇÃO — uma fração pequena do total de lotes
     (a maioria nasce com via pela geração 9.12). Não vira a estratégia dominante de loteamento."""
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
-    layout = geom.gerar_layout(box(0, 0, 1200, 800), programa_do_preset("alta", {"pct_lazer": 0.2}), diretrizes=dd)
+    layout = geom.gerar_layout(box(0, 0, 1200, 800), programa_do_preset("alta", {"pct_lazer": 0.2}), diretrizes=dd, estilo={})
     med = medida.medir(layout)
     fundo = layout.viario_diagnostico["lotes_fundidos_fundo"]
     assert fundo < 0.1 * med.indicadores["n_lotes"]   # exceção, não regra (<10% dos lotes)

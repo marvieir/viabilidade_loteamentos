@@ -8,6 +8,8 @@ recuperados≥1); em São Roque, já maximizada por 9.11–9.13 e com porções 
 de escopo §10), n_lotes/vendável NÃO REGRIDEM e verde_sobra não cresce — ganho ~0 é honesto (§1-A:
 recuperar é dar acesso geométrico, não forçar número)."""
 
+# U6a: estes goldens guardam a MECÂNICA do traçado clássico
+# (grelha/sinuoso/poda) — o arquétipo paisagístico tem goldens próprios; estilo={} fixa o clássico.
 import re
 
 from shapely.geometry import Point, box
@@ -35,12 +37,12 @@ def _layout_donut():
     """Gleba-fixture: retângulo com restrição CENTRAL grande (buraco) — contornável, com faces que
     o contorno torna acessíveis. É onde a regra D DEMONSTRA recuperação de lote (sobra → lote)."""
     gleba = box(0, 0, 420, 300).difference(box(150, 110, 290, 200))  # buraco ≥30% central
-    lay = geom.gerar_layout(gleba, _prog(), diretrizes=_dd())
+    lay = geom.gerar_layout(gleba, _prog(), diretrizes=_dd(), estilo={})
     return lay, medida.medir(lay), gleba
 
 
 def _layout_caixa():
-    lay = geom.gerar_layout(box(0, 0, 343, 172), _prog(), diretrizes=_dd())
+    lay = geom.gerar_layout(box(0, 0, 343, 172), _prog(), diretrizes=_dd(), estilo={})
     return lay, medida.medir(lay)
 
 
