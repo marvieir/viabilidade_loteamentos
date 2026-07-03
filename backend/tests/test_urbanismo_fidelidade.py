@@ -94,7 +94,9 @@ def test_esqueleto_consumido():
     (pontos do eixo caem na arruamento); esqueleto_usado=true."""
     esq = [[[0.1, 0.5], [0.9, 0.5]]]  # eixo horizontal no meio
     prog = programa_do_preset("alta", {"pct_lazer": 0.1, "esqueleto": esq})
-    layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 200.0), prog)
+    # U6a: este golden guarda a mecânica 9.9 do ESQUELETO (traçado clássico) — o arquétipo
+    # paisagístico ignora o esqueleto por design; fixa o clássico p/ testar a máquina certa.
+    layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 200.0), prog, estilo={})
     assert layout.meta["esqueleto_usado"] is True
     assert len(layout.centerlines) >= 1
     eixo = unary_union(layout.centerlines)

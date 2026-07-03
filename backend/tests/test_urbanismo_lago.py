@@ -55,7 +55,10 @@ def test_fator_agua_liga_com_anel_274m():
     med = medida.medir(_layout(LAGO), publico_alvo="alta")
     assert "agua" not in med.heatmap["fatores_ausentes"]
     fatores = [p["fatores"]["agua"] for p in med.heatmap["por_lote"]]
-    assert max(fatores) > 0.8 and min(fatores) == 0.0  # anel: perto premia, longe não
+    # U6a: no arquétipo paisagístico o lote fica ATRÁS da orla-parque (nunca colado na
+    # lâmina — é o padrão das referências: lago público com orla), então o topo do anel é
+    # gradiente, não contato. Perto premia (≥0,4), longe zera — o anel de 274 m funciona.
+    assert max(fatores) >= 0.4 and min(fatores) == 0.0
     # sem lago o fator fica AUSENTE (não zero em silêncio)
     med2 = medida.medir(_layout(None), publico_alvo="alta")
     assert "agua" in med2.heatmap["fatores_ausentes"]
