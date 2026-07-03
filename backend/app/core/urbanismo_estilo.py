@@ -59,11 +59,14 @@ ESTILO_DEFAULT: dict[str, dict] = {
         "lago_frac_aproveitavel": 0.03,
         "lago_max_m2": 12000.0,
         "hub_fracao_livre": 0.25,
+        # Fase U6a — composição paisagística (anéis/folha + cinturão) é o default do alto.
+        "arquetipo": "loops_paisagem",
+        "cinturao_verde_m": 15.0,
     },
 }
 
 _CHAVES_NUM = ("pracas_por_quadras", "lazer_pracas_frac", "lago_frac_aproveitavel",
-               "lago_max_m2", "hub_fracao_livre")
+               "lago_max_m2", "hub_fracao_livre", "cinturao_verde_m")
 
 
 def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:
@@ -95,6 +98,8 @@ def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:
                 continue
         elif chave == "lago_prioritario":
             base[chave] = bool(valor)
+        elif chave == "arquetipo" and isinstance(valor, str) and valor.strip():
+            base[chave] = valor.strip()  # "loops_paisagem" liga a U6a; outro valor desliga
         elif chave == "prompt_regras" and isinstance(valor, str) and valor.strip():
             base[chave] = valor.strip()[:2000]
     return base, None

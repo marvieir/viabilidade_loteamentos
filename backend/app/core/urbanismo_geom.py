@@ -453,11 +453,19 @@ def lado_quadra_adaptativo(area_ilha: float, teto_w: float, teto_h: float,
 
 
 def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
-                    block_h: float, via_local: float, via_tronco: float, podar: bool = True):
+                    block_h: float, via_local: float, via_tronco: float, podar: bool = True,
+                    eixos_prontos=None):
     """MALHA de UMA ILHA (frame rotacionado ``reg``): grade local recortada à ilha + tronco,
     depois PODA dos stubs (Fase 9.8). Devolve ``(faces, ruas, eixos, troncos, n_stubs)`` — a
-    malha é conexa DENTRO da ilha (a gleba partida por restrição é tratada como ilhas separadas)."""
-    eixos, troncos = _eixos_da_ilha(reg, eixos_ia, block_w, block_h, via_local, via_tronco)
+    malha é conexa DENTRO da ilha (a gleba partida por restrição é tratada como ilhas separadas).
+
+    Fase U6a — ``eixos_prontos`` ([(LineString, largura)]) substitui a grade axial pelo
+    traçado PAISAGÍSTICO (anéis/folha); faces, poda e bulbos seguem o pipeline idêntico."""
+    if eixos_prontos:
+        eixos = list(eixos_prontos)
+        troncos = [g for g, w in eixos if w >= via_tronco - 1e-6]
+    else:
+        eixos, troncos = _eixos_da_ilha(reg, eixos_ia, block_w, block_h, via_local, via_tronco)
     if not eixos:  # ilha menor que um bloco → uma quadra só, sem via interna (degrada honesto)
         return [g for g in _componentes(reg)], None, [], [], 0
     faces = _faces_de(reg, eixos)  # estável: danglers não criam face (polygonize os ignora)
@@ -1168,8 +1176,19 @@ def gerar_layout(
     if estilo is None:
         from app.core.urbanismo_estilo import carregar_estilo
         estilo, _ = carregar_estilo(programa.publico_alvo)
+    # Fase U6a — arquétipo de COMPOSIÇÃO PAISAGÍSTICA (spec fase-U6-pods.md): paisagem
+    # estrutura, lotes preenchem. Liga pelo perfil de estilo (default: alto padrão).
+    usa_paisagem = str(estilo.get("arquetipo", "")) == "loops_paisagem"
+    from app.core import urbanismo_loops as paisagem
 
     canvas = aproveitavel
+    # Fase U6a P1 — CINTURÃO verde perimetral (frame original): nenhum lote encosta na
+    # divisa; a moldura entra na doação como verde reservado (todas as referências).
+    cinturao_orig = None
+    if usa_paisagem:
+        canvas, cinturao_orig = paisagem.cinturao_perimetral(
+            canvas, float(estilo.get("cinturao_verde_m", 15.0))
+        )
     # Fase 10.8 — ≥30% veda LOTE, não VIA (Lei 6.766 art. 3º: parcelamento, não estrada). A malha
     # viária ATRAVESSA a restrição (junta as porções num loteamento só); só os LOTES a evitam. Por
     # isso NÃO descontamos `restricoes` do canvas das ruas — ela é descontada das QUADRAS (faces→
@@ -1275,6 +1294,7 @@ def gerar_layout(
     # ilhas que comportam lote, com flag de acesso à entrada (borda da gleba).
     contorno_reg: list[BaseGeometry] = []
     porcoes_info: list[dict] = []
+    modos_paisagem: list[str] = []  # U6a — modo do traçado paisagístico por ilha
     ilhas = _componentes(reg)
     for idx, ilha in enumerate(ilhas):
         # Fase 9.11 — GRADE ADAPTATIVA: o lado do quarteirão é função do tamanho DESTA ilha (com
@@ -1303,8 +1323,25 @@ def gerar_layout(
         outras = _uniao_segura([x for j, x in enumerate(ilhas) if j != idx])
         cont_cl = trac.rotear_contornando_restricao(ilha, outras, trac.AFAST_VIA_M, via_local)
         contorno_reg.extend(cont_cl)
+        # Fase U6a P3 — traçado PAISAGÍSTICO no lugar da grade axial: anéis (compacta) ou
+        # folha (alongada); eixos vazios → degrada para a grade (nunca quebra a geração).
+        eixos_pais = None
+        if usa_paisagem:
+            _ac_pais = None
+            if acesso_externo is not None and not acesso_externo.is_empty:
+                _acp = (acesso_externo if isinstance(acesso_externo, Point)
+                        else acesso_externo.representative_point())
+                _ac_pais = rotate(_acp, -ang_deg, origin=cen) if ang_deg else _acp
+            eixos_pais, modo_pais = paisagem.eixos_paisagem(
+                ilha, None, _ac_pais, bh_i, via_local, via_tronco
+            )
+            if eixos_pais:
+                modos_paisagem.append(modo_pais)
+            else:
+                eixos_pais = None  # ilha pequena/degenerada → grade axial (honesto)
         fcs, ruas_i, eix_i, _tron_i, n_stub = construir_malha(
-            ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True
+            ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True,
+            eixos_prontos=eixos_pais,
         )
         faces.extend(fcs)
         eixos_reg.extend(eix_i)
@@ -1650,7 +1687,9 @@ def gerar_layout(
     # frame rotacionado a solda é frágil e o buffer(0) do _back a quebra): com travessia VIÁVEL,
     # garante UMA malha viária contínua (fecha o "buraco" entre as porções). Sem travessia/greide
     # inviável → não roda (degradação honesta: segue partido com alerta de engenharia).
-    if travessia_viavel and arruamento is not None and not arruamento.is_empty:
+    if (travessia_viavel or usa_paisagem) and arruamento is not None and not arruamento.is_empty:
+        # U6a — nervuras/anéis recortados pela borda podem sair em pedaços: a solda liga
+        # (mesma máquina da 10.4; o conector pode cruzar ≥30% — veda lote, não via).
         arruamento = _conectar_malha(arruamento, conexao_mod.CAIXA_TRONCO_M) or arruamento
     clube = _back(clube_reg)
     pracas = [r for r in (_back(p) for p in pracas_reg) if r is not None]
@@ -1663,6 +1702,11 @@ def gerar_layout(
     inst = _back(inst_reg)
     verde_reservado = _back(verde_reservado_reg)
     verde = _back(verde_total_reg)
+    # Fase U6a — o CINTURÃO perimetral (frame original) entra no verde reservado/total:
+    # moldura verde da divisa é doação legítima, não sobra.
+    if cinturao_orig is not None and not cinturao_orig.is_empty:
+        verde_reservado = _uniao_segura([verde_reservado, cinturao_orig])
+        verde = _uniao_segura([verde, cinturao_orig])
     sobra_ponta = _back(sobra_reg)
     eixos_malha = [r for r in (_back(e) for e in eixos_reg) if r is not None]
     # 9.9 — curvas (IA/fallback) efetivamente usadas, no frame original (p/ desenho + sinuosidade).
@@ -1904,6 +1948,12 @@ def gerar_layout(
             "A subdivisão não acomodou lotes na área aproveitável "
             "(gleba pequena/irregular para o perfil)."
         )
+    if usa_paisagem and modos_paisagem:
+        avisos.append(
+            f"Arquétipo PAISAGÍSTICO (U6a): traçado '{'/'.join(sorted(set(modos_paisagem)))}' "
+            "com cinturão verde perimetral — a paisagem estrutura, os lotes preenchem "
+            "(spec fase-U6-pods.md, padrão das referências do operador)."
+        )
     if pracas:
         avisos.append(
             f"Lazer distribuído (U2): {len(pracas)} praça(s) de bolso reservada(s) para "
@@ -1958,6 +2008,11 @@ def gerar_layout(
         "teto_lote_m2": round(teto_lote, 2),
         "faixa_lote_m2": [round(piso_lote, 2), round(teto_lote, 2)],
         "lote_alvo_origem": programa.lote_alvo_origem,
+        # Fase U6a — arquétipo paisagístico efetivo (modo por ilha) + cinturão.
+        "paisagem": ({
+            "modos": modos_paisagem,
+            "cinturao_m2": round(cinturao_orig.area, 1) if cinturao_orig is not None else 0.0,
+        } if usa_paisagem else None),
         # Fase U4 — que variante gerou este layout (proveniência da estratégia).
         "variante": {
             "id": str(variante.get("id", "V1")),
