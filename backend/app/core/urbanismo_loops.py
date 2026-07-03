@@ -184,7 +184,8 @@ def eixos_paisagem(
     return eixos, "aneis", {"nucleo": nucleo, "ang_entrada": ang}
 
 
-def cinturao_perimetral(aprov: BaseGeometry, largura: float):
+def cinturao_perimetral(aprov: BaseGeometry, largura: float,
+                        ja_protegido: Optional[BaseGeometry] = None):
     """Fase U6a P1 — cinturão VERDE na divisa: devolve ``(canvas_util, cinturao)``. O
     cinturão emoldura o empreendimento (nenhum lote na borda — todas as referências);
     entra na doação como verde reservado. Gleba pequena demais → sem cinturão (honesto)."""
@@ -194,9 +195,13 @@ def cinturao_perimetral(aprov: BaseGeometry, largura: float):
     if canvas.is_empty or canvas.area < aprov.area * 0.35:
         return aprov, None  # cinturão comeria a gleba → degrada (sem moldura)
     cinturao = aprov.difference(canvas)
+    # CALIBRAÇÃO de yield (benchmark do operador): onde a divisa já faceia área PRESERVADA
+    # (mata/APP), a moldura é a própria mata — o cinturão não desconta terra de novo.
+    if ja_protegido is not None and not ja_protegido.is_empty:
+        cinturao = cinturao.difference(ja_protegido.buffer(largura * 1.5))
     if cinturao.is_empty:
         return aprov, None
-    return canvas, cinturao
+    return aprov.difference(cinturao), cinturao
 
 
 def armadura_de(restricao: Optional[BaseGeometry], agua: Optional[BaseGeometry],

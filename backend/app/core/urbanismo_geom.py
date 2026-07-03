@@ -1249,7 +1249,8 @@ def gerar_layout(
     cinturao_orig = None
     if usa_paisagem:
         canvas, cinturao_orig = paisagem.cinturao_perimetral(
-            canvas, float(estilo.get("cinturao_verde_m", 15.0))
+            canvas, float(estilo.get("cinturao_verde_m", 8.0)),
+            ja_protegido=restricao_externa,
         )
     # Fase 10.8 — ≥30% veda LOTE, não VIA (Lei 6.766 art. 3º: parcelamento, não estrada). A malha
     # viária ATRAVESSA a restrição (junta as porções num loteamento só); só os LOTES a evitam. Por
@@ -1659,7 +1660,13 @@ def gerar_layout(
     pracas_m2 = sum(p.area for p in pracas_reg)
 
     # 4.c VERDE: quadras verdes formadas até o orçamento de lazer — sempre deixando ≥1 p/ lotes.
-    verde_budget = max(lazer_area - clube_m2 - pracas_m2, 0.0)
+    # CALIBRAÇÃO U6a (benchmark do operador: verde ~28%, vendável ~57%): o verde ESTRUTURAL
+    # já reservado (cinturão + corredores) CONSOME o orçamento de verde do programa — sem
+    # isso o motor empilhava verde três vezes e o vendável caía a ~25%.
+    estrutural_ja_reservado = sum(c.area for c in corredores_reg) + (
+        cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
+    )
+    verde_budget = max(lazer_area - clube_m2 - pracas_m2 - estrutural_ja_reservado, 0.0)
     verdes_reg, pool = (
         _selecionar_verde(pool, verde_budget, ingreme_reg) if _pode_reservar(pool) else ([], pool)
     )

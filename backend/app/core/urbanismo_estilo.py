@@ -62,7 +62,7 @@ ESTILO_DEFAULT: dict[str, dict] = {
         # Fase U6a — composição paisagística (anéis/folha + cinturão) é o default do alto;
         # exige gleba mínima (referências são 15–100 ha) — abaixo degrada p/ o clássico.
         "arquetipo": "loops_paisagem",
-        "cinturao_verde_m": 15.0,
+        "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
     },
 }
