@@ -184,6 +184,53 @@ def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog, restr_m=None)
     return tv.eixo, diag
 
 
+def _dump_insumos_motor(
+    analise_id: str, proposta_id: str, *, aprov_m, restr_m, decliv_lote_m,
+    decliv_acentuada_m, orientacao, travessia_eixo, travessia_diag,
+    acesso_externo_m, lago_param, estilo, diretrizes, prog, variante, publico_alvo,
+) -> None:
+    """LAB do operador — grava os insumos EXATOS que o motor recebeu (WKT + JSON) para
+    replay determinístico FORA do app (harness de render itera no MESMO desenho — a regra 4
+    garante que mesma entrada → mesmo layout). Ferramenta de laboratório: falha de escrita
+    nunca derruba a proposta."""
+    try:
+        import json
+        from pathlib import Path
+        from shapely import wkt as _shapely_wkt
+
+        destino = Path(os.getenv("URBANISMO_DUMP_DIR", "/tmp/urbanismo_dumps"))
+        destino.mkdir(parents=True, exist_ok=True)
+
+        def _w(g):
+            return _shapely_wkt.dumps(g) if (g is not None and not g.is_empty) else None
+
+        dump = {
+            "analise_id": analise_id,
+            "proposta_id": proposta_id,
+            "publico_alvo": publico_alvo,
+            "orientacao_rad": orientacao,
+            "variante": variante,
+            "lago": lago_param,
+            "estilo": estilo,
+            "diretrizes": diretrizes,
+            "travessia_diag": travessia_diag,
+            "programa": dataclasses.asdict(prog),
+            "wkt": {
+                "aproveitavel": _w(aprov_m),
+                "restricoes_lote": _w(decliv_lote_m),
+                "declividade_acentuada": _w(decliv_acentuada_m),
+                "restricao_externa": _w(restr_m),
+                "travessia_eixo": _w(travessia_eixo),
+                "acesso_externo": _w(acesso_externo_m),
+            },
+        }
+        (destino / f"{analise_id}_{proposta_id}.json").write_text(
+            json.dumps(dump, ensure_ascii=False, default=str), encoding="utf-8"
+        )
+    except Exception:  # noqa: BLE001 — dump é diagnóstico; nunca interfere na proposta
+        pass
+
+
 def _garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem):
     """Fase 10 (Parte 1) — números canônicos de área (delegado ao helper único de analises)."""
     from app.routers.analises import garantir_areas_canonicas
@@ -664,6 +711,15 @@ def _propor_impl(
         "instrucoes": body.instrucoes,  # Mov.1 — proveniência do pedido do operador
     }
     fonte_urb.salvar(analise_id, salvo)
+    # LAB — replay 1:1 fora do app (harness de render do operador). Nunca derruba a proposta.
+    _dump_insumos_motor(
+        analise_id, proposta_id, aprov_m=aprov_m, restr_m=restr_m,
+        decliv_lote_m=decliv_lote_m, decliv_acentuada_m=decliv_acentuada_m,
+        orientacao=orientacao, travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
+        acesso_externo_m=acesso_externo_m, lago_param=lago_param, estilo=estilo,
+        diretrizes=diretrizes, prog=prog, variante=variante_escolhida,
+        publico_alvo=str(body.publico_alvo),
+    )
     return out
 
 
