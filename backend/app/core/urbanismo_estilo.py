@@ -64,9 +64,14 @@ ESTILO_DEFAULT: dict[str, dict] = {
         # traçado CLÁSSICO sinuoso até o paisagem passar na revisão VISUAL (harness de
         # render); para experimentar: "arquetipo": "loops_paisagem" no alta.json.
         "arquetipo": "",
+        # Opção A (traçado ORTOGONAL LIMPO — aprovado pelo operador contra a grelha diagonal
+        # bagunçada da IA): grade axial pura (ignora a espinha curva), bordas raster suavizadas,
+        # malha SEMPRE conectada (zero tocos soltos), piso de verde garantido. "" desliga (volta
+        # ao sinuoso da IA). A Opção B (vias serpenteando a cota) virá como outro valor deste knob.
+        "tracado": "grelha_ortogonal",
         "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
-        "verde_min_pct": 0.22,  # alvo folgado: o quadro mede sobre a LÍQUIDA (base maior)
+        "verde_min_pct": 0.20,  # piso LEGAL de doação verde (o operador pediu ≥20%)
     },
 }
 
@@ -106,6 +111,8 @@ def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:
             base[chave] = bool(valor)
         elif chave == "arquetipo" and isinstance(valor, str) and valor.strip():
             base[chave] = valor.strip()  # "loops_paisagem" liga a U6a; outro valor desliga
+        elif chave == "tracado" and isinstance(valor, str):
+            base[chave] = valor.strip()  # "grelha_ortogonal" liga a Opção A; "" volta ao sinuoso
         elif chave == "prompt_regras" and isinstance(valor, str) and valor.strip():
             base[chave] = valor.strip()[:2000]
     return base, None

@@ -147,6 +147,26 @@ def _diferenca_segura(a: BaseGeometry, b: Optional[BaseGeometry]) -> Optional[Ba
 
 
 # ============================ componentes / grelha ============================
+def _suavizar_raster(geom: BaseGeometry, tol: float = 12.0, fechar: float = 6.0,
+                     sliver_min: float = 50.0) -> BaseGeometry:
+    """Opção A — remove a ESCADA de 30 m (resolução do raster de mata/declividade) do contorno e
+    dropa os CACOS (< ``sliver_min`` m²) que a interseção raster∩gleba deixa. Fechamento
+    morfológico (buffer +r/−r arredonda os cantos retos em degrau) + Douglas-Peucker (colapsa os
+    degraus colineares). Determinístico. A ±30 m de incerteza do DEM, uma linha suave é MAIS
+    honesta que degraus falsos; sem isto o desenho fica serrilhado e nasce sliver que vira 'sobra'."""
+    if geom is None or geom.is_empty:
+        return geom
+    pecas = [p for p in _componentes(geom) if p.area >= sliver_min]
+    if not pecas:
+        return geom
+    base = _uniao_segura(pecas)
+    if base is None or base.is_empty:
+        return geom
+    suave = base.buffer(fechar, join_style=1).buffer(-fechar, join_style=1).simplify(tol)
+    suave = _valido(suave)
+    return suave if (suave is not None and not suave.is_empty) else base
+
+
 def _componentes(geom: BaseGeometry) -> list[Polygon]:
     """TODOS os polígonos buildáveis (a restrição pode partir a tela em várias ilhas). VALIDA a
     entrada (a gleba real, corrigida por auto-interseção, pode chegar inválida e estourar o GEOS
@@ -1241,9 +1261,18 @@ def gerar_layout(
                     and aproveitavel.area >= paisagem_min)
     paisagem_degradou = (str(estilo.get("arquetipo", "")) == "loops_paisagem"
                          and not usa_paisagem)
+    # Opção A — TRAÇADO ORTOGONAL LIMPO (knob de estilo, default do alto padrão): grade axial pura
+    # (sem a espinha curva da IA), bordas raster suavizadas, malha sempre conectada e piso de verde.
+    # Incompatível com a paisagem (U6a) — a paisagem tem o próprio traçado; ortho só quando ela não roda.
+    ortogonal = str(estilo.get("tracado", "")) == "grelha_ortogonal" and not usa_paisagem
     from app.core import urbanismo_loops as paisagem
 
     canvas = aproveitavel
+    if ortogonal:
+        # tira a escada de 30 m e os cacos ANTES de traçar (borda limpa + zero sliver→sobra).
+        canvas = _suavizar_raster(canvas)
+        if restricao_externa is not None and not restricao_externa.is_empty:
+            restricao_externa = _suavizar_raster(restricao_externa)
     # Fase U6a P1 — CINTURÃO verde perimetral (frame original): nenhum lote encosta na
     # divisa; a moldura entra na doação como verde reservado (todas as referências).
     cinturao_orig = None
@@ -1298,9 +1327,11 @@ def gerar_layout(
     # diagnóstico 9.8 achou), NÃO cair na grade silenciosa: gerar uma ESPINHA SINUOSA por ilha
     # (fallback explícito, rotulado). Na grelha (baixa), mantém a linha central reta (intencional).
     centerlines, descartes = _eixos(programa.esqueleto, aprov)
-    usar_esqueleto = programa.arquetipo_viario != ARQUETIPO_GRELHA and bool(centerlines)
+    # Opção A: a grade axial pura IGNORA a espinha curva da IA (a origem do 'diagonal bagunçado'
+    # e dos tocos soltos) e mantém a coletora reta central — grade limpa e conectada.
+    usar_esqueleto = (not ortogonal) and programa.arquetipo_viario != ARQUETIPO_GRELHA and bool(centerlines)
     eixos_ia = centerlines if usar_esqueleto else []
-    quer_curva = programa.arquetipo_viario != ARQUETIPO_GRELHA  # arquétipo sinuoso/misto → curva
+    quer_curva = (not ortogonal) and programa.arquetipo_viario != ARQUETIPO_GRELHA
     if usar_esqueleto:
         orig = getattr(programa, "esqueleto_origem", "vazio")
         esqueleto_origem = orig if orig == "llm" else "llm"  # esqueleto presente e usado = da IA
@@ -1615,7 +1646,14 @@ def gerar_layout(
         elif prioridade_lago:
             vizinhas = sorted(miolos, key=lambda f: f.distance(lg_reg_pt))[:3]
             face_lago = max(vizinhas, key=lambda f: f.area)
-            lago_alvo = min(lago_alvo, face_lago.area / 1.5)  # corpo + orla cabem na face
+            # Redimensiona pela FORMA da face (raio que CABE no ponto), não só pela área: uma
+            # face alongada tem área alta mas comporta um disco menor — sem isto o corpo clipa
+            # abaixo do piso e o lago-prioritário some (regressão do traçado ortogonal, faces
+            # mais alongadas que as do sinuoso). Determinístico.
+            _c_fit = (lg_reg_pt if face_lago.contains(lg_reg_pt)
+                      else face_lago.representative_point())
+            _r_fit = _c_fit.distance(face_lago.boundary)
+            lago_alvo = min(lago_alvo, face_lago.area / 1.5, math.pi * _r_fit * _r_fit)
             lago_redimensionado = True
         if face_lago is not None and lago_alvo >= 300.0:
             centro_lago = (lg_reg_pt if face_lago.contains(lg_reg_pt)
@@ -1887,7 +1925,7 @@ def gerar_layout(
 
     # U6a — VERDE MÍNIMO do estilo (lei local): completa a reserva com as MAIORES peças
     # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
-    alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if usa_paisagem else 0.0
+    alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if (usa_paisagem or ortogonal) else 0.0
     if alvo_verde_pct > 0 and sobra_reg is not None and not sobra_reg.is_empty:
         verde_atual = (verde_reservado_reg.area if verde_reservado_reg is not None else 0.0) + (
             cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
@@ -1921,9 +1959,11 @@ def gerar_layout(
     # frame rotacionado a solda é frágil e o buffer(0) do _back a quebra): com travessia VIÁVEL,
     # garante UMA malha viária contínua (fecha o "buraco" entre as porções). Sem travessia/greide
     # inviável → não roda (degradação honesta: segue partido com alerta de engenharia).
-    if (travessia_viavel or usa_paisagem) and arruamento is not None and not arruamento.is_empty:
+    if (travessia_viavel or usa_paisagem or ortogonal) and arruamento is not None and not arruamento.is_empty:
         # U6a — nervuras/anéis recortados pela borda podem sair em pedaços: a solda liga
         # (mesma máquina da 10.4; o conector pode cruzar ≥30% — veda lote, não via).
+        # Opção A — a solda garante ZERO toco solto (a queixa nº 1 do operador): a grade
+        # recortada pela gleba irregular vira UMA malha viária contínua.
         arruamento = _conectar_malha(arruamento, conexao_mod.CAIXA_TRONCO_M) or arruamento
     clube = _back(clube_reg)
     pracas = [r for r in (_back(p) for p in pracas_reg) if r is not None]
