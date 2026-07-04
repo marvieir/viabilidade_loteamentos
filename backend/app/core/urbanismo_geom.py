@@ -1801,6 +1801,57 @@ def gerar_layout(
         if n_lotes_e:
             lotes_recuperados += n_lotes_e
 
+    # U6a REGRA F — ANEXAÇÃO (fundo estendido): sobra SEM frente própria que ENCOSTA em
+    # lotes já formados é repartida entre os vizinhos (Voronoi dos lotes encostados) e vira
+    # fundo maior — prática padrão de projeto. TETO legal respeitado: parte que estouraria
+    # o teto permanece sobra (clamp 9.4 inviolável). Sobra → vendável sem lote ilegal.
+    if usa_paisagem and sobra_reg is not None and not sobra_reg.is_empty and lotes_reg:
+        from shapely.geometry import MultiPoint
+        from shapely.ops import voronoi_diagram
+
+        restante_f: list[BaseGeometry] = []
+        for peca in _componentes(sobra_reg):
+            viz = [i for i, l in enumerate(lotes_reg) if l.distance(peca) < 0.5]
+            if not viz or peca.area < 20.0:
+                restante_f.append(peca)
+                continue
+            if len(viz) == 1:
+                partes = [(viz[0], peca)]
+            else:
+                try:
+                    vd = voronoi_diagram(
+                        MultiPoint([lotes_reg[i].representative_point() for i in viz]),
+                        envelope=peca.buffer(60.0),
+                    )
+                    celulas = list(vd.geoms)
+                    partes = []
+                    for i in viz:
+                        rp = lotes_reg[i].representative_point()
+                        cel = next((c for c in celulas if c.contains(rp)), None)
+                        if cel is None:
+                            continue
+                        sub = _valido(peca.intersection(cel))
+                        if sub is not None and not sub.is_empty:
+                            partes.append((i, sub))
+                except Exception:  # noqa: BLE001 — voronoi degenerado → peça fica na sobra
+                    restante_f.append(peca)
+                    continue
+            for i, sub in partes:
+                for comp in _componentes(sub):
+                    if comp is None or comp.is_empty:
+                        continue
+                    if comp.area < 5.0 or comp.distance(lotes_reg[i]) > 0.5:
+                        restante_f.append(comp)
+                        continue
+                    novo = _valido(_uniao_segura([lotes_reg[i], comp]))
+                    if (novo is not None and not novo.is_empty
+                            and novo.geom_type == "Polygon"
+                            and novo.area <= teto_lote + 0.5):
+                        lotes_reg[i] = novo  # fundo estendido (teto legal preservado)
+                    else:
+                        restante_f.append(comp)
+        sobra_reg = _uniao_segura(restante_f)
+
     # U6a — VERDE MÍNIMO do estilo (lei local): completa a reserva com as MAIORES peças
     # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
     alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if usa_paisagem else 0.0
