@@ -224,7 +224,7 @@ def _dump_insumos_motor(
     analise_id: str, proposta_id: str, *, aprov_m, restr_m, decliv_lote_m,
     decliv_acentuada_m, orientacao, travessia_eixo, travessia_diag,
     acesso_externo_m, lago_param, estilo, diretrizes, prog, variante, publico_alvo,
-    dem_amostras=None,
+    dem_amostras=None, contorno_espinha=None,
 ) -> None:
     """LAB do operador — grava os insumos EXATOS que o motor recebeu (WKT + JSON) para
     replay determinístico FORA do app (harness de render itera no MESMO desenho — a regra 4
@@ -259,6 +259,7 @@ def _dump_insumos_motor(
                 "restricao_externa": _w(restr_m),
                 "travessia_eixo": _w(travessia_eixo),
                 "acesso_externo": _w(acesso_externo_m),
+                "contorno_espinha": _w(contorno_espinha),  # Opção B — via-tronco (curva de nível)
             },
             "dem_amostras": dem_amostras,  # LAB Opção B — elevação no frame do motor (ou None)
         }
@@ -588,6 +589,20 @@ def _propor_impl(
                     "cota_m": round(melhor[0], 1),
                 }
 
+    # Opção B — VIA-TRONCO na CURVA DE NÍVEL: quando o estilo pede o traçado serpenteante,
+    # extrai a isolinha do DEM (mediana das cotas) já no frame do motor. Sem DEM/curva → None e
+    # o motor degrada honesto para a GRADE LIMPA (Opção A). Determinístico (mesmo DEM → mesma via).
+    contornos_b = None
+    if str(estilo.get("tracado", "")) == "contorno_serpente" and dem_recorte is not None:
+        try:
+            from app.core import contorno_dem
+
+            espinha = contorno_dem.extrair_espinha(dem_recorte, to_local, dentro=aprov_m)
+            if espinha is not None and not espinha.is_empty:
+                contornos_b = [espinha]
+        except Exception:  # noqa: BLE001 — B degrada p/ A; nunca derruba a geração
+            contornos_b = None
+
     # Fase U4 — K VARIANTES determinísticas por chamada de IA: o motor gera as estratégias e a
     # FUNÇÃO DE VALOR (Σ área×multiplicador do score v2 — proxy de VGV posicional) escolhe a
     # melhor; as alternativas ficam materializáveis depois SEM IA (POST /urbanismo/variante).
@@ -607,6 +622,7 @@ def _propor_impl(
             variante=var,
             lago=lago_param,  # U3 — ponto baixo do DEM (None sem opt-in/DEM)
             estilo=estilo,  # Mov.2 — knobs de composição do perfil de estilo
+            contornos=contornos_b,  # Opção B — via-tronco na curva de nível (None → grade limpa)
         )
         layout_v.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular (não recalcula)
         layout_v.restricao_origem = restr_origem
@@ -758,6 +774,7 @@ def _propor_impl(
         diretrizes=diretrizes, prog=prog, variante=variante_escolhida,
         publico_alvo=str(body.publico_alvo),
         dem_amostras=_dem_amostras_no_frame(dem_recorte, to_local),
+        contorno_espinha=(contornos_b[0] if contornos_b else None),
     )
     return out
 

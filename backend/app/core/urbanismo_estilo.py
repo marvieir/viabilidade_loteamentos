@@ -64,11 +64,13 @@ ESTILO_DEFAULT: dict[str, dict] = {
         # traçado CLÁSSICO sinuoso até o paisagem passar na revisão VISUAL (harness de
         # render); para experimentar: "arquetipo": "loops_paisagem" no alta.json.
         "arquetipo": "",
-        # Opção A (traçado ORTOGONAL LIMPO — aprovado pelo operador contra a grelha diagonal
-        # bagunçada da IA): grade axial pura (ignora a espinha curva), bordas raster suavizadas,
-        # malha SEMPRE conectada (zero tocos soltos), piso de verde garantido. "" desliga (volta
-        # ao sinuoso da IA). A Opção B (vias serpenteando a cota) virá como outro valor deste knob.
-        "tracado": "grelha_ortogonal",
+        # Traçado do alto padrão (aprovado pelo operador). Valores:
+        #   "contorno_serpente" (Opção B, DEFAULT): via-tronco seguindo a CURVA DE NÍVEL do DEM
+        #     (vias acompanham a declividade) + limpezas da A. Sem DEM → degrada p/ a grade limpa.
+        #   "grelha_ortogonal" (Opção A): grade axial pura, sem espinha curva.
+        #   "" : sinuoso da IA (traçado clássico antigo).
+        # Todas partilham: bordas raster suavizadas, malha SEMPRE conectada, piso de verde.
+        "tracado": "contorno_serpente",
         "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
         "verde_min_pct": 0.20,  # piso LEGAL de doação verde (o operador pediu ≥20%)

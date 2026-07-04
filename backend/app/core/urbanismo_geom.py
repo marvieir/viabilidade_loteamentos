@@ -1229,6 +1229,7 @@ def gerar_layout(
     variante: Optional[dict] = None,
     lago: Optional[dict] = None,
     estilo: Optional[dict] = None,
+    contornos: Optional[list] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1261,14 +1262,20 @@ def gerar_layout(
                     and aproveitavel.area >= paisagem_min)
     paisagem_degradou = (str(estilo.get("arquetipo", "")) == "loops_paisagem"
                          and not usa_paisagem)
-    # Opção A — TRAÇADO ORTOGONAL LIMPO (knob de estilo, default do alto padrão): grade axial pura
-    # (sem a espinha curva da IA), bordas raster suavizadas, malha sempre conectada e piso de verde.
-    # Incompatível com a paisagem (U6a) — a paisagem tem o próprio traçado; ortho só quando ela não roda.
-    ortogonal = str(estilo.get("tracado", "")) == "grelha_ortogonal" and not usa_paisagem
+    # Traçados LIMPOS (knob de estilo; default do alto padrão = grelha_ortogonal). Dois modos
+    # partilham as MESMAS limpezas (bordas raster suavizadas, malha sempre conectada, piso de
+    # verde que come a sobra) — a diferença é só a ESPINHA:
+    #   • Opção A "grelha_ortogonal": grade axial PURA (sem espinha curva) → grade limpa;
+    #   • Opção B "contorno_serpente": mantém a espinha CURVA (a via-tronco segue a curva de
+    #     nível do DEM, passada pelo esqueleto) → traçado orgânico acompanhando a declividade.
+    # Incompatível com a paisagem (U6a, que tem o próprio traçado): só quando ela não roda.
+    _tracado = str(estilo.get("tracado", ""))
+    limpar = _tracado in ("grelha_ortogonal", "contorno_serpente") and not usa_paisagem
+    grade_pura = _tracado == "grelha_ortogonal" and not usa_paisagem
     from app.core import urbanismo_loops as paisagem
 
     canvas = aproveitavel
-    if ortogonal:
+    if limpar:
         # tira a escada de 30 m e os cacos ANTES de traçar (borda limpa + zero sliver→sobra).
         canvas = _suavizar_raster(canvas)
         if restricao_externa is not None and not restricao_externa.is_empty:
@@ -1327,11 +1334,37 @@ def gerar_layout(
     # diagnóstico 9.8 achou), NÃO cair na grade silenciosa: gerar uma ESPINHA SINUOSA por ilha
     # (fallback explícito, rotulado). Na grelha (baixa), mantém a linha central reta (intencional).
     centerlines, descartes = _eixos(programa.esqueleto, aprov)
-    # Opção A: a grade axial pura IGNORA a espinha curva da IA (a origem do 'diagonal bagunçado'
-    # e dos tocos soltos) e mantém a coletora reta central — grade limpa e conectada.
-    usar_esqueleto = (not ortogonal) and programa.arquetipo_viario != ARQUETIPO_GRELHA and bool(centerlines)
+    # Opção B (contorno_serpente): a via-tronco é a CURVA DE NÍVEL do DEM (extraída no router,
+    # já no frame do motor) — SUBSTITUI a espinha da IA. Recorta ao canvas e valida; vazio →
+    # degrada para a curva-padrão/grade (nunca quebra). Só a espinha muda; as limpezas (bordas,
+    # conexão, piso de verde) são as mesmas de A.
+    b_contorno = False
+    if _tracado == "contorno_serpente" and contornos:
+        # A via-tronco é a CURVA DE NÍVEL. Normaliza cada polilinha (0..1 do bbox do canvas) e
+        # roda pelo MESMO pipeline da espinha da IA (_eixos → Catmull-Rom + valida is_simple +
+        # recorta) — que já sai limpo (arruamento válido). Vazio → degrada p/ curva-padrão/grade.
+        _mnx, _mny, _mxx, _mxy = canvas.bounds
+        _w, _h = max(_mxx - _mnx, 1e-9), max(_mxy - _mny, 1e-9)
+        esq_cont = []
+        for c in contornos:
+            if c is None or c.is_empty:
+                continue
+            for parte in _linhas(_valido(c)):
+                if parte.length >= L_MIN_EIXO_M:
+                    esq_cont.append([[(x - _mnx) / _w, (y - _mny) / _h] for x, y in parte.coords])
+        cont_lines, _cont_desc = _eixos(esq_cont, canvas)
+        if cont_lines:
+            centerlines = cont_lines
+            b_contorno = True  # a espinha da cota vale mesmo se a IA propôs grelha
+    if _tracado == "contorno_serpente" and not b_contorno:
+        grade_pura = True  # B sem DEM/curva de nível → degrada p/ a GRADE LIMPA (Opção A)
+    # Opção A (grade_pura): a grade axial pura IGNORA a espinha curva (origem do 'diagonal
+    # bagunçado' e dos tocos) e mantém a coletora reta central. Opção B mantém a espinha (curva
+    # de nível) — não é grade_pura, então segue pelo caminho da via curva abaixo.
+    usar_esqueleto = (not grade_pura) and bool(centerlines) and (
+        b_contorno or programa.arquetipo_viario != ARQUETIPO_GRELHA)
     eixos_ia = centerlines if usar_esqueleto else []
-    quer_curva = (not ortogonal) and programa.arquetipo_viario != ARQUETIPO_GRELHA
+    quer_curva = (not grade_pura) and (b_contorno or programa.arquetipo_viario != ARQUETIPO_GRELHA)
     if usar_esqueleto:
         orig = getattr(programa, "esqueleto_origem", "vazio")
         esqueleto_origem = orig if orig == "llm" else "llm"  # esqueleto presente e usado = da IA
@@ -1925,7 +1958,7 @@ def gerar_layout(
 
     # U6a — VERDE MÍNIMO do estilo (lei local): completa a reserva com as MAIORES peças
     # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
-    alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if (usa_paisagem or ortogonal) else 0.0
+    alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if (usa_paisagem or limpar) else 0.0
     if alvo_verde_pct > 0 and sobra_reg is not None and not sobra_reg.is_empty:
         verde_atual = (verde_reservado_reg.area if verde_reservado_reg is not None else 0.0) + (
             cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
@@ -1953,13 +1986,25 @@ def gerar_layout(
         return rotate(g, ang_deg, origin=cen) if ang_deg else g
 
     lotes = [r for r in (_back(l) for l in lotes_reg) if r is not None]
+    # Sanitização FINAL: nenhum lote inválido sai do motor (self-interseção do recorte da face
+    # sob via CURVA — mais frequente na Opção B). Repara com buffer(0); se virar multipeça,
+    # mantém a MAIOR parte válida; descarta o irreparável (raro). Garante GeoJSON/medida sãos.
+    def _repara_lote(l: BaseGeometry) -> Optional[BaseGeometry]:
+        if l.is_valid and l.geom_type == "Polygon":
+            return l
+        rep = _valido(l)
+        if rep is None or rep.is_empty:
+            return None
+        partes = _componentes(rep)
+        return max(partes, key=lambda p: p.area) if partes else None
+    lotes = [x for x in (_repara_lote(l) for l in lotes) if x is not None and x.area > 1.0]
     quadras_geom = [r for r in (_back(q) for q in (miolos + verdes_min)) if r is not None]
     arruamento = _back(ruas_reg)
     # Fase 10.4 — SOLDA FINAL da malha (no frame ORIGINAL já validado, onde a união é ESTÁVEL — no
     # frame rotacionado a solda é frágil e o buffer(0) do _back a quebra): com travessia VIÁVEL,
     # garante UMA malha viária contínua (fecha o "buraco" entre as porções). Sem travessia/greide
     # inviável → não roda (degradação honesta: segue partido com alerta de engenharia).
-    if (travessia_viavel or usa_paisagem or ortogonal) and arruamento is not None and not arruamento.is_empty:
+    if (travessia_viavel or usa_paisagem or limpar) and arruamento is not None and not arruamento.is_empty:
         # U6a — nervuras/anéis recortados pela borda podem sair em pedaços: a solda liga
         # (mesma máquina da 10.4; o conector pode cruzar ≥30% — veda lote, não via).
         # Opção A — a solda garante ZERO toco solto (a queixa nº 1 do operador): a grade
