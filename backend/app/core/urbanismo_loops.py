@@ -72,15 +72,24 @@ def _aneis(reg, nucleo, passo_anel: float, via_local: float, via_tronco: float,
     if interior.is_empty:
         return eixos
     diag = math.hypot(*(reg.bounds[2] - reg.bounds[0], reg.bounds[3] - reg.bounds[1]))
-    d = max(via_tronco, passo_anel * 0.5)
-    while d < diag:
-        anel = nucleo.buffer(d, quad_segs=8)
-        if anel.contains(reg):
+    # U6a v2 — as fitas são PARALELAS AO CONTORNO da gleba (offsets internos), não círculos
+    # em volta de um ponto: é a "cebola" ORGÂNICA das referências (Lagoon/Lake Side) — a via
+    # acompanha a forma do terreno e CADA gleba gera um desenho próprio (a versão circular
+    # virava sempre a mesma "pizza radial"). Para ao alcançar o coração (núcleo/armadura).
+    d = passo_anel * 0.9  # 1ª via a ~1 fita da borda (o cinturão já descontou a moldura)
+    while d < diag / 2.0:
+        faixa = reg.buffer(-d)
+        if faixa.is_empty or faixa.area < passo_anel ** 2:
             break
-        borda = anel.exterior if hasattr(anel, "exterior") else anel.boundary
-        for linha in _linhas_de(borda.intersection(interior)):
-            if linha.length >= passo_anel * 1.5:  # pedaço curto demais não vira via
-                eixos.append((linha, via_local))
+        for parte in getattr(faixa, "geoms", [faixa]):
+            if parte.is_empty or parte.area < passo_anel ** 2:
+                continue
+            for linha in _linhas_de(parte.exterior.intersection(interior)):
+                if linha.length >= passo_anel * 1.5:  # pedaço curto demais não vira via
+                    eixos.append((linha, via_local))
+        if (nucleo is not None and not nucleo.is_empty
+                and faixa.within(nucleo.buffer(passo_anel))):
+            break  # chegou ao coração — o miolo fica verde/hub, não vira mais via
         d += passo_anel
     # RADIAIS de costura: do núcleo para fora, na direção da entrada e na oposta —
     # sem elas os anéis ficam concêntricos e DESCONEXOS (a poda derrubaria tudo).

@@ -1692,6 +1692,23 @@ def gerar_layout(
     # as vias internas injetadas entram na malha ANTES do frente-via (p/ os lotes do miolo contarem
     # como lindeiros) e no arruamento medido.
     if vias_internas_reg:
+        # U6a — via interna de pod TERMINA na borda do pod, e a borda é o CORREDOR verde
+        # (12 m): sem ponte ela flutua a 12 m do anel (a solda tardia liga com conector de
+        # coletora, largo e tosco). Ponte EXPLÍCITA na largura da via local, atravessando o
+        # corredor até a rua mais próxima — o cruzamento viário sobre o corredor é normal
+        # nas referências (o pedestre cruza a rua).
+        if usa_paisagem and ruas_reg is not None and not ruas_reg.is_empty:
+            corredor_m_g = float(estilo.get("corredor_verde_m", 12.0))
+            pontes_vi = []
+            for vi in vias_internas_reg:
+                d_vi = vi.distance(ruas_reg)
+                if 0.05 < d_vi <= corredor_m_g + 2.0 * via_local:
+                    a_pt, b_pt = nearest_points(vi, ruas_reg)
+                    pontes_vi.append(
+                        LineString([(a_pt.x, a_pt.y), (b_pt.x, b_pt.y)])
+                        .buffer(via_local / 2.0, cap_style=2)
+                    )
+            vias_internas_reg.extend(pontes_vi)
         ruas_reg = _uniao_segura([ruas_reg, *vias_internas_reg]) or ruas_reg
 
     # Fase 9.14 — REGRA D (recuperação ADITIVA): blocos de SOBRA-verde ≥ 2·MIN_QUADRA que faceiam a

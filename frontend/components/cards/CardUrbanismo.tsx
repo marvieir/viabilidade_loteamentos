@@ -268,7 +268,6 @@ export function CardUrbanismo({
   const temFeatures = !!lotesFeatures && lotesFeatures.features.length > 0;
   if (proposta) {
     const g = proposta.geometria;
-    if (g.arruamento) overlays.urb_arruamento = g.arruamento;
     // Fase 9.6 — verde SEPARADO: bloco reservado (destaque) × sobra de ponta (discreto).
     if (g.areas_verdes_reservada) overlays.urb_verde_reservada = g.areas_verdes_reservada;
     if (g.areas_verdes_sobra) overlays.urb_verde_sobra = g.areas_verdes_sobra;
@@ -276,6 +275,9 @@ export function CardUrbanismo({
       overlays.urb_verde = g.areas_verdes; // fallback (backend antigo)
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
+    // U6a — o VIÁRIO entra por último (desenha POR CIMA dos verdes): sem isso o corredor
+    // verde pinta sobre os cruzamentos e as vias internas dos pods parecem desconectadas.
+    if (g.arruamento) overlays.urb_arruamento = g.arruamento;
     if (g.portico) overlays.urb_portico = g.portico; // Fase 11.3 — marcador da entrada/portaria
     if (g.agua) overlays.urb_agua = g.agua; // U3 — lago/espelho d'água criado
     // Fase 9.8 — restrição recortada (mata/declividade/APP): demarcada e rotulada (não "clarão").
