@@ -184,10 +184,47 @@ def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog, restr_m=None)
     return tv.eixo, diag
 
 
+def _dem_amostras_no_frame(dem, to_local):
+    """LAB Opção B — amostras de ELEVAÇÃO do DEM já REPROJETADAS para o frame métrico do motor
+    (o mesmo das geometrias do dump). Devolve ``{"pontos": [[x,y,z],...], "px_m": ...}`` ou None.
+    Downsample p/ ~≤60×60 (dump enxuto). Assim o laboratório traça a curva de nível (Opção B —
+    via serpenteando a cota) SEM reprojetar nada. Puro diagnóstico: qualquer falha → None."""
+    try:
+        if dem is None or getattr(dem, "elevacao", None) is None or not dem.crs_proj4:
+            return None
+        import numpy as _np
+        from pyproj import Transformer as _Tr
+
+        z = _np.asarray(dem.elevacao, dtype=float)
+        if z.ndim != 2 or z.size == 0:
+            return None
+        nrow, ncol = z.shape
+        passo = max(1, int(max(nrow, ncol) / 60))  # downsample p/ ≤ ~60×60
+        dem2wgs = _Tr.from_crs(dem.crs_proj4, "EPSG:4326", always_xy=True).transform
+        pontos: list[list[float]] = []
+        for r in range(0, nrow, passo):
+            for c in range(0, ncol, passo):
+                zv = z[r, c]
+                if zv is None or not _np.isfinite(zv):
+                    continue
+                xm = dem.x0_m + (c + 0.5) * dem.px_m
+                ym = dem.y0_m - (r + 0.5) * dem.px_m  # row cresce p/ baixo (y decresce)
+                lon, lat = dem2wgs(xm, ym)
+                xe, ye = to_local(lon, lat)
+                pontos.append([round(xe, 1), round(ye, 1), round(float(zv), 2)])
+        if len(pontos) < 4:
+            return None
+        return {"pontos": pontos, "px_m": round(float(dem.px_m) * passo, 2),
+                "fonte": dem.fonte, "n": len(pontos)}
+    except Exception:  # noqa: BLE001 — diagnóstico; nunca derruba a proposta
+        return None
+
+
 def _dump_insumos_motor(
     analise_id: str, proposta_id: str, *, aprov_m, restr_m, decliv_lote_m,
     decliv_acentuada_m, orientacao, travessia_eixo, travessia_diag,
     acesso_externo_m, lago_param, estilo, diretrizes, prog, variante, publico_alvo,
+    dem_amostras=None,
 ) -> None:
     """LAB do operador — grava os insumos EXATOS que o motor recebeu (WKT + JSON) para
     replay determinístico FORA do app (harness de render itera no MESMO desenho — a regra 4
@@ -223,6 +260,7 @@ def _dump_insumos_motor(
                 "travessia_eixo": _w(travessia_eixo),
                 "acesso_externo": _w(acesso_externo_m),
             },
+            "dem_amostras": dem_amostras,  # LAB Opção B — elevação no frame do motor (ou None)
         }
         (destino / f"{analise_id}_{proposta_id}.json").write_text(
             json.dumps(dump, ensure_ascii=False, default=str), encoding="utf-8"
@@ -719,6 +757,7 @@ def _propor_impl(
         acesso_externo_m=acesso_externo_m, lago_param=lago_param, estilo=estilo,
         diretrizes=diretrizes, prog=prog, variante=variante_escolhida,
         publico_alvo=str(body.publico_alvo),
+        dem_amostras=_dem_amostras_no_frame(dem_recorte, to_local),
     )
     return out
 
