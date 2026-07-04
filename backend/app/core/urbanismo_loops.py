@@ -79,9 +79,9 @@ def _aneis(reg, nucleo, passo_anel: float, via_local: float, via_tronco: float,
     # virava sempre a mesma "pizza radial"). Para ao alcançar o coração (núcleo/armadura).
     d = passo_anel * 0.9  # 1ª via a ~1 fita da borda (o cinturão já descontou a moldura)
     while d < diag / 2.0:
-        faixa = reg.buffer(-d)
-        if faixa.is_empty or faixa.area < passo_anel ** 2:
-            break
+        faixa = reg.buffer(-d, join_style=2, mitre_limit=4.0)
+        if faixa.is_empty or faixa.area < (3.0 * passo_anel) ** 2:
+            break  # o MIOLO (≥ ~3 fitas) fica para hub/verde — sem 'alvo' de mini-anéis
         for parte in getattr(faixa, "geoms", [faixa]):
             if parte.is_empty or parte.area < passo_anel ** 2:
                 continue
@@ -103,13 +103,15 @@ def _aneis(reg, nucleo, passo_anel: float, via_local: float, via_tronco: float,
     for a in (ang, ang + math.pi):
         fim = (cen.x + diag * math.cos(a), cen.y + diag * math.sin(a))
         if abs(nivel_rad) > 1e-9:
-            # arqueia ACOMPANHANDO a curva de nível média (DEM): o meio da radial desvia na
-            # direção do nível — a via cruza a encosta em diagonal suave, não reta morro
-            # abaixo (padrão das referências). Sem DEM (nivel 0) → reta (honesto).
-            desvio = passo_anel * 0.8
-            meio = ((cen.x + fim[0]) / 2.0 + desvio * math.cos(nivel_rad),
-                    (cen.y + fim[1]) / 2.0 + desvio * math.sin(nivel_rad))
-            raio = LineString([(cen.x, cen.y), meio, fim])
+            # SERPENTINA acompanhando a curva de nível (DEM): dois pontos intermediários
+            # alternados na direção do nível → a via cruza a encosta em S suave (padrão
+            # das referências), nunca reta morro abaixo. Sem DEM (nivel 0) → reta (honesto).
+            desvio = max(passo_anel * 1.2, diag * 0.06)
+            p13 = (cen.x + (fim[0] - cen.x) / 3.0 + desvio * math.cos(nivel_rad),
+                   cen.y + (fim[1] - cen.y) / 3.0 + desvio * math.sin(nivel_rad))
+            p23 = (cen.x + 2.0 * (fim[0] - cen.x) / 3.0 - desvio * 0.6 * math.cos(nivel_rad),
+                   cen.y + 2.0 * (fim[1] - cen.y) / 3.0 - desvio * 0.6 * math.sin(nivel_rad))
+            raio = LineString([(cen.x, cen.y), p13, p23, fim])
         else:
             raio = LineString([(cen.x, cen.y), fim])
         for linha in _linhas_de(raio.intersection(interior)):
