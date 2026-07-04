@@ -64,7 +64,7 @@ ESTILO_DEFAULT: dict[str, dict] = {
         "arquetipo": "loops_paisagem",
         "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
-        "verde_min_pct": 0.20,
+        "verde_min_pct": 0.22,  # alvo folgado: o quadro mede sobre a LÍQUIDA (base maior)
     },
 }
 

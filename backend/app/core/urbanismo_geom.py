@@ -1252,6 +1252,19 @@ def gerar_layout(
             canvas, float(estilo.get("cinturao_verde_m", 8.0)),
             ja_protegido=restricao_externa,
         )
+        # U6a v3 — CONSOLIDAÇÃO: a aproveitável real é multipartida (mata recorta o miolo) e
+        # o cinturão estilhaça pescoços finos → dezenas de MICRO-ILHAS, cada uma com caquinho
+        # de via desconexo e quadra sub-lote (o "42 ilhas" do operador). Micro-ilha NÃO ganha
+        # viário: vira verde da moldura; só ilhas que comportam ≥ ~4 quadras são urbanizadas.
+        pecas_cv = _componentes(canvas)
+        if len(pecas_cv) > 1:
+            uteis_cv = [pc for pc in pecas_cv if pc.area >= 4.0 * MIN_QUADRA_M2]
+            micro_cv = [pc for pc in pecas_cv if pc.area < 4.0 * MIN_QUADRA_M2]
+            if uteis_cv and micro_cv:
+                canvas = _uniao_segura(uteis_cv)
+                cinturao_orig = _uniao_segura(
+                    [g for g in (cinturao_orig, *micro_cv) if g is not None]
+                )
     # Fase 10.8 — ≥30% veda LOTE, não VIA (Lei 6.766 art. 3º: parcelamento, não estrada). A malha
     # viária ATRAVESSA a restrição (junta as porções num loteamento só); só os LOTES a evitam. Por
     # isso NÃO descontamos `restricoes` do canvas das ruas — ela é descontada das QUADRAS (faces→
@@ -1397,7 +1410,10 @@ def gerar_layout(
                         else acesso_externo.representative_point())
                 _ac_pais = rotate(_acp, -ang_deg, origin=cen) if ang_deg else _acp
             eixos_pais, modo_pais, extras_pais = paisagem.eixos_paisagem(
-                ilha, None, _ac_pais, bh_i, via_local, via_tronco
+                ilha, None, _ac_pais, bh_i, via_local, via_tronco,
+                # curva de nível média do DEM (0 = sem DEM): radiais/espinha arqueiam
+                # acompanhando o nível em vez de descer a encosta em linha reta.
+                nivel_rad=orientacao_rad,
             )
             if eixos_pais:
                 modos_paisagem.append(modo_pais)

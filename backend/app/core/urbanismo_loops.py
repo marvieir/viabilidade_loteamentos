@@ -65,7 +65,8 @@ def _linhas_de(geom) -> list[LineString]:
 
 
 def _aneis(reg, nucleo, passo_anel: float, via_local: float, via_tronco: float,
-           entrada: Optional[Point]) -> list[tuple[LineString, float]]:
+           entrada: Optional[Point], nivel_rad: float = 0.0
+           ) -> list[tuple[LineString, float]]:
     """Fitas concêntricas em volta do ``nucleo`` + 2 radiais de costura (conectividade)."""
     eixos: list[tuple[LineString, float]] = []
     interior = reg.buffer(-via_local / 2.0)
@@ -100,18 +101,25 @@ def _aneis(reg, nucleo, passo_anel: float, via_local: float, via_tronco: float,
         alvo = Point(cen.x, reg.bounds[1])  # base da ilha (mesmo fallback do pórtico)
     ang = math.atan2(alvo.y - cen.y, alvo.x - cen.x)
     for a in (ang, ang + math.pi):
-        raio = LineString([
-            (cen.x, cen.y),
-            (cen.x + diag * math.cos(a), cen.y + diag * math.sin(a)),
-        ])
+        fim = (cen.x + diag * math.cos(a), cen.y + diag * math.sin(a))
+        if abs(nivel_rad) > 1e-9:
+            # arqueia ACOMPANHANDO a curva de nível média (DEM): o meio da radial desvia na
+            # direção do nível — a via cruza a encosta em diagonal suave, não reta morro
+            # abaixo (padrão das referências). Sem DEM (nivel 0) → reta (honesto).
+            desvio = passo_anel * 0.8
+            meio = ((cen.x + fim[0]) / 2.0 + desvio * math.cos(nivel_rad),
+                    (cen.y + fim[1]) / 2.0 + desvio * math.sin(nivel_rad))
+            raio = LineString([(cen.x, cen.y), meio, fim])
+        else:
+            raio = LineString([(cen.x, cen.y), fim])
         for linha in _linhas_de(raio.intersection(interior)):
             if linha.length >= passo_anel * 0.75:
                 eixos.append((linha, via_tronco))
     return eixos
 
 
-def _folha(reg, passo_anel: float, via_local: float, via_tronco: float
-           ) -> list[tuple[LineString, float]]:
+def _folha(reg, passo_anel: float, via_local: float, via_tronco: float,
+           nivel_rad: float = 0.0) -> list[tuple[LineString, float]]:
     """Espinha no eixo longo + nervuras diagonais ARQUEADAS (3 pontos) dos dois lados."""
     (cx, cy), ul, uc, comp_l, _comp_c = _mrr_eixos(reg)
     interior = reg.buffer(-via_local / 2.0)
@@ -119,10 +127,19 @@ def _folha(reg, passo_anel: float, via_local: float, via_tronco: float
         return []
     eixos: list[tuple[LineString, float]] = []
     meia = comp_l / 2.0
-    espinha_full = LineString([
-        (cx - ul[0] * meia, cy - ul[1] * meia),
-        (cx + ul[0] * meia, cy + ul[1] * meia),
-    ])
+    if abs(nivel_rad) > 1e-9:
+        # espinha arqueada pelo nível topográfico (mesma lógica das radiais dos anéis)
+        desvio_e = passo_anel * 0.8
+        espinha_full = LineString([
+            (cx - ul[0] * meia, cy - ul[1] * meia),
+            (cx + desvio_e * math.cos(nivel_rad), cy + desvio_e * math.sin(nivel_rad)),
+            (cx + ul[0] * meia, cy + ul[1] * meia),
+        ])
+    else:
+        espinha_full = LineString([
+            (cx - ul[0] * meia, cy - ul[1] * meia),
+            (cx + ul[0] * meia, cy + ul[1] * meia),
+        ])
     espinha_partes = _linhas_de(espinha_full.intersection(interior))
     for linha in espinha_partes:
         eixos.append((linha, via_tronco))
@@ -160,6 +177,7 @@ def eixos_paisagem(
     passo_anel: float,
     via_local: float,
     via_tronco: float,
+    nivel_rad: float = 0.0,
 ) -> tuple[list[tuple[LineString, float]], str, dict]:
     """Eixos do arquétipo ``loops_paisagem`` para UMA ilha. ``passo_anel`` = profundidade
     da fita dupla (2×prof do lote + via). Devolve ``(eixos, modo, extras)`` — extras traz
@@ -168,7 +186,7 @@ def eixos_paisagem(
     _c, _ul, _uc, comp_l, comp_c = _mrr_eixos(reg)
     elong = comp_l / max(comp_c, 1.0)
     if elong >= ELONGACAO_FOLHA:
-        eixos = _folha(reg, passo_anel, via_local, via_tronco)
+        eixos = _folha(reg, passo_anel, via_local, via_tronco, nivel_rad)
         return eixos, "folha", {}
     # núcleo dos anéis = maior célula da ARMADURA dentro da ilha; sem armadura → disco
     # central (o "coração" verde que os anéis abraçam — Verano).
@@ -182,7 +200,7 @@ def eixos_paisagem(
                 nucleo = max(poligonos, key=lambda g: g.area)
     if nucleo is None:
         nucleo = reg.centroid.buffer(passo_anel * 0.8, quad_segs=8)
-    eixos = _aneis(reg, nucleo, passo_anel, via_local, via_tronco, entrada)
+    eixos = _aneis(reg, nucleo, passo_anel, via_local, via_tronco, entrada, nivel_rad)
     # extras p/ os CORTES radiais (corredores verdes) do chamador — mesmo ângulo das radiais
     cen = nucleo.centroid
     if entrada is not None and not entrada.is_empty:
