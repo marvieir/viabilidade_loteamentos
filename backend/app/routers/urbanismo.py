@@ -44,6 +44,8 @@ from app.core.vegetacao import FonteVegetacao, get_fonte_vegetacao
 from app.models import schemas
 
 from app.core.acesso import analise_do_dono
+from app.core.auth import usuario_atual
+from app.models.db_models import Usuario
 router = APIRouter(dependencies=[Depends(analise_do_dono)])
 
 # Faixas não-edificáveis que viram restrição (espelha o aproveitamento — Fase 2.2).
@@ -255,6 +257,7 @@ def propor(
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
     fonte_vias: FonteVias | None = Depends(get_fonte_vias),
     fonte_memoria: FonteMemoriaUrbanismo | None = Depends(get_fonte_memoria_urbanismo),
+    usuario: Usuario = Depends(usuario_atual),
 ):
     registro = STORE.get(analise_id)
     if registro is None:
@@ -271,7 +274,11 @@ def propor(
     # layout já são mais que suficientes para uma gleba — não é ferramenta de gerar em massa.
     # Barra loop/abuso; não é cobrança, é proteção. Fase U4: só GERAÇÕES COM IA contam —
     # materializar uma variante alternativa (geometria pura) não consome o cap.
-    _max = int(os.getenv("URBANISMO_MAX_GERACOES", "15"))
+    # ADMIN não tem cap (calibração/testes do operador consomem muitas gerações);
+    # o custo continua medido no admin/custos (uso_llm) — visível, não silencioso.
+    _max = 0 if getattr(usuario, "papel", "") == "admin" else int(
+        os.getenv("URBANISMO_MAX_GERACOES", "15")
+    )
     geracoes_ia = [
         p for p in fonte_urb.listar(analise_id)
         if (p.get("origem_geracao") or "llm") == "llm"
