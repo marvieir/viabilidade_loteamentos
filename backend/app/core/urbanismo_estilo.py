@@ -59,9 +59,11 @@ ESTILO_DEFAULT: dict[str, dict] = {
         "lago_frac_aproveitavel": 0.03,
         "lago_max_m2": 12000.0,
         "hub_fracao_livre": 0.25,
-        # Fase U6a — composição paisagística (anéis/folha + cinturão) é o default do alto;
-        # exige gleba mínima (referências são 15–100 ha) — abaixo degrada p/ o clássico.
-        "arquetipo": "loops_paisagem",
+        # Fase U6a — o arquétipo paisagístico VOLTOU AO LABORATÓRIO (feedback do operador:
+        # desenho pior que o clássico — buracos no miolo, vias angulosas). O ALTO usa o
+        # traçado CLÁSSICO sinuoso até o paisagem passar na revisão VISUAL (harness de
+        # render); para experimentar: "arquetipo": "loops_paisagem" no alta.json.
+        "arquetipo": "",
         "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
         "verde_min_pct": 0.22,  # alvo folgado: o quadro mede sobre a LÍQUIDA (base maior)

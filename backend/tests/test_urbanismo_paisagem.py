@@ -11,7 +11,15 @@ COMPRIDA = box(0.0, 0.0, 1100.0, 220.0)  # 24 ha, elongada → folha
 PEQUENA = box(0.0, 0.0, 260.0, 200.0)    # 5,2 ha → abaixo do mínimo → clássico
 
 
+from app.core.urbanismo_estilo import ESTILO_DEFAULT
+
+# O arquétipo é OPT-IN enquanto está no laboratório (default do alto voltou ao clássico):
+# estes goldens seguem guardando a mecânica do paisagem com o estilo explícito.
+_ESTILO_PAISAGEM = {**ESTILO_DEFAULT["alta"], "arquetipo": "loops_paisagem"}
+
+
 def _alta(gleba, **kw):
+    kw.setdefault("estilo", dict(_ESTILO_PAISAGEM))
     return geom.gerar_layout(gleba, programa_do_preset("alta", {"pct_lazer": 0.15}), **kw)
 
 
@@ -43,7 +51,7 @@ def test_pods_com_corredores_verdes():
 
 
 def test_gleba_pequena_degrada_rotulado():
-    lay = _alta(PEQUENA)
+    lay = _alta(PEQUENA)  # estilo paisagem explícito; gleba pequena degrada mesmo assim
     assert lay.meta.get("paisagem") is None  # clássico
     assert any("Arquétipo paisagístico NÃO aplicado" in a for a in lay.avisos)
 
