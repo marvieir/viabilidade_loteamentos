@@ -224,7 +224,7 @@ def _dump_insumos_motor(
     analise_id: str, proposta_id: str, *, aprov_m, restr_m, decliv_lote_m,
     decliv_acentuada_m, orientacao, travessia_eixo, travessia_diag,
     acesso_externo_m, lago_param, estilo, diretrizes, prog, variante, publico_alvo,
-    dem_amostras=None, contorno_espinha=None,
+    dem_amostras=None, contornos_b=None,
 ) -> None:
     """LAB do operador — grava os insumos EXATOS que o motor recebeu (WKT + JSON) para
     replay determinístico FORA do app (harness de render itera no MESMO desenho — a regra 4
@@ -259,8 +259,9 @@ def _dump_insumos_motor(
                 "restricao_externa": _w(restr_m),
                 "travessia_eixo": _w(travessia_eixo),
                 "acesso_externo": _w(acesso_externo_m),
-                "contorno_espinha": _w(contorno_espinha),  # Opção B — via-tronco (curva de nível)
             },
+            # Opção B — as curvas de nível (via-tronco / bandas orgânicas) no frame do motor, p/ replay 1:1.
+            "contornos_b": [_w(c) for c in (contornos_b or []) if c is not None and not c.is_empty],
             "dem_amostras": dem_amostras,  # LAB Opção B — elevação no frame do motor (ou None)
         }
         (destino / f"{analise_id}_{proposta_id}.json").write_text(
@@ -597,9 +598,15 @@ def _propor_impl(
         try:
             from app.core import contorno_dem
 
-            espinha = contorno_dem.extrair_espinha(dem_recorte, to_local, dentro=aprov_m)
-            if espinha is not None and not espinha.is_empty:
-                contornos_b = [espinha]
+            if estilo.get("ruas_locais_contorno"):
+                # Opção B ORGÂNICA — VÁRIAS curvas de nível (ruas locais ao longo da encosta).
+                bandas = contorno_dem.extrair_bandas(dem_recorte, to_local, dentro=aprov_m)
+                contornos_b = bandas or None
+            if not contornos_b:
+                # B clássica (ou orgânica sem bandas suficientes) — só a via-tronco na cota mediana.
+                espinha = contorno_dem.extrair_espinha(dem_recorte, to_local, dentro=aprov_m)
+                if espinha is not None and not espinha.is_empty:
+                    contornos_b = [espinha]
         except Exception:  # noqa: BLE001 — B degrada p/ A; nunca derruba a geração
             contornos_b = None
 
@@ -774,7 +781,7 @@ def _propor_impl(
         diretrizes=diretrizes, prog=prog, variante=variante_escolhida,
         publico_alvo=str(body.publico_alvo),
         dem_amostras=_dem_amostras_no_frame(dem_recorte, to_local),
-        contorno_espinha=(contornos_b[0] if contornos_b else None),
+        contornos_b=contornos_b,
     )
     return out
 

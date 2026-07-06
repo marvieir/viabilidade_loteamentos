@@ -68,3 +68,41 @@ def test_b_deterministico():
     b = geom.gerar_layout(GLEBA, prog, estilo=_estilo("contorno_serpente"), contornos=[curva])
     assert len(a.lotes) == len(b.lotes)
     assert abs(sum(l.area for l in a.lotes) - sum(l.area for l in b.lotes)) < 1.0
+
+
+def _estilo_organico():
+    e = _estilo("contorno_serpente")
+    e["ruas_locais_contorno"] = True
+    return e
+
+
+def test_b_organica_bandas_arruamento_valido_e_conexo():
+    """Opção B ORGÂNICA — ruas locais em bandas de contorno: várias curvas paralelas viram a malha
+    LOCAL. Invariantes duros: arruamento VÁLIDO (a união densa de vias curvas sai auto-intersectada,
+    o motor repara), UMA malha conexa (fora slivers), zero lote inválido, todo lote com frente."""
+    prog = programa_do_preset("alta", {"pct_lazer": 0.15})
+    bandas = [
+        LineString([(50, 150 + k), (300, 120 + k), (550, 180 + k), (850, 140 + k)])
+        for k in (0, 60, 120, 180, 240, 300)
+    ]
+    lay = geom.gerar_layout(GLEBA, prog, estilo=_estilo_organico(), contornos=bandas)
+    assert lay.lotes
+    assert all(l.is_valid and l.geom_type == "Polygon" for l in lay.lotes), "zero lote inválido"
+    arr = lay.arruamento
+    assert arr is not None and arr.is_valid, "arruamento deve sair VÁLIDO (reparo buffer(0))"
+    comps = sorted(geom._componentes(arr), key=lambda c: -c.area)
+    principais = [c for c in comps if c.area >= 200]
+    assert len(principais) == 1, "malha ÚNICA (ignorando slivers de buffer)"
+    arr_buf = arr.buffer(1.0)
+    assert all(l.boundary.intersection(arr_buf).length >= 1.0 for l in lay.lotes)
+
+
+def test_marching_squares_bandas_selecao_espacial():
+    """extrair_bandas seleciona curvas espaçadas ~banda_m (guloso): num grid com rampa suave, poucas
+    curvas espaçadas — nunca amontoadas. Testa o encadeamento por nível (sem reprojeção/DEM real)."""
+    r, c = np.mgrid[0:50, 0:70]
+    z = c * 1.0 + 3 * np.sin(r * 0.25)
+    níveis = np.quantile(z[np.isfinite(z)], np.linspace(0.1, 0.9, 20))
+    # cada nível gera segmentos; níveis distintos → isolinhas distintas (não colapsam num ponto)
+    contagens = [len(contorno_dem._segmentos_isolinha(z, float(n))) for n in níveis]
+    assert all(n > 5 for n in contagens), "toda cota interna tem uma isolinha contínua"

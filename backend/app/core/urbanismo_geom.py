@@ -1293,6 +1293,11 @@ def gerar_layout(
     _tracado = str(estilo.get("tracado", ""))
     limpar = _tracado in ("grelha_ortogonal", "contorno_serpente") and not usa_paisagem
     grade_pura = _tracado == "grelha_ortogonal" and not usa_paisagem
+    # Opção B ORGÂNICA (ruas locais em bandas de contorno): a malha curva custa mais área
+    # (viário/faces) → o orçamento de lazer/verde RESERVADO é menor (a MATA preservada já cobre a
+    # doação legal — confirmado São Roque) para o yield ficar no padrão Urbia (~50%). O parque real
+    # do padrão vem do lago + estações; a moldura de mata é o grande verde.
+    organico = _tracado == "contorno_serpente" and bool(estilo.get("ruas_locais_contorno")) and not usa_paisagem
     from app.core import urbanismo_loops as paisagem
 
     canvas = aproveitavel
@@ -1348,6 +1353,17 @@ def gerar_layout(
     pct_verde_min = float(split.get("verde") or 0.0)
     pct_inst_min = float(split.get("institucional") or 0.0)
     pct_lazer0 = max(0.0, min(max(programa.pct_lazer, pct_verde_min), 0.6))
+    # Opção B orgânica: teto do lazer/verde reservado (default 0,10) — MAS só quando a MATA
+    # PRESERVADA já cobre a doação legal (senão reservar pouco verde seria ILEGAL numa gleba sem
+    # mata). Mata que cobre = restrição preservada ≥ doação mínima da gleba bruta. Respeita sempre
+    # o piso da LUOS (pct_verde_min). Fora disso, o orçamento normal (o traçado orgânico continua).
+    mata_area = (restricao_externa.area
+                 if (restricao_externa is not None and not restricao_externa.is_empty) else 0.0)
+    doacao_min = float(diretrizes.get("doacao_min_pct", 0.20) or 0.20)
+    gleba_bruta = aprov_area + mata_area
+    mata_cobre_doacao = gleba_bruta > 0 and (mata_area / gleba_bruta) >= doacao_min
+    if organico and mata_cobre_doacao:
+        pct_lazer0 = max(pct_verde_min, min(pct_lazer0, float(estilo.get("lazer_pct_organico", 0.10))))
     pct_inst = max(0.0, min(max(programa.pct_institucional, pct_inst_min), 0.3))
 
     # (b) Fase 9.9 — EIXOS CURVOS: a IA propõe a geometria dos eixos (polilinha → curva suave);
@@ -1989,6 +2005,8 @@ def gerar_layout(
     # U6a — VERDE MÍNIMO do estilo (lei local): completa a reserva com as MAIORES peças
     # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
     alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if (usa_paisagem or limpar) else 0.0
+    if organico and mata_cobre_doacao:  # piso de verde baixo SÓ quando a mata cobre a doação legal
+        alvo_verde_pct = min(alvo_verde_pct, float(estilo.get("verde_min_pct_organico", 0.08)))
     if alvo_verde_pct > 0 and sobra_reg is not None and not sobra_reg.is_empty:
         verde_atual = (verde_reservado_reg.area if verde_reservado_reg is not None else 0.0) + (
             cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
@@ -2030,6 +2048,18 @@ def gerar_layout(
     lotes = [x for x in (_repara_lote(l) for l in lotes) if x is not None and x.area > 1.0]
     quadras_geom = [r for r in (_back(q) for q in (miolos + verdes_min)) if r is not None]
     arruamento = _back(ruas_reg)
+    # A união DENSA de vias da Opção B orgânica (curvas + conectores) sai auto-intersectada. Repara
+    # com buffer(0) — que devolve um MultiPolygon LIMPO preservando a área (make_valid devolveria uma
+    # GeometryCollection com MultiPolygon aninhado, que _componentes/render tratam mal). Sem isto o
+    # arruamento fica inválido: _componentes → [] e a solda vira no-op (a malha "parece partida"),
+    # além de gerar GeoJSON inválido no front. Só quando inválido; fallback ao original.
+    if arruamento is not None and not arruamento.is_empty and not arruamento.is_valid:
+        try:
+            _b0 = arruamento.buffer(0)
+            if _b0 is not None and not _b0.is_empty and _b0.geom_type in ("Polygon", "MultiPolygon"):
+                arruamento = _b0
+        except Exception:  # noqa: BLE001 — mantém o original (degrada honesto)
+            pass
     # Fase 10.4 — SOLDA FINAL da malha (no frame ORIGINAL já validado, onde a união é ESTÁVEL — no
     # frame rotacionado a solda é frágil e o buffer(0) do _back a quebra): com travessia VIÁVEL,
     # garante UMA malha viária contínua (fecha o "buraco" entre as porções). Sem travessia/greide

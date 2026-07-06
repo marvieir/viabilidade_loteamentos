@@ -43,6 +43,76 @@ def _segmentos_isolinha(z: np.ndarray, nivel: float) -> list[tuple[tuple[float, 
     return segs
 
 
+def _isolinha_na_cota(dem, dem2wgs, to_local, nivel, dentro, simplify_m, min_len_m):
+    """Uma isolinha (LineString mais longa) na cota ``nivel``, já no frame do motor. Ou None."""
+    z = np.asarray(dem.elevacao, dtype=float)
+    segs = _segmentos_isolinha(z, nivel)
+    if not segs:
+        return None
+
+    def _para_frame(col, row):
+        xm = dem.x0_m + col * dem.px_m
+        ym = dem.y0_m - row * dem.px_m
+        lon, lat = dem2wgs(xm, ym)
+        return to_local(lon, lat)
+
+    linhas = []
+    for p0, p1 in segs:
+        a = _para_frame(*p0)
+        b = _para_frame(*p1)
+        if a != b:
+            linhas.append(LineString([a, b]))
+    if not linhas:
+        return None
+    merged = linemerge(MultiLineString(linhas)) if len(linhas) > 1 else linhas[0]
+    partes = list(getattr(merged, "geoms", [merged]))
+    if dentro is not None and not dentro.is_empty:
+        rec = []
+        for ln in partes:
+            inter = ln.intersection(dentro)
+            rec += [g for g in getattr(inter, "geoms", [inter])
+                    if g.geom_type == "LineString" and not g.is_empty]
+        partes = rec or partes
+    partes = [p for p in partes if p.length >= min_len_m]
+    if not partes:
+        return None
+    maior = max(partes, key=lambda l: l.length).simplify(simplify_m)
+    return maior if maior.length >= min_len_m else None
+
+
+def extrair_bandas(
+    dem, to_local, dentro: Optional[BaseGeometry] = None,
+    banda_m: float = 52.0, max_bandas: int = 8, simplify_m: float = 6.0, min_len_m: float = 120.0,
+) -> list:
+    """Opção B ORGÂNICA — VÁRIAS curvas de nível espaçadas ~``banda_m`` ESPACIALMENTE (guloso), para
+    servirem de RUAS locais ao longo da encosta. Extrai isolinhas em cotas finas e seleciona as que
+    ficam a ≥ ~banda_m umas das outras (evita amontoar onde o morro é íngreme). Devolve lista de
+    LineStrings no frame do motor (vazia se DEM insuficiente). Determinístico."""
+    try:
+        if dem is None or getattr(dem, "elevacao", None) is None or not dem.crs_proj4:
+            return []
+        z = np.asarray(dem.elevacao, dtype=float)
+        finito = z[np.isfinite(z)]
+        if finito.size < 9:
+            return []
+        from pyproj import Transformer
+
+        dem2wgs = Transformer.from_crs(dem.crs_proj4, "EPSG:4326", always_xy=True).transform
+        cotas = np.quantile(finito, np.linspace(0.05, 0.95, 30))
+        selec: list = []
+        for nivel in cotas:
+            ln = _isolinha_na_cota(dem, dem2wgs, to_local, float(nivel), dentro, simplify_m, min_len_m)
+            if ln is None:
+                continue
+            if all(ln.distance(s) >= banda_m * 0.8 for s in selec):
+                selec.append(ln)
+            if len(selec) >= max_bandas:
+                break
+        return selec
+    except Exception:  # noqa: BLE001 — degrada p/ espinha única / grade
+        return []
+
+
 def extrair_espinha(
     dem, to_local, dentro: Optional[BaseGeometry] = None,
     quantil: float = 0.5, simplify_m: float = 6.0, min_len_m: float = 60.0,

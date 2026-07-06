@@ -71,6 +71,13 @@ ESTILO_DEFAULT: dict[str, dict] = {
         #   "" : sinuoso da IA (traçado clássico antigo).
         # Todas partilham: bordas raster suavizadas, malha SEMPRE conectada, piso de verde.
         "tracado": "contorno_serpente",
+        # Opção B ORGÂNICA (estilo Urbia): as RUAS LOCAIS também seguem a cota (bandas de contorno
+        # paralelas + conectores descendo a encosta), não só a via-tronco. Precisa de DEM com ≥2
+        # curvas; sem isso degrada para a via-tronco única (e daí p/ a grade limpa). Yield no padrão
+        # Urbia (~50%): a mata preservada cobre a doação, então o verde reservado fica baixo.
+        "ruas_locais_contorno": True,
+        "lazer_pct_organico": 0.10,
+        "verde_min_pct_organico": 0.08,
         "cinturao_verde_m": 8.0,
         "paisagem_area_min_m2": 80000.0,
         "verde_min_pct": 0.20,  # piso LEGAL de doação verde (o operador pediu ≥20%)
@@ -79,7 +86,8 @@ ESTILO_DEFAULT: dict[str, dict] = {
 
 _CHAVES_NUM = ("pracas_por_quadras", "lazer_pracas_frac", "lago_frac_aproveitavel",
                "lago_max_m2", "hub_fracao_livre", "cinturao_verde_m",
-               "paisagem_area_min_m2", "verde_min_pct")
+               "paisagem_area_min_m2", "verde_min_pct",
+               "lazer_pct_organico", "verde_min_pct_organico")
 
 
 def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:
@@ -109,7 +117,7 @@ def carregar_estilo(publico_alvo: str) -> tuple[dict, Optional[str]]:
                 base[chave] = float(valor)
             except (TypeError, ValueError):
                 continue
-        elif chave == "lago_prioritario":
+        elif chave in ("lago_prioritario", "ruas_locais_contorno"):
             base[chave] = bool(valor)
         elif chave == "arquetipo" and isinstance(valor, str) and valor.strip():
             base[chave] = valor.strip()  # "loops_paisagem" liga a U6a; outro valor desliga
