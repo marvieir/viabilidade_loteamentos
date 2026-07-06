@@ -472,6 +472,27 @@ def lado_quadra_adaptativo(area_ilha: float, teto_w: float, teto_h: float,
     return max(piso_w, teto_w * escala), max(piso_h, teto_h * escala)
 
 
+def _bandas_contorno_eixos(ilha: BaseGeometry, contornos_ilha: Sequence[BaseGeometry],
+                           via_local: float, via_tronco: float, conn_m: float):
+    """Opção B ORGÂNICA — eixos da malha LOCAL em BANDAS DE CONTORNO (frame reg, cota ~horizontal):
+    as curvas de nível são as RUAS ao longo da encosta; conectores VERTICAIS (descendo a encosta)
+    a cada ``conn_m`` fecham as quadras. Devolve ``[(LineString, largura)]`` p/ ``eixos_prontos``.
+    A curva mais LONGA vira via-tronco (coletora); as demais e os conectores são locais."""
+    contos = [c for c in contornos_ilha if c is not None and c.length >= L_MIN_EIXO_M]
+    if not contos:
+        return None
+    tronco = max(contos, key=lambda c: c.length)
+    eixos: list[tuple[BaseGeometry, float]] = [
+        (c, via_tronco if c is tronco else via_local) for c in contos
+    ]
+    minx, miny, maxx, maxy = ilha.bounds
+    x = minx + conn_m * 0.5
+    while x < maxx:
+        eixos.append((LineString([(x, miny - 1.0), (x, maxy + 1.0)]), via_local))
+        x += conn_m
+    return eixos
+
+
 def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
                     block_h: float, via_local: float, via_tronco: float, podar: bool = True,
                     eixos_prontos=None):
@@ -1467,6 +1488,14 @@ def gerar_layout(
         # Fase U6a P3 — traçado PAISAGÍSTICO no lugar da grade axial: anéis (compacta) ou
         # folha (alongada); eixos vazios → degrada para a grade (nunca quebra a geração).
         eixos_pais = None
+        # Opção B ORGÂNICA (ruas_locais_contorno): a malha LOCAL vira CURVAS DE NÍVEL paralelas
+        # (ruas ao longo da encosta) + conectores descendo a encosta (verticais no frame reg,
+        # onde a cota é ~horizontal). Substitui a grade axial → as ruas locais também seguem a
+        # declividade (estilo Urbia). Precisa de ≥2 curvas; senão degrada p/ a espinha única.
+        if (_tracado == "contorno_serpente" and estilo.get("ruas_locais_contorno")
+                and len(eixos_ia_ilha) >= 2):
+            conn_m = max(bw_i, 3.0 * testada_alvo)
+            eixos_pais = _bandas_contorno_eixos(ilha, eixos_ia_ilha, via_local, via_tronco, conn_m)
         if usa_paisagem:
             _ac_pais = None
             if acesso_externo is not None and not acesso_externo.is_empty:
@@ -1490,7 +1519,8 @@ def gerar_layout(
         # Fase U6a P4 — fitas → PODS de ~pod_lotes_max lotes separados por CORREDORES
         # verdes (os "bairrinhos"): nos ANÉIS o corte é RADIAL (a banda é curva — e o
         # corredor liga armadura↔cinturão, como nas referências); na FOLHA, transversal.
-        if eixos_pais:
+        # (Só na paisagem U6a; a Opção B orgânica usa eixos_pais mas não fatia em pods.)
+        if usa_paisagem and eixos_pais:
             pod_len = float(estilo.get("pod_lotes_max", 24.0)) / 2.0 * testada_alvo
             corredor_m = float(estilo.get("corredor_verde_m", 12.0))
             if extras_pais.get("nucleo") is not None:
