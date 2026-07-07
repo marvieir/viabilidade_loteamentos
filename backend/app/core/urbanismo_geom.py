@@ -493,6 +493,37 @@ def _bandas_contorno_eixos(ilha: BaseGeometry, contornos_ilha: Sequence[BaseGeom
     return eixos
 
 
+def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: float,
+                          banda: float, conn_m: float):
+    """Gramática FAIXAS FLUIDAS (U8 — padrão SR/Ribeira, gleba ALONGADA): família de curvas
+    PARALELAS e uniformemente espaçadas (offsets de uma espinha suave) ao longo do eixo da cota —
+    ruas harmônicas que seguem a declividade — mais conectores de descida ESPARSOS (viram
+    cul-de-sac). Frame reg (a cota é ~horizontal). Devolve ``[(LineString, largura)]`` p/
+    ``eixos_prontos``. Espaçamento UNIFORME por construção (sem o emaranhado das curvas cruas)."""
+    minx, miny, maxx, maxy = ilha.bounds
+    W, H = maxx - minx, maxy - miny
+    if W < banda or H < banda:
+        return None
+    xg = [minx - 20.0 + i * (W + 40.0) / 47.0 for i in range(48)]
+    amp = H * 0.08  # ondulação suave (orgânico) — pequena o bastante p/ não colapsar offsets
+    meio = (miny + maxy) / 2.0
+    eixos: list[tuple[BaseGeometry, float]] = []
+    s = -H
+    while s < H:
+        ys = [meio + s + amp * math.sin((x - minx) / max(W, 1.0) * math.pi * 1.3) for x in xg]
+        for parte in _linhas(_valido(LineString(list(zip(xg, ys))).intersection(ilha))):
+            if parte.length >= L_MIN_EIXO_M:
+                eixos.append((parte, via_local))
+        s += banda
+    x = minx + conn_m * 0.5
+    while x < maxx:
+        for parte in _linhas(_valido(LineString([(x, miny - 1.0), (x, maxy + 1.0)]).intersection(ilha))):
+            if parte.length >= L_MIN_EIXO_M:
+                eixos.append((parte, via_local))
+        x += conn_m
+    return eixos or None
+
+
 def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
                     block_h: float, via_local: float, via_tronco: float, podar: bool = True,
                     eixos_prontos=None):
@@ -1521,7 +1552,14 @@ def gerar_layout(
         if (_tracado == "contorno_serpente" and estilo.get("ruas_locais_contorno")
                 and len(eixos_ia_ilha) >= 2):
             conn_m = max(bw_i, 3.0 * testada_alvo)
-            eixos_pais = _bandas_contorno_eixos(ilha, eixos_ia_ilha, via_local, via_tronco, conn_m)
+            # U8 — GRAMÁTICA de traçado (selecionável): "faixas_fluidas" = família paralela
+            # harmônica (gleba alongada, padrão SR/Ribeira); default = curvas de nível cruas.
+            if str(estilo.get("gramatica", "")) == "faixas_fluidas":
+                banda_ff = max(2.0 * prof, bh_i)  # faixa = 2 fileiras costas-com-costas
+                conn_ff = max(4.0 * testada_alvo, 160.0)  # conectores esparsos (viram cul-de-sac)
+                eixos_pais = _faixas_fluidas_eixos(ilha, via_local, via_tronco, banda_ff, conn_ff)
+            if eixos_pais is None:
+                eixos_pais = _bandas_contorno_eixos(ilha, eixos_ia_ilha, via_local, via_tronco, conn_m)
         if usa_paisagem:
             _ac_pais = None
             if acesso_externo is not None and not acesso_externo.is_empty:
