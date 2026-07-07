@@ -85,6 +85,20 @@ async def extrair_perfil(
     except ExtratorIndisponivel as exc:
         raise HTTPException(503, str(exc))
     perfil.status = "proposto"  # garante o gate, independente do extrator
+    # LAB — dump da extração para o operador conferir/enviar (mesmo padrão do urbanismo). É a
+    # proposta CRUA do LLM (antes de qualquer edição humana), com as normas urbanísticas. Falha
+    # de escrita nunca derruba a extração.
+    try:
+        import os as _os
+        from pathlib import Path as _Path
+
+        _dest = _Path(_os.getenv("LUOS_DUMP_DIR", "/tmp/luos_dumps"))
+        _dest.mkdir(parents=True, exist_ok=True)
+        (_dest / f"perfil_{cod_ibge}.json").write_text(
+            perfil.model_dump_json(indent=2), encoding="utf-8"
+        )
+    except Exception:  # noqa: BLE001 — dump é diagnóstico
+        pass
     return perfil
 
 
