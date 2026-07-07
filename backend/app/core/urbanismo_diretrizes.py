@@ -34,7 +34,7 @@ def resolver_diretrizes(
     perf = PERFIL_LOTE.get(publico_alvo, PERFIL_LOTE["media"])
     piso_mercado, teto_mercado = perf["faixa"]
 
-    lote_zona = doacao_pct = None
+    lote_zona = doacao_pct = apac_pct = None
     split = None
     confirmada = (
         perfil is not None and getattr(perfil, "status", None) == "confirmado" and bool(zona_codigo)
@@ -49,6 +49,12 @@ def resolver_diretrizes(
         p_doa = _param_zona(zona, modalidade, "doacao_pct")
         if p_doa is not None and p_doa.valor is not None:
             doacao_pct = float(p_doa.valor)
+        # U7 — APAC/reserva ambiental é POR ZONA (São Roque: 10% Consolidação / 20% MUE). É o
+        # PISO de verde que o motor honra (a mata preservada conta p/ ele). Sem zona/valor → None
+        # e o motor usa o fallback de estilo rotulado (não inventa).
+        p_apac = getattr(zona.params, "apac_pct", None)
+        if p_apac is not None and p_apac.valor is not None:
+            apac_pct = float(p_apac.valor)
         sp = zona.params.doacao_split
         if sp is not None:
             split = {"viario": sp.viario, "verde": sp.verde, "institucional": sp.institucional}
@@ -88,6 +94,7 @@ def resolver_diretrizes(
         "alvo_lote_m2": round(alvo_lote, 2),
         "piso_mercado_m2": piso_mercado,
         "doacao_min_pct": doacao_pct,
+        "apac_pct": apac_pct,  # U7 — reserva ambiental da zona (piso de verde do motor); None = fallback
         "doacao_split": split,  # frações da gleba (viário/verde/institucional)
         "testada_alvo_m": perf["testada"],
         "prof_alvo_m": perf["prof"],
