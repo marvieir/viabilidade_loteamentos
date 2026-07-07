@@ -100,6 +100,50 @@ def test_get_sem_perfil_404(client, fonte_perfil):
     assert client.get(f"/api/municipios/{COD}/perfil").status_code == 404
 
 
+# ----- Fase U7: normas urbanísticas do condomínio (nível município) -----
+def test_normas_urbanisticas_sobrevivem_confirmacao(client, fonte_perfil):
+    """As normas urbanísticas do condomínio (via/cul-de-sac/APAC — São Roque LC 106/2020)
+    entram no perfil, com proveniência, e sobrevivem ao confirmar+recarregar."""
+    from app.models.schemas import NormasUrbanisticas, ParamBoolProv
+
+    perfil = _perfil_proposto()
+    perfil.normas_urbanisticas = NormasUrbanisticas(
+        via_local_sem_estac_m=ParamProv(valor=6.0, artigo="Art. 11, I", pagina=4, trecho="6,00 (seis) metros"),
+        via_local_estac_2lados_m=ParamProv(valor=11.0, artigo="Art. 11, III", pagina=4, trecho="11 (onze) metros"),
+        area_comum_m2_por_unidade=ParamProv(valor=6.0, artigo="Art. 11, V", pagina=4, trecho="6,00 m² por unidade"),
+        cul_de_sac_obrigatorio=ParamBoolProv(valor=True, artigo="Art. 11, IX", pagina=4, trecho="providas de cul de sac"),
+        apac_pct=ParamProv(valor=0.10, artigo="Art. 9, c", pagina=3, trecho="reservar 10% de sua área a título de APAC"),
+        area_min_doacao_m2=ParamProv(valor=15000.0, artigo="Art. 16", pagina=5, trecho="15.000,00 m²"),
+    )
+    body = perfil.model_dump()
+    body["validado_por"] = "Eng. Fulana"
+    assert client.put(f"/api/municipios/{COD}/perfil", json=body).status_code == 200
+    g = client.get(f"/api/municipios/{COD}/perfil").json()
+    nu = g["normas_urbanisticas"]
+    assert nu["via_local_sem_estac_m"]["valor"] == 6.0
+    assert nu["via_local_estac_2lados_m"]["valor"] == 11.0
+    assert nu["cul_de_sac_obrigatorio"]["valor"] is True
+    assert nu["apac_pct"]["valor"] == 0.10
+    assert nu["cul_de_sac_obrigatorio"]["artigo"] == "Art. 11, IX"  # proveniência preservada
+
+
+def test_extrator_monta_normas_e_carimba_origem():
+    """O extrator monta NormasUrbanisticas a partir do dict do LLM e carimba origem='proposto_llm'
+    em cada campo (não confia no modelo)."""
+    from app.core.extrator_luos import _marcar_origem_llm
+
+    p = PerfilMunicipal.model_validate({
+        "cod_ibge": COD, "municipio": "São Roque",
+        "normas_urbanisticas": {
+            "cul_de_sac_obrigatorio": {"valor": True, "artigo": "Art. 11, IX", "pagina": 4, "trecho": "cul de sac"},
+            "apac_pct": {"valor": 0.10, "artigo": "Art. 9, c", "pagina": 3, "trecho": "10% ... APAC"},
+        },
+    })
+    _marcar_origem_llm(p)
+    assert p.normas_urbanisticas.cul_de_sac_obrigatorio.origem == "proposto_llm"
+    assert p.normas_urbanisticas.apac_pct.origem == "proposto_llm"
+
+
 # ----- Cenário diretriz no aproveitamento (núcleo) -----
 def _criar_analise(client):
     r = client.post("/api/analises", files={"kmz": ("g.kmz", make_kmz([RET_RETANGULO]), "application/vnd.google-earth.kmz")})

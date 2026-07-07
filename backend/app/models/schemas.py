@@ -465,6 +465,38 @@ class DoacaoSplit(BaseModel):
     pagina: Optional[int] = None
 
 
+class ParamBoolProv(BaseModel):
+    """Regra BOOLEANA da diretriz + proveniência (ex.: cul-de-sac obrigatório). ``valor=None`` =
+    não encontrado — o LLM nunca inventa a regra, só transcreve o que o texto diz."""
+
+    valor: Optional[bool] = None
+    artigo: Optional[str] = None
+    pagina: Optional[int] = None
+    trecho: Optional[str] = None
+    origem: OrigemParam = "proposto_llm"
+
+
+class NormasUrbanisticas(BaseModel):
+    """Fase U7 — normas urbanísticas do CONDOMÍNIO (nível MUNICÍPIO, não por zona): capítulo
+    "Das Normas Urbanísticas" da lei de condomínio de lotes + a reserva ambiental (APAC/área
+    verde). Cada campo carrega proveniência (artigo/página/trecho); ``None`` = não extraído
+    (degrada rotulado, o motor usa fallback e avisa "verificar na prefeitura"). O LLM LÊ o
+    documento e transcreve — nunca inventa (§1). Ex. São Roque LC 106/2020, Art. 9/11/16."""
+
+    via_local_sem_estac_m: Optional[ParamProv] = None       # via sem estacionamento (ex.: 6 m)
+    via_local_estac_1lado_m: Optional[ParamProv] = None     # estacionamento 1 lado (ex.: 9 m)
+    via_local_estac_2lados_m: Optional[ParamProv] = None    # estacionamento 2 lados (ex.: 11 m)
+    via_pedestres_m: Optional[ParamProv] = None             # via de pedestres (ex.: 1,90 m)
+    area_comum_m2_por_unidade: Optional[ParamProv] = None   # uso comum ≥ X m²/unidade (ex.: 6)
+    portaria_max_m2: Optional[ParamProv] = None             # portaria no recuo (ex.: ≤ 10 m²)
+    vaga_visitante_pct: Optional[ParamProv] = None          # visitantes = X% das unidades (0.12)
+    vaga_visitante_min: Optional[ParamProv] = None          # mínimo de vagas visitante (ex.: 4)
+    cul_de_sac_obrigatorio: Optional[ParamBoolProv] = None  # via sem saída exige cul-de-sac
+    testada_min_via_publica_m: Optional[ParamProv] = None   # testada p/ via pública (ex.: 20 m)
+    apac_pct: Optional[ParamProv] = None                    # reserva ambiental APAC/área verde (0.10)
+    area_min_doacao_m2: Optional[ParamProv] = None          # gatilho da doação (ex.: 15.000 m²)
+
+
 class ZonaParams(BaseModel):
     """Índices por zona. Apenas ``lote_min_m2`` e ``doacao_pct`` entram no número (decisão
     vetável §6-B); o resto é perfil para a Jurídica (Fase 3)."""
@@ -508,6 +540,8 @@ class PerfilMunicipal(BaseModel):
     status: Literal["proposto", "confirmado"] = "proposto"
     fonte_documento: Optional[str] = None
     zonas: list[ZonaPerfil] = []
+    # Fase U7 — normas urbanísticas do condomínio (nível município; None = não extraído).
+    normas_urbanisticas: Optional[NormasUrbanisticas] = None
     avisos: list[str] = []
     validado_por: Optional[str] = None
     data_referencia: Optional[str] = None

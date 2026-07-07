@@ -81,7 +81,17 @@ _INSTRUCAO_ANTIALUCINACAO = (
     "sobre a área aproveitável, ou 'combinada') conforme a LUOS. Doação 0 é válida quando "
     "a LUOS isenta — registre 0 com a citação, não omita.\n"
     "5. Você LÊ e PROPÕE; um humano confere cada valor contra a citação antes de qualquer "
-    "cálculo. Não conclua nada sobre a viabilidade da gleba."
+    "cálculo. Não conclua nada sobre a viabilidade da gleba.\n"
+    "6. Além dos índices POR ZONA, capture as NORMAS URBANÍSTICAS DO CONDOMÍNIO (nível do "
+    "MUNICÍPIO, valem para o empreendimento todo, não por zona) — geralmente num capítulo "
+    "'Das Normas Urbanísticas' e no capítulo de doação/meio-ambiente. Preencha o objeto "
+    "`normas_urbanisticas` (mesma regra: cada campo com valor+artigo+pagina+trecho; ausente "
+    "→ omita). Procure especificamente: larguras de via local por estacionamento (sem "
+    "estacionamento / 1 lado / 2 lados), via de pedestres, área de uso comum mínima por "
+    "unidade, área/tamanho máximo de portaria, vagas de visitante (percentual e mínimo), se "
+    "'cul-de-sac' é obrigatório em via sem saída (booleano), testada mínima para via pública, "
+    "reserva ambiental interna (APAC / APA / área verde / percentual a preservar) e a área "
+    "mínima que dispara a exigência de doação."
 )
 
 # Formato pedido ao LLM (JSON-only, parse tolerante no nosso lado). Cada ParamProv =
@@ -100,6 +110,13 @@ _INSTRUCAO_FORMATO = (
     '"avisos": ["..."]}\n'
     "Capture TAMBÉM, quando constarem: recuo_frontal_m, recuo_lateral_m, recuo_fundos_m, "
     "gabarito_m (altura máxima em metros) e permeabilidade_min_pct (fração: 20% → 0.2). "
+    "Inclua ainda um objeto `normas_urbanisticas` (nível município, fora de `zonas`) com os "
+    "campos que encontrar, cada um {valor, artigo, pagina, trecho}: via_local_sem_estac_m, "
+    "via_local_estac_1lado_m, via_local_estac_2lados_m, via_pedestres_m, "
+    "area_comum_m2_por_unidade, portaria_max_m2, vaga_visitante_pct (fração), "
+    "vaga_visitante_min, cul_de_sac_obrigatorio (valor booleano true/false), "
+    "testada_min_via_publica_m, apac_pct (fração da reserva ambiental/área verde), "
+    "area_min_doacao_m2. "
     "Omita qualquer parâmetro cujo valor você não encontrou no texto (NÃO invente). Se não "
     "conseguir ler o documento, devolva {\"zonas\": [], \"avisos\": [\"motivo\"]}."
 )
@@ -149,6 +166,19 @@ _FERRAMENTA = {
                     },
                     "required": ["codigo"],
                 },
+            },
+            "normas_urbanisticas": {
+                "type": "object",
+                "description": (
+                    "Normas urbanísticas do CONDOMÍNIO (nível município, não por zona). Cada "
+                    'campo: {"valor": number|boolean, "artigo": "Art. X", "pagina": int, '
+                    '"trecho": "verbatim"}. Chaves: via_local_sem_estac_m, '
+                    "via_local_estac_1lado_m, via_local_estac_2lados_m, via_pedestres_m, "
+                    "area_comum_m2_por_unidade, portaria_max_m2, vaga_visitante_pct (fração), "
+                    "vaga_visitante_min, cul_de_sac_obrigatorio (valor true/false), "
+                    "testada_min_via_publica_m, apac_pct (fração de reserva ambiental/área "
+                    "verde), area_min_doacao_m2. Omita o que não achar."
+                ),
             },
             "avisos": {"type": "array", "items": {"type": "string"}},
         },
@@ -277,6 +307,7 @@ class ExtratorLUOSClaude:
                     "status": "proposto",
                     "fonte_documento": nome_arquivo,
                     "zonas": bruto.get("zonas", []),
+                    "normas_urbanisticas": bruto.get("normas_urbanisticas") or None,
                     "avisos": bruto.get("avisos", []),
                 }
             )
@@ -302,6 +333,13 @@ def _marcar_origem_llm(perfil: PerfilMunicipal) -> None:
                 p = getattr(ov, nome, None)
                 if p is not None:
                     p.origem = "proposto_llm"
+    # U7 — normas urbanísticas do condomínio (nível município).
+    nu = perfil.normas_urbanisticas
+    if nu is not None:
+        for nome in nu.model_fields:
+            p = getattr(nu, nome, None)
+            if p is not None and hasattr(p, "origem"):
+                p.origem = "proposto_llm"
 
 
 def _opcoes_tls() -> dict:
