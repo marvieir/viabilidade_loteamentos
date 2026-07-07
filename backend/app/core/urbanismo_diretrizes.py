@@ -64,6 +64,19 @@ def resolver_diretrizes(
         fonte = "BASE_FEDERAL — diretriz municipal não confirmada (verificar na prefeitura)"
         cobertura = "BASE_FEDERAL"
 
+    # U7 — NORMAS URBANÍSTICAS do condomínio (nível município): viram REQUISITOS que o motor honra
+    # e a conformidade verifica (larguras de via, área comum/unidade, cul-de-sac, testada). Só do
+    # perfil CONFIRMADO (§2). Cada campo é {valor, artigo} p/ a conformidade citar. Ausente → não-avaliado.
+    normas: dict = {}
+    if confirmada and getattr(perfil, "normas_urbanisticas", None) is not None:
+        nu = perfil.normas_urbanisticas
+        for _campo in ("via_local_sem_estac_m", "via_local_estac_1lado_m", "via_local_estac_2lados_m",
+                       "area_comum_m2_por_unidade", "testada_min_via_publica_m",
+                       "cul_de_sac_obrigatorio", "doacao_pct"):
+            p = getattr(nu, _campo, None)
+            if p is not None and getattr(p, "valor", None) is not None:
+                normas[_campo] = {"valor": p.valor, "artigo": getattr(p, "artigo", None)}
+
     # Piso LEGAL do lote: a ZONA (LUOS) é o piso quando confirmada (a lei vence); sem zona,
     # usa o piso de mercado do perfil como mínimo prático. SEMPRE ≥ 125 m² (federal). Decisão
     # de contrato: o piso de mercado NÃO sobe acima da zona — o histograma fica em [zona, teto]
@@ -95,6 +108,7 @@ def resolver_diretrizes(
         "piso_mercado_m2": piso_mercado,
         "doacao_min_pct": doacao_pct,
         "apac_pct": apac_pct,  # U7 — reserva ambiental da zona (piso de verde do motor); None = fallback
+        "normas": normas,  # U7 — normas urbanísticas do condomínio (requisitos p/ motor + conformidade)
         "doacao_split": split,  # frações da gleba (viário/verde/institucional)
         "testada_alvo_m": perf["testada"],
         "prof_alvo_m": perf["prof"],

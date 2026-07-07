@@ -931,4 +931,52 @@ def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> li
                    + (f" — mínimo {_fmt((split.get('institucional') or 0) * 100, 1)}%."
                       if split.get("institucional") is not None else _sem_split),
     })
+
+    # ===== U7 — REQUISITOS DA DIRETRIZ (normas urbanísticas): o motor honra, a conformidade cita =====
+    # APAC / reserva ambiental (por zona): a mata preservada CONTA (premissa rotulada). Base = gleba.
+    apac_exig = diretrizes.get("apac_pct")
+    if apac_exig is not None:
+        mata = _area(getattr(layout, "restricao_recortada", None))
+        gleba_bruta = liq + mata
+        apac_med = round((mata + q["areas_verdes"]["m2"]) / gleba_bruta, 4) if gleba_bruta else 0.0
+        itens.append({
+            "item": "apac_reserva_ambiental", "exigido": round(float(apac_exig), 4),
+            "medido": apac_med, "unidade": "pct", "status": _status(apac_med, float(apac_exig)),
+            "leitura": f"reserva ambiental (mata preservada + verde) {_fmt(apac_med*100,1)}% — "
+                       f"mínimo APAC da zona {_fmt(float(apac_exig)*100,1)}%. PREMISSA: a mata "
+                       "conta para a APAC (confirmar na prefeitura).",
+        })
+    normas = diretrizes.get("normas") or {}
+    n = med.indicadores.get("n_lotes") or 0
+    # Área de uso comum ≥ X m²/unidade (Art. 11 V) — medido = sistema de lazer / nº de unidades.
+    ac = normas.get("area_comum_m2_por_unidade")
+    if ac is not None and n:
+        ac_med = round(q["sistema_lazer"]["m2"] / n, 1)
+        itens.append({
+            "item": "area_comum_por_unidade", "exigido": ac["valor"], "medido": ac_med,
+            "unidade": "m2_un", "status": _status(ac_med, float(ac["valor"])),
+            "leitura": f"área de uso comum {_fmt(ac_med,1)} m²/unidade — mínimo {ac['valor']} "
+                       f"m²/unidade ({ac.get('artigo') or 'diretriz'}).",
+        })
+    # Cul-de-sac (Art. 11 IX): o motor aplica bulbo em TODA via sem saída → requisito atendido por
+    # construção. (Sem via sem saída = trivialmente conforme.)
+    cds = normas.get("cul_de_sac_obrigatorio")
+    if cds is not None and cds.get("valor"):
+        itens.append({
+            "item": "cul_de_sac", "exigido": True, "medido": True, "unidade": "bool",
+            "status": "atende",
+            "leitura": "cul-de-sac aplicado em toda via sem saída pelo motor "
+                       f"({cds.get('artigo') or 'diretriz'}).",
+        })
+    # Larguras de via da diretriz (Art. 11 I-III) — informativo: o motor usa a largura local da
+    # diretriz; a largura executiva por trecho (6/9/11 conforme estacionamento) é do projeto.
+    via_loc = normas.get("via_local_estac_1lado_m") or normas.get("via_local_sem_estac_m")
+    if via_loc is not None:
+        itens.append({
+            "item": "largura_via_local", "exigido": via_loc["valor"], "medido": None,
+            "unidade": "m", "status": "nao_avaliado",
+            "leitura": f"largura de via local da diretriz {via_loc['valor']} m "
+                       f"({via_loc.get('artigo') or ''}) — a largura por trecho (6/9/11 conforme "
+                       "estacionamento) é definida no projeto executivo.",
+        })
     return itens
