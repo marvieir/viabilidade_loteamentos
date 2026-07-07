@@ -71,8 +71,17 @@ def _decodificar(token: str, tipo: Literal["access", "refresh"]) -> dict:
     segredo = JWT_SECRET if tipo == "access" else JWT_REFRESH_SECRET
     try:
         payload = jwt.decode(token, segredo, algorithms=[JWT_ALG])
+    except jwt.ExpiredSignatureError:
+        # Mensagem CLARA e acionável p/ o usuário (não o jargão "token expirado").
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Sua sessão expirou por inatividade. Faça login novamente para continuar.",
+        )
     except jwt.PyJWTError:
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Token inválido ou expirado.")
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED,
+            "Sessão inválida. Faça login novamente.",
+        )
     if payload.get("tipo") != tipo:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Tipo de token inválido.")
     return payload
