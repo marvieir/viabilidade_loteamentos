@@ -524,6 +524,30 @@ def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: floa
     return eixos or None
 
 
+def _bulbos_cul_de_sac(eixos: Sequence[BaseGeometry], ilha: BaseGeometry,
+                       via_local: float, raio: float):
+    """U8 — CUL-DE-SAC (exigência da diretriz, Art.11 IX + eficiência Urbia): bulbo de retorno em
+    toda ponta de via SEM SAÍDA (endpoint de grau 1, interior à gleba — não termina na borda nem
+    encontra outra via). Devolve os discos (∩ ilha) p/ unir ao arruamento. Determinístico."""
+    bulbos: list[BaseGeometry] = []
+    linhas = [e for e in eixos if e is not None and not e.is_empty]
+    if not linhas:
+        return bulbos
+    borda = ilha.boundary
+    for ls in linhas:
+        cs = list(ls.coords)
+        for c in (cs[0], cs[-1]):
+            pt = Point(c)
+            if pt.distance(borda) <= via_local:
+                continue  # termina na borda → é acesso, não via sem saída
+            grau = sum(1 for e in linhas if e.distance(pt) <= 0.6)
+            if grau <= 1:  # só a própria via toca o ponto → ponta morta
+                disco = _valido(pt.buffer(raio, quad_segs=16).intersection(ilha))
+                if disco is not None and not disco.is_empty:
+                    bulbos.append(disco)
+    return bulbos
+
+
 def construir_malha(reg: BaseGeometry, eixos_ia: Sequence[BaseGeometry], block_w: float,
                     block_h: float, via_local: float, via_tronco: float, podar: bool = True,
                     eixos_prontos=None):
@@ -1580,6 +1604,11 @@ def gerar_layout(
             ilha, eixos_ia_ilha, bw_i, bh_i, via_local, via_tronco, podar=True,
             eixos_prontos=eixos_pais,
         )
+        # U8 — CUL-DE-SAC: bulbo de retorno em toda via sem saída (Art.11 IX + look Urbia).
+        if str(estilo.get("gramatica", "")) == "faixas_fluidas" and eix_i:
+            _bulbos = _bulbos_cul_de_sac(eix_i, ilha, via_local, max(via_local, 8.0))
+            if _bulbos:
+                ruas_i = _uniao_segura([ruas_i, *_bulbos]) if ruas_i is not None else _uniao_segura(_bulbos)
         # Fase U6a P4 — fitas → PODS de ~pod_lotes_max lotes separados por CORREDORES
         # verdes (os "bairrinhos"): nos ANÉIS o corte é RADIAL (a banda é curva — e o
         # corredor liga armadura↔cinturão, como nas referências); na FOLHA, transversal.
