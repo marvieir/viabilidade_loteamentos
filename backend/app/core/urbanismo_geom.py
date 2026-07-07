@@ -1353,16 +1353,26 @@ def gerar_layout(
     pct_verde_min = float(split.get("verde") or 0.0)
     pct_inst_min = float(split.get("institucional") or 0.0)
     pct_lazer0 = max(0.0, min(max(programa.pct_lazer, pct_verde_min), 0.6))
-    # Opção B orgânica: teto do lazer/verde reservado (default 0,10) — MAS só quando a MATA
-    # PRESERVADA já cobre a doação legal (senão reservar pouco verde seria ILEGAL numa gleba sem
-    # mata). Mata que cobre = restrição preservada ≥ doação mínima da gleba bruta. Respeita sempre
-    # o piso da LUOS (pct_verde_min). Fora disso, o orçamento normal (o traçado orgânico continua).
+    # U7 — PISO DE VERDE = APAC da DIRETRIZ (reserva ambiental da zona), não número inventado. A
+    # mata preservada CONTA para a APAC (contabilizável como área permeável — São Roque Art.7 §3;
+    # ROTULADO p/ a prefeitura confirmar). Piso de verde RESERVADO = déficit da APAC após a mata:
+    # max(0, apac − fração de mata). Gleba com muita mata (ex.: 27,8% ≥ 20% APAC) → piso 0 → verde
+    # mínimo reservado, yield alto. Sem APAC na diretriz → fallback de ESTILO, rotulado.
     mata_area = (restricao_externa.area
                  if (restricao_externa is not None and not restricao_externa.is_empty) else 0.0)
-    doacao_min = float(diretrizes.get("doacao_min_pct", 0.20) or 0.20)
     gleba_bruta = aprov_area + mata_area
-    mata_cobre_doacao = gleba_bruta > 0 and (mata_area / gleba_bruta) >= doacao_min
-    if organico and mata_cobre_doacao:
+    mata_frac = (mata_area / gleba_bruta) if gleba_bruta > 0 else 0.0
+    apac_alvo = diretrizes.get("apac_pct")
+    if apac_alvo is not None:
+        verde_piso = max(0.0, float(apac_alvo) - mata_frac)  # déficit da APAC após a mata
+        apac_fonte = "diretriz"
+    else:  # diretriz silenciosa → piso de estilo (boas práticas), rotulado
+        verde_piso = float(estilo.get("verde_min_pct_organico", 0.08)) if organico else float(
+            estilo.get("verde_min_pct", 0.0))
+        apac_fonte = "fallback_estilo"
+    # o piso de verde cobre o mínimo; o motor pode reservar MAIS por qualidade, nunca menos.
+    if (organico or limpar) and verde_piso <= 0.02:
+        # APAC coberta pela mata → só o teto orgânico de lazer/verde (não afunda o yield).
         pct_lazer0 = max(pct_verde_min, min(pct_lazer0, float(estilo.get("lazer_pct_organico", 0.10))))
     pct_inst = max(0.0, min(max(programa.pct_institucional, pct_inst_min), 0.3))
 
@@ -2004,9 +2014,9 @@ def gerar_layout(
 
     # U6a — VERDE MÍNIMO do estilo (lei local): completa a reserva com as MAIORES peças
     # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
-    alvo_verde_pct = float(estilo.get("verde_min_pct", 0.0)) if (usa_paisagem or limpar) else 0.0
-    if organico and mata_cobre_doacao:  # piso de verde baixo SÓ quando a mata cobre a doação legal
-        alvo_verde_pct = min(alvo_verde_pct, float(estilo.get("verde_min_pct_organico", 0.08)))
+    # U7 — o piso do top-up de verde é o VERDE_PISO derivado da APAC (déficit após a mata). Na
+    # paisagem/limpo usa esse piso; fora, 0. (verde_piso já embute o fallback de estilo rotulado.)
+    alvo_verde_pct = verde_piso if (usa_paisagem or limpar) else 0.0
     if alvo_verde_pct > 0 and sobra_reg is not None and not sobra_reg.is_empty:
         verde_atual = (verde_reservado_reg.area if verde_reservado_reg is not None else 0.0) + (
             cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
@@ -2331,6 +2341,26 @@ def gerar_layout(
         avisos.append(
             "A subdivisão não acomodou lotes na área aproveitável "
             "(gleba pequena/irregular para o perfil)."
+        )
+    # U7 — rotula a fonte e a cobertura do piso de verde (APAC). §1/§5: número da diretriz, não
+    # inventado; a contabilização da mata na APAC é premissa a confirmar na prefeitura.
+    if apac_fonte == "diretriz" and apac_alvo is not None:
+        if mata_frac >= float(apac_alvo) - 1e-6:
+            avisos.append(
+                f"Reserva ambiental APAC {float(apac_alvo)*100:.0f}% (diretriz da zona) ATENDIDA "
+                f"pela mata preservada ({mata_frac*100:.1f}% da gleba) — o verde reservado é o "
+                "mínimo de qualidade. PREMISSA: a mata conta para a APAC (confirmar na prefeitura)."
+            )
+        else:
+            avisos.append(
+                f"Reserva ambiental APAC {float(apac_alvo)*100:.0f}% (diretriz): a mata preservada "
+                f"({mata_frac*100:.1f}%) NÃO cobre sozinha — o motor reserva +{verde_piso*100:.1f}% "
+                "de verde para completar o piso."
+            )
+    elif apac_fonte == "fallback_estilo" and (usa_paisagem or limpar):
+        avisos.append(
+            "APAC/área verde NÃO consta na diretriz confirmada — piso de verde por boas práticas "
+            f"(~{verde_piso*100:.0f}%), rotulado. Verificar a exigência real na prefeitura."
         )
     if usa_paisagem and modos_paisagem:
         avisos.append(
