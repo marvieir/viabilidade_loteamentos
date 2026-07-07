@@ -75,6 +75,32 @@ def _layout(gleba, publico="media", pct_lazer=0.12):
     return geom.gerar_layout(gleba, prog)
 
 
+def test_conformidade_com_normas_valida_no_schema():
+    """Regressão (U7.4): a conformidade com NORMAS da diretriz (APAC/via/cul-de-sac) tem que
+    validar em ConformidadeLegalOut. Um item com medido=None (largura executiva) ou regra
+    booleana (cul-de-sac) derrubava a geração inteira (500 mascarado como 'token inválido')."""
+    from app.core import urbanismo_medida as medida
+    from app.models import schemas
+
+    layout = _layout(GLEBA_COMPRIDA, publico="alta")
+    med = medida.medir(layout, publico_alvo="alta")
+    diretrizes = {
+        "piso_lote_efetivo_m2": 125.0, "lote_min_zona_m2": 360.0, "doacao_min_pct": 0.10,
+        "apac_pct": 0.20, "doacao_split": None,
+        "normas": {
+            "area_comum_m2_por_unidade": {"valor": 6.0, "artigo": "Art. 11, V"},
+            "cul_de_sac_obrigatorio": {"valor": True, "artigo": "Art. 11, IX"},
+            "via_local_estac_1lado_m": {"valor": 9.0, "artigo": "Art. 11, II"},
+        },
+    }
+    itens = medida.conformidade_legal(med, layout, diretrizes)
+    # ESTE é o caminho que crashava — cada item TEM que validar no schema:
+    validados = [schemas.ConformidadeLegalOut(**c) for c in itens]
+    assert {"apac_reserva_ambiental", "cul_de_sac", "largura_via_local"} <= {v.item for v in validados}
+    cds = next(v for v in validados if v.item == "cul_de_sac")
+    assert cds.medido is None and cds.status == "atende"  # regra booleana não vira float
+
+
 def test_gleba_comprida_ganha_praca_e_cobertura():
     layout = _layout(GLEBA_COMPRIDA)
     d = layout.sistema_lazer_diagnostico
