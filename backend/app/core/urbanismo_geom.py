@@ -1508,7 +1508,15 @@ def gerar_layout(
                    if (declividade_acentuada is not None and not declividade_acentuada.is_empty and ang_deg)
                    else declividade_acentuada)
 
-    via_local = min(via, VIA_LOCAL_M)         # rua de quadra (local)
+    # U7 — LARGURA DE VIA LOCAL da DIRETRIZ (São Roque Art.11 I-III: 6/9/11 m conforme
+    # estacionamento). O motor honra o valor da diretriz quando a LUOS confirmada o traz; senão usa
+    # o default de projeto (VIA_LOCAL_M). Preferência: estacionamento 1 lado (9 m) — meio-termo do
+    # condomínio; cai p/ sem-estacionamento (6 m) se for o único informado. Determinístico.
+    _normas = diretrizes.get("normas") or {}
+    _via_dir = (_normas.get("via_local_estac_1lado_m") or _normas.get("via_local_estac_2lados_m")
+                or _normas.get("via_local_sem_estac_m"))
+    via_local_diretriz = float(_via_dir["valor"]) if (_via_dir and _via_dir.get("valor")) else None
+    via_local = via_local_diretriz if via_local_diretriz else min(via, VIA_LOCAL_M)  # rua de quadra
     # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO usa a
     # largura da via principal (já capada p/ ~11 m em condomínio privado na fronteira do programa).
     via_tronco = max(via, via_local + 2.0) if quer_curva else max(via, VIA_TRONCO_M)
