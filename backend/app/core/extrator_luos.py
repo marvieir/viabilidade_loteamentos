@@ -90,8 +90,12 @@ _INSTRUCAO_ANTIALUCINACAO = (
     "estacionamento / 1 lado / 2 lados), via de pedestres, área de uso comum mínima por "
     "unidade, área/tamanho máximo de portaria, vagas de visitante (percentual e mínimo), se "
     "'cul-de-sac' é obrigatório em via sem saída (booleano), testada mínima para via pública, "
-    "reserva ambiental interna (APAC / APA / área verde / percentual a preservar) e a área "
-    "mínima que dispara a exigência de doação."
+    "faixa verde de frente para via (largura em metros) e a área mínima que dispara a doação. "
+    "A DOAÇÃO ao município (%) para condomínio é norma de MUNICÍPIO → ponha em "
+    "`normas_urbanisticas.doacao_pct` (fração). ATENÇÃO à reserva ambiental **APAC/área "
+    "permeável**: se ela VARIA POR ZONA/MACROZONA (ex.: 10% numa, 20% noutra), NÃO a coloque "
+    "em normas_urbanisticas — registre `apac_pct` DENTRO de cada zona (params), com a citação "
+    "da respectiva zona. Se for um valor único de município, aí sim vai em normas_urbanisticas."
 )
 
 # Formato pedido ao LLM (JSON-only, parse tolerante no nosso lado). Cada ParamProv =
@@ -152,7 +156,9 @@ _FERRAMENTA = {
                                 'leva "base": "total"|"liquida"|"combinada". Chaves: '
                                 "lote_min_m2, frente_min_m, doacao_pct, ca, taxa_ocupacao, "
                                 "recuo_frontal_m, recuo_lateral_m, recuo_fundos_m, gabarito_m "
-                                "(altura máx. em metros), permeabilidade_min_pct (fração: 0.2=20%)."
+                                "(altura máx. em metros), permeabilidade_min_pct (fração: 0.2=20%), "
+                                "apac_pct (reserva ambiental/área verde da zona, fração; use aqui "
+                                "quando VARIA por zona/macrozona)."
                             ),
                         },
                         "modalidades": {
@@ -176,8 +182,9 @@ _FERRAMENTA = {
                     "via_local_estac_1lado_m, via_local_estac_2lados_m, via_pedestres_m, "
                     "area_comum_m2_por_unidade, portaria_max_m2, vaga_visitante_pct (fração), "
                     "vaga_visitante_min, cul_de_sac_obrigatorio (valor true/false), "
-                    "testada_min_via_publica_m, apac_pct (fração de reserva ambiental/área "
-                    "verde), area_min_doacao_m2. Omita o que não achar."
+                    "testada_min_via_publica_m, faixa_verde_via_m, doacao_pct (fração — doação "
+                    "ao município p/ condomínio), area_min_doacao_m2. (APAC/área verde que VARIA "
+                    "por zona vai em zonas[].params.apac_pct, NÃO aqui.) Omita o que não achar."
                 ),
             },
             "avisos": {"type": "array", "items": {"type": "string"}},
@@ -324,7 +331,8 @@ class ExtratorLUOSClaude:
 def _marcar_origem_llm(perfil: PerfilMunicipal) -> None:
     """Carimba ``origem='proposto_llm'`` em todo ParamProv vindo da extração."""
     for zona in perfil.zonas:
-        for nome in ("lote_min_m2", "frente_min_m", "doacao_pct", "ca", "taxa_ocupacao"):
+        for nome in ("lote_min_m2", "frente_min_m", "doacao_pct", "ca", "taxa_ocupacao",
+                     "permeabilidade_min_pct", "apac_pct"):
             p = getattr(zona.params, nome, None)
             if p is not None:
                 p.origem = "proposto_llm"

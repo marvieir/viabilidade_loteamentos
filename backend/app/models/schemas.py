@@ -493,8 +493,10 @@ class NormasUrbanisticas(BaseModel):
     vaga_visitante_min: Optional[ParamProv] = None          # mínimo de vagas visitante (ex.: 4)
     cul_de_sac_obrigatorio: Optional[ParamBoolProv] = None  # via sem saída exige cul-de-sac
     testada_min_via_publica_m: Optional[ParamProv] = None   # testada p/ via pública (ex.: 20 m)
-    apac_pct: Optional[ParamProv] = None                    # reserva ambiental APAC/área verde (0.10)
+    faixa_verde_via_m: Optional[ParamProv] = None           # faixa verde de frente p/ via (ex.: 6 m)
+    doacao_pct: Optional[ParamProv] = None                  # doação ao município (Art.16; nível município)
     area_min_doacao_m2: Optional[ParamProv] = None          # gatilho da doação (ex.: 15.000 m²)
+    # (APAC saiu daqui — é POR ZONA: ver ZonaParams.apac_pct. Descoberto pela extração real.)
 
 
 class ZonaParams(BaseModel):
@@ -513,6 +515,10 @@ class ZonaParams(BaseModel):
     recuo_fundos_m: Optional[ParamProv] = None
     gabarito_m: Optional[ParamProv] = None  # gabarito/altura máxima
     permeabilidade_min_pct: Optional[ParamProv] = None  # taxa de permeabilidade mínima (fração)
+    # U7 — reserva ambiental APAC/área verde é POR ZONA/MACROZONA (ex.: São Roque = 10% na
+    # Consolidação Urbana, 20% na Urbanização Específica — Art. 7°/12 LC 106/2020). Descoberto
+    # pela extração real: não é um valor único de município. Fração (0.20 = 20%).
+    apac_pct: Optional[ParamProv] = None
 
 
 class ModalidadeOverride(BaseModel):

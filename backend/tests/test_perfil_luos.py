@@ -107,13 +107,16 @@ def test_normas_urbanisticas_sobrevivem_confirmacao(client, fonte_perfil):
     from app.models.schemas import NormasUrbanisticas, ParamBoolProv
 
     perfil = _perfil_proposto()
+    # APAC é POR ZONA (descoberto na extração real de São Roque: 10% Consolidação / 20% Urb.Específica).
+    perfil.zonas[0].params.apac_pct = ParamProv(
+        valor=0.20, artigo="Art. 7°, §3", pagina=5, trecho="reservar 20% ... a título de APAC")
     perfil.normas_urbanisticas = NormasUrbanisticas(
-        via_local_sem_estac_m=ParamProv(valor=6.0, artigo="Art. 11, I", pagina=4, trecho="6,00 (seis) metros"),
-        via_local_estac_2lados_m=ParamProv(valor=11.0, artigo="Art. 11, III", pagina=4, trecho="11 (onze) metros"),
-        area_comum_m2_por_unidade=ParamProv(valor=6.0, artigo="Art. 11, V", pagina=4, trecho="6,00 m² por unidade"),
-        cul_de_sac_obrigatorio=ParamBoolProv(valor=True, artigo="Art. 11, IX", pagina=4, trecho="providas de cul de sac"),
-        apac_pct=ParamProv(valor=0.10, artigo="Art. 9, c", pagina=3, trecho="reservar 10% de sua área a título de APAC"),
-        area_min_doacao_m2=ParamProv(valor=15000.0, artigo="Art. 16", pagina=5, trecho="15.000,00 m²"),
+        via_local_sem_estac_m=ParamProv(valor=6.0, artigo="Art. 11, I", pagina=6, trecho="6,00 (seis) metros"),
+        via_local_estac_2lados_m=ParamProv(valor=11.0, artigo="Art. 11, III", pagina=6, trecho="11 (onze) metros"),
+        area_comum_m2_por_unidade=ParamProv(valor=6.0, artigo="Art. 11, V", pagina=6, trecho="6,00 m² por unidade"),
+        cul_de_sac_obrigatorio=ParamBoolProv(valor=True, artigo="Art. 11, IX", pagina=6, trecho="providas de cul de sac"),
+        doacao_pct=ParamProv(valor=0.10, artigo="Art. 16", pagina=8, trecho="no mínimo, 10% ... do terreno"),
+        area_min_doacao_m2=ParamProv(valor=15000.0, artigo="Art. 16", pagina=8, trecho="15.000,00 m²"),
     )
     body = perfil.model_dump()
     body["validado_por"] = "Eng. Fulana"
@@ -121,10 +124,10 @@ def test_normas_urbanisticas_sobrevivem_confirmacao(client, fonte_perfil):
     g = client.get(f"/api/municipios/{COD}/perfil").json()
     nu = g["normas_urbanisticas"]
     assert nu["via_local_sem_estac_m"]["valor"] == 6.0
-    assert nu["via_local_estac_2lados_m"]["valor"] == 11.0
     assert nu["cul_de_sac_obrigatorio"]["valor"] is True
-    assert nu["apac_pct"]["valor"] == 0.10
     assert nu["cul_de_sac_obrigatorio"]["artigo"] == "Art. 11, IX"  # proveniência preservada
+    assert nu["doacao_pct"]["valor"] == 0.10                        # doação nível município
+    assert g["zonas"][0]["params"]["apac_pct"]["valor"] == 0.20     # APAC por zona
 
 
 def test_extrator_monta_normas_e_carimba_origem():
@@ -134,14 +137,17 @@ def test_extrator_monta_normas_e_carimba_origem():
 
     p = PerfilMunicipal.model_validate({
         "cod_ibge": COD, "municipio": "São Roque",
+        "zonas": [{"codigo": "Urb. Específica", "params": {
+            "apac_pct": {"valor": 0.20, "artigo": "Art. 7°, §3", "pagina": 5, "trecho": "20% APAC"}}}],
         "normas_urbanisticas": {
-            "cul_de_sac_obrigatorio": {"valor": True, "artigo": "Art. 11, IX", "pagina": 4, "trecho": "cul de sac"},
-            "apac_pct": {"valor": 0.10, "artigo": "Art. 9, c", "pagina": 3, "trecho": "10% ... APAC"},
+            "cul_de_sac_obrigatorio": {"valor": True, "artigo": "Art. 11, IX", "pagina": 6, "trecho": "cul de sac"},
+            "doacao_pct": {"valor": 0.10, "artigo": "Art. 16", "pagina": 8, "trecho": "10% do terreno"},
         },
     })
     _marcar_origem_llm(p)
     assert p.normas_urbanisticas.cul_de_sac_obrigatorio.origem == "proposto_llm"
-    assert p.normas_urbanisticas.apac_pct.origem == "proposto_llm"
+    assert p.normas_urbanisticas.doacao_pct.origem == "proposto_llm"
+    assert p.zonas[0].params.apac_pct.origem == "proposto_llm"  # APAC por zona, origem carimbada
 
 
 # ----- Cenário diretriz no aproveitamento (núcleo) -----
