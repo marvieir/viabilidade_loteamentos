@@ -1441,7 +1441,7 @@ class DiretrizesOut(BaseModel):
 class ConformidadeLegalOut(BaseModel):
     item: str
     exigido: Optional[float] = None
-    medido: float
+    medido: Optional[float] = None  # None p/ itens não medidos no estudo (ex.: largura executiva)
     unidade: str
     status: str  # atende | atende_com_folga | nao_atende | nao_avaliado
     leitura: str

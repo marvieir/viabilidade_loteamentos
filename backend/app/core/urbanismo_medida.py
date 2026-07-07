@@ -963,7 +963,7 @@ def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> li
     cds = normas.get("cul_de_sac_obrigatorio")
     if cds is not None and cds.get("valor"):
         itens.append({
-            "item": "cul_de_sac", "exigido": True, "medido": True, "unidade": "bool",
+            "item": "cul_de_sac", "exigido": None, "medido": None, "unidade": "regra",
             "status": "atende",
             "leitura": "cul-de-sac aplicado em toda via sem saída pelo motor "
                        f"({cds.get('artigo') or 'diretriz'}).",
