@@ -553,16 +553,22 @@ async def anexar_levantamento(
             "(camada de curva) e, se for DWG, se o conversor está disponível no servidor — exportar "
             "em DXF costuma ser o caminho mais seguro.",
         )
+    # ACUMULA entre uploads: a gleba pode ser N matrículas (São Roque = 3) — cada DXF cobre uma área;
+    # somando, o levantamento cobre a gleba toda. (Re-anexar do zero: nova análise ou limpar o campo.)
+    ja = registro.get("levantamento") or {}
+    contornos = list(ja.get("contornos_wgs") or []) + [c.wkt for c in curvas]
+    arquivos = list(ja.get("arquivos") or []) + [arquivo.filename or "levantamento"]
     registro["levantamento"] = {
-        "contornos_wgs": [c.wkt for c in curvas],
+        "contornos_wgs": contornos,
         "epsg": int(epsg),
-        "arquivo": arquivo.filename or "levantamento",
-        "n": len(curvas),
+        "arquivos": arquivos,
+        "n": len(contornos),
     }
     return schemas.LevantamentoOut(
-        arquivo=arquivo.filename or "levantamento", n_curvas=len(curvas), epsg=int(epsg),
-        aviso="Curvas de nível reais anexadas — passam a guiar o traçado do urbanismo (no lugar do "
-              "DEM de 30 m). Gere o urbanismo de novo para ver o efeito.",
+        arquivo=", ".join(arquivos), n_curvas=len(contornos), epsg=int(epsg),
+        aviso=f"Curvas de nível reais anexadas ({len(arquivos)} arquivo(s), {len(contornos)} curvas) "
+              "— passam a guiar o traçado do urbanismo no lugar do DEM de 30 m. Anexe as outras "
+              "matrículas se a gleba tiver mais de uma área; depois regere o urbanismo.",
     )
 
 
