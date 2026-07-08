@@ -19,6 +19,8 @@ import {
   avaliarUrbanismo,
   listarAvaliacoesUrbanismo,
   valorPosicionalUrbanismo,
+  anexarLevantamento,
+  type LevantamentoResult,
   type ChaveOverlay,
   type ConformidadeLegal,
   type Declividade,
@@ -116,6 +118,9 @@ export function CardUrbanismo({
   const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
   const [criarLago, setCriarLago] = useState(false); // Fase U3 — lago no ponto baixo do DEM
   const [instrucoes, setInstrucoes] = useState(""); // Mov.1 — diretrizes livres do operador
+  const [lev, setLev] = useState<LevantamentoResult | null>(null); // U9 — levantamento anexado
+  const [levErro, setLevErro] = useState<string | null>(null);
+  const [levCarregando, setLevCarregando] = useState(false);
   const [proposta, setProposta] = useState<PropostaUrbanistica | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
@@ -183,6 +188,20 @@ export function CardUrbanismo({
       setErro(e instanceof Error ? e.message : "Falha ao gerar o estudo de massa.");
     } finally {
       setCarregando(false);
+    }
+  }
+
+  // U9 — anexa o levantamento planialtimétrico (curvas de nível reais → traçado segue a cota).
+  async function anexarLev(arquivo: File) {
+    setLevCarregando(true);
+    setLevErro(null);
+    try {
+      const r = await anexarLevantamento(analiseId, arquivo);
+      setLev(r);
+    } catch (e) {
+      setLevErro(e instanceof Error ? e.message : "Falha ao anexar o levantamento.");
+    } finally {
+      setLevCarregando(false);
     }
   }
 
@@ -426,6 +445,37 @@ export function CardUrbanismo({
           placeholder='Diretrizes para o gerador (opcional) — ex.: "inclua academia, 3 quadras, mirante e áreas de descanso espalhadas". O lago é pelo checkbox acima; números continuam medidos pelo motor.'
           className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm placeholder:text-slate-400"
         />
+        {/* U9 — LEVANTAMENTO PLANIALTIMÉTRICO (nível da gleba): curvas de nível reais do agrimensor
+            guiam o traçado no lugar do DEM de 30 m (ruas seguem a cota → traçado mais orgânico). */}
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-emerald-900">🗺️ Levantamento planialtimétrico</span>
+            <label className="cursor-pointer rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
+              {levCarregando ? "Enviando…" : lev ? "Trocar arquivo" : "Anexar DXF/DWG"}
+              <input
+                type="file"
+                accept=".dxf,.dwg"
+                className="hidden"
+                disabled={levCarregando}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) anexarLev(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {lev && (
+              <span className="text-xs text-emerald-700">
+                ✓ {lev.arquivo} — {lev.n_curvas} curvas. Regere o urbanismo para ver o efeito.
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-[11px] text-emerald-700/80">
+            Opcional. As curvas reais (1/5 m) substituem o DEM de satélite (30 m) como guia do
+            traçado — as ruas passam a seguir a cota de verdade. Sem levantamento, o motor usa o DEM.
+          </p>
+          {levErro && <p className="mt-1 text-[11px] text-rose-700">{levErro}</p>}
+        </div>
         {proposta && !carregando && (
           <p className="-mt-1 text-[11px] text-slate-400">
             Layout carregado do último salvo — não consumiu IA. Clique em “Regenerar” só se quiser

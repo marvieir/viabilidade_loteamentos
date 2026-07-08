@@ -303,6 +303,37 @@ export async function gerarLaudoExcel(
 
 // Autocomplete por NOME sobre a malha local (offline). O código IBGE volta no
 // payload para resolver internamente — o usuário nunca digita nem vê o código.
+// U9 — levantamento planialtimétrico (curvas de nível reais) no nível da gleba.
+export interface LevantamentoResult {
+  arquivo: string;
+  n_curvas: number;
+  epsg: number;
+  aviso?: string | null;
+}
+
+export async function anexarLevantamento(
+  analiseId: string,
+  arquivo: File,
+  epsg = 31983
+): Promise<LevantamentoResult> {
+  const form = new FormData();
+  form.append("arquivo", arquivo);
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/levantamento?epsg=${epsg}`,
+    { method: "POST", body: form }
+  );
+  if (!res.ok) {
+    let detail = "Falha ao anexar o levantamento.";
+    try {
+      detail = ((await res.json()) as { detail?: string }).detail ?? detail;
+    } catch {
+      /* corpo não-JSON */
+    }
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 export async function buscarMunicipios(q: string): Promise<MunicipioRef[]> {
   const termo = q.trim();
   if (termo.length === 0) return [];
