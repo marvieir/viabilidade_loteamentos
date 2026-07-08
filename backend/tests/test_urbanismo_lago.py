@@ -64,6 +64,25 @@ def test_fator_agua_liga_com_anel_274m():
     assert "agua" in med2.heatmap["fatores_ausentes"]
 
 
+def test_orla_e_anel_nao_a_face_inteira():
+    """Regressão (U8) — a orla-parque é um ANEL em volta da lâmina, NÃO a face inteira. Numa face
+    grande (banda das gramáticas), orla=face−lago virava dezenas de milhares de m² de lazer e
+    tankava o yield. A orla tem que ser proporcional à lâmina (anel), não à face."""
+    from app.core import urbanismo_geom as geom
+
+    layout = _layout({"ponto": (900.0, 110.0), "area_m2": 5000.0})
+    agua = layout.agua
+    assert agua is not None and not agua.is_empty
+    # o sistema de lazer (clube+praças+orla) não pode explodir por causa do lago: a orla é um anel
+    # de ~ORLA_PARQUE_M em volta da lâmina — no MÁXIMO a lâmina + um anel, não uma banda inteira.
+    orla = layout.sistema_lazer
+    if orla is not None and not orla.is_empty:
+        teto_orla = agua.area + agua.buffer(geom.ORLA_PARQUE_M + 2.0).area  # folga generosa
+        assert orla.area <= teto_orla + 20000.0, (
+            f"lazer {orla.area:.0f} m² explodiu além do lago+anel ({teto_orla:.0f})"
+        )
+
+
 def test_lago_deterministico_e_prioridade_por_perfil():
     a = _layout(LAGO)
     b = _layout(LAGO)

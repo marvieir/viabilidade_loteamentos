@@ -63,6 +63,7 @@ VIA_TRONCO_M = 21.0
 N_LOTES_QUADRA = 6
 # Face menor que isso (m²) não vira quadra loteável → quadra VERDE formada (sobra, não sliver).
 MIN_QUADRA_M2 = 250.0
+ORLA_PARQUE_M = 18.0  # anel de orla-parque em volta da lâmina do lago (não a face inteira — U8)
 # Critérios legais do INSTITUCIONAL (Lei 6.766/art. municipal): frente p/ via, compacidade,
 # círculo inscrito, declividade. Frente/profundidade lido como NÃO-SLIVER (≥1/3) — ver nota no
 # código (a spec escreve "≤1/3"; a razão técnica "não retalho" é o piso de compacidade ≥1/3).
@@ -525,30 +526,27 @@ def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: floa
 
 
 def _bulbos_cul_de_sac(eixos: Sequence[BaseGeometry], ilha: BaseGeometry,
-                       via_local: float, raio: float, mata: Optional[BaseGeometry] = None):
-    """U8 — CUL-DE-SAC (Art.11 IX + look Urbia): bulbo de retorno em toda ponta de via SEM SAÍDA
-    (endpoint de grau 1). Ponta morta = (a) interior à gleba, ou (b) contra a MATA preservada (a
-    rua morre na orla da floresta — não dá p/ seguir; é o cul-de-sac das referências). Pontas na
-    borda EXTERNA (acesso/perímetro) NÃO ganham bulbo. Devolve os discos (∩ ilha). Determinístico."""
+                       via_local: float, raio: float, acesso: Optional[BaseGeometry] = None):
+    """U8 — CUL-DE-SAC (Art.11 IX + look Urbia): num CONDOMÍNIO FECHADO, TODA ponta de via de grau 1
+    é via SEM SAÍDA e ganha bulbo de retorno — a rua morre contra a mata, na divisa ou no fim de
+    banda, e o carro precisa retornar. A ÚNICA exceção é a ponta do ACESSO (pórtico/entrada), que
+    liga à via pública. Devolve os discos (∩ ilha) p/ unir ao arruamento. Determinístico."""
     bulbos: list[BaseGeometry] = []
     linhas = [e for e in eixos if e is not None and not e.is_empty]
     if not linhas:
         return bulbos
-    borda = ilha.boundary
     for ls in linhas:
         cs = list(ls.coords)
         for c in (cs[0], cs[-1]):
             pt = Point(c)
             grau = sum(1 for e in linhas if e.distance(pt) <= 0.6)
             if grau > 1:
-                continue  # encontra outra via → não é ponta morta
-            na_borda = pt.distance(borda) <= via_local
-            contra_mata = mata is not None and not mata.is_empty and pt.distance(mata) <= via_local * 1.5
-            # cul-de-sac quando: interior (não na borda) OU morre contra a mata (mesmo na borda da ilha).
-            if (not na_borda) or contra_mata:
-                disco = _valido(pt.buffer(raio, quad_segs=16).intersection(ilha))
-                if disco is not None and not disco.is_empty:
-                    bulbos.append(disco)
+                continue  # encontra outra via → é cruzamento, não ponta morta
+            if acesso is not None and not acesso.is_empty and pt.distance(acesso) <= via_local * 3.0:
+                continue  # é a ENTRADA (liga à via pública) — não é via sem saída
+            disco = _valido(pt.buffer(raio, quad_segs=16).intersection(ilha))
+            if disco is not None and not disco.is_empty:
+                bulbos.append(disco)
     return bulbos
 
 
@@ -1511,11 +1509,13 @@ def gerar_layout(
     ingreme_reg = (rotate(declividade_acentuada, -ang_deg, origin=cen)
                    if (declividade_acentuada is not None and not declividade_acentuada.is_empty and ang_deg)
                    else declividade_acentuada)
-    # U8 — mata preservada no frame reg (p/ o cul-de-sac: ruas que morrem contra a floresta ganham
-    # bulbo de retorno, o padrão das referências Urbia — cul-de-sac na orla da mata).
-    mata_reg = (rotate(restricao_externa, -ang_deg, origin=cen)
-                if (restricao_externa is not None and not restricao_externa.is_empty and ang_deg)
-                else restricao_externa)
+    # U8 — ponto de ACESSO (pórtico) no frame reg — a ÚNICA ponta de via que NÃO é cul-de-sac
+    # (liga à via pública); todas as outras pontas mortas ganham bulbo (condomínio fechado).
+    acesso_reg = None
+    if acesso_externo is not None and not acesso_externo.is_empty:
+        _ac_pt = (acesso_externo if isinstance(acesso_externo, Point)
+                  else acesso_externo.representative_point())
+        acesso_reg = rotate(_ac_pt, -ang_deg, origin=cen) if ang_deg else _ac_pt
 
     # U7 — LARGURA DE VIA LOCAL da DIRETRIZ (São Roque Art.11 I-III: 6/9/11 m conforme
     # estacionamento). O motor honra o valor da diretriz quando a LUOS confirmada o traz; senão usa
@@ -1623,7 +1623,7 @@ def gerar_layout(
         )
         # U8 — CUL-DE-SAC: bulbo de retorno em toda via sem saída (Art.11 IX + look Urbia).
         if str(estilo.get("gramatica", "")) == "faixas_fluidas" and eix_i:
-            _bulbos = _bulbos_cul_de_sac(eix_i, ilha, via_local, max(via_local, 8.0), mata=mata_reg)
+            _bulbos = _bulbos_cul_de_sac(eix_i, ilha, via_local, max(via_local, 8.0), acesso=acesso_reg)
             if _bulbos:
                 ruas_i = _uniao_segura([ruas_i, *_bulbos]) if ruas_i is not None else _uniao_segura(_bulbos)
         # Fase U6a P4 — fitas → PODS de ~pod_lotes_max lotes separados por CORREDORES
@@ -1835,8 +1835,19 @@ def gerar_layout(
             corpo = _valido(corpo.intersection(face_lago)) if corpo is not None else None
             if corpo is not None and not corpo.is_empty and corpo.area >= lago_alvo * 0.5:
                 lago_reg = corpo
-                orla_reg = _diferenca_segura(face_lago, corpo)  # orla-parque pública
+                # A orla-parque é um ANEL em volta da lâmina (~18 m), NÃO a face inteira: nas
+                # gramáticas de banda a face é enorme e a orla=face−lago viraria dezenas de milhares
+                # de m² de lazer, roubando lotes (o bug do lago que tankava o yield). O RESTO da
+                # face (além do anel) VOLTA a lotear como quadra.
+                orla_bruta = _diferenca_segura(face_lago, corpo)
+                _anel = _valido(corpo.buffer(ORLA_PARQUE_M))
+                orla_reg = (_valido(orla_bruta.intersection(_anel))
+                            if (_anel is not None and not _anel.is_empty) else orla_bruta)
                 miolos = [f for f in miolos if f is not face_lago]
+                _resto = _diferenca_segura(orla_bruta, orla_reg)
+                for _r in _componentes(_resto):
+                    if _r.area >= MIN_QUADRA_M2:
+                        miolos.append(_r)  # a banda além da orla volta a virar lote
 
     # 4.a INSTITUCIONAL: uma quadra com frente para via que satisfaça os 4 checks legais (borda).
     inst_reg, inst_diag = (
