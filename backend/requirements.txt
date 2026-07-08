@@ -25,3 +25,4 @@ slowapi==0.1.10           # Fase 13 — rate limiting (anti brute-force) nos end
 # dev / testes
 pytest==8.3.4
 httpx==0.28.1
+ezdxf==1.4.4
