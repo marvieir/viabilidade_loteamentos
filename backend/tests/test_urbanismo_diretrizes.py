@@ -95,6 +95,40 @@ def test_reserva_e_conformidade():
     assert itens["area_verde"]["medido"] >= (dd["doacao_split"]["verde"] - 1e-6)
 
 
+def _perfil_mue_com_normas():
+    """MUE + normas urbanísticas do condomínio (São Roque LC 106/2020) p/ conformidade citar TODOS
+    os requisitos coletados do LUOS — incl. a testada mínima em via pública (Art. 11 §1)."""
+    from app.models.schemas import NormasUrbanisticas, ParamBoolProv
+
+    perfil = _perfil_mue()
+    perfil.normas_urbanisticas = NormasUrbanisticas(
+        via_local_sem_estac_m=ParamProv(valor=6.0, artigo="Art. 11, I", pagina=6, trecho="6 m"),
+        via_local_estac_1lado_m=ParamProv(valor=9.0, artigo="Art. 11, II", pagina=6, trecho="9 m"),
+        area_comum_m2_por_unidade=ParamProv(valor=6.0, artigo="Art. 11, V", pagina=6, trecho="6 m²/un"),
+        testada_min_via_publica_m=ParamProv(valor=20.0, artigo="Art. 11, § 1°", pagina=6, trecho="20 m"),
+        cul_de_sac_obrigatorio=ParamBoolProv(valor=True, artigo="Art. 11, IX", pagina=6, trecho="cul de sac"),
+    )
+    return perfil
+
+
+def test_conformidade_inclui_todos_requisitos_luos():
+    """Guardrail do operador: a conformidade SEMPRE inclui TODOS os requisitos coletados do LUOS.
+    Regressão do achado: a testada mínima em via pública (Art. 11 §1) estava sendo COLETADA mas não
+    aparecia na conformidade — agora aparece, medida e com o artigo citado. Cul-de-sac, área comum e
+    largura de via também presentes."""
+    layout, _, med, dd = _dist(SAO_ROQUE, "alta", _perfil_mue_com_normas(), "MUE")
+    itens = {c["item"]: c for c in medida.conformidade_legal(med, layout, dd)}
+    # cada requisito coletado do LUOS tem uma linha na conformidade
+    for req in ("testada_min_via_publica", "cul_de_sac", "area_comum_por_unidade", "largura_via_local"):
+        assert req in itens, f"requisito do LUOS ausente na conformidade: {req}"
+    # a testada é MEDIDA e cita o artigo da diretriz (não some em silêncio)
+    tst = itens["testada_min_via_publica"]
+    assert tst["exigido"] == 20.0 and tst["medido"] is not None
+    assert "§ 1" in tst["leitura"] and tst["status"] in ("atende", "atende_com_folga", "nao_atende")
+    # cul-de-sac citado com o artigo (Art. 11 IX) — atendido por construção pelo motor
+    assert "11" in itens["cul_de_sac"]["leitura"] and itens["cul_de_sac"]["status"] == "atende"
+
+
 def test_sobra_de_ponta_vai_para_area_verde():
     """Regressão (achado de campo): a sobra de ponta (quadra − lotes) é DEVOLVIDA à área verde,
     nunca contabilizada como retalho perdido nem inflada no viário (§4 da spec). retalho≈0,

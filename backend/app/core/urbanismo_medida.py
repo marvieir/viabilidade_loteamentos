@@ -1018,4 +1018,22 @@ def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> li
                        f"({via_loc.get('artigo') or ''}) — a largura por trecho (6/9/11 conforme "
                        "estacionamento) é definida no projeto executivo.",
         })
+    # Testada mínima em via pública (Art. 11 §1) — requisito SEMPRE incluído quando a LUOS o coleta.
+    # Num condomínio a via interna é condominial (privada); o mínimo PÚBLICO vale p/ os lotes que dão
+    # frente à via pública (perímetro/entrada). Medimos a testada média e citamos o artigo; a
+    # aplicabilidade por lote (público × condominial) fica p/ o projeto confirmar.
+    tmv = normas.get("testada_min_via_publica_m")
+    if tmv is not None:
+        tmed = med.indicadores.get("testada_media_m")
+        itens.append({
+            "item": "testada_min_via_publica", "exigido": float(tmv["valor"]),
+            "medido": tmed, "unidade": "m",
+            "status": "nao_avaliado" if tmed is None else _status(tmed, float(tmv["valor"])),
+            "leitura": (
+                f"testada mínima em via pública {tmv['valor']} m "
+                f"({tmv.get('artigo') or 'diretriz'}) — testada média medida "
+                f"{_fmt(tmed, 1) if tmed is not None else '—'} m. O mínimo público vale p/ os lotes "
+                "com frente à via PÚBLICA; a via interna do condomínio é condominial (confirmar no "
+                "projeto quais lotes dão frente à via pública)."),
+        })
     return itens
