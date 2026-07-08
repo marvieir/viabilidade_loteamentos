@@ -525,10 +525,11 @@ def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: floa
 
 
 def _bulbos_cul_de_sac(eixos: Sequence[BaseGeometry], ilha: BaseGeometry,
-                       via_local: float, raio: float):
-    """U8 — CUL-DE-SAC (exigência da diretriz, Art.11 IX + eficiência Urbia): bulbo de retorno em
-    toda ponta de via SEM SAÍDA (endpoint de grau 1, interior à gleba — não termina na borda nem
-    encontra outra via). Devolve os discos (∩ ilha) p/ unir ao arruamento. Determinístico."""
+                       via_local: float, raio: float, mata: Optional[BaseGeometry] = None):
+    """U8 — CUL-DE-SAC (Art.11 IX + look Urbia): bulbo de retorno em toda ponta de via SEM SAÍDA
+    (endpoint de grau 1). Ponta morta = (a) interior à gleba, ou (b) contra a MATA preservada (a
+    rua morre na orla da floresta — não dá p/ seguir; é o cul-de-sac das referências). Pontas na
+    borda EXTERNA (acesso/perímetro) NÃO ganham bulbo. Devolve os discos (∩ ilha). Determinístico."""
     bulbos: list[BaseGeometry] = []
     linhas = [e for e in eixos if e is not None and not e.is_empty]
     if not linhas:
@@ -538,10 +539,13 @@ def _bulbos_cul_de_sac(eixos: Sequence[BaseGeometry], ilha: BaseGeometry,
         cs = list(ls.coords)
         for c in (cs[0], cs[-1]):
             pt = Point(c)
-            if pt.distance(borda) <= via_local:
-                continue  # termina na borda → é acesso, não via sem saída
             grau = sum(1 for e in linhas if e.distance(pt) <= 0.6)
-            if grau <= 1:  # só a própria via toca o ponto → ponta morta
+            if grau > 1:
+                continue  # encontra outra via → não é ponta morta
+            na_borda = pt.distance(borda) <= via_local
+            contra_mata = mata is not None and not mata.is_empty and pt.distance(mata) <= via_local * 1.5
+            # cul-de-sac quando: interior (não na borda) OU morre contra a mata (mesmo na borda da ilha).
+            if (not na_borda) or contra_mata:
                 disco = _valido(pt.buffer(raio, quad_segs=16).intersection(ilha))
                 if disco is not None and not disco.is_empty:
                     bulbos.append(disco)
@@ -1507,6 +1511,11 @@ def gerar_layout(
     ingreme_reg = (rotate(declividade_acentuada, -ang_deg, origin=cen)
                    if (declividade_acentuada is not None and not declividade_acentuada.is_empty and ang_deg)
                    else declividade_acentuada)
+    # U8 — mata preservada no frame reg (p/ o cul-de-sac: ruas que morrem contra a floresta ganham
+    # bulbo de retorno, o padrão das referências Urbia — cul-de-sac na orla da mata).
+    mata_reg = (rotate(restricao_externa, -ang_deg, origin=cen)
+                if (restricao_externa is not None and not restricao_externa.is_empty and ang_deg)
+                else restricao_externa)
 
     # U7 — LARGURA DE VIA LOCAL da DIRETRIZ (São Roque Art.11 I-III: 6/9/11 m conforme
     # estacionamento). O motor honra o valor da diretriz quando a LUOS confirmada o traz; senão usa
@@ -1614,7 +1623,7 @@ def gerar_layout(
         )
         # U8 — CUL-DE-SAC: bulbo de retorno em toda via sem saída (Art.11 IX + look Urbia).
         if str(estilo.get("gramatica", "")) == "faixas_fluidas" and eix_i:
-            _bulbos = _bulbos_cul_de_sac(eix_i, ilha, via_local, max(via_local, 8.0))
+            _bulbos = _bulbos_cul_de_sac(eix_i, ilha, via_local, max(via_local, 8.0), mata=mata_reg)
             if _bulbos:
                 ruas_i = _uniao_segura([ruas_i, *_bulbos]) if ruas_i is not None else _uniao_segura(_bulbos)
         # Fase U6a P4 — fitas → PODS de ~pod_lotes_max lotes separados por CORREDORES
