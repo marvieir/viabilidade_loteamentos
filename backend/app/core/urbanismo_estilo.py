@@ -76,6 +76,10 @@ ESTILO_DEFAULT: dict[str, dict] = {
         # curvas; sem isso degrada para a via-tronco única (e daí p/ a grade limpa). Yield no padrão
         # Urbia (~50%): a mata preservada cobre a doação, então o verde reservado fica baixo.
         "ruas_locais_contorno": True,
+        # U8 — GRAMÁTICA de traçado (default do alto padrão): "faixas_fluidas" = família de curvas
+        # PARALELAS harmônicas (padrão SR/Ribeira), aprovada pelo operador — supera a Urbia (61,8%
+        # vendável). "" volta às curvas de nível cruas. Futuro: selecionável por projeto (laços/clusters).
+        "gramatica": "faixas_fluidas",
         "lazer_pct_organico": 0.10,
         "verde_min_pct_organico": 0.08,
         "cinturao_verde_m": 8.0,
