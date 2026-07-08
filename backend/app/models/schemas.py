@@ -43,6 +43,16 @@ class MunicipioIn(BaseModel):
     cod_ibge: str
 
 
+class LevantamentoOut(BaseModel):
+    """U9 — resultado de anexar o levantamento planialtimétrico (curvas de nível reais). Estas
+    curvas passam a guiar o traçado do urbanismo no lugar do DEM de 30 m (mais precisas/lisas)."""
+
+    arquivo: str
+    n_curvas: int
+    epsg: int
+    aviso: Optional[str] = None
+
+
 class OrigemGeometriaOut(BaseModel):
     """Proveniência da rota de ingestão (Fase 1.5; POLYGON_REPARADO desde a 1.8)."""
 

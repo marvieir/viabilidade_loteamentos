@@ -594,7 +594,22 @@ def _propor_impl(
     # extrai a isolinha do DEM (mediana das cotas) já no frame do motor. Sem DEM/curva → None e
     # o motor degrada honesto para a GRADE LIMPA (Opção A). Determinístico (mesmo DEM → mesma via).
     contornos_b = None
-    if str(estilo.get("tracado", "")) == "contorno_serpente" and dem_recorte is not None:
+    # U9 — LEVANTAMENTO REAL tem PRIORIDADE sobre o DEM: se o operador anexou o planialtimétrico,
+    # as curvas de nível reais (lisas, precisas) guiam o traçado no lugar do satélite de 30 m.
+    _lev = registro.get("levantamento")
+    if str(estilo.get("tracado", "")) == "contorno_serpente" and _lev and _lev.get("contornos_wgs"):
+        try:
+            from shapely import wkt as _wkt
+            from app.core import levantamento as _lv
+
+            _curvas_wgs = [_wkt.loads(w) for w in _lev["contornos_wgs"] if w]
+            # 1 a cada 2 curvas mestre → ruas espaçadas (evita viário inchado de curvas coladas).
+            contornos_b = _lv.reprojetar_para_frame(
+                _curvas_wgs, to_local, dentro=aprov_m, orientacao_rad=orientacao, passo=2
+            ) or None
+        except Exception:  # noqa: BLE001 — levantamento ruim → cai p/ o DEM
+            contornos_b = None
+    if contornos_b is None and str(estilo.get("tracado", "")) == "contorno_serpente" and dem_recorte is not None:
         try:
             from app.core import contorno_dem
 

@@ -8,6 +8,8 @@ Endpoints:
 
 import hashlib
 import math
+import os
+import tempfile
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -515,6 +517,53 @@ def corrigir_municipio(
         raise HTTPException(422, str(exc))
     registro["jurisdicao"] = jur
     return _jurisdicao_to_schema(jur)
+
+
+@router.post("/analises/{analise_id}/levantamento", response_model=schemas.LevantamentoOut)
+async def anexar_levantamento(
+    analise_id: str,
+    arquivo: UploadFile = File(...),
+    epsg: int = Query(31983, description="CRS do levantamento (default SIRGAS 2000 / UTM 23S)"),
+    registro: dict = Depends(analise_do_dono),
+):
+    """U9 — anexa o levantamento planialtimétrico (DXF/DWG) do agrimensor. Extrai as curvas de nível
+    REAIS (georreferenciadas) que passam a guiar o traçado do urbanismo no lugar do DEM de 30 m —
+    ruas seguem a cota de verdade. Degrada honesto: sem camada de curva / DWG sem conversor → 422
+    claro, e o urbanismo segue no DEM enquanto isso."""
+    from app.core import levantamento
+
+    nome = (arquivo.filename or "levantamento").lower()
+    if not nome.endswith((".dxf", ".dwg")):
+        raise HTTPException(422, "Envie o levantamento em DXF ou DWG (curvas de nível do agrimensor).")
+    dados = await ler_upload_limitado(arquivo)
+    tmp = tempfile.mktemp(suffix=".dwg" if nome.endswith(".dwg") else ".dxf")
+    try:
+        with open(tmp, "wb") as f:
+            f.write(dados)
+        curvas = levantamento.extrair_contornos_wgs(tmp, epsg)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+    if not curvas:
+        raise HTTPException(
+            422,
+            "Não encontrei curvas de nível no arquivo. Confira se é o levantamento planialtimétrico "
+            "(camada de curva) e, se for DWG, se o conversor está disponível no servidor — exportar "
+            "em DXF costuma ser o caminho mais seguro.",
+        )
+    registro["levantamento"] = {
+        "contornos_wgs": [c.wkt for c in curvas],
+        "epsg": int(epsg),
+        "arquivo": arquivo.filename or "levantamento",
+        "n": len(curvas),
+    }
+    return schemas.LevantamentoOut(
+        arquivo=arquivo.filename or "levantamento", n_curvas=len(curvas), epsg=int(epsg),
+        aviso="Curvas de nível reais anexadas — passam a guiar o traçado do urbanismo (no lugar do "
+              "DEM de 30 m). Gere o urbanismo de novo para ver o efeito.",
+    )
 
 
 @router.post(

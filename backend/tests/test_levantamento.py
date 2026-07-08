@@ -78,3 +78,36 @@ def test_espacamento_uniforme_afina(tmp_path):
     metade = levantamento.espacar_uniforme(curvas, 0.0, passo=2)
     assert len(todas) == 5
     assert len(metade) == 3  # 1 a cada 2 de 5 → índices 0,2,4
+
+
+# ------------------------- endpoint POST /analises/{id}/levantamento -------------------------
+def test_endpoint_anexa_levantamento_e_guarda_no_registro(client, tmp_path):
+    from tests.conftest import RET_RETANGULO, make_kmz
+    from app.core.store import STORE
+
+    r = client.post("/api/analises", files={
+        "kmz": ("g.kmz", make_kmz([RET_RETANGULO]), "application/vnd.google-earth.kmz")})
+    aid = r.json()["analise_id"]
+    dxf = str(tmp_path / "lev.dxf"); _dxf_fake(dxf)
+    with open(dxf, "rb") as f:
+        resp = client.post(f"/api/analises/{aid}/levantamento",
+                           files={"arquivo": ("lev.dxf", f.read(), "application/octet-stream")})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["n_curvas"] == 5 and body["epsg"] == 31983
+    # ficou no registro (o urbanismo vai preferir estas curvas ao DEM)
+    assert len(STORE.get(aid)["levantamento"]["contornos_wgs"]) == 5
+
+
+def test_endpoint_422_sem_curva_de_nivel(client, tmp_path):
+    from tests.conftest import RET_RETANGULO, make_kmz
+
+    r = client.post("/api/analises", files={
+        "kmz": ("g.kmz", make_kmz([RET_RETANGULO]), "application/vnd.google-earth.kmz")})
+    aid = r.json()["analise_id"]
+    dxf = str(tmp_path / "sem.dxf"); _dxf_fake(dxf, com_curva=False)
+    with open(dxf, "rb") as f:
+        resp = client.post(f"/api/analises/{aid}/levantamento",
+                           files={"arquivo": ("sem.dxf", f.read(), "application/octet-stream")})
+    assert resp.status_code == 422
+    assert "curvas de nível" in resp.json()["detail"]
