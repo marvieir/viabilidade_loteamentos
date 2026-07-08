@@ -291,6 +291,7 @@ export function CardUrbanismo({
 
   const q = proposta?.quadro_areas;
   const ind = proposta?.indicadores;
+  const vc = proposta?.verde_consolidado; // U8.1 — verde consolidado sobre a gleba bruta
 
   // Fase 11.12 — VOCAÇÃO do terreno pela topografia: a app sugere o perfil (e avisa se o escolhido
   // não combina). Heurística sobre a declividade já calculada (média + fração ≥30%).
@@ -792,6 +793,44 @@ export function CardUrbanismo({
                       m2={q.arruamento.m2_fmt}
                       pct={q.arruamento.pct_fmt}
                     />
+                  </div>
+                )}
+                {/* U8.1 — VERDE AMBIENTAL consolidado: o quadro acima é sobre a área LÍQUIDA (já sem a
+                    mata preservada), então a "reserva" parece baixa. Aqui somamos os dois baldes sobre
+                    a GLEBA BRUTA (preservada não-edif. + reserva) — todos os números vêm do backend. */}
+                {vc && (
+                  <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 p-3">
+                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                      🌳 Verde ambiental (sobre a gleba bruta {vc.gleba_bruta_fmt} m²)
+                    </p>
+                    <div className="divide-y divide-emerald-100">
+                      <LinhaArea
+                        rotulo="Mata/APP/≥30% preservada (não-edif.)"
+                        m2={vc.preservada.m2_fmt}
+                        pct={vc.preservada.pct_fmt}
+                      />
+                      <LinhaArea
+                        rotulo="+ Verde de doação/reserva"
+                        m2={vc.reserva.m2_fmt}
+                        pct={vc.reserva.pct_fmt}
+                      />
+                      <LinhaArea
+                        rotulo="= Verde total"
+                        m2={vc.total.m2_fmt}
+                        pct={vc.total.pct_fmt}
+                        forte
+                      />
+                    </div>
+                    <p className="mt-2 text-xs text-emerald-700">
+                      ✓ A preservada conta para a APAC (reserva ambiental) — some do quadro acima
+                      porque este é sobre a área líquida (gleba já sem a mata).
+                    </p>
+                    <details className="mt-1 text-xs text-slate-500">
+                      <summary className="cursor-pointer select-none hover:text-slate-700">
+                        Como calculamos
+                      </summary>
+                      <p className="mt-1 leading-relaxed">{vc.fonte}</p>
+                    </details>
                   </div>
                 )}
                 {ind && (

@@ -1377,6 +1377,16 @@ export interface QuadroAreas {
   lamina_dagua?: UsoArea | null;
 }
 
+// U8.1 — verde CONSOLIDADO (os dois baldes sobre a gleba bruta): preservada + reserva = total.
+export interface VerdeConsolidado {
+  gleba_bruta_m2: number;
+  gleba_bruta_fmt: string;
+  preservada: UsoArea; // mata/APP/≥30% não-edificável (conta p/ APAC)
+  reserva: UsoArea; // doação/programa dentro da área loteável
+  total: UsoArea; // preservada + reserva
+  fonte: string; // proveniência
+}
+
 export interface IndicadoresUrb {
   n_lotes: number;
   area_media_m2: number | null;
@@ -1678,6 +1688,7 @@ export interface PropostaUrbanistica {
   programa: ProgramaUrb;
   geometria: GeometriaUrb;
   quadro_areas: QuadroAreas;
+  verde_consolidado?: VerdeConsolidado | null; // U8.1 — verde sobre a gleba bruta (explica a reserva)
   indicadores: IndicadoresUrb;
   heatmap: HeatmapUrb;
   fidelidade: Fidelidade | null;

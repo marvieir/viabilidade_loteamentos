@@ -30,3 +30,37 @@ def test_sobra_e_fracao_e_nao_some_no_verde():
     _, med = _layout_sao_roque()
     q = med.quadro
     assert q["sobra_geometrica"]["m2"] > 0.0  # há sobra real a mostrar (não zero forçado)
+
+
+# ------------------------- U8.1 — VERDE CONSOLIDADO (os dois baldes sobre a gleba bruta) -------------------------
+def test_verde_consolidado_soma_preservada_mais_reserva_sobre_a_bruta():
+    """U8.1: o quadro é sobre a área LÍQUIDA (sem a mata preservada), então a "reserva" parece baixa.
+    `consolidar_verde` soma preservada (não-edif., conta p/ APAC) + reserva na base da GLEBA BRUTA e
+    devolve o total — os números que a UI mostra no bloco 'Verde ambiental'."""
+    from app.core import urbanismo_medida as medida
+
+    _, med = _layout_sao_roque()
+    q = med.quadro
+    reserva_m2 = q["area_verde_reserva"]["m2"]
+    gleba_bruta = 190000.0
+    preservada = 52000.0
+    vc = medida.consolidar_verde(q, gleba_bruta, preservada)
+    assert vc is not None
+    # preservada e reserva batem com as entradas; total = soma; % sobre a BRUTA (não a líquida)
+    assert abs(vc["preservada"]["m2"] - preservada) < 1.0
+    assert abs(vc["reserva"]["m2"] - reserva_m2) < 1.0
+    assert abs(vc["total"]["m2"] - (preservada + reserva_m2)) < 1.0
+    assert abs(vc["preservada"]["pct_apo"] - preservada / gleba_bruta) < 1e-3
+    assert abs(vc["total"]["pct_apo"] - (preservada + reserva_m2) / gleba_bruta) < 1e-3
+    # a preservada domina o verde (é o balde que some do quadro) e o total supera a reserva sozinha
+    assert vc["total"]["m2"] > reserva_m2
+    assert "APAC" in vc["fonte"] and "bruta" in vc["fonte"].lower()  # proveniência (§3) explica o cálculo
+
+
+def test_verde_consolidado_degrada_sem_gleba_bruta():
+    """Sem gleba bruta canônica → None (não inventa denominador — degrada honesto, §5)."""
+    from app.core import urbanismo_medida as medida
+
+    _, med = _layout_sao_roque()
+    assert medida.consolidar_verde(med.quadro, None, 52000.0) is None
+    assert medida.consolidar_verde(med.quadro, 0.0, 52000.0) is None

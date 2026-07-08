@@ -725,6 +725,15 @@ def _propor_impl(
         "verificar na prefeitura (art. 6º Lei 6.766).",
     ]
 
+    # Fase 10 (Parte 1) — áreas CANÔNICAS computadas UMA vez (fonte única §10): servem tanto a
+    # ``areas_canonicas`` quanto ao verde consolidado (U8.1), sem recomputar.
+    canonicas = _garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem)
+    # U8.1 — verde consolidado sobre a gleba bruta (preservada não-edif. + reserva): a mata/APP/≥30%
+    # some do quadro (que é sobre a líquida); aqui ela volta e conta p/ a APAC. Sem gleba → None.
+    verde_consolidado = medida.consolidar_verde(
+        quadro, canonicas.gleba_bruta_m2, canonicas.restricoes_fisicas_m2
+    )
+
     out = schemas.PropostaUrbanisticaOut(
         proposta_id=proposta_id,
         versao=versao,
@@ -734,6 +743,7 @@ def _propor_impl(
             layout, to_wgs, med.heatmap.get("por_lote"), declividade_por_lote=decliv_por_lote
         ),
         quadro_areas=quadro,
+        verde_consolidado=verde_consolidado,
         indicadores=indicadores,
         heatmap=heatmap,
         fidelidade=fidelidade,
@@ -744,9 +754,7 @@ def _propor_impl(
         reconciliacao=reconciliacao,  # Fase 9.10 — ponte (rotula o estudo + cita o teto)
         esqueleto_ignorado=layout.ignorados,
         # Fase 10 (Parte 1) — a líquida CANÔNICA (mesma das abas Ambiental/Aproveitamento).
-        areas_canonicas=schemas.AreasCanonicasOut(
-            **_garantir_areas_canonicas(registro, fonte_veg, fonte_camadas, fonte_dem).__dict__
-        ),
+        areas_canonicas=schemas.AreasCanonicasOut(**canonicas.__dict__),
         variantes=variantes_out,  # Fase U4 — resumo das K estratégias (esta = a escolhida)
         proveniencia=(
             f"Programa proposto por IA ({prog.origem}, perfil '{body.publico_alvo}') + "

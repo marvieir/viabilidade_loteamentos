@@ -1470,6 +1470,20 @@ class QuadroAreasOut(BaseModel):
     lamina_dagua: Optional[UsoAreaOut] = None
 
 
+class VerdeConsolidadoOut(BaseModel):
+    """U8.1 — os DOIS baldes de verde num quadro sobre a GLEBA BRUTA. O ``QuadroAreasOut`` é sobre a
+    área LÍQUIDA (já sem a mata/APP/≥30% preservada), então ``area_verde_reserva`` parece baixo; a
+    preservada (não-edificável, conta p/ a APAC) some da conta. Aqui: preservada + reserva = total,
+    tudo sobre a bruta. None quando não há gleba bruta canônica."""
+
+    gleba_bruta_m2: float
+    gleba_bruta_fmt: str
+    preservada: UsoAreaOut  # mata/APP/≥30% não-edificável (conta p/ APAC — reserva ambiental)
+    reserva: UsoAreaOut     # doação/programa dentro da área loteável
+    total: UsoAreaOut       # preservada + reserva
+    fonte: str              # proveniência (§3)
+
+
 class IndicadoresUrbOut(BaseModel):
     n_lotes: int
     area_media_m2: Optional[float] = None
@@ -1648,6 +1662,9 @@ class PropostaUrbanisticaOut(BaseModel):
     programa: ProgramaOut
     geometria: dict
     quadro_areas: QuadroAreasOut
+    # U8.1 — verde CONSOLIDADO (preservada + reserva sobre a gleba bruta): explica por que a linha
+    # de reserva no quadro (sobre a líquida) parece baixa. None quando não há gleba bruta canônica.
+    verde_consolidado: Optional[VerdeConsolidadoOut] = None
     indicadores: IndicadoresUrbOut
     heatmap: HeatmapOut
     fidelidade: Optional[FidelidadeOut] = None  # Fase 9.1

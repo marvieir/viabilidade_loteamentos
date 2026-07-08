@@ -241,6 +241,45 @@ def medir(layout: Layout, publico_alvo: Optional[str] = None) -> Medicao:
     return Medicao(quadro=quadro, indicadores=indicadores, heatmap=heatmap)
 
 
+def consolidar_verde(
+    quadro: dict, gleba_bruta_m2: Optional[float], preservada_m2: Optional[float]
+) -> Optional[dict]:
+    """U8.1 — VERDE CONSOLIDADO: os DOIS baldes de verde num quadro sobre a GLEBA BRUTA.
+
+    O "Quadro de áreas" é sobre a área LÍQUIDA (gleba MENOS a mata/APP/≥30% preservada), então a
+    linha "Área verde de doação/reserva" (~12%) esconde que a maior parte do verde é a **mata
+    preservada não-edificável** — que fica de fora da líquida e só aparece no mapa (verde-escuro).
+    Aqui somamos os dois numa base ÚNICA (a gleba bruta): preservada (conta p/ a APAC/reserva
+    ambiental — permeável, rotulado p/ a prefeitura confirmar) + reserva (doação/programa) = verde
+    total. Números vindos do backend com proveniência (§1/§2/§3); o front só renderiza.
+
+    ``gleba_bruta_m2`` e ``preservada_m2`` vêm das áreas CANÔNICAS (§10 — mesma fonte das abas
+    Ambiental/Aproveitamento). Sem gleba bruta → None (degrada honesto, sem inventar denominador)."""
+    if not gleba_bruta_m2 or gleba_bruta_m2 <= 0:
+        return None
+    reserva_m2 = round(float((quadro.get("area_verde_reserva") or {}).get("m2") or 0.0), 2)
+    preservada = round(max(0.0, float(preservada_m2 or 0.0)), 2)
+    total = round(preservada + reserva_m2, 2)
+
+    def _linha(m2: float) -> dict:
+        pct = round(m2 / gleba_bruta_m2, 4)
+        return {"m2": m2, "m2_fmt": _fmt(m2), "pct_apo": pct, "pct_fmt": _fmt(pct * 100, 1) + "%"}
+
+    return {
+        "gleba_bruta_m2": round(gleba_bruta_m2, 2),
+        "gleba_bruta_fmt": _fmt(gleba_bruta_m2),
+        "preservada": _linha(preservada),  # mata/APP/≥30% não-edificável (conta p/ APAC)
+        "reserva": _linha(reserva_m2),      # doação/programa dentro da área loteável
+        "total": _linha(total),             # preservada + reserva
+        "fonte": (
+            "Áreas canônicas (§10) + medida do motor. A área preservada (mata, APP e declividade "
+            "≥30%) é NÃO-EDIFICÁVEL e conta como reserva ambiental/APAC (superfície permeável) — "
+            "rotulado para a prefeitura confirmar (ex.: São Roque, Art. 7 §3). Percentuais sobre a "
+            "gleba BRUTA; o quadro de áreas acima é sobre a área líquida (já sem a preservada)."
+        ),
+    }
+
+
 # ------------------------- heatmap (score de valor v2 — Fase U1) -------------------------
 # Faixas de score (limites superiores inclusivos): 0–3, 3–5, 5–7, 7–9, 9–10.
 _FAIXAS = [("0-3", 3.0), ("3-5", 5.0), ("5-7", 7.0), ("7-9", 9.0), ("9-10", 10.01)]
