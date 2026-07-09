@@ -746,7 +746,7 @@ def _propor_impl(
     # U8.1 — verde consolidado sobre a gleba bruta (preservada não-edif. + reserva): a mata/APP/≥30%
     # some do quadro (que é sobre a líquida); aqui ela volta e conta p/ a APAC. Sem gleba → None.
     verde_consolidado = medida.consolidar_verde(
-        quadro, canonicas.gleba_bruta_m2, canonicas.restricoes_fisicas_m2
+        med.quadro, canonicas.gleba_bruta_m2, canonicas.restricoes_fisicas_m2
     )
 
     out = schemas.PropostaUrbanisticaOut(

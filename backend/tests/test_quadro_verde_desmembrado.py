@@ -57,6 +57,22 @@ def test_verde_consolidado_soma_preservada_mais_reserva_sobre_a_bruta():
     assert "APAC" in vc["fonte"] and "bruta" in vc["fonte"].lower()  # proveniência (§3) explica o cálculo
 
 
+def test_consolidar_verde_aceita_schema_quadroareas():
+    """Regressão de CAMPO (500 em toda geração): o router passa `QuadroAreasOut` (Pydantic), não o
+    dict cru — e o schema não tem `.get()`, então `consolidar_verde` estourava com AttributeError.
+    Reproduz o que o router monta e exige que a função aceite os dois (dict e schema)."""
+    from app.core import urbanismo_medida as medida
+    from app.models.schemas import QuadroAreasOut
+
+    _, med = _layout_sao_roque()
+    schema = QuadroAreasOut(**med.quadro)  # EXATAMENTE o objeto que o router passava
+    vc = medida.consolidar_verde(schema, 190000.0, 52000.0)
+    assert vc is not None and vc["total"]["m2"] > 0
+    # e o dict cru segue funcionando idêntico
+    vc_dict = medida.consolidar_verde(med.quadro, 190000.0, 52000.0)
+    assert vc_dict["total"]["m2"] == vc["total"]["m2"]
+
+
 def test_verde_consolidado_degrada_sem_gleba_bruta():
     """Sem gleba bruta canônica → None (não inventa denominador — degrada honesto, §5)."""
     from app.core import urbanismo_medida as medida

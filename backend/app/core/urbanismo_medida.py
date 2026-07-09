@@ -257,6 +257,10 @@ def consolidar_verde(
     Ambiental/Aproveitamento). Sem gleba bruta → None (degrada honesto, sem inventar denominador)."""
     if not gleba_bruta_m2 or gleba_bruta_m2 <= 0:
         return None
+    # DEFENSIVO: o chamador pode passar o dict cru (med.quadro) OU o schema QuadroAreasOut — normaliza
+    # p/ dict (o schema Pydantic não tem .get(), o que estourava toda a geração — regressão de campo).
+    if not isinstance(quadro, dict):
+        quadro = quadro.model_dump() if hasattr(quadro, "model_dump") else dict(quadro)
     reserva_m2 = round(float((quadro.get("area_verde_reserva") or {}).get("m2") or 0.0), 2)
     preservada = round(max(0.0, float(preservada_m2 or 0.0)), 2)
     total = round(preservada + reserva_m2, 2)
