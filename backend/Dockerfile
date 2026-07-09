@@ -16,6 +16,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 ENV GDAL_CONFIG=/usr/bin/gdal-config
 
+# U9 — dwg2dxf (libredwg) p/ ler o LEVANTAMENTO planialtimétrico em DWG DIRETO no servidor (o
+# agrimensor entrega DWG; sem isto só DXF). Compila do fonte (arch-agnóstico x86_64/arm64, igual
+# ao rasterio) e PURGA o toolchain extra na MESMA layer → imagem enxuta. Binário self-contained
+# (--disable-shared) → só o executável fica em /usr/local/bin. `test -f` falha o build alto e claro
+# se o binário não sair (em vez de silenciosamente ficar sem conversor).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git autoconf automake libtool \
+    && git clone --depth 1 https://github.com/LibreDWG/libredwg.git /tmp/libredwg \
+    && cd /tmp/libredwg \
+    && sh autogen.sh \
+    && ./configure --disable-shared --disable-bindings --disable-dependency-tracking \
+    && ( make -j"$(nproc)" || make || true ) \
+    && test -f programs/dwg2dxf \
+    && install -m 0755 programs/dwg2dxf /usr/local/bin/dwg2dxf \
+    && cd / && rm -rf /tmp/libredwg \
+    && apt-get purge -y git autoconf automake libtool \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 COPY requirements.txt .
