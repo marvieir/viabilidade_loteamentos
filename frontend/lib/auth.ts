@@ -97,6 +97,23 @@ export async function me(): Promise<Usuario> {
 }
 
 // Wrapper de fetch autenticado: injeta o Bearer e, no 401, tenta UM refresh e repete.
+// `fetch()` só REJEITA (throw) em falha de REDE — quando não houve resposta nenhuma do servidor:
+// backend reiniciando (após rebuild), serviço caído, conexão perdida ou operação longa demais que
+// derrubou a conexão. O navegador dá "Failed to fetch", que não diz nada ao usuário. Trocamos por
+// uma mensagem acionável. (Erros DA APLICAÇÃO não caem aqui — vêm com status HTTP e corpo próprio.)
+async function _fetchOuErroDeRede(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new Error(
+      "Não foi possível falar com o servidor. O backend pode estar reiniciando (logo após um " +
+        "rebuild), a operação pode ter demorado demais e a conexão caiu, ou o serviço parou. " +
+        "Aguarde alguns segundos e tente de novo. Se persistir, veja os logs do backend " +
+        "(ex.: `podman-compose logs --tail=100 api`).",
+    );
+  }
+}
+
 export async function apiFetch(
   path: string,
   init: RequestInit = {},
@@ -110,11 +127,11 @@ export async function apiFetch(
     },
   });
 
-  let res = await fetch(`${API_BASE}${path}`, comAuth(accessToken));
+  let res = await _fetchOuErroDeRede(`${API_BASE}${path}`, comAuth(accessToken));
   if (res.status === 401) {
     try {
       const novo = await refresh();
-      res = await fetch(`${API_BASE}${path}`, comAuth(novo));
+      res = await _fetchOuErroDeRede(`${API_BASE}${path}`, comAuth(novo));
     } catch {
       /* refresh falhou — devolve o 401 original para o chamador tratar */
     }
