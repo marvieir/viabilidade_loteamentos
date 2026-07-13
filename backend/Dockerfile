@@ -32,8 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && install -m 0755 programs/dwg2dxf /usr/local/bin/dwg2dxf \
     && cd / && rm -rf /tmp/libredwg \
     && apt-get purge -y git autoconf automake libtool \
-    && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
+# NOTA: sem `apt-get autoremove` aqui — ele removia o gdal-config (rasterio) junto. Purgamos só as
+# ferramentas que ESTE bloco adicionou (git/autotools); as libs do GDAL/build-essential ficam intactas.
 
 WORKDIR /app
 
