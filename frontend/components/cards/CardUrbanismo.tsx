@@ -451,7 +451,7 @@ export function CardUrbanismo({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-emerald-900">🗺️ Levantamento planialtimétrico</span>
             <label className="cursor-pointer rounded-md border border-emerald-300 bg-white px-2 py-1 text-xs font-medium text-emerald-800 hover:bg-emerald-100">
-              {levCarregando ? "Enviando…" : lev ? "Trocar arquivo" : "Anexar DXF/DWG"}
+              {levCarregando ? "Enviando…" : lev ? "+ Anexar outra matrícula" : "Anexar DXF/DWG"}
               <input
                 type="file"
                 accept=".dxf,.dwg"
