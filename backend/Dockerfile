@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && cd /tmp/libredwg \
     && sh autogen.sh \
     && ./configure --disable-shared --disable-bindings --disable-dependency-tracking \
-    && ( make -j"$(nproc)" || make || true ) \
+    && ( make -j2 || make || true ) \
     && test -f programs/dwg2dxf \
     && install -m 0755 programs/dwg2dxf /usr/local/bin/dwg2dxf \
     && cd / && rm -rf /tmp/libredwg \
