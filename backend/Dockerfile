@@ -16,11 +16,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 ENV GDAL_CONFIG=/usr/bin/gdal-config
 
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 # U9 — dwg2dxf (libredwg) p/ ler o LEVANTAMENTO planialtimétrico em DWG DIRETO no servidor (o
-# agrimensor entrega DWG; sem isto só DXF). Compila do fonte (arch-agnóstico x86_64/arm64, igual
-# ao rasterio) e PURGA o toolchain extra na MESMA layer → imagem enxuta. Binário self-contained
-# (--disable-shared) → só o executável fica em /usr/local/bin. `test -f` falha o build alto e claro
-# se o binário não sair (em vez de silenciosamente ficar sem conversor).
+# agrimensor entrega DWG; sem isto só DXF). DEPOIS do pip install de propósito: o rasterio já
+# compilou (com o gdal-config intacto), então nada que este bloco faça no apt pode quebrá-lo —
+# gdal-config só é preciso em BUILD, não em runtime. Compila do fonte (arch-agnóstico x86_64/arm64)
+# e instala só o binário self-contained (--disable-shared) em /usr/local/bin.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         git autoconf automake libtool \
     && git clone --depth 1 https://github.com/LibreDWG/libredwg.git /tmp/libredwg \
@@ -31,15 +36,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && test -f programs/dwg2dxf \
     && install -m 0755 programs/dwg2dxf /usr/local/bin/dwg2dxf \
     && cd / && rm -rf /tmp/libredwg \
-    && apt-get purge -y git autoconf automake libtool \
     && rm -rf /var/lib/apt/lists/*
-# NOTA: sem `apt-get autoremove` aqui — ele removia o gdal-config (rasterio) junto. Purgamos só as
-# ferramentas que ESTE bloco adicionou (git/autotools); as libs do GDAL/build-essential ficam intactas.
-
-WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# NOTA: NÃO purgamos git/autotools aqui — o `apt-get purge` removia em cascata dependências do
+# libgdal-dev (gdal-config) e quebrava o rasterio. Como este bloco roda DEPOIS do pip install, o
+# rasterio já está compilado; deixamos o toolchain (imagem ~80MB maior) em troca de build à prova
+# de bala. Enxugar depois é otimização, não urgência.
 
 COPY app ./app
 # scripts/ — comandos manuais do operador (ex.: seed de admin via scripts/criar_admin.py). NÃO são
