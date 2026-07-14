@@ -1422,6 +1422,9 @@ def gerar_layout(
     from app.core import urbanismo_loops as paisagem
 
     canvas = aproveitavel
+    # Restrição CRUA (declarada) — a suavização abaixo corta cantos p/ DENTRO da mata; o grampo
+    # legal final (fim da função) recorta lote/via contra ESTA, não contra a suavizada.
+    restricao_raw = restricao_externa
     if limpar:
         # tira a escada de 30 m e os cacos ANTES de traçar (borda limpa + zero sliver→sobra).
         canvas = _suavizar_raster(canvas)
@@ -2571,6 +2574,57 @@ def gerar_layout(
             "no ALTO PADRÃO o lago é priorizado e redimensionado automaticamente) — reduza a "
             "área do lago ou regenere com o perfil alta renda."
         )
+
+    # ===== GRAMPO LEGAL FINAL (achado de campo — dump 022 do operador) =====
+    # A suavização da escada do raster (30 m) corta cantos PARA DENTRO da restrição → via/lote
+    # ficavam com lascas sobre mata DECLARADA (842 m² de via + 21 lotes no caso real). Regra dura:
+    # NADA fica sobre a restrição crua — via só pode pisar na declividade ≥30% (nota geotécnica,
+    # Lei 6.766 art. 3º); LOTE não pisa em nada. Lote que perder área abaixo do piso legal sai
+    # (o resto vira sobra→verde). Determinístico; avisos rotulam o ajuste (§5).
+    if restricao_raw is not None and not restricao_raw.is_empty:
+        _mata_via = (_diferenca_segura(restricao_raw, declividade_acentuada)
+                     if (declividade_acentuada is not None and not declividade_acentuada.is_empty)
+                     else restricao_raw)
+        if (arruamento is not None and not arruamento.is_empty and _mata_via is not None
+                and not _mata_via.is_empty and arruamento.intersects(_mata_via)):
+            _corte_via = arruamento.intersection(_mata_via).area
+            if _corte_via > 1.0:
+                arruamento = _diferenca_segura(arruamento, _mata_via)
+                if _corte_via > 10.0:
+                    avisos.append(
+                        f"Sanitização: {_corte_via:,.0f} m² de via sobre restrição declarada "
+                        "REMOVIDOS (mata/APP bloqueia via; só a declividade ≥30% pode, com laudo)."
+                    )
+        _novos, _lq, _perdidos_m2, _slivers = [], [], 0.0, []
+        _tem_lq = bool(lote_quadra) and len(lote_quadra) == len(lotes)
+        for _i, _l in enumerate(lotes):
+            if not _l.intersects(restricao_raw):
+                _novos.append(_l)
+                if _tem_lq:
+                    _lq.append(lote_quadra[_i])
+                continue
+            _l2 = _diferenca_segura(_l, restricao_raw)
+            _partes = [p for p in _componentes(_l2)] if (_l2 is not None and not _l2.is_empty) else []
+            _maior = max(_partes, key=lambda p: p.area) if _partes else None
+            if _maior is not None and _maior.area >= piso_lote - 0.5:
+                _novos.append(_maior)
+                if _tem_lq:
+                    _lq.append(lote_quadra[_i])
+            else:
+                _perdidos_m2 += _l.area
+                if _maior is not None and _maior.area >= 30.0:
+                    _slivers.append(_maior)  # resto fora da restrição vira verde/sobra
+        if _perdidos_m2 > 10.0 or len(_novos) != len(lotes):
+            avisos.append(
+                f"Sanitização: lote(s) sobre restrição declarada ajustados/removidos "
+                f"({_perdidos_m2:,.0f} m² devolvidos ao verde/sobra)."
+            )
+        lotes = _novos
+        if _tem_lq:
+            lote_quadra = _lq
+        if _slivers:
+            sobra_ponta = _uniao_segura([sobra_ponta, *_slivers])
+            verde = _uniao_segura([verde, *_slivers])
 
     meta = {
         "lazer_alvo_pct": round(pct_lazer0, 4),
