@@ -514,6 +514,23 @@ def _paisagem_eixos(ilha: BaseGeometry, contornos_ilha: Sequence[BaseGeometry],
                 recorte.append(p)
     if not recorte:
         return None
+    # SUAVIZAÇÃO (corte de cantos de Chaikin, 2 passadas): as curvas do LEVANTAMENTO (densas) quase
+    # não mudam; as do DEM de 30 m (5-9 pontos, serrilhadas) ficam redondas — o modo Paisagem SEM
+    # levantamento sai orgânico-aproximado em vez de anguloso. Determinístico.
+    def _chaikin(ls, passadas=2):
+        pts = list(ls.coords)
+        for _ in range(passadas):
+            if len(pts) < 3:
+                break
+            novo = [pts[0]]
+            for a, b in zip(pts[:-1], pts[1:]):
+                novo.append((0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]))
+                novo.append((0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]))
+            novo.append(pts[-1])
+            pts = novo
+        return LineString(pts)
+
+    recorte = [_chaikin(c) for c in recorte]
     recorte.sort(key=lambda c: c.centroid.y)   # descendo a encosta (frame reg: cota ~horizontal)
     kept: list[BaseGeometry] = []
     ultima = None
