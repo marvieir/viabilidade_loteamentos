@@ -494,6 +494,53 @@ def _bandas_contorno_eixos(ilha: BaseGeometry, contornos_ilha: Sequence[BaseGeom
     return eixos
 
 
+def _paisagem_eixos(ilha: BaseGeometry, contornos_ilha: Sequence[BaseGeometry],
+                    via_local: float, via_tronco: float, banda: float, conn_m: float):
+    """Trilha 2 — gramática PAISAGEM (objetivo "desenho", padrão Urbia): as ruas SÃO as curvas de
+    nível REAIS do levantamento, ESPAÇADAS de verdade (varredura descendo a encosta + checagem de
+    distância geométrica ≥ banda — sem isso toda curva vira rua e o viário incha p/ ~30%). Cada rua
+    RECUA das bordas (~2,5×via) → a ponta morre dentro da ilha (grau 1) → bulbo de CUL-DE-SAC
+    (Art. 11 IX). Conectores esparsos descem a encosta. A mais longa vira via-tronco (coletora).
+    Devolve ``[(LineString, largura)]`` p/ ``eixos_prontos``; None degrada p/ bandas/grade."""
+    recorte: list[BaseGeometry] = []
+    for c in contornos_ilha:
+        if c is None or c.is_empty:
+            continue
+        inter = _valido(c.intersection(ilha))
+        if inter is None:
+            continue
+        for p in _linhas(inter):
+            if p.length >= L_MIN_EIXO_M:
+                recorte.append(p)
+    if not recorte:
+        return None
+    recorte.sort(key=lambda c: c.centroid.y)   # descendo a encosta (frame reg: cota ~horizontal)
+    kept: list[BaseGeometry] = []
+    ultima = None
+    for c in recorte:
+        if ultima is not None and c.distance(ultima) < banda:
+            continue  # perto demais da rua anterior → quadra rasa/viário inchado; pula
+        rec = min(via_local * 2.5, c.length * 0.2)
+        if c.length > 2 * rec + L_MIN_EIXO_M:
+            ini, fim = rec / c.length, 1 - rec / c.length
+            pts = [c.interpolate(ini + (fim - ini) * i / 24, normalized=True) for i in range(25)]
+            c = LineString([(p.x, p.y) for p in pts])
+        kept.append(c)
+        ultima = c
+    if not kept:
+        return None
+    tronco = max(kept, key=lambda c: c.length)
+    eixos: list[tuple[BaseGeometry, float]] = [
+        (c, via_tronco if c is tronco else via_local) for c in kept
+    ]
+    minx, miny, maxx, maxy = ilha.bounds
+    x = minx + conn_m * 0.5
+    while x < maxx:
+        eixos.append((LineString([(x, miny - 1.0), (x, maxy + 1.0)]), via_local))
+        x += conn_m
+    return eixos
+
+
 def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: float,
                           banda: float, conn_m: float):
     """Gramática FAIXAS FLUIDAS (U8 — padrão SR/Ribeira, gleba ALONGADA): família de curvas
@@ -1427,6 +1474,12 @@ def gerar_layout(
         verde_piso = float(estilo.get("verde_min_pct_organico", 0.08)) if organico else float(
             estilo.get("verde_min_pct", 0.0))
         apac_fonte = "fallback_estilo"
+    # Trilha 2 — VERDE DE DESENHO (gramática paisagem/objetivo "desenho"): mesmo quando a mata já
+    # cobre a APAC (piso legal = 0), o padrão Urbia reserva verde POR ESTÉTICA (corredores entre
+    # quadras, ~26% verde na líquida). É escolha de projeto do operador, não exigência legal —
+    # o aviso de proveniência rotula. Sem isso o modo desenho degenera em máquina de yield.
+    if str(estilo.get("gramatica", "")) == "paisagem":
+        verde_piso = max(verde_piso, float(estilo.get("verde_paisagem_pct", 0.18)))
     # o piso de verde cobre o mínimo; o motor pode reservar MAIS por qualidade, nunca menos.
     if (organico or limpar) and verde_piso <= 0.02:
         # APAC coberta pela mata → só o teto orgânico de lazer/verde (não afunda o yield).
@@ -1594,11 +1647,18 @@ def gerar_layout(
                 and len(eixos_ia_ilha) >= 2):
             conn_m = max(bw_i, 3.0 * testada_alvo)
             # U8 — GRAMÁTICA de traçado (selecionável): "faixas_fluidas" = família paralela
-            # harmônica (gleba alongada, padrão SR/Ribeira); default = curvas de nível cruas.
-            if str(estilo.get("gramatica", "")) == "faixas_fluidas":
+            # harmônica (gleba alongada, padrão SR/Ribeira); "paisagem" (trilha 2) = as curvas
+            # REAIS espaçadas + cul-de-sacs (objetivo desenho); default = curvas de nível cruas.
+            _gram = str(estilo.get("gramatica", ""))
+            if _gram == "faixas_fluidas":
                 banda_ff = max(2.0 * prof, bh_i)  # faixa = 2 fileiras costas-com-costas
                 conn_ff = max(4.0 * testada_alvo, 160.0)  # conectores esparsos (viram cul-de-sac)
                 eixos_pais = _faixas_fluidas_eixos(ilha, via_local, via_tronco, banda_ff, conn_ff)
+            elif _gram == "paisagem":
+                banda_ff = max(2.0 * prof, bh_i)
+                conn_ff = max(4.0 * testada_alvo, 160.0)
+                eixos_pais = _paisagem_eixos(ilha, eixos_ia_ilha, via_local, via_tronco,
+                                             banda_ff, conn_ff)
             if eixos_pais is None:
                 eixos_pais = _bandas_contorno_eixos(ilha, eixos_ia_ilha, via_local, via_tronco, conn_m)
         if usa_paisagem:
@@ -1622,7 +1682,7 @@ def gerar_layout(
             eixos_prontos=eixos_pais,
         )
         # U8 — CUL-DE-SAC: bulbo de retorno em toda via sem saída (Art.11 IX + look Urbia).
-        if str(estilo.get("gramatica", "")) == "faixas_fluidas" and eix_i:
+        if str(estilo.get("gramatica", "")) in ("faixas_fluidas", "paisagem") and eix_i:
             _bulbos = _bulbos_cul_de_sac(eix_i, ilha, via_local, max(via_local, 8.0), acesso=acesso_reg)
             if _bulbos:
                 ruas_i = _uniao_segura([ruas_i, *_bulbos]) if ruas_i is not None else _uniao_segura(_bulbos)

@@ -117,6 +117,7 @@ export function CardUrbanismo({
   const [zona, setZona] = useState<string>("");
   const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
   const [criarLago, setCriarLago] = useState(false); // Fase U3 — lago no ponto baixo do DEM
+  const [objetivo, setObjetivo] = useState<"rendimento" | "paisagem">("rendimento"); // Trilha 2
   const [instrucoes, setInstrucoes] = useState(""); // Mov.1 — diretrizes livres do operador
   const [lev, setLev] = useState<LevantamentoResult | null>(null); // U9 — levantamento anexado
   const [levErro, setLevErro] = useState<string | null>(null);
@@ -178,7 +179,8 @@ export function CardUrbanismo({
         loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null,
         acessoPonto ? [acessoPonto[1], acessoPonto[0]] : null,
         criarLago,
-        instrucoes
+        instrucoes,
+        objetivo
       );
       setProposta(p);
       onData?.(p);
@@ -415,6 +417,19 @@ export function CardUrbanismo({
             title="Tamanho máximo de lote recomendado (m²). Vazio = padrão do perfil. Nunca abaixo do piso legal."
             className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
           />
+          {/* Trilha 2 — OBJETIVO do estudo: o cliente escolhe entre espremer lote (rendimento)
+              e desenho premium (paisagem — curvas reais + cul-de-sacs + verde, padrão Urbia). */}
+          <label className="flex items-center gap-1.5 text-sm text-slate-600" title="Rendimento: máximo aproveitamento (mais lotes; a grade compete). Paisagem: desenho premium — as ruas seguem as curvas de nível REAIS (levantamento), cul-de-sacs e verde de desenho (padrão dos master plans). Anexe o levantamento p/ o melhor resultado.">
+            Objetivo
+            <select
+              value={objetivo}
+              onChange={(e) => setObjetivo(e.target.value as "rendimento" | "paisagem")}
+              className="rounded-lg border border-slate-200 px-2 py-2 text-sm"
+            >
+              <option value="rendimento">Rendimento (mais lotes)</option>
+              <option value="paisagem">Paisagem (desenho premium)</option>
+            </select>
+          </label>
           <label
             className="flex items-center gap-1.5 text-sm text-slate-600"
             title="Sintetiza um lago paisagístico no ponto baixo do terreno (DEM) com orla-parque — amenidade valorizadora (pesquisa §1). Sem DEM, degrada com aviso."

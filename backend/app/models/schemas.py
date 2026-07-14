@@ -1366,6 +1366,10 @@ class ProporUrbanismoIn(BaseModel):
     # Acesso marcado PELO OPERADOR no mapa ([lon, lat] WGS84): âncora DEFINITIVA do pórtico —
     # tem prioridade sobre o OSM (zona rural tem via mal mapeada; o dado do operador vence).
     acesso_ponto: Optional[list[float]] = None
+    # Trilha 2 — OBJETIVO do estudo (escolha do operador): "rendimento" (default — máximo
+    # aproveitamento, comportamento atual) ou "paisagem" (desenho premium: traçado segue as
+    # curvas REAIS do levantamento + cul-de-sacs + verde de desenho, padrão Urbia).
+    objetivo: Optional[Literal["rendimento", "paisagem"]] = None
 
 
 class MedirUrbanismoIn(BaseModel):

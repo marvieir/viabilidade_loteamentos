@@ -411,6 +411,14 @@ def _propor_impl(
     from app.core.urbanismo_estilo import carregar_estilo
 
     estilo, aviso_estilo = carregar_estilo(str(body.publico_alvo))
+    # Trilha 2 — OBJETIVO DO ESTUDO (escolha do operador, não adivinhação do motor):
+    #   "rendimento" (default) = comportamento atual (máximo aproveitamento; a grade compete);
+    #   "paisagem" = gramática que segue as curvas REAIS do levantamento + cul-de-sacs + verde de
+    #   desenho (padrão Urbia). No modo paisagem a grelha girada sai das candidatas (rotacionar o
+    #   frame quebraria a premissa cota~horizontal das curvas — e a grade venceria no nº de lotes,
+    #   anulando a escolha do operador).
+    if getattr(body, "objetivo", None) == "paisagem":
+        estilo["gramatica"] = "paisagem"
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
     # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
     aprov_wgs, restr_wgs, restr_origem, decliv_wgs = _aproveitavel_wgs(
@@ -629,6 +637,9 @@ def _propor_impl(
     # FUNÇÃO DE VALOR (Σ área×multiplicador do score v2 — proxy de VGV posicional) escolhe a
     # melhor; as alternativas ficam materializáveis depois SEM IA (POST /urbanismo/variante).
     candidatas = [variante_unica] if variante_unica is not None else VARIANTES_U4
+    if getattr(body, "objetivo", None) == "paisagem" and variante_unica is None:
+        # modo paisagem: só variantes SEM rotação extra (curvas reais exigem o frame da cota)
+        candidatas = [v for v in VARIANTES_U4 if not v.get("orientacao_extra_rad")]
     geradas: list[tuple[dict, object, object, float]] = []
     for var in candidatas:
         layout_v = geom.gerar_layout(
@@ -793,6 +804,7 @@ def _propor_impl(
         "acesso_ponto": body.acesso_ponto,
         "criar_lago": body.criar_lago,  # U3 — a variante rematerializa com o mesmo lago
         "instrucoes": body.instrucoes,  # Mov.1 — proveniência do pedido do operador
+        "objetivo": getattr(body, "objetivo", None),  # trilha 2 — a variante herda o modo
     }
     fonte_urb.salvar(analise_id, salvo)
     # LAB — replay 1:1 fora do app (harness de render do operador). Nunca derruba a proposta.
