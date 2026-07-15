@@ -68,6 +68,19 @@
 - [ ] `pip-audit` / `npm audit` sem CVE crítica; `next` no último 14.2.x.
 - [ ] Backups testados (restaurar um snapshot/dump).
 
+## 5.1) Deltas do ciclo U7–U9 (julho/2026) — o que mudou p/ o deploy
+- **Conversor de DWG na imagem do backend**: o Dockerfile compila o `dwg2dxf` (libredwg) do fonte
+  no build (arch-agnóstico x86_64/arm64). Custo: **+1–3 min no build** e ~80 MB na imagem (o
+  toolchain fica — decisão consciente pró-confiabilidade). Nada a configurar.
+- **`LEVANTAMENTOS_DIR`** (novo, já no prod compose): levantamento planialtimétrico persistido por
+  análise em `/data/perfis/levantamentos` (dentro do volume `perfis_dados`) — sobrevive a deploys;
+  re-subir o mesmo KMZ reencontra as curvas sem re-anexar.
+- **Build do backend**: recomendar **4 GB RAM** na instância p/ o `--build` (rasterio + libredwg
+  compilam do fonte); em 2 GB o build pode ficar lento/instável — alternativa: buildar a imagem
+  fora e fazer push p/ um registry.
+- **Invariantes legais do urbanismo** (testados): via/lote jamais sobre vegetação declarada; malha
+  viária conexa (acesso religado por A*); quadro soma 100%. Sem config — é comportamento do motor.
+
 ## 6) Custo / dimensionamento (referência)
 - Instância 2 GB ≈ faixa de US$ ~10–12/mês; 4 GB ≈ US$ ~20/mês. IP estático grátis enquanto anexado.
 - Managed Database (quando migrar o Postgres) entra como custo adicional, com TLS+backup inclusos.
