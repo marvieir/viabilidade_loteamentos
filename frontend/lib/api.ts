@@ -311,6 +311,15 @@ export interface LevantamentoResult {
   aviso?: string | null;
 }
 
+export async function buscarLevantamento(
+  analiseId: string
+): Promise<LevantamentoResult | null> {
+  const res = await apiFetch(`/api/analises/${analiseId}/levantamento`);
+  if (res.status === 404) return null; // nunca anexado — estado normal
+  if (!res.ok) return null;            // indisponível → o card só não mostra o salvo
+  return res.json();
+}
+
 export async function anexarLevantamento(
   analiseId: string,
   arquivo: File,

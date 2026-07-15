@@ -555,7 +555,9 @@ async def anexar_levantamento(
         )
     # ACUMULA entre uploads: a gleba pode ser N matrículas (São Roque = 3) — cada DXF cobre uma área;
     # somando, o levantamento cobre a gleba toda. (Re-anexar do zero: nova análise ou limpar o campo.)
-    ja = registro.get("levantamento") or {}
+    # Persistido em disco (chave = analise_id determinístico): sobrevive a restart — o operador
+    # não re-anexa os 3 DWG toda vez; re-subir o MESMO KMZ reencontra o levantamento sozinho.
+    ja = levantamento.obter_levantamento(analise_id, registro) or {}
     contornos = list(ja.get("contornos_wgs") or []) + [c.wkt for c in curvas]
     arquivos = list(ja.get("arquivos") or []) + [arquivo.filename or "levantamento"]
     registro["levantamento"] = {
@@ -564,11 +566,31 @@ async def anexar_levantamento(
         "arquivos": arquivos,
         "n": len(contornos),
     }
+    persistiu = levantamento.salvar_persistido(analise_id, registro["levantamento"])
     return schemas.LevantamentoOut(
         arquivo=", ".join(arquivos), n_curvas=len(contornos), epsg=int(epsg),
         aviso=f"Curvas de nível reais anexadas ({len(arquivos)} arquivo(s), {len(contornos)} curvas) "
               "— passam a guiar o traçado do urbanismo no lugar do DEM de 30 m. Anexe as outras "
-              "matrículas se a gleba tiver mais de uma área; depois regere o urbanismo.",
+              "matrículas se a gleba tiver mais de uma área; depois regere o urbanismo."
+              + ("" if persistiu else " ATENÇÃO: não consegui salvar em disco (só nesta sessão)."),
+    )
+
+
+@router.get("/analises/{analise_id}/levantamento", response_model=schemas.LevantamentoOut)
+def ver_levantamento(analise_id: str, registro: dict = Depends(analise_do_dono)):
+    """Levantamento salvo desta análise (memória ou disco) — o front mostra o estado ao carregar,
+    sem o operador re-anexar os DWG a cada sessão. 404 se nunca foi anexado."""
+    from app.core import levantamento
+
+    lev = levantamento.obter_levantamento(analise_id, registro)
+    if not lev:
+        raise HTTPException(404, "Nenhum levantamento anexado a esta análise.")
+    arquivos = lev.get("arquivos") or ([lev.get("arquivo")] if lev.get("arquivo") else [])
+    return schemas.LevantamentoOut(
+        arquivo=", ".join(a for a in arquivos if a) or "levantamento",
+        n_curvas=int(lev.get("n") or len(lev.get("contornos_wgs") or [])),
+        epsg=int(lev.get("epsg") or 31983),
+        aviso="Levantamento salvo — as curvas reais guiam o traçado. Anexar mais arquivos ACUMULA.",
     )
 
 

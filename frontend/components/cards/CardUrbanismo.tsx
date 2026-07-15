@@ -20,6 +20,7 @@ import {
   listarAvaliacoesUrbanismo,
   valorPosicionalUrbanismo,
   anexarLevantamento,
+  buscarLevantamento,
   type LevantamentoResult,
   type ChaveOverlay,
   type ConformidadeLegal,
@@ -193,6 +194,15 @@ export function CardUrbanismo({
     }
   }
 
+  // U9 — levantamento SALVO (persistido por análise): mostra ao abrir, sem re-anexar os DWG.
+  useEffect(() => {
+    let vivo = true;
+    buscarLevantamento(analiseId)
+      .then((r) => { if (vivo && r) setLev(r); })
+      .catch(() => {/* sem estado salvo — segue */});
+    return () => { vivo = false; };
+  }, [analiseId]);
+
   // U9 — anexa o levantamento planialtimétrico (curvas de nível reais → traçado segue a cota).
   async function anexarLev(arquivo: File) {
     setLevCarregando(true);
@@ -296,15 +306,17 @@ export function CardUrbanismo({
       overlays.urb_verde = g.areas_verdes; // fallback (backend antigo)
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
     if (g.institucional) overlays.urb_institucional = g.institucional;
-    // U6a — o VIÁRIO entra por último (desenha POR CIMA dos verdes): sem isso o corredor
-    // verde pinta sobre os cruzamentos e as vias internas dos pods parecem desconectadas.
-    if (g.arruamento) overlays.urb_arruamento = g.arruamento;
-    if (g.portico) overlays.urb_portico = g.portico; // Fase 11.3 — marcador da entrada/portaria
-    if (g.agua) overlays.urb_agua = g.agua; // U3 — lago/espelho d'água criado
     // Fase 9.8 — restrição recortada (mata/declividade/APP): demarcada e rotulada (não "clarão").
+    // ANTES do viário: a restrição pintava POR CIMA da via ("via escondida atrás da mata" — achado
+    // do operador); a via precisa ficar visível onde quer que passe, nunca encoberta.
     if (g.restricao_recortada) overlays.urb_restricao = g.restricao_recortada;
     // ≥30% por cima do bosque: via legal ali não é violação (dump 024 do operador).
     if (g.restricao_via_ok) overlays.urb_restricao_via_ok = g.restricao_via_ok;
+    // U6a — o VIÁRIO entra por último (desenha POR CIMA dos verdes E das restrições): sem isso o
+    // corredor verde pinta sobre os cruzamentos e a mata encobre a via.
+    if (g.arruamento) overlays.urb_arruamento = g.arruamento;
+    if (g.portico) overlays.urb_portico = g.portico; // Fase 11.3 — marcador da entrada/portaria
+    if (g.agua) overlays.urb_agua = g.agua; // U3 — lago/espelho d'água criado
     // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback
     // para o polígono fundido (compat com versões antigas do backend).
     if (!temFeatures && g.lotes) overlays.urb_lotes = g.lotes;

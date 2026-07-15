@@ -136,6 +136,59 @@ def espacar_uniforme(curvas: Sequence[LineString], orientacao_rad: float,
     return [c for i, c in enumerate(ordenadas) if i % passo == 0]
 
 
+# ---------------- persistência (o operador não re-anexa os DWG a cada restart) ----------------
+# Chaveado pelo analise_id — que é DETERMINÍSTICO (derivado do conteúdo do KMZ): re-subir o mesmo
+# KMZ reencontra o levantamento salvo sozinho. Grava no volume /data/perfis (bind — sobrevive a
+# rebuilds); fora do container cai numa pasta local. Falha de disco NUNCA derruba o fluxo (§5).
+
+def _dir_persistencia() -> str:
+    d = os.getenv("LEVANTAMENTOS_DIR", "").strip()
+    if d:
+        return d
+    return ("/data/perfis/levantamentos" if os.path.isdir("/data/perfis")
+            else "app/perfis/_dados/levantamentos")
+
+
+def salvar_persistido(analise_id: str, dados: dict) -> bool:
+    """Grava o levantamento extraído (contornos WGS + metadados) em disco. Best-effort."""
+    import json
+
+    try:
+        d = _dir_persistencia()
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, f"{analise_id}.json"), "w", encoding="utf-8") as f:
+            json.dump(dados, f)
+        return True
+    except OSError:
+        return False
+
+
+def carregar_persistido(analise_id: str) -> Optional[dict]:
+    """Levantamento salvo desta análise (None se não há). Nunca lança."""
+    import json
+
+    try:
+        caminho = os.path.join(_dir_persistencia(), f"{analise_id}.json")
+        if not os.path.exists(caminho):
+            return None
+        with open(caminho, encoding="utf-8") as f:
+            dados = json.load(f)
+        return dados if isinstance(dados, dict) and dados.get("contornos_wgs") else None
+    except (OSError, ValueError):
+        return None
+
+
+def obter_levantamento(analise_id: str, registro: dict) -> Optional[dict]:
+    """Levantamento da análise: memória → disco (reidrata o registro). Uso nos routers."""
+    lev = registro.get("levantamento")
+    if lev and lev.get("contornos_wgs"):
+        return lev
+    lev = carregar_persistido(analise_id)
+    if lev:
+        registro["levantamento"] = lev
+    return lev
+
+
 def extrair_contornos_dxf(
     caminho_dxf: str,
     to_local: Callable[[float, float], tuple[float, float]],

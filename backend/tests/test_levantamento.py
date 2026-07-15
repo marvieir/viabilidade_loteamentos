@@ -99,6 +99,45 @@ def test_endpoint_anexa_levantamento_e_guarda_no_registro(client, tmp_path):
     assert len(STORE.get(aid)["levantamento"]["contornos_wgs"]) == 5
 
 
+def test_persistencia_sobrevive_restart(client, tmp_path, monkeypatch):
+    """O operador não re-anexa os 3 DWG a cada restart: o levantamento é salvo em disco chaveado
+    pelo analise_id (determinístico — mesmo KMZ → mesmo id). Simula o restart limpando o registro
+    em memória: o GET reencontra do disco e o registro é reidratado."""
+    from tests.conftest import RET_RETANGULO, make_kmz
+    from app.core.store import STORE
+
+    monkeypatch.setenv("LEVANTAMENTOS_DIR", str(tmp_path / "persist"))
+    r = client.post("/api/analises", files={
+        "kmz": ("g.kmz", make_kmz([RET_RETANGULO]), "application/vnd.google-earth.kmz")})
+    aid = r.json()["analise_id"]
+    dxf = str(tmp_path / "lev.dxf"); _dxf_fake(dxf)
+    with open(dxf, "rb") as f:
+        assert client.post(f"/api/analises/{aid}/levantamento",
+                           files={"arquivo": ("lev.dxf", f.read(), "application/octet-stream")}
+                           ).status_code == 200
+    # "restart": a memória some (o STORE zera), mas o disco fica
+    STORE.get(aid).pop("levantamento", None)
+    g = client.get(f"/api/analises/{aid}/levantamento")
+    assert g.status_code == 200, g.text
+    assert g.json()["n_curvas"] == 5                       # reencontrado do disco
+    assert STORE.get(aid).get("levantamento") is not None  # registro reidratado
+    # e o ACUMULAR continua: anexar de novo soma com o que estava salvo
+    with open(dxf, "rb") as f:
+        r2 = client.post(f"/api/analises/{aid}/levantamento",
+                         files={"arquivo": ("lev2.dxf", f.read(), "application/octet-stream")})
+    assert r2.json()["n_curvas"] == 10
+
+
+def test_get_404_sem_levantamento(client, tmp_path, monkeypatch):
+    from tests.conftest import RET_RETANGULO, make_kmz
+
+    monkeypatch.setenv("LEVANTAMENTOS_DIR", str(tmp_path / "vazio"))
+    r = client.post("/api/analises", files={
+        "kmz": ("g.kmz", make_kmz([RET_RETANGULO]), "application/vnd.google-earth.kmz")})
+    aid = r.json()["analise_id"]
+    assert client.get(f"/api/analises/{aid}/levantamento").status_code == 404
+
+
 def test_endpoint_422_sem_curva_de_nivel(client, tmp_path):
     from tests.conftest import RET_RETANGULO, make_kmz
 

@@ -224,7 +224,7 @@ def _dump_insumos_motor(
     analise_id: str, proposta_id: str, *, aprov_m, restr_m, decliv_lote_m,
     decliv_acentuada_m, orientacao, travessia_eixo, travessia_diag,
     acesso_externo_m, lago_param, estilo, diretrizes, prog, variante, publico_alvo,
-    dem_amostras=None, contornos_b=None,
+    dem_amostras=None, contornos_b=None, veg_bloqueio_m=None,
 ) -> None:
     """LAB do operador — grava os insumos EXATOS que o motor recebeu (WKT + JSON) para
     replay determinístico FORA do app (harness de render itera no MESMO desenho — a regra 4
@@ -611,7 +611,8 @@ def _propor_impl(
     contornos_b = None
     # U9 — LEVANTAMENTO REAL tem PRIORIDADE sobre o DEM: se o operador anexou o planialtimétrico,
     # as curvas de nível reais (lisas, precisas) guiam o traçado no lugar do satélite de 30 m.
-    _lev = registro.get("levantamento")
+    from app.core import levantamento as _lev_mod
+    _lev = _lev_mod.obter_levantamento(analise_id, registro)  # memória → disco (não re-anexar)
     if str(estilo.get("tracado", "")) == "contorno_serpente" and _lev and _lev.get("contornos_wgs"):
         try:
             from shapely import wkt as _wkt
@@ -835,6 +836,7 @@ def _propor_impl(
         decliv_lote_m=decliv_lote_m, decliv_acentuada_m=decliv_acentuada_m,
         orientacao=orientacao, travessia_eixo=travessia_eixo, travessia_diag=travessia_diag,
         acesso_externo_m=acesso_externo_m, lago_param=lago_param, estilo=estilo,
+        veg_bloqueio_m=veg_bloqueio_m,
         diretrizes=diretrizes, prog=prog, variante=variante_escolhida,
         publico_alvo=str(body.publico_alvo),
         dem_amostras=_dem_amostras_no_frame(dem_recorte, to_local),
