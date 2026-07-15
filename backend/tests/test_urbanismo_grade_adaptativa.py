@@ -47,11 +47,18 @@ def _sao_roque_aproveitavel():
     return wkb.loads(dados["aproveitavel_wkb_hex"], hex=True), float(dados["orientacao_rad"])
 
 
+# ESTILO DE GRADE explícito: estes valores-ouro calibram a GRADE ADAPTATIVA (9.11/9.12), que
+# baixa/média ainda usam. O default do ALTO virou faixas fluidas (U8, aprovado pelo operador) —
+# sem fixar o estilo aqui, os testes mediam outra gramática e falhavam por vocação, não por bug.
+_ESTILO_GRADE = {"tracado": "", "gramatica": "", "ruas_locais_contorno": False, "arquetipo": ""}
+
+
 def _layout_sao_roque():
     aprov, orient = _sao_roque_aproveitavel()
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
     prog = programa_do_preset("alta", {"pct_lazer": 0.2})
-    layout = geom.gerar_layout(aprov, prog, orientacao_rad=orient, diretrizes=dd)
+    layout = geom.gerar_layout(aprov, prog, orientacao_rad=orient, diretrizes=dd,
+                               estilo=dict(_ESTILO_GRADE))
     return layout, medida.medir(layout)
 
 
@@ -111,7 +118,8 @@ def test_caixa_limpa_nao_regride():
     consequência adaptativa (banda [0,12 ; 0,26])."""
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
     prog = programa_do_preset("alta", {"pct_lazer": 0.2})
-    layout = geom.gerar_layout(box(0.0, 0.0, 343.0, 172.0), prog, diretrizes=dd)
+    layout = geom.gerar_layout(box(0.0, 0.0, 343.0, 172.0), prog, diretrizes=dd,
+                               estilo=dict(_ESTILO_GRADE))
     med = medida.medir(layout)
     q = med.quadro
     v = layout.viario_diagnostico

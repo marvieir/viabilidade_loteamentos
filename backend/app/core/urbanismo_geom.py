@@ -2711,6 +2711,44 @@ def gerar_layout(
             "área do lago ou regenere com o perfil alta renda."
         )
 
+    # ===== INVARIANTE: VIA VENCE LOTE (double-count de 1,7% no quadro — task #27) =====
+    # A solda final da malha (_conectar_malha) e outras costuras podem passar POR CIMA de lotes já
+    # subdivididos — lote∩via inflava a soma do quadro (1,0175). Aqui todo lote é recortado contra
+    # o arruamento FINAL; abaixo do piso legal, sai (resto vira sobra→verde). Determinístico.
+    if arruamento is not None and not arruamento.is_empty and lotes:
+        _lts3, _lqs3, _sobras3 = [], [], []
+        _tem_lq3 = bool(lote_quadra) and len(lote_quadra) == len(lotes)
+        for _i, _l in enumerate(lotes):
+            if not _intersecta_segura(_l, arruamento):
+                _lts3.append(_l)
+                if _tem_lq3:
+                    _lqs3.append(lote_quadra[_i])
+                continue
+            _l2 = _diferenca_segura(_l, arruamento)
+            _ps = [pp for pp in _componentes(_l2)] if (_l2 is not None and not _l2.is_empty) else []
+            _m3 = max(_ps, key=lambda pp: pp.area) if _ps else None
+            if _m3 is not None and _m3.area >= piso_lote - 0.5:
+                _lts3.append(_m3)
+                if _tem_lq3:
+                    _lqs3.append(lote_quadra[_i])
+            elif _m3 is not None and _m3.area >= 30.0:
+                _sobras3.append(_m3)
+        lotes = _lts3
+        if _tem_lq3:
+            lote_quadra = _lqs3
+        if _sobras3:
+            sobra_ponta = _uniao_segura([sobra_ponta, *_sobras3])
+            verde = _uniao_segura([verde, *_sobras3])
+        # verdes/lazer/inst também não dividem chão com a via (o quadro soma 100% por construção)
+        verde = _diferenca_segura(verde, arruamento) if verde is not None else None
+        verde_reservado = (_diferenca_segura(verde_reservado, arruamento)
+                           if verde_reservado is not None else None)
+        sobra_ponta = (_diferenca_segura(sobra_ponta, arruamento)
+                       if sobra_ponta is not None else None)
+        lazer_total = (_diferenca_segura(lazer_total, arruamento)
+                       if lazer_total is not None else None)
+        inst = _diferenca_segura(inst, arruamento) if inst is not None else None
+
     # ===== GRAMPO LEGAL FINAL (achado de campo — dump 022 do operador) =====
     # A suavização da escada do raster (30 m) corta cantos PARA DENTRO da restrição → via/lote
     # ficavam com lascas sobre mata DECLARADA (842 m² de via + 21 lotes no caso real). Regra dura:
