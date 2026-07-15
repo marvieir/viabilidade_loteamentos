@@ -592,7 +592,7 @@ def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: floa
 def _rota_acesso_desviando(origem: Point, destino: Point,
                            bloqueado: Optional[BaseGeometry],
                            caro: Optional[BaseGeometry],
-                           passo: float = 10.0,
+                           passo: float = 6.0,
                            custo_caro: float = 6.0) -> Optional[LineString]:
     """Rota da VIA DE ACESSO desviando da restrição (achado do operador — dump 026: a descida do
     pórtico cortava RETO por cima da encosta ≥30% quando existia corredor aproveitável do lado).
@@ -602,14 +602,20 @@ def _rota_acesso_desviando(origem: Point, destino: Point,
     volta; mata jamais. Devolve a polilinha suavizada (Chaikin) ou None (sem caminho)."""
     import heapq
 
-    minx = min(origem.x, destino.x) - 160.0
-    maxx = max(origem.x, destino.x) + 160.0
-    miny = min(origem.y, destino.y) - 160.0
-    maxy = max(origem.y, destino.y) + 160.0
+    # Janela LARGA (dump 030): o desvio legal pode contornar LONGE da linha reta (ex.: descer
+    # pelo corredor leste). Folga generosa; se a grade ficar grande, ENGROSSA o passo (nunca
+    # desiste por tamanho — determinístico).
+    _folga = 420.0
+    minx = min(origem.x, destino.x) - _folga
+    maxx = max(origem.x, destino.x) + _folga
+    miny = min(origem.y, destino.y) - _folga
+    maxy = max(origem.y, destino.y) + _folga
     nx = max(int((maxx - minx) / passo) + 1, 2)
     ny = max(int((maxy - miny) / passo) + 1, 2)
-    if nx * ny > 40000:  # janela enorme → não vale o custo; chamador cai no traço reto
-        return None
+    while nx * ny > 60000:
+        passo *= 1.5
+        nx = max(int((maxx - minx) / passo) + 1, 2)
+        ny = max(int((maxy - miny) / passo) + 1, 2)
 
     def _cel(p: Point) -> tuple[int, int]:
         return (min(max(int((p.x - minx) / passo), 0), nx - 1),
@@ -638,7 +644,9 @@ def _rota_acesso_desviando(origem: Point, destino: Point,
             if not (0 <= nb[0] < nx and 0 <= nb[1] < ny) or nb in visto:
                 continue
             p = Point(_pt(nb))
-            if blq is not None and blq.contains(p):
+            # bloqueio NÃO vale na célula de chegada/partida (encostam na borda da rua/malha —
+            # o corredor de 16 m numa grade grossa quebrava por puro alinhamento; dump 030).
+            if nb != fim and nb != ini and blq is not None and blq.contains(p):
                 continue  # mata/APP: via jamais
             passo_c = math.hypot(dx, dy)
             mult = custo_caro if (car is not None and car.contains(p)) else 1.0
@@ -654,6 +662,7 @@ def _rota_acesso_desviando(origem: Point, destino: Point,
     pts = [(origem.x, origem.y)] + [_pt(c) for c in caminho[1:-1]] + [(destino.x, destino.y)]
     if len(pts) < 2:
         return None
+    pts_crus = list(pts)  # guarda a rota crua: a suavizada não pode invadir o bloqueado
     for _ in range(2):  # Chaikin: descadeia a grade (via de acesso suave)
         if len(pts) < 3:
             break
@@ -663,7 +672,11 @@ def _rota_acesso_desviando(origem: Point, destino: Point,
             novo_pts.append((0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]))
         novo_pts.append(pts[-1])
         pts = novo_pts
-    return LineString(pts)
+    rota = LineString(pts)
+    # A suavização corta cantos: se invadiu o bloqueado, volta à rota CRUA da grade (legal > liso).
+    if bloqueado is not None and not bloqueado.is_empty and rota.intersects(bloqueado.buffer(-0.25)):
+        rota = LineString(pts_crus)
+    return rota
 
 
 def _bulbos_cul_de_sac(eixos: Sequence[BaseGeometry], ilha: BaseGeometry,
@@ -1508,6 +1521,14 @@ def gerar_layout(
         canvas = _suavizar_raster(canvas)
         if restricao_externa is not None and not restricao_externa.is_empty:
             restricao_externa = _suavizar_raster(restricao_externa)
+    # RAIZ do "via fantasma na mata" (dump 030): a suavização do canvas PONTEAVA vãos de vegetação
+    # — o tronco era DESENHADO sobre a mata e o grampo final recortava, deixando fragmentos soltos
+    # no alinhamento antigo (acesso desconexo). O canvas NUNCA inclui a vegetação crua: quem
+    # bloqueia via não entra nem no rascunho.
+    if restricao_via_bloqueio is not None and not restricao_via_bloqueio.is_empty:
+        _c2 = _diferenca_segura(canvas, restricao_via_bloqueio)
+        if _c2 is not None and not _c2.is_empty:
+            canvas = _c2
     # Fase U6a P1 — CINTURÃO verde perimetral (frame original): nenhum lote encosta na
     # divisa; a moldura entra na doação como verde reservado (todas as referências).
     cinturao_orig = None
@@ -2726,6 +2747,100 @@ def gerar_layout(
         if _slivers:
             sobra_ponta = _uniao_segura([sobra_ponta, *_slivers])
             verde = _uniao_segura([verde, *_slivers])
+
+    # ===== GARANTIA DE CONEXÃO (pós-grampo — dump 030) =====
+    # O grampo pode fatiar a malha (fragmentos no alinhamento velho) e deixar o ACESSO solto.
+    # Aqui: migalhas soltas viram verde; o componente do acesso (e qualquer trecho relevante) é
+    # RECONECTADO à malha principal por rota A* que DESVIA da vegetação; sem rota legal → aviso
+    # ALTO (nunca silêncio). A ligação nova desconta lote/verde que atravessar (o traçado manda).
+    if arruamento is not None and not arruamento.is_empty:
+        _comps = sorted(_componentes(arruamento), key=lambda p: -p.area)
+        if len(_comps) > 1:
+            _principal = _comps[0]
+            _ac_pt = None
+            if acesso_externo is not None and not acesso_externo.is_empty:
+                _ac_pt = (acesso_externo if isinstance(acesso_externo, Point)
+                          else acesso_externo.representative_point())
+            _veg = (restricao_via_bloqueio
+                    if (restricao_via_bloqueio is not None and not restricao_via_bloqueio.is_empty)
+                    else (_diferenca_segura(restricao_raw, declividade_acentuada)
+                          if (restricao_raw is not None and not restricao_raw.is_empty
+                              and declividade_acentuada is not None
+                              and not declividade_acentuada.is_empty)
+                          else restricao_raw))
+            _novos_arr = [_principal]
+            _migalhas = []
+            _sem_rota = False
+            for _c in _comps[1:]:
+                _importante = ((_ac_pt is not None and _c.distance(_ac_pt) < 25.0)
+                               or _c.area >= 900.0)
+                if not _importante:
+                    _migalhas.append(_c)
+                    continue
+                # pontos de conexão AFASTADOS da vegetação (o mais próximo cru fica colado na
+                # borda e o último trecho invadia ~5 m — dump 030): amostra a borda e escolhe o
+                # candidato livre (≥5 m da veg) mais perto; sem candidato livre, usa o cru.
+                def _pt_conexao(_geo, _ref):
+                    _b = _geo.boundary
+                    _n = max(min(int(_b.length // 8.0), 400), 1)
+                    _cands = [_b.interpolate(_i / _n, normalized=True) for _i in range(_n + 1)]
+                    if _veg is not None and not _veg.is_empty:
+                        _livres = [q for q in _cands if q.distance(_veg) > 5.0]
+                        _cands = _livres or _cands
+                    return min(_cands, key=lambda q: (round(q.distance(_ref), 2), q.x, q.y))
+                _p1 = _pt_conexao(_c, _principal)
+                _p2 = _pt_conexao(_principal, _p1)
+                _rota = _rota_acesso_desviando(_p1, _p2, _veg, restricao_raw)
+                _lig = None
+                if _rota is not None:
+                    _lig = _valido(_rota.buffer(conexao_mod.CAIXA_TRONCO_M / 2.0,
+                                                cap_style=2, join_style=2))
+                    if _lig is not None and _veg is not None and not _veg.is_empty:
+                        _lig = _diferenca_segura(_lig, _veg)  # cinto e suspensório
+                _novos_arr.append(_c)
+                if _lig is not None and not _lig.is_empty:
+                    _novos_arr.append(_lig)
+                else:
+                    _sem_rota = True
+            if _sem_rota:
+                avisos.append(
+                    "ACESSO/TRECHO SEM LIGAÇÃO LEGAL À MALHA: a vegetação preservada fecha o "
+                    "corredor — ligar exigiria supressão autorizada (Lei 11.428/2006). Verificar "
+                    "acesso alternativo com o urbanista/ambiental."
+                )
+            if _migalhas:
+                sobra_ponta = _uniao_segura([sobra_ponta, *_migalhas])
+                verde = _uniao_segura([verde, *_migalhas])
+            _antes = _uniao_segura(_comps)
+            arruamento = _uniao_segura(_novos_arr)
+            _novo_solo = _diferenca_segura(arruamento, _antes)  # só a ligação acrescentada
+            if _novo_solo is not None and not _novo_solo.is_empty:
+                _lts, _lqs = [], []
+                _tem_lq2 = bool(lote_quadra) and len(lote_quadra) == len(lotes)
+                for _i, _l in enumerate(lotes):
+                    if not _l.intersects(_novo_solo):
+                        _lts.append(_l)
+                        if _tem_lq2:
+                            _lqs.append(lote_quadra[_i])
+                        continue
+                    _l2 = _diferenca_segura(_l, _novo_solo)
+                    _ps = [pp for pp in _componentes(_l2)] if (_l2 is not None and not _l2.is_empty) else []
+                    _m2 = max(_ps, key=lambda pp: pp.area) if _ps else None
+                    if _m2 is not None and _m2.area >= piso_lote - 0.5:
+                        _lts.append(_m2)
+                        if _tem_lq2:
+                            _lqs.append(lote_quadra[_i])
+                lotes = _lts
+                if _tem_lq2:
+                    lote_quadra = _lqs
+                verde = _diferenca_segura(verde, _novo_solo) if verde is not None else None
+                verde_reservado = (_diferenca_segura(verde_reservado, _novo_solo)
+                                   if verde_reservado is not None else None)
+                sobra_ponta = (_diferenca_segura(sobra_ponta, _novo_solo)
+                               if sobra_ponta is not None else None)
+                lazer_total = (_diferenca_segura(lazer_total, _novo_solo)
+                               if lazer_total is not None else None)
+                inst = _diferenca_segura(inst, _novo_solo) if inst is not None else None
 
     meta = {
         "lazer_alvo_pct": round(pct_lazer0, 4),

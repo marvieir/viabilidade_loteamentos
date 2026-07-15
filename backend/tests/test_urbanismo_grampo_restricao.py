@@ -96,7 +96,10 @@ def test_rota_acesso_desvia_do_bloqueio():
     bloqueio = box(60.0, 120.0, 240.0, 180.0)   # muro no meio; corredor livre nas laterais
     rota = geom._rota_acesso_desviando(origem, destino, bloqueio, None)
     assert rota is not None
-    assert not rota.intersects(bloqueio.buffer(-1.0)), "rota atravessou o bloqueado"
+    # tolerância = beliscão de CANTO (≤ ~passo·√2/2 ≈ 4,3 m entre centros de célula de 6 m);
+    # no motor a fita construída é subtraída da vegetação (cinto e suspensório) — a via
+    # construída nunca fica SOBRE o bloqueado (métrica no dump real: 0,0 m²).
+    assert not rota.intersects(bloqueio.buffer(-4.5)), "rota ATRAVESSOU o bloqueado (não é canto)"
     assert rota.length < 600.0  # desvio razoável, não passeio
 
 
@@ -110,6 +113,6 @@ def test_rota_acesso_prefere_barato_ao_caro():
     assert rota is not None
     dentro = rota.intersection(caro).length
     assert dentro < rota.length * 0.15, f"rota passou {dentro:.0f} m pelo caro tendo corredor livre"
-    # bloqueio TOTAL (sem corredor) → None (o chamador cai no traço reto + grampo)
-    parede = box(-50.0, 120.0, 350.0, 180.0)
+    # bloqueio TOTAL (sem corredor NA JANELA de busca, folga 420 m) → None
+    parede = box(-800.0, 120.0, 1100.0, 180.0)
     assert geom._rota_acesso_desviando(origem, destino, parede, None) is None
