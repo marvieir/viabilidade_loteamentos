@@ -39,6 +39,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_portico: "#db2777", // Fase 11.3 — pórtico/entrada: rosa/magenta (cor ÚNICA, não clasha c/ lote)
   urb_agua: "#0369a1", // U3 — lago criado: azul-água (profundo, distinto do ciano do lazer)
   urb_restricao: "#14532d", // Fase 11.6 — bosque preservado: verde-FLORESTA bem escuro (o mais escuro)
+  urb_restricao_via_ok: "#8d9d4f", // ≥30% dentro da restrição: oliva (lote vedado; VIA permitida c/ laudo)
 };
 
 // Fase 9.6 — estilo POR camada (contraste sobre satélite, borda própria). Sem entrada → default.
@@ -76,6 +77,7 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // (#22c55e, manicured) e do verde-sobra (pálido). Não compete com os lotes (fica ao fundo), mas
   // LÊ como amenidade preservada — não como vazio com satélite vazando. O dado/geometria não muda.
   urb_restricao: { color: "#052e16", weight: 1.5, fillColor: "#14532d", fillOpacity: 0.5, dashArray: "1 6" },
+  urb_restricao_via_ok: { color: "#6b7d3a", weight: 1, fillColor: "#8d9d4f", fillOpacity: 0.45, dashArray: "4 4" },
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
@@ -113,7 +115,8 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_institucional: "Institucional",
   urb_portico: "Pórtico / entrada",
   urb_agua: "Lago / espelho d'água (criado)",
-  urb_restricao: "Bosque/área verde preservada (não-edif.: mata/≥30%/APP)",
+  urb_restricao: "Mata/APP preservada (não-edificável — nem via, nem lote)",
+  urb_restricao_via_ok: "Declividade ≥30% — LOTE vedado; via permitida (laudo geotécnico, Lei 6.766 art. 3º)",
 };
 
 // Cores das 8 faixas de declividade (verde→vermelho) — usadas no card E na camada do mapa.

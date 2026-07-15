@@ -303,6 +303,8 @@ export function CardUrbanismo({
     if (g.agua) overlays.urb_agua = g.agua; // U3 — lago/espelho d'água criado
     // Fase 9.8 — restrição recortada (mata/declividade/APP): demarcada e rotulada (não "clarão").
     if (g.restricao_recortada) overlays.urb_restricao = g.restricao_recortada;
+    // ≥30% por cima do bosque: via legal ali não é violação (dump 024 do operador).
+    if (g.restricao_via_ok) overlays.urb_restricao_via_ok = g.restricao_via_ok;
     // Fase 9.5 — lotes desenhados LOTE A LOTE (FeatureCollection). Sem features → fallback
     // para o polígono fundido (compat com versões antigas do backend).
     if (!temFeatures && g.lotes) overlays.urb_lotes = g.lotes;

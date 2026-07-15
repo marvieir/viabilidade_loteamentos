@@ -659,6 +659,15 @@ def _propor_impl(
         )
         layout_v.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular (não recalcula)
         layout_v.restricao_origem = restr_origem
+        # Achado do operador (dump 024): a via legal sobre ≥30% parecia violação porque o mapa
+        # pinta mata e ≥30% da MESMA cor. Camada própria: dentro da restrição, onde é DECLIVIDADE
+        # (via permitida c/ laudo; lote vedado) — o front desenha por cima com cor/rótulo distintos.
+        layout_v.restricao_via_ok = (
+            restr_m.intersection(decliv_acentuada_m)
+            if (restr_m is not None and not restr_m.is_empty
+                and decliv_acentuada_m is not None and not decliv_acentuada_m.is_empty)
+            else None
+        )
         # Fase U1 — o perfil do público-alvo escolhe os PESOS do score de valor v2.
         med_v = medida.medir(layout_v, publico_alvo=body.publico_alvo)
         valor_v = sum(

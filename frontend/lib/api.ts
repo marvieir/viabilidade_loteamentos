@@ -465,6 +465,7 @@ export type ChaveOverlay =
   | "apcb"
   | "fund_malha"
   // Fase 9 — camadas do estudo de massa esquemático (card de Urbanismo)
+  | "urb_restricao_via_ok"
   | "urb_lotes"
   | "urb_quadras"
   | "urb_arruamento"
@@ -1540,6 +1541,8 @@ export interface GeometriaUrb {
   restricao_recortada?:
     | (GeoJSON.Geometry & { origem?: string[]; rotulo?: string; estilo_sugerido?: string })
     | null;
+  // ≥30% dentro da restrição — via legal (laudo); lote vedado. Cor própria no mapa (dump 024).
+  restricao_via_ok?: GeoJSON.Geometry | null;
   // Fase 9.7/9.8 — diagnósticos: conectividade + ilhas + stubs podados + qualificação legal.
   viario_diagnostico?: {
     conexo: boolean;

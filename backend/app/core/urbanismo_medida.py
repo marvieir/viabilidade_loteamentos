@@ -87,6 +87,9 @@ class Layout:
     # rotular (em vez do "clarão"); ``restricao_origem`` = de onde veio (vegetacao/declividade/app).
     restricao_recortada: Optional[BaseGeometry] = None
     restricao_origem: list[str] = field(default_factory=list)
+    # Parte da restrição que é DECLIVIDADE ≥30%: via PODE (laudo geotécnico), lote NÃO — o mapa
+    # desenha por cima do bosque com cor própria (senão via legal parece violação — dump 024).
+    restricao_via_ok: Optional[BaseGeometry] = None
     # Fase 11.3 — PÓRTICO/ENTRADA: marcador do acesso único do loteamento (alto padrão) p/ o mapa
     # desenhar o componente, não só contar no diagnóstico. Ponto/disco no arruamento junto à borda.
     portico: Optional[BaseGeometry] = None
@@ -687,6 +690,8 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
         "institucional_diagnostico": idiag,
         # Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").
         "restricao_recortada": _restricao_gj(layout, to_wgs),
+        # Parte ≥30% da restrição (via legal c/ laudo) — cor própria no mapa (dump 024).
+        "restricao_via_ok": _gj(layout.restricao_via_ok),
     }
 
 
