@@ -39,7 +39,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_portico: "#db2777", // Fase 11.3 — pórtico/entrada: rosa/magenta (cor ÚNICA, não clasha c/ lote)
   urb_agua: "#0369a1", // U3 — lago criado: azul-água (profundo, distinto do ciano do lazer)
   urb_restricao: "#14532d", // Fase 11.6 — bosque preservado: verde-FLORESTA bem escuro (o mais escuro)
-  urb_restricao_via_ok: "#8d9d4f", // ≥30% dentro da restrição: oliva (lote vedado; VIA permitida c/ laudo)
+  urb_restricao_via_ok: "#d4b13f", // ≥30% dentro da restrição: CAQUI/dourado (lote vedado; VIA permitida c/ laudo) — inconfundível com os verdes sobre o satélite
 };
 
 // Fase 9.6 — estilo POR camada (contraste sobre satélite, borda própria). Sem entrada → default.
@@ -77,7 +77,7 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // (#22c55e, manicured) e do verde-sobra (pálido). Não compete com os lotes (fica ao fundo), mas
   // LÊ como amenidade preservada — não como vazio com satélite vazando. O dado/geometria não muda.
   urb_restricao: { color: "#052e16", weight: 1.5, fillColor: "#14532d", fillOpacity: 0.5, dashArray: "1 6" },
-  urb_restricao_via_ok: { color: "#6b7d3a", weight: 1, fillColor: "#8d9d4f", fillOpacity: 0.45, dashArray: "4 4" },
+  urb_restricao_via_ok: { color: "#8a6d1a", weight: 2, fillColor: "#d4b13f", fillOpacity: 0.55, dashArray: "8 5" },
 };
 
 export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
