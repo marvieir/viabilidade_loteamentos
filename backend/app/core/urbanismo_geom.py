@@ -1449,6 +1449,7 @@ def gerar_layout(
     lago: Optional[dict] = None,
     estilo: Optional[dict] = None,
     contornos: Optional[list] = None,
+    restricao_via_bloqueio: Optional[BaseGeometry] = None,
 ) -> Layout:
     """Materializa o estudo de massa dentro de ``aproveitavel`` (CRS métrico). ``diretrizes``
     (Fase 9.4) traz piso/teto LEGAL de lote e o split de doação (município→federal); sem ele,
@@ -1912,10 +1913,16 @@ def gerar_layout(
             _dec_reg = (rotate(declividade_acentuada, -ang_deg, origin=cen)
                         if (declividade_acentuada is not None and not declividade_acentuada.is_empty
                             and ang_deg) else declividade_acentuada)
-            _mata_reg = (_diferenca_segura(_restr_raw_reg, _dec_reg)
-                         if (_restr_raw_reg is not None and not _restr_raw_reg.is_empty
-                             and _dec_reg is not None and not _dec_reg.is_empty)
-                         else _restr_raw_reg)
+            # BLOQUEIO da via = camada de VEGETAÇÃO/APP quando fornecida (dump 027: mata∩encosta
+            # continua mata — via jamais); sem ela, aproximação antiga (restrição − ≥30%).
+            if restricao_via_bloqueio is not None and not restricao_via_bloqueio.is_empty:
+                _mata_reg = (rotate(restricao_via_bloqueio, -ang_deg, origin=cen)
+                             if ang_deg else restricao_via_bloqueio)
+            else:
+                _mata_reg = (_diferenca_segura(_restr_raw_reg, _dec_reg)
+                             if (_restr_raw_reg is not None and not _restr_raw_reg.is_empty
+                                 and _dec_reg is not None and not _dec_reg.is_empty)
+                             else _restr_raw_reg)
             _eixo_ac = _rota_acesso_desviando(ac_reg, alvo_rua, _mata_reg, _restr_raw_reg)
             if _eixo_ac is None:
                 _eixo_ac = LineString([(ac_reg.x, ac_reg.y), (alvo_rua.x, alvo_rua.y)])
@@ -2673,9 +2680,12 @@ def gerar_layout(
     # Lei 6.766 art. 3º); LOTE não pisa em nada. Lote que perder área abaixo do piso legal sai
     # (o resto vira sobra→verde). Determinístico; avisos rotulam o ajuste (§5).
     if restricao_raw is not None and not restricao_raw.is_empty:
-        _mata_via = (_diferenca_segura(restricao_raw, declividade_acentuada)
-                     if (declividade_acentuada is not None and not declividade_acentuada.is_empty)
-                     else restricao_raw)
+        _mata_via = (restricao_via_bloqueio
+                     if (restricao_via_bloqueio is not None and not restricao_via_bloqueio.is_empty)
+                     else (_diferenca_segura(restricao_raw, declividade_acentuada)
+                           if (declividade_acentuada is not None
+                               and not declividade_acentuada.is_empty)
+                           else restricao_raw))
         if (arruamento is not None and not arruamento.is_empty and _mata_via is not None
                 and not _mata_via.is_empty and arruamento.intersects(_mata_via)):
             _corte_via = arruamento.intersection(_mata_via).area

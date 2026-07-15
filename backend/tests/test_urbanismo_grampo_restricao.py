@@ -65,6 +65,27 @@ def test_grampo_vale_tambem_na_faixas():
     assert lay.arruamento.intersection(mata).area < 1.0
 
 
+def test_mata_que_tambem_e_encosta_bloqueia_via():
+    """Dump 027 (achado do operador): mata∩encosta CONTINUA mata — via jamais. Sem a camada de
+    vegetação separada, o motor tratava tudo que é ≥30% como 'via ok' e cortava por cima da
+    floresta íngreme. Aqui a mata É TAMBÉM declividade (pior caso): com `restricao_via_bloqueio`
+    a via não pisa nela nem 1 m²."""
+    aprov, mata, curvas = _cenario_raster()
+    prog = programa_do_preset("alta", {"pct_lazer": 0.12})
+    estilo, _ = carregar_estilo("alta")
+    estilo["gramatica"] = "paisagem"
+    lay = geom.gerar_layout(
+        aprov, prog, orientacao_rad=0.0,
+        restricao_externa=mata,
+        declividade_acentuada=mata,      # a mata TODA é também ≥30% (pior caso do dump 027)
+        restricao_via_bloqueio=mata,     # camada de vegetação separada: bloqueia via SEMPRE
+        contornos=curvas, estilo=estilo,
+    )
+    assert lay.arruamento is not None and not lay.arruamento.is_empty
+    inv = lay.arruamento.intersection(mata).area
+    assert inv < 1.0, f"via sobre mata∩encosta: {inv:.0f} m² (mata bloqueia via mesmo sendo ≥30%)"
+
+
 # ------------------- roteador da via de acesso (desvia da restrição — dump 026) -------------------
 def test_rota_acesso_desvia_do_bloqueio():
     """A via de acesso NÃO corta reto por cima do bloqueado quando há corredor livre do lado:

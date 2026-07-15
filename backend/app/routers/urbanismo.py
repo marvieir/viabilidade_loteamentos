@@ -256,6 +256,7 @@ def _dump_insumos_motor(
                 "aproveitavel": _w(aprov_m),
                 "restricoes_lote": _w(decliv_lote_m),
                 "declividade_acentuada": _w(decliv_acentuada_m),
+                "restricao_via_bloqueio": _w(veg_bloqueio_m),
                 "restricao_externa": _w(restr_m),
                 "travessia_eixo": _w(travessia_eixo),
                 "acesso_externo": _w(acesso_externo_m),
@@ -312,7 +313,10 @@ def _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem):
     # restrição COMPLETA (mata/APP ∪ ≥30%) p/ o mapa rotular a faixa não-edificável (Fase 9.8).
     full = [g for g in (restr_via, decliv_lote) if g is not None and not g.is_empty]
     restr_full = unary_union(full) if full else None
-    return aprov, restr_full, origem, decliv_lote
+    # ``restr_via`` SEPARADO (achado do operador — dump 027): é o conjunto que BLOQUEIA VIA
+    # (vegetação/APP/faixas — Fase 10.8). A união restr_full APAGA a distinção mata∩encosta
+    # (que bloqueia via) × encosta limpa (via ok c/ laudo) — o motor precisa das duas camadas.
+    return aprov, restr_full, origem, decliv_lote, restr_via
 
 
 # Fase U4 — as K variantes DETERMINÍSTICAS geradas por chamada de IA (1 chamada → K layouts):
@@ -421,12 +425,15 @@ def _propor_impl(
         estilo["gramatica"] = "paisagem"
     # 1) Tela = área aproveitável (restrição já descontada); projeta para CRS métrico. A restrição
     # recortada (mata/declividade/APP) é guardada p/ o mapa rotular (Fase 9.8), não p/ recalcular.
-    aprov_wgs, restr_wgs, restr_origem, decliv_wgs = _aproveitavel_wgs(
+    aprov_wgs, restr_wgs, restr_origem, decliv_wgs, veg_bloqueio_wgs = _aproveitavel_wgs(
         registro, fonte_veg, fonte_camadas, fonte_dem
     )
     to_local, to_wgs = medida.transformadores([aprov_wgs])
     aprov_m = transform(to_local, aprov_wgs)
     restr_m = transform(to_local, restr_wgs) if restr_wgs is not None else None
+    # camada que BLOQUEIA via (vegetação/APP — dump 027): mata∩encosta continua mata p/ a via.
+    veg_bloqueio_m = (transform(to_local, veg_bloqueio_wgs)
+                      if veg_bloqueio_wgs is not None and not veg_bloqueio_wgs.is_empty else None)
     # Fase 10.8 — ≥30% (veta só LOTE) no frame métrico; o motor o desconta das quadras, não das vias.
     decliv_lote_m = transform(to_local, decliv_wgs) if decliv_wgs is not None else None
     # Declividade ACENTUADA (>20%, legal mas íngreme) — penalidade SUAVE: o motor prefere o terreno
@@ -656,18 +663,24 @@ def _propor_impl(
             lago=lago_param,  # U3 — ponto baixo do DEM (None sem opt-in/DEM)
             estilo=estilo,  # Mov.2 — knobs de composição do perfil de estilo
             contornos=contornos_b,  # Opção B — via-tronco na curva de nível (None → grade limpa)
+            restricao_via_bloqueio=veg_bloqueio_m,  # dump 027 — mata∩encosta BLOQUEIA via
         )
         layout_v.restricao_recortada = restr_m  # Fase 9.8 — p/ o mapa rotular (não recalcula)
         layout_v.restricao_origem = restr_origem
         # Achado do operador (dump 024): a via legal sobre ≥30% parecia violação porque o mapa
         # pinta mata e ≥30% da MESMA cor. Camada própria: dentro da restrição, onde é DECLIVIDADE
         # (via permitida c/ laudo; lote vedado) — o front desenha por cima com cor/rótulo distintos.
-        layout_v.restricao_via_ok = (
+        _via_ok = (
             restr_m.intersection(decliv_acentuada_m)
             if (restr_m is not None and not restr_m.is_empty
                 and decliv_acentuada_m is not None and not decliv_acentuada_m.is_empty)
             else None
         )
+        # dump 027 — mata∩encosta NÃO é "via ok": subtrai a camada de vegetação/APP do caqui.
+        if (_via_ok is not None and not _via_ok.is_empty
+                and veg_bloqueio_m is not None and not veg_bloqueio_m.is_empty):
+            _via_ok = _via_ok.difference(veg_bloqueio_m)
+        layout_v.restricao_via_ok = _via_ok if (_via_ok is not None and not _via_ok.is_empty) else None
         # Fase U1 — o perfil do público-alvo escolhe os PESOS do score de valor v2.
         med_v = medida.medir(layout_v, publico_alvo=body.publico_alvo)
         valor_v = sum(
