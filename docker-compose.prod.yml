@@ -53,6 +53,9 @@ services:
       VIAS_CACHE_DIR: "/data/perfis/vias"
       FINANCEIRA_DIR: "/data/perfis/financeira"
       ECONOMICA_DIR: "/data/perfis/economica"
+      # U9 — levantamento planialtimétrico persistido POR ANÁLISE (DWG/DXF do agrimensor):
+      # sobrevive a deploys; re-subir o MESMO KMZ reencontra as curvas sem re-anexar.
+      LEVANTAMENTOS_DIR: "/data/perfis/levantamentos"
     volumes:
       - perfis_municipais:/data/perfis-municipais
       - juridico:/data/juridico

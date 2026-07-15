@@ -166,6 +166,16 @@ def programa_hub(
         return [], {}
     ordem, fora, sem = mapear_amenidades(propostas, publico_alvo)
     axial, ang, origem = _frame_axial(hub)
+    # Robustez (#25): o hub pode chegar INVÁLIDO do GEOS em gleba gigante (side location conflict
+    # no intersection). Valida com buffer(0) — degrada honesto (sem programa) se não der.
+    if axial is not None and not axial.is_valid:
+        try:
+            axial = axial.buffer(0)
+        except Exception:  # noqa: BLE001
+            axial = None
+        if axial is None or axial.is_empty:
+            return [], {"nao_coube": [a.rotulo for a in ordem], "fora_do_hub": fora,
+                        "sem_correspondencia": sem}
     minx, miny, maxx, maxy = axial.bounds
     altura = max(maxy - miny, 1e-6)
     # Mov.2 — a fração livre pode vir do perfil de estilo (default embarcado).
