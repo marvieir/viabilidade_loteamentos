@@ -589,6 +589,23 @@ def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: floa
     return eixos or None
 
 
+def _intersecta_segura(a, b) -> bool:
+    """`intersects` robusto a geometria inválida do GEOS (side location conflict — crash de campo
+    na religação): valida com buffer(0) e, se ainda estourar, responde True (conservador — o
+    chamador cai no caminho da diferença, que já é segura)."""
+    try:
+        return a.intersects(b)
+    except Exception:  # noqa: BLE001 — TopologyException
+        try:
+            av = _valido(a)
+            bv = _valido(b)
+            if av is None or bv is None:
+                return False
+            return av.intersects(bv)
+        except Exception:  # noqa: BLE001
+            return True
+
+
 def _rota_acesso_desviando(origem: Point, destino: Point,
                            bloqueado: Optional[BaseGeometry],
                            caro: Optional[BaseGeometry],
@@ -2708,7 +2725,7 @@ def gerar_layout(
                                and not declividade_acentuada.is_empty)
                            else restricao_raw))
         if (arruamento is not None and not arruamento.is_empty and _mata_via is not None
-                and not _mata_via.is_empty and arruamento.intersects(_mata_via)):
+                and not _mata_via.is_empty and _intersecta_segura(arruamento, _mata_via)):
             _corte_via = arruamento.intersection(_mata_via).area
             if _corte_via > 1.0:
                 arruamento = _diferenca_segura(arruamento, _mata_via)
@@ -2720,7 +2737,7 @@ def gerar_layout(
         _novos, _lq, _perdidos_m2, _slivers = [], [], 0.0, []
         _tem_lq = bool(lote_quadra) and len(lote_quadra) == len(lotes)
         for _i, _l in enumerate(lotes):
-            if not _l.intersects(restricao_raw):
+            if not _intersecta_segura(_l, restricao_raw):
                 _novos.append(_l)
                 if _tem_lq:
                     _lq.append(lote_quadra[_i])
@@ -2813,12 +2830,12 @@ def gerar_layout(
                 verde = _uniao_segura([verde, *_migalhas])
             _antes = _uniao_segura(_comps)
             arruamento = _uniao_segura(_novos_arr)
-            _novo_solo = _diferenca_segura(arruamento, _antes)  # só a ligação acrescentada
+            _novo_solo = _valido(_diferenca_segura(arruamento, _antes))  # só a ligação acrescentada
             if _novo_solo is not None and not _novo_solo.is_empty:
                 _lts, _lqs = [], []
                 _tem_lq2 = bool(lote_quadra) and len(lote_quadra) == len(lotes)
                 for _i, _l in enumerate(lotes):
-                    if not _l.intersects(_novo_solo):
+                    if not _intersecta_segura(_l, _novo_solo):
                         _lts.append(_l)
                         if _tem_lq2:
                             _lqs.append(lote_quadra[_i])
