@@ -63,3 +63,32 @@ def test_grampo_vale_tambem_na_faixas():
     for l in lay.lotes:
         assert l.intersection(mata).area < 0.5
     assert lay.arruamento.intersection(mata).area < 1.0
+
+
+# ------------------- roteador da via de acesso (desvia da restrição — dump 026) -------------------
+def test_rota_acesso_desvia_do_bloqueio():
+    """A via de acesso NÃO corta reto por cima do bloqueado quando há corredor livre do lado:
+    o A* contorna (achado do operador — a descida do pórtico cortava a encosta sem necessidade)."""
+    from shapely.geometry import Point
+
+    origem, destino = Point(150.0, 290.0), Point(150.0, 10.0)
+    bloqueio = box(60.0, 120.0, 240.0, 180.0)   # muro no meio; corredor livre nas laterais
+    rota = geom._rota_acesso_desviando(origem, destino, bloqueio, None)
+    assert rota is not None
+    assert not rota.intersects(bloqueio.buffer(-1.0)), "rota atravessou o bloqueado"
+    assert rota.length < 600.0  # desvio razoável, não passeio
+
+
+def test_rota_acesso_prefere_barato_ao_caro():
+    """Com corredor LIVRE disponível, a rota evita a zona cara (≥30%); cruza só sem alternativa."""
+    from shapely.geometry import Point
+
+    origem, destino = Point(150.0, 290.0), Point(150.0, 10.0)
+    caro = box(60.0, 120.0, 240.0, 180.0)       # zona cara no meio; livre nas laterais
+    rota = geom._rota_acesso_desviando(origem, destino, None, caro)
+    assert rota is not None
+    dentro = rota.intersection(caro).length
+    assert dentro < rota.length * 0.15, f"rota passou {dentro:.0f} m pelo caro tendo corredor livre"
+    # bloqueio TOTAL (sem corredor) → None (o chamador cai no traço reto + grampo)
+    parede = box(-50.0, 120.0, 350.0, 180.0)
+    assert geom._rota_acesso_desviando(origem, destino, parede, None) is None

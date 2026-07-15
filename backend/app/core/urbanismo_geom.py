@@ -589,6 +589,83 @@ def _faixas_fluidas_eixos(ilha: BaseGeometry, via_local: float, via_tronco: floa
     return eixos or None
 
 
+def _rota_acesso_desviando(origem: Point, destino: Point,
+                           bloqueado: Optional[BaseGeometry],
+                           caro: Optional[BaseGeometry],
+                           passo: float = 10.0,
+                           custo_caro: float = 6.0) -> Optional[LineString]:
+    """Rota da VIA DE ACESSO desviando da restrição (achado do operador — dump 026: a descida do
+    pórtico cortava RETO por cima da encosta ≥30% quando existia corredor aproveitável do lado).
+    A* determinístico numa grade de ``passo`` m no bbox local: célula em ``bloqueado`` (mata/APP —
+    via NUNCA) é intransponível; em ``caro`` (≥30% — via pode, com laudo) custa ``custo_caro``×;
+    resto custa 1. Preferência natural: contornar pelo aproveitável; cruzar o ≥30% só se não houver
+    volta; mata jamais. Devolve a polilinha suavizada (Chaikin) ou None (sem caminho)."""
+    import heapq
+
+    minx = min(origem.x, destino.x) - 160.0
+    maxx = max(origem.x, destino.x) + 160.0
+    miny = min(origem.y, destino.y) - 160.0
+    maxy = max(origem.y, destino.y) + 160.0
+    nx = max(int((maxx - minx) / passo) + 1, 2)
+    ny = max(int((maxy - miny) / passo) + 1, 2)
+    if nx * ny > 40000:  # janela enorme → não vale o custo; chamador cai no traço reto
+        return None
+
+    def _cel(p: Point) -> tuple[int, int]:
+        return (min(max(int((p.x - minx) / passo), 0), nx - 1),
+                min(max(int((p.y - miny) / passo), 0), ny - 1))
+
+    def _pt(c: tuple[int, int]) -> tuple[float, float]:
+        return (minx + c[0] * passo + passo / 2.0, miny + c[1] * passo + passo / 2.0)
+
+    from shapely.prepared import prep
+    blq = prep(bloqueado) if (bloqueado is not None and not bloqueado.is_empty) else None
+    car = prep(caro) if (caro is not None and not caro.is_empty) else None
+
+    ini, fim = _cel(origem), _cel(destino)
+    abertos: list = [(0.0, 0.0, ini, None)]
+    visto: dict = {}
+    while abertos:
+        f, custo, cel, pai = heapq.heappop(abertos)
+        if cel in visto:
+            continue
+        visto[cel] = pai
+        if cel == fim:
+            break
+        cx, cy = cel
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)):
+            nb = (cx + dx, cy + dy)
+            if not (0 <= nb[0] < nx and 0 <= nb[1] < ny) or nb in visto:
+                continue
+            p = Point(_pt(nb))
+            if blq is not None and blq.contains(p):
+                continue  # mata/APP: via jamais
+            passo_c = math.hypot(dx, dy)
+            mult = custo_caro if (car is not None and car.contains(p)) else 1.0
+            novo = custo + passo_c * mult
+            h = math.hypot(nb[0] - fim[0], nb[1] - fim[1])
+            heapq.heappush(abertos, (novo + h, novo, nb, cel))
+    if fim not in visto:
+        return None
+    caminho = [fim]
+    while visto[caminho[-1]] is not None:
+        caminho.append(visto[caminho[-1]])
+    caminho.reverse()
+    pts = [(origem.x, origem.y)] + [_pt(c) for c in caminho[1:-1]] + [(destino.x, destino.y)]
+    if len(pts) < 2:
+        return None
+    for _ in range(2):  # Chaikin: descadeia a grade (via de acesso suave)
+        if len(pts) < 3:
+            break
+        novo_pts = [pts[0]]
+        for a, b in zip(pts[:-1], pts[1:]):
+            novo_pts.append((0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1]))
+            novo_pts.append((0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]))
+        novo_pts.append(pts[-1])
+        pts = novo_pts
+    return LineString(pts)
+
+
 def _bulbos_cul_de_sac(eixos: Sequence[BaseGeometry], ilha: BaseGeometry,
                        via_local: float, raio: float, acesso: Optional[BaseGeometry] = None):
     """U8 — CUL-DE-SAC (Art.11 IX + look Urbia): num CONDOMÍNIO FECHADO, TODA ponta de via de grau 1
@@ -1813,11 +1890,13 @@ def gerar_layout(
         # (a SOLDA final da malha — _conectar_malha — roda como ÚLTIMO passo, após o contorno, abaixo)
 
     # Fase 11.15 — VIA DE ACESSO até o ponto de entrada (operador/OSM): quando o acesso fica
-    # LONGE da malha (ex.: a única via pública do outro lado do bosque preservado), materializa
-    # a ligação malha→ponto na mesma caixa da via-tronco. Via PODE cruzar preservado/restrição
-    # (art. 3º Lei 6.766 veda LOTE, não via); as quadras abaixo já a descontam. Sem isto, marcar
-    # o acesso numa via sem rua interna perto NÃO tinha efeito (o contato não existia) — e o
-    # pórtico é FORÇADO no ponto de entrada (é a entrada; não se rediscute).
+    # LONGE da malha, materializa a ligação malha→ponto na mesma caixa da via-tronco. O pórtico
+    # é FORÇADO no ponto de entrada (é a entrada; não se rediscute).
+    # Achado do operador (dump 026): a ligação era uma RETA que cortava por cima da encosta ≥30%
+    # mesmo com corredor aproveitável do lado. Agora a rota DESVIA (A* determinístico): mata/APP
+    # é intransponível (via jamais); ≥30% é caro (via pode, com laudo — só se não houver volta);
+    # aproveitável é o caminho natural. Sem caminho na grade → cai no traço reto (o grampo final
+    # remove o que pisar em mata).
     portico_forcado = None
     if (acesso_externo is not None and not acesso_externo.is_empty
             and ruas_reg is not None and not ruas_reg.is_empty):
@@ -1827,9 +1906,21 @@ def gerar_layout(
         alvo_rua = nearest_points(ac_reg, ruas_reg)[1]
         dist_ac = ac_reg.distance(alvo_rua)
         if 2.0 < dist_ac <= VIA_ACESSO_MAX_M:
+            _restr_raw_reg = (rotate(restricao_raw, -ang_deg, origin=cen)
+                              if (restricao_raw is not None and not restricao_raw.is_empty and ang_deg)
+                              else restricao_raw)
+            _dec_reg = (rotate(declividade_acentuada, -ang_deg, origin=cen)
+                        if (declividade_acentuada is not None and not declividade_acentuada.is_empty
+                            and ang_deg) else declividade_acentuada)
+            _mata_reg = (_diferenca_segura(_restr_raw_reg, _dec_reg)
+                         if (_restr_raw_reg is not None and not _restr_raw_reg.is_empty
+                             and _dec_reg is not None and not _dec_reg.is_empty)
+                         else _restr_raw_reg)
+            _eixo_ac = _rota_acesso_desviando(ac_reg, alvo_rua, _mata_reg, _restr_raw_reg)
+            if _eixo_ac is None:
+                _eixo_ac = LineString([(ac_reg.x, ac_reg.y), (alvo_rua.x, alvo_rua.y)])
             via_ac = _valido(
-                LineString([(ac_reg.x, ac_reg.y), (alvo_rua.x, alvo_rua.y)])
-                .buffer(conexao_mod.CAIXA_TRONCO_M / 2.0, cap_style=2, join_style=2)
+                _eixo_ac.buffer(conexao_mod.CAIXA_TRONCO_M / 2.0, cap_style=2, join_style=2)
             )
             if via_ac is not None and not via_ac.is_empty:
                 ruas_reg = _uniao_segura([ruas_reg, via_ac])
