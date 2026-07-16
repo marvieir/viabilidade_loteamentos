@@ -66,7 +66,7 @@ function PainelAdmin() {
             Esta área é exclusiva do administrador.
           </p>
           <Link
-            href="/"
+            href="/app"
             className="mt-5 inline-block rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white"
           >
             Voltar
@@ -90,7 +90,7 @@ function PainelAdmin() {
         </div>
         <div className="flex items-center gap-2">
           <Link
-            href="/"
+            href="/app"
             className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
           >
             Voltar ao app

@@ -47,7 +47,7 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
     try {
       if (cadastro) await cadastrar(email, senha, nome);
       else await entrar(email, senha);
-      router.push("/");
+      router.push("/app");
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Falha na autenticação.");
     } finally {
