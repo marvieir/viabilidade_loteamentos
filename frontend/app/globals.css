@@ -40,3 +40,24 @@ table,
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ------- Marketing (páginas públicas) ------- */
+.font-display {
+  font-family: "Fraunces", Georgia, "Times New Roman", serif;
+}
+.mkt-js .mkt-reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+}
+.mkt-js .mkt-reveal.mkt-visivel {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mkt-js .mkt-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}

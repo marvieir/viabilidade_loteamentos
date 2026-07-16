@@ -28,6 +28,11 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        {/* Fraunces — serifa display das páginas públicas (marketing); degrada p/ Georgia. */}
+        <link
+          href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap"
+          rel="stylesheet"
+        />
       </head>
       <body className="min-h-screen bg-slate-100 text-slate-900 antialiased">
         <AuthProvider>{children}</AuthProvider>

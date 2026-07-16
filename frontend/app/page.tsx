@@ -127,7 +127,7 @@ export default function PaginaPrincipal() {
       <HeaderSite />
 
       {/* 1. Hero */}
-      <section className="bg-slate-900 pb-16 pt-14 text-white">
+      <section className="bg-[#16241f] pb-16 pt-14 text-white">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
@@ -147,9 +147,9 @@ export default function PaginaPrincipal() {
           </div>
           <div className="mx-auto mt-12 max-w-4xl">
             <PrintReal
-              src="/marketing/hero-tracado.png"
+              src="/marketing/plano-masterplan.svg"
               alt="Traçado urbanístico gerado sobre a foto de satélite, ao lado do quadro de áreas"
-              legenda="Traçado gerado sobre a gleba real, com o quadro de áreas fechando em 100%"
+              legenda="Estudo real gerado pelo motor: gleba de 18,7 ha em São Roque · SP, 154 lotes, vias contornando a mata"
             />
           </div>
         </div>
@@ -183,7 +183,7 @@ export default function PaginaPrincipal() {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {VIRADA.map((b) => (
               <div key={b.titulo} className="rounded-xl border border-slate-200 bg-white p-6">
-                <h3 className="text-lg font-semibold text-emerald-700">{b.titulo}</h3>
+                <h3 className="text-lg font-semibold text-[#1b4332]">{b.titulo}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{b.texto}</p>
               </div>
             ))}
@@ -200,7 +200,7 @@ export default function PaginaPrincipal() {
           <ol className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-3">
             {PASSOS.map((p, i) => (
               <li key={p.titulo} className="rounded-xl border border-slate-200 p-6">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 text-sm font-bold text-white">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#1b4332] text-sm font-bold text-[#f3ecd8]">
                   {i + 1}
                 </span>
                 <h3 className="mt-3 font-semibold">{p.titulo}</h3>
@@ -228,10 +228,10 @@ export default function PaginaPrincipal() {
               >
                 <h3 className="font-semibold">{p.card}</h3>
                 <p className="mt-2 text-sm text-slate-500">{p.dor}</p>
-                <p className="mt-2 text-sm font-medium text-emerald-700">{p.transformacao}</p>
+                <p className="mt-2 text-sm font-medium text-[#1b4332]">{p.transformacao}</p>
                 <Link
                   href={p.href}
-                  className="mt-auto pt-4 text-sm font-semibold text-emerald-600 hover:text-emerald-500"
+                  className="mt-auto pt-4 text-sm font-semibold text-[#a4744d] hover:text-[#8a5f3d]"
                 >
                   Ver como funciona para você →
                 </Link>
@@ -290,7 +290,7 @@ export default function PaginaPrincipal() {
       </section>
 
       {/* 8. CTA final */}
-      <section id="cta" className="bg-slate-900 py-16 text-white">
+      <section id="cta" className="bg-[#16241f] py-16 text-white">
         <div className="mx-auto max-w-3xl px-5 text-center">
           <h2 className="text-3xl font-bold tracking-tight">A primeira análise sai hoje</h2>
           <p className="mt-4 leading-relaxed text-slate-300">

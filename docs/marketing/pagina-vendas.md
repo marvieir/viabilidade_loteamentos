@@ -176,3 +176,21 @@ especialista antes, agende a demonstração online.
 `Criar conta grátis` · `Agendar demonstração online`
 
 *Rodapé: mesmo disclaimer-mestre da página principal.*
+
+---
+
+## Nota de layout (v1.2 — 16/07/2026)
+
+O operador pediu página sofisticada e com visual. Redesign editorial aplicado no frontend
+(`frontend/app/loteadores/page.tsx`), mantendo a copy v1.1 na íntegra:
+
+- Pranchas SVG geradas pelo MOTOR REAL (replay do estudo de São Roque, 154 lotes; heatmap com o
+  score v2 verdadeiro) via `scripts/gerar_pranchas_marketing.py`. Selo "saída real do motor" em
+  cada prancha. Mockup continua proibido.
+- Tipografia display serifada (Fraunces) + Inter; paleta verde-floresta/creme/terracota.
+- Capítulos editoriais com rótulo lateral fixo, pull-quote, banda de fatos reais, chip de
+  proveniência com número real (52.253,23 m² de mata preservada), planos em cards (anual em
+  destaque), objeções em acordeão, barra de CTA fixa após o hero, revelação suave ao rolar
+  (progressive enhancement: sem JS a página fica 100% visível).
+- Referências de conversão usadas: um único objetivo (criar conta), visual do produto no hero,
+  clareza acima de tudo, microinterações discretas (Unbounce, KlientBoost, MagicUI, Webflow 2025).
