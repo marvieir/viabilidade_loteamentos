@@ -1,11 +1,11 @@
 # Blueprint · Página de Vendas · Loteador em operação (Viabilidade homeeye)
 
-**Data:** 16/07/2026 · **Versão:** v1
+**Data:** 16/07/2026 · **Versão:** v1.1
 **Público:** Balde 2, loteador em operação (decisão aprovada: uma página, começando pelo público
 de maior apetite; os demais chegam pelo freemium da home)
-**Oferta:** Gratuito (1 gleba/mês, até 10 análises; gleba fixa no mês) · Assinatura anual
-(50 análises/mês; [VALOR A DEFINIR])
-**Pendências:** valor da assinatura; nº de áreas simultâneas na assinatura (ilimitado?);
+**Oferta:** Gratuito (1 gleba/mês, até 5 análises; gleba fixa no mês) · Assinatura anual
+(200 áreas + 600 análises por ano; [VALOR A DEFINIR])
+**Pendências:** valor da assinatura;
 eventual garantia de reembolso (hoje o risco reverso é o plano gratuito; nada de reembolso foi
 prometido); prints finais em produção.
 
@@ -20,7 +20,7 @@ prometido); prints finais em produção.
 **Sub-headline:** A pré-análise que corta do seu funil a gleba que morre na diligência, antes de
 você pagar o estudo caro por ela.
 
-**CTA:** `Criar conta grátis` · microcopy: "Grátis: 1 gleba por mês, com até 10 análises."
+**CTA:** `Criar conta grátis` · microcopy: "Grátis: 1 gleba por mês, com até 5 análises."
 
 ## 2. A cena que você conhece *(cenário ilustrativo)*
 
@@ -73,7 +73,7 @@ mostra a cobertura usada, em vez de fingir completude.
 - Concentrar o orçamento de diligência nas 2 ou 3 áreas que passaram
 - Descobrir o passivo ambiental antes do sinal, quando ainda vira desconto
 - Comparar todas as glebas do funil com a mesma régua, sempre
-- Rodar até 50 análises por mês sem fila de fornecedor
+- Rodar até 600 análises por ano sem fila de fornecedor
 - Testar a mesma gleba em dois objetivos: Rendimento (mais lotes) ou Paisagem (desenho premium)
 - Chegar ao investidor com quadro de áreas, VGV e fontes em vez de conversa
 
@@ -100,8 +100,8 @@ mostra a fonte de cada número, você audita.
 
 | | **Gratuito** | **Assinatura anual** |
 |---|---|---|
-| Áreas (glebas) | 1 por mês (fixa no mês) | A CONFIRMAR |
-| Análises por mês | Até 10, somando as dimensões | 50 |
+| Áreas (glebas) | 1 por mês (fixa no mês) | 200 por ano |
+| Análises | Até 5 por mês, somando as dimensões | 600 por ano |
 | Dimensões (ambiental, jurídica, urbanística, financeira) | Todas | Todas |
 | Proveniência em todo número | Sim | Sim |
 | Para quem | Testar na sua gleba real | Operação de originação |
@@ -140,19 +140,19 @@ na primeira. E o teste custa zero.
 
 **"Está caro para o quanto eu usaria."** O custo que importa é o custo por decisão, e cada
 decisão de gleba movimenta milhões. Usar pouco custa R$ 0,00: o plano gratuito dá 1 gleba por
-mês com até 10 análises. Com 50 análises mensais, a assinatura tria um funil inteiro: contando
-as 4 dimensões por gleba, são cerca de 12 áreas completas por mês.
+mês com até 5 análises. Com 200 áreas e 600 análises por ano, a assinatura tria um funil
+inteiro: contando as 4 dimensões por gleba, dá para fechar mais de 12 áreas completas por mês.
 
 ## 10. Risco reverso
 
-O plano gratuito é permanente: 1 gleba por mês, até 10 análises, todas as dimensões, com
+O plano gratuito é permanente: 1 gleba por mês, até 5 análises, todas as dimensões, com
 proveniência. Você valida o método na sua área real, no seu ritmo, e assina quando o funil pedir
 mais. A decisão de pagar chega depois da prova.
 
 ## 11. FAQ operacional
 
 - **O que conta como 1 análise?** Cada rodada de uma dimensão: uma análise ambiental, uma
-  jurídica, uma financeira ou uma geração de urbanismo. No plano gratuito são até 10 por mês,
+  jurídica, uma financeira ou uma geração de urbanismo. No plano gratuito são até 5 por mês,
   todas na mesma gleba; a gleba escolhida fica fixa até o mês virar.
 - **O que eu preciso ter?** O KMZ da gleba (o contorno do Google Earth). Se tiver o levantamento
   planialtimétrico das matrículas em DWG, anexe: o traçado passa a seguir a cota real. Sem ele,

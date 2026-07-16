@@ -1,8 +1,8 @@
 # Objeções e Quebras · Viabilidade homeeye
 
-**Data:** 16/07/2026 · **Versão:** v1
-**Oferta usada:** Gratuito (1 gleba/mês, até 10 análises; gleba fixa no mês) · Assinatura anual
-(50 análises/mês; valor A DEFINIR, marcado como [VALOR A DEFINIR] onde entra)
+**Data:** 16/07/2026 · **Versão:** v1.1
+**Oferta usada:** Gratuito (1 gleba/mês, até 5 análises; gleba fixa no mês) · Assinatura anual
+(200 áreas + 600 análises por ano; valor A DEFINIR, marcado como [VALOR A DEFINIR] onde entra)
 **Promessa:** Decidir em 1 dia se a gleba vira loteamento
 **Nota:** todos os casos com nome são cenários ilustrativos até existirem casos reais autorizados.
 
@@ -56,7 +56,7 @@ substituída. Foi armada.
 
 **5. Argumento de Valor**
 
-O plano gratuito custa zero e analisa 1 gleba por mês, com até 10 análises entre as dimensões. O
+O plano gratuito custa zero e analisa 1 gleba por mês, com até 5 análises entre as dimensões. O
 teste deste argumento é imediato: rode a gleba que você mais conhece e compare o resultado com o
 que você sabe dela. Se a análise só confirmar o que você já sabia, você perdeu minutos. Se
 aparecer uma mancha que você não conhecia, ela acabou de valer mais que a assinatura anual
@@ -195,7 +195,7 @@ Mesma folha de pagamento, funil três vezes maior.
 
 **5. Argumento de Valor**
 
-A assinatura anual [VALOR A DEFINIR] cobre até 50 análises por mês; um único estudo tradicional
+A assinatura anual [VALOR A DEFINIR] cobre 200 áreas e 600 análises por ano; um único estudo tradicional
 encomendado custa uma fração relevante disso e cobre uma gleba só. O plano gratuito permite
 validar a conta no seu caso antes de pagar qualquer real.
 
@@ -296,9 +296,9 @@ proveniência de cada número é exatamente isso.
 
 **1. Argumento Incontestável**
 
-O plano de entrada custa zero: 1 gleba por mês, com até 10 análises entre as dimensões
+O plano de entrada custa zero: 1 gleba por mês, com até 5 análises entre as dimensões
 (ambiental, jurídica, urbanística, financeira). "Usar pouco" tem preço exato de R$ 0,00. A
-assinatura anual só entra quando o seu volume comprova a necessidade das 50 análises mensais.
+assinatura anual só entra quando o seu volume comprova a necessidade das 200 áreas e 600 análises anuais.
 
 No mercado tradicional, um único estudo de viabilidade encomendado custa milhares de reais e
 cobre uma gleba. O modelo de assinatura dilui o custo por dezenas de análises no mês.
@@ -391,6 +391,6 @@ premissa errada custa revisão inteira; a análise antes ancora o projeto no ter
 **Entrante: "Ainda não tenho cliente para justificar a assinatura."**
 *Lógico*: o material técnico vem antes do cliente; é ele que abre a porta. Esperar o cliente
 para ter o instrumento inverte a ordem da venda. *Valor*: o plano gratuito existe para essa
-fase: 1 gleba por mês, com até 10 análises, monta o portfólio de demonstração a custo zero.
+fase: 1 gleba por mês, com até 5 análises, monta o portfólio de demonstração a custo zero.
 *Consequência*: seis meses prospectando na conversa contra a chance de fechar o primeiro mandato
 mostrando a análise da gleba do próprio prospect.

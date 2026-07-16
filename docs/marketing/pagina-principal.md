@@ -1,8 +1,8 @@
 # Blueprint · Página Principal · Viabilidade homeeye
 
-**Data:** 16/07/2026 · **Versão:** v1
-**Oferta:** Gratuito (1 gleba/mês, até 10 análises somando as dimensões; gleba fixa no mês) ·
-Assinatura anual (50 análises/mês; valor A DEFINIR)
+**Data:** 16/07/2026 · **Versão:** v1.1
+**Oferta:** Gratuito (1 gleba/mês, até 5 análises somando as dimensões; gleba fixa no mês) ·
+Assinatura anual (200 áreas + 600 análises por ano; valor A DEFINIR)
 **Pendências:** valor da assinatura; nº de áreas na assinatura; domínio; prints finais a
 capturar em produção (mapa São Roque com traçado Paisagem, quadro de áreas, card de
 conformidade).
@@ -17,7 +17,7 @@ conformidade).
 **Sub-headline:** A plataforma Viabilidade homeeye faz a pré-análise ambiental, jurídica,
 urbanística e financeira da sua gleba a partir do KMZ, com a fonte legal ao lado de cada número.
 
-**CTA primário:** `Criar conta grátis` · microcopy: "Grátis: 1 gleba por mês, com até 10
+**CTA primário:** `Criar conta grátis` · microcopy: "Grátis: 1 gleba por mês, com até 5
 análises."
 **CTA secundário:** `Agendar demonstração online`
 
@@ -106,7 +106,7 @@ exigência.*
    qualquer real. O relatório declara o que cobriu e o que não cobriu, e o plano gratuito custa
    zero: o custo de duvidar da gente é nenhum.
 5. **"Vou usar pouco. Vale o preço?"** Usar pouco custa R$ 0,00: o plano gratuito dá 1 gleba por
-   mês com até 10 análises entre as dimensões (ambiental, jurídica, urbanística, financeira). A
+   mês com até 5 análises entre as dimensões (ambiental, jurídica, urbanística, financeira). A
    assinatura só faz sentido quando o seu volume pedir mais áreas e mais análises. Comece de
    graça e deixe o uso decidir.
 
@@ -114,7 +114,7 @@ exigência.*
 
 **Título:** A primeira análise sai hoje
 
-Crie a conta gratuita, suba o KMZ e veja a sua gleba em números: 1 gleba por mês, com até 10
+Crie a conta gratuita, suba o KMZ e veja a sua gleba em números: 1 gleba por mês, com até 5
 análises, grátis. Se preferir ver antes com um especialista, agende a demonstração online.
 
 `Criar conta grátis` · `Agendar demonstração online`

@@ -1,11 +1,11 @@
 # Concepção de Marketing · Viabilidade homeeye
 
-**Data:** 16/07/2026 · **Versão:** v1
-**Oferta:** Gratuito (1 gleba/mês, até 10 análises somando as dimensões; gleba fixa no mês) ·
-Assinatura anual (50 análises/mês; valor A DEFINIR)
+**Data:** 16/07/2026 · **Versão:** v1.1
+**Oferta:** Gratuito (1 gleba/mês, até 5 análises somando as dimensões; gleba fixa no mês) ·
+Assinatura anual (200 áreas + 600 análises por ano; valor A DEFINIR)
 **CTA:** primário "Criar conta grátis"; secundário "Agendar demonstração online"
 **Tom:** direto-empreendedor · **Estilo:** Light Copy (sem travessão, sem exclamação)
-**Pendências:** valor da assinatura; nº de áreas simultâneas na assinatura; domínio; prints finais.
+**Pendências:** valor da assinatura; domínio; prints finais.
 
 ---
 
@@ -52,7 +52,7 @@ dominante: falta de instrumento profissional para analisar e se posicionar.
 
 | Dor (cena) | Transformação | Mecanismo | Prova |
 |---|---|---|---|
-| A gleba está parada desde o inventário, pagando ITR e limpeza, e ninguém sabe dizer o que ela vale | Sabe em números o que tem na mão antes de qualquer conversa | Sobe o KMZ; medição geodésica, restrições oficiais, pré-projeto com quadro de áreas | A conta gratuita analisa 1 gleba por mês (até 10 análises): teste na própria gleba hoje |
+| A gleba está parada desde o inventário, pagando ITR e limpeza, e ninguém sabe dizer o que ela vale | Sabe em números o que tem na mão antes de qualquer conversa | Sobe o KMZ; medição geodésica, restrições oficiais, pré-projeto com quadro de áreas | A conta gratuita analisa 1 gleba por mês (até 5 análises): teste na própria gleba hoje |
 | A loteadora ofereceu permuta de 30% e eu não sei se é bom negócio | Senta na mesa sabendo o potencial e negocia de igual para igual | Pré-projeto com nº de lotes, área vendável e VGV posicional no preço de m² informado | O quadro de áreas fecha em 100% e cada número mostra a origem |
 | Um vizinho jura que metade é APP, outro que não tem nada | As restrições aparecem no mapa, sobre o satélite, com a lei ao lado | Camadas oficiais (APP, Mata Atlântica, declividade, nascentes, UCs) com fonte e data | Cada mancha pode ser conferida contra a fonte citada |
 | Medo de gastar com topógrafo, advogado e engenheiro para descobrir que não dá em nada | Contrata os profissionais caros só onde a triagem mostrou que vale | O relatório aponta o que verificar com cada profissional (regra "consta / verificar com") | O relatório rotula o que é indício e o que é medição |
@@ -61,7 +61,7 @@ dominante: falta de instrumento profissional para analisar e se posicionar.
 
 | Dor (cena) | Transformação | Mecanismo | Prova |
 |---|---|---|---|
-| Avalio 30 áreas por ano; estudo caro, semanas, e 8 em 10 morrem na diligência | Tria as 30 em dias e manda para estudo caro só as que passaram | Análise multi-dimensão em minutos; 50 análises/mês na assinatura | O plano gratuito permite rodar uma gleba real e cronometrar |
+| Avalio 30 áreas por ano; estudo caro, semanas, e 8 em 10 morrem na diligência | Tria as 30 em dias e manda para estudo caro só as que passaram | Análise multi-dimensão em minutos; 600 análises por ano na assinatura | O plano gratuito permite rodar uma gleba real e cronometrar |
 | Perdi uma área boa porque minha resposta demorou três semanas | Responde ao corretor com números na mesma reunião | KMZ sobe na hora; pré-projeto e quadro na mesma sessão | A demonstração online mostra o fluxo ao vivo |
 | Descobri mata em estágio avançado depois do sinal; o projeto encolheu 40% | O risco ambiental aparece antes do sinal, com a mancha no mapa | Vegetação, APP e declividade com regra legal aplicada: o traçado nem desenha via sobre mata (Lei 11.428) | O desvio da mata é visível na tela, no traçado gerado |
 | Cada urbanista entrega um estudo num critério; não consigo comparar | Compara todas as glebas com a mesma régua, sempre | Motor determinístico: mesma entrada, mesma saída | Rode a mesma gleba duas vezes e o resultado repete |
@@ -107,7 +107,7 @@ dominante: falta de instrumento profissional para analisar e se posicionar.
 ### Tempo
 1. Triar uma gleba em minutos, no lugar de semanas de espera por relatório
 2. Responder ao corretor com números ainda na mesma reunião
-3. Rodar até 50 análises por mês sem fila de fornecedor
+3. Rodar até 600 análises por ano sem fila de fornecedor
 4. Eliminar a ida a campo em área que a triagem já descartou
 5. Parar de esperar três semanas para ouvir que a gleba não presta
 6. Reanalisar a mesma gleba com outro objetivo (Rendimento ou Paisagem) na hora
