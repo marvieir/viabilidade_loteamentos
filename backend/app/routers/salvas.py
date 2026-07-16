@@ -91,6 +91,37 @@ def salvar(
 ) -> schemas.AnaliseDetalheOut:
     if not body.titulo.strip():
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Informe um título.")
+    # Upsert pelo id de trabalho (auto-salvar, 2026-07-17): se já existe salva deste usuário
+    # vinculada ao mesmo analise_id (criada no upload ou num salvar anterior), ATUALIZA em vez
+    # de duplicar — um trabalho, uma linha em 'Minhas análises'.
+    if body.analise_id:
+        existente = next(
+            (
+                s
+                for s in db.query(Analise).filter(Analise.usuario_id == usuario.id).all()
+                if isinstance(s.resultados, dict)
+                and s.resultados.get("_analise_id") == body.analise_id
+            ),
+            None,
+        )
+        if existente is not None:
+            existente.titulo = body.titulo.strip()
+            if body.kmz_nome is not None:
+                existente.kmz_nome = body.kmz_nome
+            if body.gleba_geojson is not None:
+                existente.gleba_geojson = body.gleba_geojson
+            if body.cidade is not None:
+                existente.cidade = body.cidade
+            if body.uf is not None:
+                existente.uf = body.uf
+            if body.area_ha is not None:
+                existente.area_ha = body.area_ha
+            existente.resultados = _resultados_com_origem(body.resultados, body.analise_id) or (
+                existente.resultados
+            )
+            db.commit()
+            db.refresh(existente)
+            return _detalhe(existente)
     a = Analise(
         usuario_id=usuario.id,
         titulo=body.titulo.strip(),
@@ -227,6 +258,7 @@ def carregar(
 
     return schemas.AnaliseOut(
         analise_id=novo_id,
+        salva_id=a.id,
         geometria=schemas.GeometriaOut(
             area_m2=round(area, 2),
             area_ha=round(area / 10_000, 2),

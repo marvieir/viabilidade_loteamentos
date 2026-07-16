@@ -13,6 +13,7 @@ import tempfile
 import uuid
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from sqlalchemy.orm import Session
 from fastapi.responses import JSONResponse
 from pyproj import CRS, Transformer
 from shapely.geometry import mapping, shape
@@ -22,6 +23,8 @@ from shapely.ops import unary_union
 from app.core.uploads import ler_upload_limitado
 from app.core.acesso import analise_do_dono, id_analise
 from app.core.auth import usuario_atual
+from app.core.db import get_db
+from app.models.db_models import Analise as AnaliseSalvaDB
 from app.models.db_models import Usuario
 from app.core import agrupamento as agrupamento_mod
 from app.core import ambiental as ambiental_motor
@@ -198,6 +201,7 @@ async def criar_analise(
     kml: list[UploadFile] = File(default=[]),
     fonte_malha: FonteMalha | None = Depends(get_fonte_malha),
     usuario: Usuario = Depends(usuario_atual),
+    db: Session = Depends(get_db),
 ):
     # O NÚMERO DE ARQUIVOS É A INTENÇÃO (Fase 8): 1 = fluxo de hoje (intacto), 2+ = projeto
     # unificado (união geométrica). Aceita os arquivos sob a chave ``kmz`` e/ou ``kml``.
@@ -206,8 +210,8 @@ async def criar_analise(
         raise HTTPException(422, "Envie um arquivo KMZ ou KML.")
 
     if len(arquivos) == 1:
-        return await _criar_analise_unica(arquivos[0], fonte_malha, usuario)
-    return await _criar_analise_agrupada(arquivos, fonte_malha, usuario)
+        return await _criar_analise_unica(arquivos[0], fonte_malha, usuario, db)
+    return await _criar_analise_agrupada(arquivos, fonte_malha, usuario, db)
 
 
 # Compacidade Polsby-Popper (4π·área/perímetro²): abaixo de _COMPAC_LINEAR a forma é claramente
@@ -270,7 +274,59 @@ def _gleba_de_poligonos(poligonos, rotulo: str = ""):
     return maior, avisos
 
 
-async def _criar_analise_unica(upload: UploadFile, fonte_malha, usuario: Usuario):
+
+def _auto_salvar_registro(db, usuario, analise_id, poly, area_m2, jur, kmz_nome, avisos):
+    """Achado do operador (2026-07-17) — toda análise NASCE salva: o upload grava/atualiza a
+    salva do usuário com o vínculo ``resultados._analise_id``. Com isso o STORE em memória fica
+    100% reconstruível após restart (a guarda ``analise_do_dono`` reidrata daqui) e nenhuma
+    análise de cliente depende de "clicar em salvar". Upsert pelo id de trabalho: re-subir o
+    mesmo KMZ atualiza a MESMA salva (lista não duplica) e preserva os resultados já gravados.
+    Falha aqui NUNCA derruba o upload — vira aviso honesto na resposta."""
+    try:
+        existentes = db.query(AnaliseSalvaDB).filter(AnaliseSalvaDB.usuario_id == usuario.id).all()
+        alvo = next(
+            (
+                a for a in existentes
+                if isinstance(a.resultados, dict)
+                and a.resultados.get("_analise_id") == analise_id
+            ),
+            None,
+        )
+        gj = mapping(poly)
+        titulo_kmz = (kmz_nome or "").rsplit("/", 1)[-1].rsplit(".", 1)[0].strip()
+        if alvo is None:
+            alvo = AnaliseSalvaDB(
+                usuario_id=usuario.id,
+                titulo=(titulo_kmz or f"Gleba {jur.municipio or 'sem município'}")[:300],
+                kmz_nome=(kmz_nome or None),
+                gleba_geojson=gj,
+                cidade=jur.municipio,
+                uf=jur.uf,
+                area_ha=round(area_m2 / 10_000, 2),
+                resultados={"_analise_id": analise_id},
+            )
+            db.add(alvo)
+        else:
+            alvo.gleba_geojson = gj
+            alvo.kmz_nome = kmz_nome or alvo.kmz_nome
+            alvo.area_ha = round(area_m2 / 10_000, 2)
+            if jur.municipio:
+                alvo.cidade = jur.municipio
+            if jur.uf:
+                alvo.uf = jur.uf
+        db.commit()
+        db.refresh(alvo)
+        return alvo.id
+    except Exception:  # noqa: BLE001 — persistência auxiliar não pode derrubar o upload
+        db.rollback()
+        avisos.append(
+            "Não foi possível salvar esta análise automaticamente em 'Minhas análises'; "
+            "use o botão Salvar para garantir a persistência."
+        )
+        return None
+
+
+async def _criar_analise_unica(upload: UploadFile, fonte_malha, usuario: Usuario, db):
     """Caminho de UM arquivo — comportamento idêntico ao da Fase 1.5/1.7 (não-regressão)."""
     conteudo = await ler_upload_limitado(upload)
     if not conteudo:
@@ -317,9 +373,11 @@ async def _criar_analise_unica(upload: UploadFile, fonte_malha, usuario: Usuario
         "jurisdicao": jur,
         "usuario_id": usuario.id,
     }
+    salva_id = _auto_salvar_registro(db, usuario, analise_id, poly, area, jur, upload.filename, avisos)
 
     return schemas.AnaliseOut(
         analise_id=analise_id,
+        salva_id=salva_id,
         geometria=schemas.GeometriaOut(
             area_m2=round(area, 2),
             area_ha=round(area / 10_000, 2),
@@ -370,7 +428,7 @@ async def _ler_gleba(upload: UploadFile):
     return gleba, conteudo, avisos
 
 
-async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha, usuario: Usuario):
+async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha, usuario: Usuario, db):
     """Caminho de 2+ arquivos (Fase 8): valida contiguidade + município comum e produz a
     UNIÃO como geometria da análise. Recusa é sempre diagnóstica e NÃO cria análise parcial.
     A jusante nada muda — o pipeline recebe um Polygon, cego à origem múltipla."""
@@ -458,9 +516,12 @@ async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha, usuar
         "agrupamento": agr_out.model_dump(),
         "usuario_id": usuario.id,
     }
+    nome_grupo = f"{nomes[0]} (+{len(nomes) - 1})" if len(nomes) > 1 else (nomes[0] if nomes else None)
+    salva_id = _auto_salvar_registro(db, usuario, analise_id, uniao_wgs, area, jur, nome_grupo, avisos)
 
     return schemas.AnaliseOut(
         analise_id=analise_id,
+        salva_id=salva_id,
         geometria=schemas.GeometriaOut(
             area_m2=round(area, 2),
             area_ha=round(area / 10_000, 2),

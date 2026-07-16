@@ -54,6 +54,9 @@ export interface Agrupamento {
 
 export interface Analise {
   analise_id: string;
+  // Auto-salvar: id da salva em "Minhas análises" criada/atualizada no upload (o botão
+  // Salvar ATUALIZA em vez de duplicar). Ausente em respostas antigas.
+  salva_id?: string | null;
   geometria: Geometria;
   jurisdicao: Jurisdicao;
   origem_geometria: OrigemGeometria;

@@ -213,7 +213,10 @@ export default function Home() {
 
   function onAnalise(a: Analise | null) {
     setAnalise(a);
-    setSalvaId(null);
+    // Auto-salvar: o upload já criou/atualizou a salva no backend — rastreia o id (Salvar vira
+    // atualização, nunca duplica) e recarrega a lista de "Minhas análises".
+    setSalvaId(a?.salva_id ?? null);
+    setRecarregarSalvas((n) => n + 1);
     setSecao("visao");
     setOverlaysAmb({});
     setOverlaysVerde({});

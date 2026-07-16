@@ -82,6 +82,10 @@ class AgrupamentoOut(BaseModel):
 
 class AnaliseOut(BaseModel):
     analise_id: str
+    # Auto-salvar (achado 2026-07-17): id da salva em 'Minhas análises' criada/atualizada no
+    # upload — o front usa para o botão Salvar ATUALIZAR em vez de duplicar. None = falhou
+    # (aviso na resposta) ou resposta antiga.
+    salva_id: Optional[str] = None
     geometria: GeometriaOut
     jurisdicao: JurisdicaoOut
     origem_geometria: OrigemGeometriaOut
