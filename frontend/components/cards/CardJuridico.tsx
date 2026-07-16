@@ -205,7 +205,7 @@ export function CardJuridico({
             }}
           />
           <Button
-            className="bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+            variant="secondary"
             onClick={() => inputRef.current?.click()}
             disabled={carregando}
           >
@@ -220,6 +220,33 @@ export function CardJuridico({
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>
+        )}
+
+        {rascunho && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3">
+            <span className="text-sm font-semibold text-amber-900">
+              Ficha extraída aguardando confirmação
+            </span>
+            <input
+              value={validadoPor}
+              onChange={(e) => setValidadoPor(e.target.value)}
+              placeholder="Validado por (seu nome)"
+              className="rounded-lg border border-amber-300 bg-white px-2 py-1.5 text-sm"
+            />
+            <Button onClick={confirmar} disabled={carregando}>
+              Confirmar ficha
+            </Button>
+            <button
+              onClick={() =>
+                document
+                  .getElementById("juridico-revisao")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              className="text-sm font-medium text-amber-800 underline-offset-2 hover:underline"
+            >
+              Revisar campos ↓
+            </button>
+          </div>
         )}
 
         {resultado &&
@@ -247,6 +274,7 @@ export function CardJuridico({
           )}
 
         {rascunho && (
+          <div id="juridico-revisao">
           <Revisao
             ficha={rascunho}
             validadoPor={validadoPor}
@@ -256,6 +284,7 @@ export function CardJuridico({
             onCancelar={() => setRascunho(null)}
             carregando={carregando}
           />
+          </div>
         )}
 
         {resultado && !rascunho && (
