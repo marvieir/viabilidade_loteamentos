@@ -8,6 +8,11 @@ FROM node:22-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Blindagem (achado do operador, 2026-07-17): o podman-remote do macOS pode IGNORAR o
+# .dockerignore e trazer o .next/ do host (stale) no contexto — o Next então reaproveita
+# prerender velho e a imagem sai com rotas de duas eras (index antigo + loteadores novo).
+# Build sempre parte de .next limpo; custa nada quando o contexto veio correto.
+RUN rm -rf .next
 ARG NEXT_PUBLIC_API_BASE=http://localhost:8700
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
 RUN npm run build
