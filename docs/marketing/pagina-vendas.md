@@ -194,3 +194,12 @@ O operador pediu página sofisticada e com visual. Redesign editorial aplicado n
   (progressive enhancement: sem JS a página fica 100% visível).
 - Referências de conversão usadas: um único objetivo (criar conta), visual do produto no hero,
   clareza acima de tudo, microinterações discretas (Unbounce, KlientBoost, MagicUI, Webflow 2025).
+
+## Nota de conteúdo (v1.3 — 17/07/2026)
+
+A seção 6 foi implementada como "O caminho inteiro, tela a tela": 7 etapas com PRINTS REAIS da
+plataforma enviados pelo operador (visão geral, ambiental, declividade, área verde, urbanismo,
+jurídico, financeira), com chips enumerando as camadas ambientais e os cálculos. O print do
+jurídico entrou APENAS com a linha de proprietários coberta por mosaico irreversível (LGPD);
+o original foi expurgado do histórico do git (dev reescrita). Números citados nas legendas vêm
+dos próprios prints. Arquivos: frontend/public/marketing/print-*.png.
