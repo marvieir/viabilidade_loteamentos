@@ -13,13 +13,18 @@ python3 scripts/gerar_pranchas_marketing.py caminho/do/dump.json
 Regra de honestidade dos blueprints: mockup inventado é proibido; estas pranchas são a
 alternativa correta enquanto não há prints (é o desenho verdadeiro do motor).
 
-## Prints reais de interface (opcionais, melhoram ainda mais)
+## Prints reais de interface (tour tela a tela da /loteadores)
 
-Se capturados em produção (PNG ≥ 1400 px, sem dado de cliente), substituem/complementam:
+Capturados pelo operador (PNG largo, ~1600 px+). Nomes EXATOS que a página espera; enquanto um
+arquivo não existir, o componente `PrintReal` mostra um quadro neutro no lugar:
 
 | Arquivo | Conteúdo |
 |---|---|
-| `conformidade.png` | Card de conformidade legal com os artigos ao lado (home, seção Confiança) |
-| `hero-tracado.png` | Print do mapa real com traçado + quadro (alternativa de hero) |
-
-Enquanto um print não existir, o componente `PrintReal` mostra um quadro neutro no lugar.
+| `print-visao-geral.png` | Painel de visão geral: KPIs + mapa com camadas oficiais |
+| `print-ambiental.png` | Alertas ambientais com proveniência (ANM, CAR, Mata Atlântica) |
+| `print-declividade.png` | Declividade por faixas + vedação ≥30% + mobilidade |
+| `print-area-verde.png` | Área verde: bioma, verde descontado, severidade |
+| `print-urbanismo.png` | Parcelamento esquemático com legenda (quintis, verde, lazer, lago) |
+| `print-juridico.png` | Pré-análise jurídica: matrículas, ônus com ato, divergência de área. ATENÇÃO LGPD: cobrir/cortar nomes de proprietários antes de publicar |
+| `print-financeira.png` | Financeira guiada: VGV, margem, exposição, VPL/TIR, divisão da parceria |
+| `conformidade.png` | Card de conformidade legal com artigos (home, seção Confiança) |

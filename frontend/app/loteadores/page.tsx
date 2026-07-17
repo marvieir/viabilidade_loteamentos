@@ -7,6 +7,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BarraCta } from "@/components/marketing/BarraCta";
+import { PrintReal } from "@/components/marketing/PrintReal";
 import { Reveal } from "@/components/marketing/Reveal";
 import { BotoesCta, FooterSite, HeaderSite, LINK_DEMO } from "@/components/marketing/site";
 
@@ -95,6 +96,129 @@ const FAQ_OPERACIONAL = [
   },
 ];
 
+
+// O tour tela a tela — prints REAIS da plataforma (gleba de São Roque). Os PNGs moram em
+// public/marketing/print-*.png; enquanto um arquivo não existe, o PrintReal degrada para o
+// quadro neutro. Números citados nas legendas vêm dos próprios prints (nada inventado).
+const TOUR: {
+  titulo: string;
+  texto: string;
+  itens?: string[];
+  src: string;
+  alt: string;
+  legenda: string;
+  selo: string;
+}[] = [
+  {
+    titulo: "A visão geral sai em segundos",
+    texto:
+      "O KMZ vira painel: área total e aproveitável medidas por cálculo geodésico, contagem de lotes possível pela diretriz da zona e as restrições críticas já na primeira tela. O mapa liga e desliga as camadas oficiais sobre a foto de satélite.",
+    src: "/marketing/print-visao-geral.png",
+    alt: "Painel de visão geral: área total, aproveitável, lotes e restrições críticas sobre o mapa",
+    legenda: "Gleba real: 18,71 ha, 13,48 ha aproveitáveis e 2 restrições críticas na 1ª tela",
+    selo: "Print real",
+  },
+  {
+    titulo: "Ambiental multicamada, com fonte em cada alerta",
+    texto:
+      "Cada camada oficial é cruzada com a gleba por interseção espacial e vira alerta com a área atingida, a fonte e a data de referência. No exemplo real: concessão de lavra da ANM com número de processo, três Reservas Legais averbadas no CAR e o domínio da Mata Atlântica (Lei 11.428/2006).",
+    itens: [
+      "APP e hidrografia",
+      "Massas d'água",
+      "Vegetação e Mata Atlântica",
+      "Unidades de conservação",
+      "Reserva Legal (CAR)",
+      "Mineração (ANM)",
+      "Terras indígenas",
+      "Territórios quilombolas",
+      "Assentamentos (INCRA)",
+      "Linhas de transmissão (ANEEL)",
+      "Dutovias",
+      "Cavernas (CECAV)",
+      "Mananciais",
+      "Áreas úmidas",
+      "Malha fundiária (SIGEF/SNCI)",
+      "Patrimônio cultural (IPHAN)",
+      "Áreas contaminadas (CETESB)",
+    ],
+    src: "/marketing/print-ambiental.png",
+    alt: "Alertas ambientais com fonte e data: ANM, Reserva Legal do CAR e Mata Atlântica",
+    legenda: "5 alertas com proveniência: processo ANM, CAR e Lei 11.428, com fonte e data",
+    selo: "Print real",
+  },
+  {
+    titulo: "Declividade por faixas, com a vedação legal",
+    texto:
+      "O relevo sai do modelo digital de elevação em oito faixas, com a vedação legal de ≥30% (Lei 6.766/79) descontada da área aproveitável e uma leitura de mobilidade urbana por faixa. No exemplo, relevo forte ondulado com 20,73% de média: exatamente o tipo de terreno onde errar a conta custa caro.",
+    src: "/marketing/print-declividade.png",
+    alt: "Análise de declividade: faixas coloridas, vedação legal e leitura de mobilidade",
+    legenda: "8 faixas de declividade + análise de mobilidade sobre a gleba real",
+    selo: "Print real",
+  },
+  {
+    titulo: "Área verde, bioma e severidade",
+    texto:
+      "A cobertura vegetal é medida por satélite e descontada do aproveitável, separando a restrição dura (APP/UC) do verde a verificar, com o potencial desbloqueável mediante laudo de engenheiro ambiental. O bioma entra com fonte IBGE, e a área líquida canônica é a mesma nas abas de Aproveitamento e Urbanismo.",
+    src: "/marketing/print-area-verde.png",
+    alt: "Análise de área verde: bioma Mata Atlântica, verde descontado e severidade",
+    legenda: "4,97 ha de verde descontado, 100% classificado como 'a verificar' (desbloqueável)",
+    selo: "Print real",
+  },
+  {
+    titulo: "O pré-projeto urbanístico completo",
+    texto:
+      "O motor desenha o estudo de massa respeitando a lei: vias que contornam a mata, cul-de-sacs onde a diretriz exige, pórtico, lago e quadro de áreas fechando em 100%. Você controla as variações: tipo de loteamento, público-alvo, lote-alvo dentro da faixa legal da zona e o objetivo Rendimento ou Paisagem.",
+    itens: [
+      "Arruamento em malha conexa",
+      "Áreas verdes e doação",
+      "Sistema de lazer e clube",
+      "Institucional",
+      "Heatmap por quintis",
+      "Score de valor por lote",
+      "VGV posicional",
+      "Testada e área média",
+    ],
+    src: "/marketing/print-urbanismo.png",
+    alt: "Parcelamento esquemático: lotes coloridos por valorização, verde, lazer, pórtico e lago",
+    legenda: "Parcelamento real: lotes por quintil de valor, mata preservada, lazer e lago",
+    selo: "Print real",
+  },
+  {
+    titulo: "Jurídico: matrículas lidas e riscos nomeados",
+    texto:
+      "A pré-análise documental lê matrícula e certidões, lista ônus e averbações com a referência ao ato e à página, soma as áreas das matrículas e compara com o KMZ apontando divergência. Nada entra na síntese sem a sua confirmação: é pré-análise com gate humano, não parecer de advogado.",
+    itens: [
+      "Ônus e gravames com o ato",
+      "Averbações",
+      "Divergência de área × KMZ",
+      "Checklist de documentos",
+      "Semáforo de risco",
+      "O que verificar com advogado",
+    ],
+    src: "/marketing/print-juridico.png",
+    alt: "Pré-análise jurídica: matrículas lidas, ônus com referência ao ato e divergência de área",
+    legenda: "2 matrículas reais lidas: ônus com ato e página, divergência de 39,5% apontada",
+    selo: "Print real",
+  },
+  {
+    titulo: "Financeira: do VGV ao fluxo, em seis passos",
+    texto:
+      "Um guiado de seis perguntas monta o fluxo do empreendimento: VGV com venda financiada, margem, exposição máxima de caixa, VPL, TIR e payback sob as premissas que você declara, além da divisão incorporador × terrenista para a conversa de parceria. O semáforo lê o resultado sob as suas premissas: pré-análise, não veredito.",
+    itens: [
+      "VGV nominal + juros",
+      "Margem",
+      "Exposição máxima de caixa",
+      "VPL e TIR",
+      "Payback simples e descontado",
+      "Divisão da parceria",
+    ],
+    src: "/marketing/print-financeira.png",
+    alt: "Análise financeira guiada: VGV, margem, exposição de caixa, VPL, TIR e divisão da parceria",
+    legenda: "Fluxo real montado: VGV, margem, exposição e VPL/TIR sob premissas declaradas",
+    selo: "Print real",
+  },
+];
+
 // Rótulo lateral de capítulo (editorial long-form).
 function Capitulo({
   numero,
@@ -135,8 +259,7 @@ function Prancha({
 }) {
   return (
     <figure className="overflow-hidden rounded-2xl border border-[#e2dac6] bg-[#fdfbf5] shadow-xl shadow-[#1b4332]/10">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="w-full" />
+      <PrintReal src={src} alt={alt} className="[&_img]:rounded-none [&_img]:border-0 [&_img]:shadow-none [&_figure]:rounded-none [&_figure]:border-0" />
       <figcaption className="flex items-center justify-between gap-3 border-t border-[#eee7d4] px-4 py-2.5">
         <span className="text-xs font-medium text-[#5a5546]">{titulo}</span>
         <span className="rounded-full bg-[#1b4332]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#1b4332]">
@@ -333,7 +456,7 @@ export default function PaginaLoteadores() {
         </Reveal>
       </section>
 
-      {/* 5. O caminho, nas pranchas do motor */}
+      {/* 5. O caminho inteiro, tela a tela (prints reais + pranchas do motor) */}
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
@@ -341,78 +464,48 @@ export default function PaginaLoteadores() {
               Capítulo 04
             </p>
             <h2 className="font-display mx-auto mt-2 max-w-2xl text-center text-3xl leading-snug">
-              O caminho inteiro, na gleba real
+              O caminho inteiro, tela a tela
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-[#7d786a]">
-              As três pranchas abaixo são saída direta do motor sobre uma gleba verdadeira de
-              São Roque · SP. Nada foi desenhado à mão.
+              Tudo abaixo é a plataforma de verdade rodando sobre uma gleba real de São Roque ·
+              SP: prints da interface e desenhos gerados pelo motor. Nada foi montado à mão.
             </p>
           </Reveal>
 
           <div className="mt-14 space-y-16">
-            <Reveal>
-              <div className="grid items-center gap-8 md:grid-cols-2">
-                <div>
-                  <p className="font-display text-xl text-[#a4744d]">1</p>
-                  <h3 className="font-display mt-1 text-2xl">As restrições aparecem primeiro</h3>
-                  <p className="mt-3 leading-relaxed text-[#3c4a42]">
-                    O KMZ vira gleba medida por cálculo geodésico, e as camadas oficiais entram
-                    em seguida: a mata em verde-floresta, a declividade que veda lote em caqui,
-                    as curvas de nível do levantamento real. Cada mancha com a fonte ao lado.
-                  </p>
-                </div>
-                <Prancha
-                  src="/marketing/plano-ambiental.svg"
-                  alt="Prancha ambiental: mata em verde-floresta, declividade em caqui e curvas de nível sobre a gleba"
-                  titulo="Camadas ambientais + curvas de nível das matrículas"
-                  selo="Saída real do motor"
-                />
-              </div>
-            </Reveal>
-
-            <Reveal>
-              <div className="grid items-center gap-8 md:grid-cols-2">
-                <div className="md:order-2">
-                  <p className="font-display text-xl text-[#a4744d]">2</p>
-                  <h3 className="font-display mt-1 text-2xl">
-                    O pré-projeto nasce respeitando a lei
-                  </h3>
-                  <p className="mt-3 leading-relaxed text-[#3c4a42]">
-                    O traçado contorna a mata porque a regra é aplicada por código, não por
-                    conferência manual. Quadro de áreas fechando em 100%, 154 lotes com testada
-                    e área média, lago no ponto baixo do terreno e malha 100% conectada.
-                  </p>
-                </div>
-                <div className="md:order-1">
+            {TOUR.map((etapa, i) => (
+              <Reveal key={etapa.titulo}>
+                <div
+                  className={`grid items-center gap-8 md:grid-cols-2 ${
+                    i % 2 === 1 ? "md:[&>*:first-child]:order-2" : ""
+                  }`}
+                >
+                  <div>
+                    <p className="font-display text-xl text-[#a4744d]">{i + 1}</p>
+                    <h3 className="font-display mt-1 text-2xl">{etapa.titulo}</h3>
+                    <p className="mt-3 leading-relaxed text-[#3c4a42]">{etapa.texto}</p>
+                    {etapa.itens && (
+                      <ul className="mt-4 flex flex-wrap gap-1.5">
+                        {etapa.itens.map((it) => (
+                          <li
+                            key={it}
+                            className="rounded-full border border-[#d8cfb8] bg-[#faf6ec] px-2.5 py-1 text-[11px] font-medium text-[#5a5546]"
+                          >
+                            {it}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   <Prancha
-                    src="/marketing/plano-masterplan.svg"
-                    alt="Masterplan: lotes, vias brancas contornando a mata, áreas verdes, lazer e lago"
-                    titulo="Estudo de massa: 154 lotes · vias fora da mata · verde preservado"
-                    selo="Saída real do motor"
+                    src={etapa.src}
+                    alt={etapa.alt}
+                    titulo={etapa.legenda}
+                    selo={etapa.selo}
                   />
                 </div>
-              </div>
-            </Reveal>
-
-            <Reveal>
-              <div className="grid items-center gap-8 md:grid-cols-2">
-                <div>
-                  <p className="font-display text-xl text-[#a4744d]">3</p>
-                  <h3 className="font-display mt-1 text-2xl">O valor aparece lote a lote</h3>
-                  <p className="mt-3 leading-relaxed text-[#3c4a42]">
-                    Score de valorização por posição (fundo para a mata, frente para o lago,
-                    bolsão de cul-de-sac) e VGV posicional no preço de m² que você define. A
-                    prancha usa o score verdadeiro deste estudo, lote por lote.
-                  </p>
-                </div>
-                <Prancha
-                  src="/marketing/plano-heatmap.svg"
-                  alt="Heatmap de valorização: lotes coloridos do areia ao terracota conforme o score real"
-                  titulo="Heatmap do score v2 · quanto mais terracota, mais valorizado"
-                  selo="Score real por lote"
-                />
-              </div>
-            </Reveal>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>

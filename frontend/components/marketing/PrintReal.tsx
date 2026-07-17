@@ -4,7 +4,7 @@
 // proibido). Enquanto o arquivo não existe em /public/marketing/, degrada para um quadro
 // neutro com a legenda, sem imagem quebrada.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function PrintReal({
   src,
@@ -18,6 +18,14 @@ export function PrintReal({
   className?: string;
 }) {
   const [erro, setErro] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // Se o 404 acontece ANTES da hidratação, o onError se perde (HTML estático) — no mount,
+  // uma imagem "completa" sem largura natural é erro e o fallback assume.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth === 0) setErro(true);
+  }, []);
 
   if (erro) {
     return (
@@ -39,6 +47,7 @@ export function PrintReal({
     <figure className={className}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
+        ref={imgRef}
         src={src}
         alt={alt}
         onError={() => setErro(true)}
