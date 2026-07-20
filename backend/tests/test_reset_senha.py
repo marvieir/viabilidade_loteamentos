@@ -177,6 +177,18 @@ def test_trocar_senha_exige_login(client_anon):
     assert r.status_code == 401
 
 
+def test_credenciais_smtp_ignoram_espacos_invisiveis(monkeypatch):
+    """A página do Google exibe a senha de app com ESPAÇOS NÃO-QUEBRÁVEIS (U+00A0) entre os
+    grupos; colada no .env, ela derrubava o smtplib. As credenciais são saneadas na leitura."""
+    from app.core.email_saida import _env_sem_espacos, smtp_configurado
+
+    monkeypatch.setenv("SMTP_USER", " voce@gmail.com ")
+    monkeypatch.setenv("SMTP_PASS", "abcd\xa0efgh\xa0ijkl\xa0mnop")
+    assert _env_sem_espacos("SMTP_USER") == "voce@gmail.com"
+    assert _env_sem_espacos("SMTP_PASS") == "abcdefghijklmnop"
+    assert smtp_configurado() is True
+
+
 def test_senha_nova_curta_recusada(client_anon, links):
     _registrar(client_anon)
     client_anon.post("/api/auth/esqueci", json={"email": "reset@exemplo.com"})

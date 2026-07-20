@@ -21,8 +21,16 @@ from email.message import EmailMessage
 logger = logging.getLogger("uvicorn.error")
 
 
+# A página de senhas de app do Google exibe o código em grupos separados por ESPAÇO
+# NÃO-QUEBRÁVEL (U+00A0). Colado no .env, ele derruba o smtplib com "'ascii' codec can't
+# encode character '\xa0'" (achado do operador, 20/07). Removemos QUALQUER espaço em
+# branco Unicode das credenciais — colar direto da página do Google passa a funcionar.
+def _env_sem_espacos(nome: str) -> str:
+    return "".join(os.getenv(nome, "").split())
+
+
 def smtp_configurado() -> bool:
-    return bool(os.getenv("SMTP_USER") and os.getenv("SMTP_PASS"))
+    return bool(_env_sem_espacos("SMTP_USER") and _env_sem_espacos("SMTP_PASS"))
 
 
 def enviar_email(destino: str, assunto: str, texto: str, html: str | None = None) -> bool:
@@ -41,11 +49,11 @@ def enviar_email(destino: str, assunto: str, texto: str, html: str | None = None
         )
         return False
 
-    host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
     porta = int(os.getenv("SMTP_PORT", "587"))
-    usuario = os.getenv("SMTP_USER", "")
-    senha = os.getenv("SMTP_PASS", "")
-    remetente = os.getenv("SMTP_REMETENTE", usuario)
+    usuario = _env_sem_espacos("SMTP_USER")
+    senha = _env_sem_espacos("SMTP_PASS")
+    remetente = os.getenv("SMTP_REMETENTE", "").strip() or usuario
 
     msg = EmailMessage()
     msg["From"] = remetente
