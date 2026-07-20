@@ -96,6 +96,55 @@ export async function me(): Promise<Usuario> {
   return apiFetch("/api/auth/me").then((r) => r.json());
 }
 
+// "Esqueci minha senha": o backend responde a MESMA mensagem exista ou não a conta
+// (anti-enumeração) e manda o link por e-mail quando ela existe.
+export async function esqueciSenha(email: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/auth/esqueci`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const { mensagem } = await jsonOrThrow(res);
+  return mensagem;
+}
+
+export async function redefinirSenha(token: string, senha: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/auth/redefinir`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, senha }),
+  });
+  const { mensagem } = await jsonOrThrow(res);
+  return mensagem;
+}
+
+// Troca de senha logado. Conta nascida pelo Google (sem senha) omite senhaAtual.
+export async function trocarSenha(
+  senhaAtual: string | undefined,
+  senhaNova: string,
+): Promise<string> {
+  const res = await apiFetch("/api/auth/trocar-senha", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ senha_atual: senhaAtual || undefined, senha_nova: senhaNova }),
+  });
+  const { mensagem } = await jsonOrThrow(res);
+  return mensagem;
+}
+
+// Login com Google: troca o ID token do botão (GIS) por uma sessão normal nossa.
+export async function loginGoogle(credential: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ credential }),
+  });
+  const { access_token } = await jsonOrThrow(res);
+  setToken(access_token);
+  return access_token;
+}
+
 // Wrapper de fetch autenticado: injeta o Bearer e, no 401, tenta UM refresh e repete.
 // `fetch()` só REJEITA (throw) em falha de REDE — quando não houve resposta nenhuma do servidor:
 // backend reiniciando (após rebuild), serviço caído, conexão perdida ou operação longa demais que

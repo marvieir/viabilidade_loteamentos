@@ -19,6 +19,10 @@ RUN echo "== SONDA: primeira linha da home no contexto ==" \
 COPY --from=deps /app/node_modules ./node_modules
 ARG NEXT_PUBLIC_API_BASE=http://localhost:8700
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE
+# Login com Google (opcional): o Client ID é PÚBLICO e vira parte do bundle no build.
+# Vazio → o botão do Google simplesmente não aparece.
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID=
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 RUN npm run build
 
 FROM node:22-slim AS runner

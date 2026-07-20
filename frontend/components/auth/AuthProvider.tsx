@@ -18,6 +18,7 @@ interface AuthContextValue {
   usuario: Usuario | null;
   carregando: boolean; // true enquanto tenta o refresh inicial
   entrar: (email: string, senha: string) => Promise<void>;
+  entrarComGoogle: (credential: string) => Promise<void>;
   cadastrar: (email: string, senha: string, nome?: string) => Promise<void>;
   sair: () => Promise<void>;
 }
@@ -52,6 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUsuario(await auth.me());
   }, []);
 
+  const entrarComGoogle = useCallback(async (credential: string) => {
+    await auth.loginGoogle(credential);
+    setUsuario(await auth.me());
+  }, []);
+
   const cadastrar = useCallback(
     async (email: string, senha: string, nome?: string) => {
       await auth.registrar(email, senha, nome);
@@ -66,7 +72,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ usuario, carregando, entrar, cadastrar, sair }}>
+    <AuthContext.Provider
+      value={{ usuario, carregando, entrar, entrarComGoogle, cadastrar, sair }}
+    >
       {children}
     </AuthContext.Provider>
   );

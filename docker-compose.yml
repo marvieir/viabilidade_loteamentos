@@ -106,6 +106,9 @@ services:
       context: ./frontend
       args:
         NEXT_PUBLIC_API_BASE: "http://localhost:8700"
+        # Login com Google (opcional; mesmo Client ID do GOOGLE_CLIENT_ID do backend/.env).
+        # É argumento de BUILD: mudou o valor → rebuild do web.
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: "${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}"
     ports:
       - "3700:3700"
     depends_on:

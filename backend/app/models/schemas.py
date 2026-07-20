@@ -1730,6 +1730,32 @@ class UsuarioOut(BaseModel):
     criado_em: str
 
 
+# ----- Recuperação/troca de senha + login com Google -----
+
+class EsqueciSenhaIn(BaseModel):
+    email: str
+
+
+class RedefinirSenhaIn(BaseModel):
+    token: str = Field(..., description="token do link enviado por e-mail")
+    senha: str = Field(..., min_length=8, description="nova senha, mínimo 8 caracteres")
+
+
+class TrocarSenhaIn(BaseModel):
+    """Conta nascida pelo Google (sem senha) pode DEFINIR a primeira senha sem informar a atual."""
+
+    senha_atual: Optional[str] = None
+    senha_nova: str = Field(..., min_length=8)
+
+
+class GoogleLoginIn(BaseModel):
+    credential: str = Field(..., description="ID token emitido pelo botão do Google (GIS)")
+
+
+class MensagemOut(BaseModel):
+    mensagem: str
+
+
 # ----- Fase 12 — análises salvas (área do cliente) -----
 
 class AnaliseSalvarIn(BaseModel):

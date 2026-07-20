@@ -1,10 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { IconDownload, IconMap, IconPlay, IconPlus, IconChevron } from "@/components/Icons";
 import { Button } from "@/components/ui/button";
 import { Menu, MenuDivisor, MenuItem, MenuLabel } from "@/components/ui/menu";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { DialogTrocarSenha } from "@/components/auth/DialogTrocarSenha";
 import type { Analise } from "@/lib/api";
 
 const ROTULO_COBERTURA: Record<string, string> = {
@@ -41,6 +43,7 @@ export function TopBar({
   jaSalva?: boolean;
 }) {
   const { usuario, sair } = useAuth();
+  const [trocandoSenha, setTrocandoSenha] = useState(false);
   const jur = analise?.jurisdicao;
   const local =
     jur?.municipio && jur?.uf
@@ -162,6 +165,7 @@ export function TopBar({
                 <MenuItem>Painel do administrador</MenuItem>
               </Link>
             )}
+            <MenuItem onClick={() => setTrocandoSenha(true)}>Alterar senha</MenuItem>
             <MenuDivisor />
             <MenuItem onClick={sair} destaque>
               Sair
@@ -169,6 +173,7 @@ export function TopBar({
           </Menu>
         )}
       </div>
+      {trocandoSenha && <DialogTrocarSenha onFechar={() => setTrocandoSenha(false)} />}
     </header>
   );
 }

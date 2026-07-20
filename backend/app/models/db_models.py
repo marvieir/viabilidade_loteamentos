@@ -41,6 +41,28 @@ class Usuario(Base):
     )
 
 
+class ResetSenhaToken(Base):
+    """Token de redefinição de senha ("esqueci minha senha").
+
+    O token em claro só existe no LINK enviado por e-mail; aqui fica apenas o SHA-256
+    (vazamento do banco não permite redefinir senha de ninguém). Uso único (``usado_em``)
+    e expiração curta (~1 h) — validados no endpoint, não por job de limpeza.
+    """
+
+    __tablename__ = "reset_senha_tokens"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    usuario_id: Mapped[str] = mapped_column(
+        String(36), ForeignKey("usuarios.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    token_sha256: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    expira_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    usado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_agora, nullable=False
+    )
+
+
 class Analise(Base):
     __tablename__ = "analises"
 

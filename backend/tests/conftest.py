@@ -220,10 +220,11 @@ def _limpa_store():
 def _limpa_banco():
     # Fase 12 — garante o schema e zera usuarios/analises entre testes (isolamento).
     from app.core.db import criar_tabelas, engine
-    from app.models.db_models import Analise, Usuario
+    from app.models.db_models import Analise, ResetSenhaToken, Usuario
 
     criar_tabelas()
     with engine.begin() as conn:
+        conn.execute(ResetSenhaToken.__table__.delete())
         conn.execute(Analise.__table__.delete())
         conn.execute(Usuario.__table__.delete())
     yield

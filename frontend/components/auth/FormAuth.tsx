@@ -8,6 +8,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { BotaoGoogle } from "@/components/auth/BotaoGoogle";
 import { IconMap } from "@/components/Icons";
 
 const VALOR = [
@@ -27,7 +28,7 @@ const VALOR = [
 
 export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
   const router = useRouter();
-  const { entrar, cadastrar } = useAuth();
+  const { entrar, entrarComGoogle, cadastrar } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [nome, setNome] = useState("");
@@ -50,6 +51,19 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
       router.push("/app");
     } catch (err) {
       setErro(err instanceof Error ? err.message : "Falha na autenticação.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  async function onGoogle(credential: string) {
+    setErro(null);
+    setEnviando(true);
+    try {
+      await entrarComGoogle(credential);
+      router.push("/app");
+    } catch (err) {
+      setErro(err instanceof Error ? err.message : "Falha no login com o Google.");
     } finally {
       setEnviando(false);
     }
@@ -155,6 +169,17 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
               required
             />
 
+            {!cadastro && (
+              <p className="text-right text-sm">
+                <Link
+                  href="/esqueci"
+                  className="font-medium text-indigo-600 hover:underline"
+                >
+                  Esqueci minha senha
+                </Link>
+              </p>
+            )}
+
             {erro && (
               <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
                 {erro}
@@ -169,6 +194,9 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
               {enviando ? "Aguarde…" : cadastro ? "Criar conta" : "Entrar"}
             </button>
           </form>
+
+          {/* Entrar/criar conta com o Google — só aparece com NEXT_PUBLIC_GOOGLE_CLIENT_ID */}
+          <BotaoGoogle onCredential={onGoogle} onErro={setErro} />
 
           <p className="mt-6 text-center text-sm text-slate-500">
             {cadastro ? (

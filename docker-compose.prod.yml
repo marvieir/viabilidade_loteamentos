@@ -31,6 +31,8 @@ services:
     environment:
       ENV: "production"
       DATABASE_URL: "postgresql+psycopg://viabilidade:${POSTGRES_PASSWORD:?}@db:5432/viabilidade"
+      # Base do LINK de "esqueci minha senha" que vai no e-mail (a URL pública do front).
+      APP_URL_BASE: "https://${DOMINIO}"
       # Perfis municipais confirmados (LUOS) persistem num volume nomeado (sobrevive a deploys).
       PERFIL_MUNICIPAL_DIR: "/data/perfis-municipais"
       # Jurídico: fichas confirmadas + anexos do checklist (Fase 3.C) num volume (sobrevive a deploys).
@@ -75,6 +77,8 @@ services:
       args:
         # O front é buildado apontando p/ o domínio HTTPS (o navegador fala com o Caddy).
         NEXT_PUBLIC_API_BASE: "https://${DOMINIO}"
+        # Login com Google (opcional; mesmo Client ID do GOOGLE_CLIENT_ID do backend/.env).
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: "${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}"
     expose:
       - "3700"        # só na rede interna
     depends_on: [api]

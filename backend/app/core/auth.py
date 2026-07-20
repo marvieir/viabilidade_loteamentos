@@ -13,6 +13,7 @@ defina ``JWT_SECRET``/``JWT_REFRESH_SECRET`` por env (Compose), nunca no código
 
 from __future__ import annotations
 
+import hashlib
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -51,11 +52,23 @@ def verifica_senha(senha: str, senha_hash: str) -> bool:
         return False
 
 
-def _emitir(sub: str, papel: str, tipo: Literal["access", "refresh"]) -> str:
+def hash_sessao(senha_hash: str) -> str:
+    """Impressão digital da senha atual, embutida no refresh token (claim ``sh``).
+
+    Trocar a senha muda a impressão → TODO refresh emitido antes deixa de valer no
+    próximo uso (quem roubou a sessão é derrubado), sem precisar de estado no banco.
+    O access token curto (30 min) expira sozinho.
+    """
+    return hashlib.sha256(senha_hash.encode("utf-8")).hexdigest()[:16]
+
+
+def _emitir(sub: str, papel: str, tipo: Literal["access", "refresh"], extras: dict | None = None) -> str:
     agora = datetime.now(timezone.utc)
     ttl = timedelta(minutes=ACCESS_TTL_MIN) if tipo == "access" else timedelta(days=REFRESH_TTL_DIAS)
     segredo = JWT_SECRET if tipo == "access" else JWT_REFRESH_SECRET
     payload = {"sub": sub, "papel": papel, "tipo": tipo, "iat": agora, "exp": agora + ttl}
+    if extras:
+        payload.update(extras)
     return jwt.encode(payload, segredo, algorithm=JWT_ALG)
 
 
@@ -64,7 +77,7 @@ def token_acesso(usuario: Usuario) -> str:
 
 
 def token_refresh(usuario: Usuario) -> str:
-    return _emitir(usuario.id, usuario.papel, "refresh")
+    return _emitir(usuario.id, usuario.papel, "refresh", {"sh": hash_sessao(usuario.senha_hash)})
 
 
 def _decodificar(token: str, tipo: Literal["access", "refresh"]) -> dict:
@@ -87,9 +100,9 @@ def _decodificar(token: str, tipo: Literal["access", "refresh"]) -> dict:
     return payload
 
 
-def sub_do_refresh(token: str) -> str:
-    """Valida um refresh token (cookie) e devolve o id do usuário."""
-    return _decodificar(token, "refresh")["sub"]
+def payload_do_refresh(token: str) -> dict:
+    """Valida um refresh token (cookie) e devolve o payload (``sub`` + ``sh``)."""
+    return _decodificar(token, "refresh")
 
 
 _bearer = HTTPBearer(auto_error=False)
