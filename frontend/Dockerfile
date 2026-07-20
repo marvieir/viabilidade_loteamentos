@@ -12,8 +12,8 @@ COPY . .
 # prerender velho e a imagem sai com rotas de duas eras (index antigo + loteadores novo).
 # Ordem à prova de contrabando: SONDA imprime no log o que o builder recebeu de verdade;
 # .next e node_modules do contexto são DESCARTADOS; deps entram só da etapa limpa.
-RUN echo "== SONDA: primeira linha de app/page.tsx no contexto ==" \
-    && head -1 app/page.tsx \
+RUN echo "== SONDA: primeira linha da home no contexto ==" \
+    && head -1 "app/(site)/page.tsx" \
     && echo "== SONDA: fim ==" \
     && rm -rf .next node_modules
 COPY --from=deps /app/node_modules ./node_modules
