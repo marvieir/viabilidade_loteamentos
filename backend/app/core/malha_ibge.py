@@ -17,6 +17,7 @@ Propriedades aceitas por feição (tolerante a esquemas do IBGE e de exports):
 
 import json
 import os
+import threading
 from typing import Optional
 
 from shapely.geometry import shape
@@ -171,13 +172,34 @@ def montar_lista(localidades: list[dict]) -> list[dict]:
     return saida
 
 
+# MEM-1 (incidente 20-21/07): ``from_env`` era chamado POR REQUISIÇÃO (Depends) e re-parseava
+# o GeoJSON do país inteiro a cada chamada — picos de RAM concorrentes + fragmentação levaram o
+# processo a 3,1 GB e a instância ao swap. A malha agora é SINGLETON por processo: carrega uma
+# vez e recarrega só se o arquivo mudar (caminho/mtime/tamanho).
+_cache_fonte: Optional[FonteMalhaArquivo] = None
+_cache_chave: Optional[tuple] = None
+_cache_lock = threading.Lock()
+
+
 def from_env() -> Optional[FonteMalhaArquivo]:
-    """Carrega a malha de ``MALHA_IBGE_PATH`` se definido e legível; senão ``None``."""
+    """Malha de ``MALHA_IBGE_PATH`` — carregada UMA vez por processo (recarrega se o
+    arquivo mudar). Sem env/arquivo → ``None`` (degradação honesta, como antes)."""
+    global _cache_fonte, _cache_chave
     caminho = os.getenv("MALHA_IBGE_PATH")
     if not caminho or not os.path.exists(caminho):
         return None
     try:
-        with open(caminho, encoding="utf-8") as fh:
-            return FonteMalhaArquivo(json.load(fh))
-    except (OSError, ValueError):
+        st = os.stat(caminho)
+    except OSError:
         return None
+    chave = (os.path.abspath(caminho), st.st_mtime_ns, st.st_size)
+    with _cache_lock:
+        if _cache_fonte is not None and _cache_chave == chave:
+            return _cache_fonte
+        try:
+            with open(caminho, encoding="utf-8") as fh:
+                fonte = FonteMalhaArquivo(json.load(fh))
+        except (OSError, ValueError):
+            return None
+        _cache_fonte, _cache_chave = fonte, chave
+        return fonte

@@ -60,3 +60,30 @@ def test_loader_consome_o_geojson_do_pipeline():
     # busca por nome tolerante a acento/caixa
     achados = fonte.buscar_por_nome("BOCAINA")
     assert any(m.cod_ibge == "3506607" for m in achados)
+
+
+def test_from_env_e_singleton_por_processo(tmp_path, monkeypatch):
+    """MEM-1: ``from_env`` é chamado por REQUISIÇÃO (Depends) — re-parsear o GeoJSON do
+    país a cada chamada afogou a produção em swap. Mesmo arquivo → MESMO objeto (uma
+    carga por processo); arquivo modificado → recarrega."""
+    import json as _json
+
+    gj = malha_ibge.montar_geojson(LOCALIDADES, MALHA_FEATURES)
+    arq = tmp_path / "malha.geojson"
+    arq.write_text(_json.dumps(gj), encoding="utf-8")
+    monkeypatch.setenv("MALHA_IBGE_PATH", str(arq))
+
+    f1 = malha_ibge.from_env()
+    f2 = malha_ibge.from_env()
+    assert f1 is not None and f1 is f2  # singleton: zero re-parse na 2ª chamada
+
+    # arquivo trocado (conteúdo/tamanho diferentes) → nova carga, dado novo servido
+    gj2 = malha_ibge.montar_geojson(LOCALIDADES[:1], MALHA_FEATURES[:1])
+    arq.write_text(_json.dumps(gj2), encoding="utf-8")
+    f3 = malha_ibge.from_env()
+    assert f3 is not f1
+    assert f3.municipio_no_ponto(-45.72, -22.64) is None  # Bocaina saiu do arquivo novo
+
+    # env ausente → None (degradação honesta preservada)
+    monkeypatch.delenv("MALHA_IBGE_PATH")
+    assert malha_ibge.from_env() is None

@@ -26,6 +26,11 @@ services:
     build: ./backend
     expose:
       - "8700"        # só na rede interna — NÃO publica no host
+    # MEM-1 (incidente 20-21/07): teto de RAM p/ a api. Se algo inflar de novo, o Docker
+    # mata e o restart religa a api em segundos — em vez de a INSTÂNCIA inteira afogar em
+    # swap e derrubar tudo (web/caddy/db juntos) até alguém intervir.
+    mem_limit: 2500m
+    memswap_limit: 2500m   # igual ao mem_limit = api NÃO usa swap (quem trava é só ela)
     env_file:
       - ./backend/.env
     environment:
