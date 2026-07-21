@@ -112,7 +112,9 @@ def test_esqueleto_invalido_descartado_e_contado():
     explícito (esqueleto_vazio=true, origem=fallback_curva), nunca a geometria crua do LLM."""
     bowtie = [[0.1, 0.1], [0.9, 0.9], [0.1, 0.9], [0.9, 0.1]]
     prog = programa_do_preset("alta", {"esqueleto": [bowtie]})
-    layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 400.0), prog)
+    # Estilo default do alto padrão hoje é contorno_serpente (sem DEM → grade limpa, ignora a
+    # espinha); o critério aqui é o pipeline da ESPINHA — fixa o traçado sinuoso clássico.
+    layout = geom.gerar_layout(box(0.0, 0.0, 400.0, 400.0), prog, estilo={"tracado": ""})
     assert layout.meta["trechos_descartados"] == 1  # bowtie registrado como descartado
     assert layout.meta["esqueleto_origem"] == "fallback_curva"  # 9.9 — fallback, não grade silenciosa
     assert layout.meta["esqueleto_vazio"] is True
@@ -128,6 +130,7 @@ def test_arquetipo_distingue_grelha_de_sinuoso():
     lay_sin = geom.gerar_layout(
         box(0.0, 0.0, 400.0, 400.0),
         programa_do_preset("alta", {"pct_lazer": 0.1, "esqueleto": esq}),  # alta = sinuoso
+        estilo={"tracado": ""},  # traçado de espinha (o default contorno_serpente ignora a IA sem DEM)
     )
     lay_gre = geom.gerar_layout(
         box(0.0, 0.0, 400.0, 400.0),

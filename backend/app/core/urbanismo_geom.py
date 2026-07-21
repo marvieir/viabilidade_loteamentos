@@ -2099,10 +2099,20 @@ def gerar_layout(
                         miolos.append(_r)  # a banda além da orla volta a virar lote
 
     # 4.a INSTITUCIONAL: uma quadra com frente para via que satisfaça os 4 checks legais (borda).
-    inst_reg, inst_diag = (
-        institucional_como_quadra(miolos, ruas_reg, reg, inst_area, declividade_pct)
-        if (pct_inst > 0 and _pode_reservar(miolos)) else (None, {})
-    )
+    if pct_inst > 0 and _pode_reservar(miolos):
+        inst_reg, inst_diag = institucional_como_quadra(
+            miolos, ruas_reg, reg, inst_area, declividade_pct
+        )
+    elif pct_inst > 0:
+        # Degradação ROTULADA (critério 3 da malha): pediu doação e não há quadra disponível
+        # nesta gleba — nunca diagnóstico vazio em silêncio.
+        inst_reg, inst_diag = None, {
+            "qualifica_legal": False, "checks": {},
+            "obs": ("nenhuma quadra disponível para a doação institucional nesta gleba — "
+                    "área institucional a definir com a Prefeitura."),
+        }
+    else:
+        inst_reg, inst_diag = None, {}
     # Degradação honesta (9.3) × quadra inteira (10.4): em gleba pequena a MENOR quadra
     # qualificada pode ser um múltiplo do alvo — materializá-la INFLA a doação (caso medido:
     # 2.130 m² para alvo de ~250 m², 43% da gleba) e esmaga lazer/lotes. Mesma guarda do
