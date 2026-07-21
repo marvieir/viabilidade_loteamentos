@@ -9,6 +9,7 @@ import { BadgeCobertura } from "@/components/BadgeCobertura";
 import { TopBar } from "@/components/shell/TopBar";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { SECOES, type Secao } from "@/components/shell/secoes";
+import { TrilhaAnalise } from "@/components/shell/TrilhaAnalise";
 import { KpiRow } from "@/components/dashboard/KpiRow";
 import { MapHero } from "@/components/dashboard/MapHero";
 import { VisaoGeral } from "@/components/dashboard/VisaoGeral";
@@ -279,6 +280,12 @@ export default function Home() {
           />
 
           <main className="mx-auto w-full max-w-7xl space-y-4 p-4 sm:p-5">
+            {/* Fase UX-1 — a trilha diz o próximo passo; o estado vem pronto do backend */}
+            <TrilhaAnalise
+              analiseId={analise.analise_id}
+              sinal={sinal}
+              onIr={setSecao}
+            />
             {analise.agrupamento && (
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
                 <p className="font-semibold">

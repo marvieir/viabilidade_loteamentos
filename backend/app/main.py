@@ -42,6 +42,7 @@ from app.routers import (
     localizacao,
     perfil,
     salvas,
+    trilha,
     urbanismo,
     vegetacao,
 )
@@ -142,6 +143,7 @@ app.include_router(localizacao.router, prefix="/api")
 app.include_router(laudo.router, prefix="/api")
 app.include_router(urbanismo.router, prefix="/api")
 app.include_router(custo_infra.router, prefix="/api")
+app.include_router(trilha.router, prefix="/api")  # Fase UX-1 — Trilha da Análise
 
 
 @app.get("/health")

@@ -1756,6 +1756,23 @@ class MensagemOut(BaseModel):
     mensagem: str
 
 
+# ----- Fase UX-1 — Trilha da Análise (docs/fase-ux-onboarding.md) -----
+
+class TrilhaPasso(BaseModel):
+    """Um passo da trilha sugerida. O estado é derivado no backend (determinístico)."""
+
+    id: str
+    titulo: str
+    estado: Literal["concluido", "disponivel", "atencao", "pendente"]
+    motivo: str = Field(..., description="o que o passo entrega / o que falta, em linguagem de usuário")
+    cobertura: Optional[str] = None  # só no passo de diretrizes (BASE_FEDERAL|PARCIAL_UF|COMPLETA)
+
+
+class TrilhaOut(BaseModel):
+    passo_atual: str
+    passos: list[TrilhaPasso]
+
+
 # ----- Fase 12 — análises salvas (área do cliente) -----
 
 class AnaliseSalvarIn(BaseModel):
