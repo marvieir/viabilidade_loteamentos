@@ -51,6 +51,10 @@ router = APIRouter(dependencies=[Depends(analise_do_dono)])
 # Faixas não-edificáveis que viram restrição (espelha o aproveitamento — Fase 2.2).
 _CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")
 
+# Decisão de produto (21/07, operador): área aproveitável MÍNIMA para gerar o estudo de
+# parcelamento — abaixo disso a recusa é explicada (desmembramento, não loteamento).
+AREA_MIN_ESTUDO_M2 = float(os.getenv("URBANISMO_AREA_MIN_M2", "10000"))
+
 
 def _programa_out(prog) -> schemas.ProgramaOut:
     return schemas.ProgramaOut(
@@ -430,6 +434,19 @@ def _propor_impl(
     )
     to_local, to_wgs = medida.transformadores([aprov_wgs])
     aprov_m = transform(to_local, aprov_wgs)
+    # Decisão de produto (21/07, operador): gleba abaixo do MÍNIMO não gera estudo de
+    # parcelamento — nessa escala o caminho usual é desmembramento, e as reservas por quadra
+    # inteira distorceriam o quadro (verde/doação inflados). Recusa EXPLICADA, nunca silêncio.
+    if aprov_m.area < AREA_MIN_ESTUDO_M2:
+        _area_fmt = f"{aprov_m.area:,.0f}".replace(",", ".")
+        _min_fmt = f"{AREA_MIN_ESTUDO_M2:,.0f}".replace(",", ".")
+        raise HTTPException(
+            422,
+            f"A área aproveitável da gleba ({_area_fmt} m²) está abaixo do mínimo para um "
+            f"estudo de parcelamento ({_min_fmt} m² = {AREA_MIN_ESTUDO_M2 / 10000:.0f} ha). "
+            "Glebas nessa escala normalmente seguem desmembramento simples, não loteamento. "
+            "Confira o polígono do KMZ ou analise uma gleba maior.",
+        )
     restr_m = transform(to_local, restr_wgs) if restr_wgs is not None else None
     # camada que BLOQUEIA via (vegetação/APP — dump 027): mata∩encosta continua mata p/ a via.
     veg_bloqueio_m = (transform(to_local, veg_bloqueio_wgs)

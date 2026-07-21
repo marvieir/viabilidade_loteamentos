@@ -72,20 +72,12 @@ def test_reserva_antes_de_lotear():
     assert invasao < 1e-6
 
 
-def test_degradacao_honesta():
-    """Critério 3: numa gleba pequena para o lote-alvo, o lazer 25% é REDUZIDO (preservando
-    lotes), rotulado 'degradado', medido < alvo — nunca inflado nem zerado."""
-    aprov = box(0.0, 0.0, 150.0, 33.0)  # ~4.950 m² — não comporta 25% + lotes (calibração 9.3)
-    prog = programa_do_preset("alta", {"pct_lazer": 0.25, "pct_institucional": 0.05})
-    layout = geom.gerar_layout(aprov, prog)
-    med = medida.medir(layout)
-    assert layout.meta["lazer_degradado"] is True
-    assert _frac_lazer(med, layout) < 0.25  # reduzido
-    assert med.indicadores["n_lotes"] > 0  # lotes preservados
-    fid = medida.construir_fidelidade(med, layout)
-    item = next(a for a in fid["areas"] if a["item"] == "lazer")
-    assert item["status"] == "degradado" and item["leitura"]
-    assert "urbanista" in item["leitura"]
+# Critério 3 (degradação honesta em gleba de ~4.950 m²) foi APOSENTADO em 21/07/2026 por
+# decisão de produto do operador: gleba abaixo de 1 ha não gera estudo de parcelamento
+# (é escala de desmembramento) — o router recusa com explicação ANTES do motor, e a
+# distorção de granularidade (quadras verdes inteiras inflando o lazer acima do alvo em
+# micro-gleba) deixa de ser cenário do produto. Cobertura do novo contrato:
+# tests/test_urbanismo_area_minima.py.
 
 
 # --------------------------- (b) viário por arquétipo + esqueleto ---------------------------

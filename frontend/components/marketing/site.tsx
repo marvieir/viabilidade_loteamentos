@@ -5,10 +5,10 @@
 import Link from "next/link";
 
 // Link do CTA secundário "Agendar demonstração online". Configurável por env no build
-// (NEXT_PUBLIC_LINK_DEMO); o fallback de e-mail é provisório até o operador definir o canal.
+// (NEXT_PUBLIC_LINK_DEMO); e-mail definido pelo operador em 21/07/2026.
 export const LINK_DEMO =
   process.env.NEXT_PUBLIC_LINK_DEMO ??
-  "mailto:contato@homeeye.com.br?subject=Demonstra%C3%A7%C3%A3o%20online%20Viabilidade%20homeeye";
+  "mailto:marco.rodrigues.vieira@gmail.com?subject=Demonstra%C3%A7%C3%A3o%20online%20Viabilidade%20homeeye";
 
 export const CORES = {
   tinta: "#1c2a24",
