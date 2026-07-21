@@ -1435,33 +1435,66 @@ def _dims(programa: Programa) -> tuple[float, float, float]:
 
 
 def _conectar_malha(ruas: Optional[BaseGeometry], caixa: float,
-                    min_area: float = 80.0) -> Optional[BaseGeometry]:
+                    min_area: float = 80.0,
+                    grupos: Optional[list] = None) -> Optional[BaseGeometry]:
     """Fase 10.4 — GARANTE uma malha viária ÚNICA (sem buraco). Enquanto houver >1 componente
     SIGNIFICATIVO de rua, liga o mais próximo ao tronco principal por um conector reto (caixa de
     coletora), do par de pontos mais próximos. Sem isto a malha sai em pedaços (as grelhas das
     porções + a ponte que não alcançou a outra malha por ficar fora do limite de 60 m) e o
     loteamento PARECE PARTIDO. O conector pode cruzar a faixa ≥30% (veda lote, não via — Fase 10.3).
-    Slivers (< ``min_area``) são ignorados (ruído de buffer, não pedaço de rua real)."""
+    Slivers (< ``min_area``) são ignorados (ruído de buffer, não pedaço de rua real).
+
+    ``grupos`` (Fase 10 P3): as porções morfológicas da gleba. Quando dadas (≥2), a solda liga
+    componentes só DENTRO da mesma porção — ponte ENTRE porções é papel exclusivo da travessia
+    avaliada (greide medido, veredicto), nunca de conector automático."""
     if ruas is None or ruas.is_empty:
         return ruas
     comps = sorted(_componentes(ruas), key=lambda c: -c.area)
     signif = [c for c in comps if c.area >= min_area]
     if len(signif) <= 1:
         return ruas
-    main = signif[0]
+
     pecas: list[BaseGeometry] = [ruas]
-    for c in signif[1:]:
-        p1, p2 = nearest_points(main, c)
-        d = p1.distance(p2)
-        if d <= 1e-6:
-            # toque PONTUAL (carro não passa) → solda com um disco da caixa de via, criando largura
-            conn = Point(p1.x, p1.y).buffer(caixa / 2.0)
-        else:
-            # vão real → conector reto com cabeça redonda (sobrepõe DENTRO das duas malhas, soldando)
-            conn = LineString([(p1.x, p1.y), (p2.x, p2.y)]).buffer(caixa / 2.0, cap_style=1)
-        pecas.append(conn)
-        main = _uniao_segura([main, c, conn])
+
+    def _soldar(grupo: list) -> None:
+        main = grupo[0]
+        for c in grupo[1:]:
+            p1, p2 = nearest_points(main, c)
+            d = p1.distance(p2)
+            if d <= 1e-6:
+                # toque PONTUAL (carro não passa) → solda com um disco da caixa de via, criando largura
+                conn = Point(p1.x, p1.y).buffer(caixa / 2.0)
+            else:
+                # vão real → conector reto com cabeça redonda (sobrepõe DENTRO das duas malhas, soldando)
+                conn = LineString([(p1.x, p1.y), (p2.x, p2.y)]).buffer(caixa / 2.0, cap_style=1)
+            pecas.append(conn)
+            main = _uniao_segura([main, c, conn])
+
+    if grupos and len(grupos) >= 2:
+        por_grupo: dict[int, list] = {}
+        for c in signif:
+            por_grupo.setdefault(_indice_do_grupo(c, grupos), []).append(c)
+        for grupo in por_grupo.values():
+            if len(grupo) >= 2:
+                _soldar(grupo)
+    else:
+        _soldar(signif)
     return _valido(_uniao_segura(pecas)) or ruas
+
+
+def _indice_do_grupo(geometria: BaseGeometry, grupos: list) -> int:
+    """Porção a que um componente de via pertence: maior interseção; sem interseção, a mais
+    próxima. Determinístico (empate resolve pelo índice)."""
+    areas = []
+    for g in grupos:
+        try:
+            areas.append(geometria.intersection(g).area if geometria.intersects(g) else 0.0)
+        except Exception:  # noqa: BLE001 — geometria degenerada não decide grupo
+            areas.append(0.0)
+    idx = max(range(len(grupos)), key=lambda i: (areas[i], -i))
+    if areas[idx] <= 0.0:
+        idx = min(range(len(grupos)), key=lambda i: (geometria.distance(grupos[i]), i))
+    return idx
 
 
 def gerar_layout(
@@ -2385,12 +2418,21 @@ def gerar_layout(
     # frame rotacionado a solda é frágil e o buffer(0) do _back a quebra): com travessia VIÁVEL,
     # garante UMA malha viária contínua (fecha o "buraco" entre as porções). Sem travessia/greide
     # inviável → não roda (degradação honesta: segue partido com alerta de engenharia).
+    # Fase 10 P3 — porções no frame ORIGINAL: base da regra "solda só dentro da porção".
+    # Com travessia VIÁVEL a lista fica vazia (malha única global é sancionada pela travessia).
+    _porcoes_orig = ([] if travessia_viavel
+                     else [r for r in (_back(l) for l in lobos_reg) if r is not None])
     if (travessia_viavel or usa_paisagem or limpar) and arruamento is not None and not arruamento.is_empty:
         # U6a — nervuras/anéis recortados pela borda podem sair em pedaços: a solda liga
         # (mesma máquina da 10.4; o conector pode cruzar ≥30% — veda lote, não via).
         # Opção A — a solda garante ZERO toco solto (a queixa nº 1 do operador): a grade
         # recortada pela gleba irregular vira UMA malha viária contínua.
-        arruamento = _conectar_malha(arruamento, conexao_mod.CAIXA_TRONCO_M) or arruamento
+        # Regressão da U6a corrigida: SEM travessia viável a solda respeita as porções —
+        # não inventa ponte entre núcleos (contrato da Fase 10 P3; o conexo segue honesto).
+        arruamento = _conectar_malha(
+            arruamento, conexao_mod.CAIXA_TRONCO_M,
+            grupos=_porcoes_orig if len(_porcoes_orig) >= 2 else None,
+        ) or arruamento
     clube = _back(clube_reg)
     pracas = [r for r in (_back(p) for p in pracas_reg) if r is not None]
     # Fase U3 — lago (lâmina d'água) + orla-parque no frame original.
@@ -2826,11 +2868,19 @@ def gerar_layout(
             _novos_arr = [_principal]
             _migalhas = []
             _sem_rota = False
+            # Fase 10 P3 — a rota A* religa fragmentos DENTRO da porção do tronco principal;
+            # componente de OUTRA porção fica como está (ponte entre núcleos só via travessia).
+            _porc_principal = (_indice_do_grupo(_principal, _porcoes_orig)
+                               if len(_porcoes_orig) >= 2 else 0)
             for _c in _comps[1:]:
                 _importante = ((_ac_pt is not None and _c.distance(_ac_pt) < 25.0)
                                or _c.area >= 900.0)
                 if not _importante:
                     _migalhas.append(_c)
+                    continue
+                if (len(_porcoes_orig) >= 2
+                        and _indice_do_grupo(_c, _porcoes_orig) != _porc_principal):
+                    _novos_arr.append(_c)  # segue partido, honesto — sem conexão forçada
                     continue
                 # pontos de conexão AFASTADOS da vegetação (o mais próximo cru fica colado na
                 # borda e o último trecho invadia ~5 m — dump 030): amostra a borda e escolhe o
