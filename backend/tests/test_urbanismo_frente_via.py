@@ -151,8 +151,13 @@ def test_parser_eixos_aceita_achatado_e_aninhado():
     achatado = [[0.05, 0.5], [0.3, 0.8], [0.6, 0.3], [0.95, 0.6]]
     aninhado = [[[0.05, 0.5], [0.3, 0.8], [0.6, 0.3], [0.95, 0.6]]]
     dd = resolver_diretrizes(None, None, None, "alta")
+    # O critério aqui é o PARSER ponta a ponta. O estilo default do alto padrão hoje é
+    # "contorno_serpente" (via-tronco pela curva de nível), que SEM DEM degrada de propósito
+    # para a grade limpa e ignora a espinha da IA — por isso o teste FIXA o traçado sinuoso
+    # clássico (espinha da IA), que é o caminho que o parser alimenta.
+    estilo_espinha = {"tracado": ""}
     for esq in (achatado, aninhado):
-        lay = geom.gerar_layout(box(0, 0, 343, 172), programa_do_preset("alta", {"esqueleto": esq, "pct_lazer": 0.2}), diretrizes=dd)
+        lay = geom.gerar_layout(box(0, 0, 343, 172), programa_do_preset("alta", {"esqueleto": esq, "pct_lazer": 0.2}), diretrizes=dd, estilo=estilo_espinha)
         v = lay.viario_diagnostico
         assert v["esqueleto_origem"] == "llm"
         assert v["eixos_ia_aceitos"] >= 1 and v["eixos_ia_descartados"] == 0
