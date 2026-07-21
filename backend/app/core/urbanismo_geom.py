@@ -2103,6 +2103,19 @@ def gerar_layout(
         institucional_como_quadra(miolos, ruas_reg, reg, inst_area, declividade_pct)
         if (pct_inst > 0 and _pode_reservar(miolos)) else (None, {})
     )
+    # Degradação honesta (9.3) × quadra inteira (10.4): em gleba pequena a MENOR quadra
+    # qualificada pode ser um múltiplo do alvo — materializá-la INFLA a doação (caso medido:
+    # 2.130 m² para alvo de ~250 m², 43% da gleba) e esmaga lazer/lotes. Mesma guarda do
+    # clube: estourou 1,5× o alvo → não materializa, rotulado (a quadra volta para lotes).
+    if inst_reg is not None and inst_reg.area > inst_area * 1.5 + 1e-6:
+        inst_diag = {
+            **inst_diag,
+            "qualifica_legal": False,
+            "obs": (f"a menor quadra qualificada ({inst_reg.area:,.0f} m²) excede o alvo da "
+                    f"doação institucional ({inst_area:,.0f} m²) — a gleba não comporta a "
+                    "quadra mínima; área institucional a definir com a Prefeitura."),
+        }
+        inst_reg = None
     pool = [q for q in miolos if inst_reg is None or q is not inst_reg]
 
     # 4.b CLUBE: figura formada com frente para via (não círculo). Verde de lazer = quadras verdes.
