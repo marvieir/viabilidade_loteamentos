@@ -2214,7 +2214,18 @@ def gerar_layout(
         )
         lote_quadra = [f"R{i + 1}" for i in range(len(lotes_reg))]
         residuais_reg.extend(_sobras_rural)
+        _rem_m2 = sum(s.area for s in _sobras_rural)
+        # ``avisos`` só nasce mais adiante — o texto entra na lista junto dos demais avisos.
+        aviso_rural = (
+            f"Parcelamento RURAL (parcela-cheia): {len(lotes_reg)} chácara(s) no módulo da "
+            f"FMP, todas com frente para via; mata/encosta internas COMPÕEM cada chácara "
+            f"(% edificável rotulado por parcela). {_rem_m2:,.0f} m² permanecem como "
+            "remanescente/verde: fragmentos abaixo do módulo ou terreno ILHADO por mata "
+            "(via não pode alcançar — Lei 11.428/2006). Divisão esquemática de triagem; "
+            "georreferenciamento e registro (INCRA/CRI) são do agrimensor."
+        )
     else:
+        aviso_rural = None
         for qi, q in enumerate(pool, start=1):
             # Fase 10.5 — face funda demais → injeta acesso interno e loteia as bandas rasas
             # (mata sobra de miolo). Faces normais voltam intactas de `_adensar_face`.
@@ -2740,6 +2751,8 @@ def gerar_layout(
     }
 
     avisos: list[str] = []
+    if regime_rural and aviso_rural:
+        avisos.append(aviso_rural)
     if not lotes:
         avisos.append(
             "A subdivisão não acomodou lotes na área aproveitável "
