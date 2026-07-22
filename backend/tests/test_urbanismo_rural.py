@@ -41,6 +41,9 @@ def test_rural_usa_fmp_da_tabela(client, gerador_urbanismo, fonte_urbanismo, fmp
     dist = r.json()["distribuicao_tamanhos"]
     assert dist["fora_da_faixa"] == 0
     assert r.json()["indicadores"]["n_lotes"] >= 1
+    # Achado do operador (21/07): doação institucional é exigência URBANA (art. 4º, Lei
+    # 6.766) — no regime rural o motor NÃO reserva quadra institucional.
+    assert r.json()["quadro_areas"]["institucional"]["m2"] == 0
 
 
 def test_rural_sem_tabela_usa_default_rotulado(client, gerador_urbanismo, fonte_urbanismo, fmp):

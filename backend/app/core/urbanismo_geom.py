@@ -2104,6 +2104,11 @@ def gerar_layout(
                         miolos.append(_r)  # a banda além da orla volta a virar lote
 
     # 4.a INSTITUCIONAL: uma quadra com frente para via que satisfaça os 4 checks legais (borda).
+    # RURAL-2 (achado do operador, 21/07/2026): doação institucional é exigência do parcelamento
+    # URBANO (art. 4º, Lei 6.766 + plano diretor) — no regime rural (Estatuto da Terra/INCRA)
+    # NÃO existe e o motor não reserva quadra para ela.
+    if regime_rural:
+        pct_inst = 0.0
     if pct_inst > 0 and _pode_reservar(miolos):
         inst_reg, inst_diag = institucional_como_quadra(
             miolos, ruas_reg, reg, inst_area, declividade_pct
@@ -2221,8 +2226,10 @@ def gerar_layout(
             f"FMP, todas com frente para via; mata/encosta internas COMPÕEM cada chácara "
             f"(% edificável rotulado por parcela). {_rem_m2:,.0f} m² permanecem como "
             "remanescente/verde: fragmentos abaixo do módulo ou terreno ILHADO por mata "
-            "(via não pode alcançar — Lei 11.428/2006). Divisão esquemática de triagem; "
-            "georreferenciamento e registro (INCRA/CRI) são do agrimensor."
+            "(via não pode alcançar — Lei 11.428/2006). SEM doação institucional: exigência "
+            "do parcelamento urbano (art. 4º, Lei 6.766), não se aplica ao regime rural. "
+            "Divisão esquemática de triagem; georreferenciamento e registro (INCRA/CRI) "
+            "são do agrimensor."
         )
     else:
         aviso_rural = None
