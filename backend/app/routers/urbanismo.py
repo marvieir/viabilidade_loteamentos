@@ -30,7 +30,8 @@ from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.declividade import FonteDEM, amostrar_declividade, get_fonte_dem
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
 from app.core.store import STORE
-from app.core.urbanismo_diretrizes import resolver_diretrizes
+from app.core.fmp import FMP_ORIGEM_DEFAULT, FMP_ORIGEM_TABELA, FonteFMP, get_fonte_fmp
+from app.core.urbanismo_diretrizes import aplicar_regime_rural, resolver_diretrizes
 from app.core.urbanismo_programa import (
     GeradorIndisponivel,
     GeradorPrograma,
@@ -352,6 +353,7 @@ def propor(
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
     fonte_vias: FonteVias | None = Depends(get_fonte_vias),
     fonte_memoria: FonteMemoriaUrbanismo | None = Depends(get_fonte_memoria_urbanismo),
+    fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
     usuario: Usuario = Depends(usuario_atual),
 ):
     registro = STORE.get(analise_id)
@@ -389,7 +391,7 @@ def propor(
         analise_id, body, registro,
         fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
         fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
-        gerador=gerador, fonte_memoria=fonte_memoria,
+        gerador=gerador, fonte_memoria=fonte_memoria, fonte_fmp=fonte_fmp,
     )
 
 
@@ -409,6 +411,7 @@ def _propor_impl(
     variante_unica: dict | None = None,
     origem_geracao: str = "llm",
     fonte_memoria: FonteMemoriaUrbanismo | None = None,
+    fonte_fmp: FonteFMP | None = None,
 ) -> schemas.PropostaUrbanisticaOut:
     """Pipeline completo do estudo de massa (Fase U4): com ``prog`` fornecido NÃO chama a IA
     (materialização de variante); ``variante_unica`` restringe a UMA estratégia (senão gera as
@@ -521,6 +524,21 @@ def _propor_impl(
     diretrizes = resolver_diretrizes(
         perfil, body.zona, body.modalidade, body.publico_alvo, body.lote_max_m2
     )
+    # Regime RURAL: piso do lote = FMP do município (INCRA), não o piso urbano (achado do
+    # operador 21/07/2026 — chácara saía com lote de 300 m²). Decisão B: o restante do quadro
+    # permanece como referência ROTULADA (aviso das diretrizes).
+    if body.tipo_loteamento == "loteamento_rural":
+        fmp_val = None
+        if fonte_fmp is not None and getattr(jur, "cod_ibge", None):
+            try:
+                fmp_val = fonte_fmp.fmp_m2(jur.cod_ibge)
+            except Exception:  # noqa: BLE001 — tabela indisponível → default rotulado
+                fmp_val = None
+        diretrizes = aplicar_regime_rural(
+            diretrizes, fmp_val,
+            FMP_ORIGEM_TABELA if fmp_val else FMP_ORIGEM_DEFAULT,
+            getattr(jur, "municipio", None), body.lote_max_m2,
+        )
 
     # 3) NÚCLEO: Python materializa (reserva conforme diretriz → subdivide → CLAMP legal) e MEDE.
     # Fase 10 (Parte 3) — LOTEAMENTO ÚNICO: se partido, a IA propôs o ponto de travessia e o Python
@@ -754,6 +772,8 @@ def _propor_impl(
         piso_lote_efetivo_m2=diretrizes["piso_lote_efetivo_m2"], teto_lote_m2=diretrizes["teto_lote_m2"],
         doacao_min_pct=diretrizes["doacao_min_pct"], doacao_split=diretrizes["doacao_split"],
         aviso=diretrizes["aviso"],
+        regime=diretrizes.get("regime"), fmp_m2=diretrizes.get("fmp_m2"),
+        fmp_origem=diretrizes.get("fmp_origem"),
     )
     conf_legal = [
         schemas.ConformidadeLegalOut(**c) for c in medida.conformidade_legal(med, layout, diretrizes)
@@ -963,6 +983,7 @@ def materializar_variante(
     fonte_dem: FonteDEM | None = Depends(get_fonte_dem),
     fonte_perfil: FontePerfilMunicipal | None = Depends(get_fonte_perfil),
     fonte_vias: FonteVias | None = Depends(get_fonte_vias),
+    fonte_fmp: FonteFMP | None = Depends(get_fonte_fmp),
 ):
     """Materializa uma VARIANTE alternativa de uma proposta já gerada: reusa o programa salvo
     (zero chamada de IA, FORA do cap de gerações) e roda só a geometria determinística."""
@@ -997,7 +1018,7 @@ def materializar_variante(
         analise_id, body_base, registro,
         fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
         fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
-        prog=prog, variante_unica=var, origem_geracao="variante",
+        prog=prog, variante_unica=var, origem_geracao="variante", fonte_fmp=fonte_fmp,
     )
 
 

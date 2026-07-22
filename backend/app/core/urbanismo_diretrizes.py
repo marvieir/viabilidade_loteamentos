@@ -120,3 +120,45 @@ def resolver_diretrizes(
             "mercado; verificar lote/doação/verde com a prefeitura."
         ),
     }
+
+
+def aplicar_regime_rural(
+    diretrizes: dict,
+    fmp_valor: Optional[float],
+    fmp_origem: str,
+    municipio: Optional[str],
+    lote_max_m2: Optional[float] = None,
+) -> dict:
+    """Parcelamento RURAL (achado do operador, 21/07/2026; decisão B): o piso legal do lote é a
+    FMP do município (Lei 5.868/72 art. 8º; Estatuto da Terra art. 65 — tabela INCRA), NÃO o
+    piso urbano da Lei 6.766 — o motor tratava chácara como lote urbano (lotes de 300 m² num
+    "loteamento rural"). Doação/verde/institucional permanecem no quadro como REFERÊNCIA
+    rotulada: no regime rural as exigências urbanas não se aplicam (verificar INCRA/prefeitura).
+
+    A testada-alvo urbana (17 m) geraria chácaras de ~1 km de fundo — no rural a chácara-alvo
+    é ~quadrada (testada = √FMP)."""
+    from app.core.fmp import FMP_DEFAULT_M2
+
+    piso = float(fmp_valor) if fmp_valor else FMP_DEFAULT_M2
+    teto = max(piso, float(lote_max_m2)) if lote_max_m2 else round(piso * 1.5, 2)
+    testada = round(piso ** 0.5, 1)
+    fmt = f"{piso:,.0f}".replace(",", ".")
+    return {
+        **diretrizes,
+        "regime": "rural",
+        "fmp_m2": round(piso, 2),
+        "fmp_origem": fmp_origem,
+        "lote_min_zona_m2": None,
+        "piso_lote_efetivo_m2": round(piso, 2),
+        "teto_lote_m2": round(teto, 2),
+        "alvo_lote_m2": round(piso, 2),
+        "testada_alvo_m": testada,
+        "prof_alvo_m": round(piso / testada, 1),
+        "aviso": (
+            f"Parcelamento RURAL — piso legal do lote = FMP de "
+            f"{municipio or 'município não detectado'}: {fmt} m² ({fmp_origem}; "
+            "Lei 5.868/72, art. 8º). Percentuais de doação/verde/institucional exibidos como "
+            "referência: no regime rural (INCRA) as exigências urbanas da Lei 6.766 não se "
+            "aplicam — verificar destinação e exigências com o INCRA e a prefeitura."
+        ),
+    }

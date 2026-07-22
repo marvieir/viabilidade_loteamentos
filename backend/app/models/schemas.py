@@ -1454,6 +1454,10 @@ class DiretrizesOut(BaseModel):
     doacao_min_pct: Optional[float] = None
     doacao_split: Optional[dict] = None
     aviso: str = ""
+    # Regime RURAL (21/07/2026): piso = FMP do município (INCRA), com proveniência.
+    regime: Optional[str] = None  # "rural" quando tipo_loteamento = loteamento_rural
+    fmp_m2: Optional[float] = None
+    fmp_origem: Optional[str] = None
 
 
 class ConformidadeLegalOut(BaseModel):
