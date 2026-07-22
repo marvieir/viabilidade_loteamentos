@@ -38,7 +38,7 @@ def test_rural_usa_fmp_da_tabela(client, gerador_urbanismo, fonte_urbanismo, fmp
     assert "RURAL" in d["aviso"] and "FMP" in d["aviso"] and "20.000" in d["aviso"]
     assert "referência" in d["aviso"]  # decisão B: quadro urbano rotulado, não removido
     # Nenhuma chácara abaixo do módulo: a distribuição respeita a faixa legal rural.
-    dist = r.json()["distribuicao"]
+    dist = r.json()["distribuicao_tamanhos"]
     assert dist["fora_da_faixa"] == 0
     assert r.json()["indicadores"]["n_lotes"] >= 1
 
