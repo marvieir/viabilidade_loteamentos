@@ -2209,7 +2209,9 @@ def gerar_layout(
                            if g is not None]),
         )
         verdes_reg = []  # o orçamento de verde urbano não reserva quadra no rural
-        lotes_reg, _sobras_rural = _parcelar_rural(_dominio_rural, alvo_area, piso_lote, teto_lote)
+        lotes_reg, _sobras_rural = _parcelar_rural(
+            _dominio_rural, alvo_area, piso_lote, teto_lote, ruas=ruas_reg
+        )
         lote_quadra = [f"R{i + 1}" for i in range(len(lotes_reg))]
         residuais_reg.extend(_sobras_rural)
     else:
@@ -3131,7 +3133,8 @@ def _corte_por_area_rural(geom: BaseGeometry, alvo: float, horizontal: bool) -> 
     return (lo + hi) / 2.0
 
 
-def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, teto: float):
+def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, teto: float,
+                    ruas: Optional[BaseGeometry] = None):
     """Chácaras por FATIAS (parcela-cheia — decisão do operador, 21/07/2026): cada componente
     do domínio (gleba INTEIRA − vias − reservas; a mata/encosta interna COMPÕE a chácara) é
     varrido no eixo maior e cortado em fatias de ~``alvo`` m² (a FMP), dentro de [piso, teto].
@@ -3147,6 +3150,20 @@ def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, t
     sobras: list[BaseGeometry] = []
     if dominio is None or dominio.is_empty:
         return parcelas, sobras
+
+    _tem_ruas = ruas is not None and not ruas.is_empty
+
+    def _toca_via(g: BaseGeometry) -> bool:
+        try:
+            return _tem_ruas and g.distance(ruas) < 0.75
+        except Exception:  # noqa: BLE001
+            return False
+
+    def _cortar(g: BaseGeometry, area_alvo: float, horizontal: bool):
+        minx, miny, maxx, maxy = g.bounds
+        corte = _corte_por_area_rural(g, area_alvo, horizontal)
+        caixa = box(minx, miny, corte, maxy) if horizontal else box(minx, miny, maxx, corte)
+        return _valido(g.intersection(caixa)), _diferenca_segura(g, caixa)
 
     def _dividir(g: BaseGeometry, prof_rec: int = 0) -> None:
         area = g.area
@@ -3176,13 +3193,20 @@ def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, t
             if resto is not None and not resto.is_empty:
                 sobras.extend(_componentes(resto))
             return
-        # metade por ÁREA no eixo maior do bbox — pedaços proporcionais, não tiras.
+        # metade por ÁREA no eixo maior do bbox — pedaços proporcionais, não tiras. Com as
+        # RUAS conhecidas, prefere o eixo em que AS DUAS metades continuam encostadas em via
+        # (senão o fundo da gleba ilha e a parcela nasce invendável).
         minx, miny, maxx, maxy = g.bounds
-        horizontal = (maxx - minx) >= (maxy - miny)
-        corte = _corte_por_area_rural(g, area / 2.0, horizontal)
-        caixa = box(minx, miny, corte, maxy) if horizontal else box(minx, miny, maxx, corte)
-        lado_a = _valido(g.intersection(caixa))
-        lado_b = _diferenca_segura(g, caixa)
+        preferido = (maxx - minx) >= (maxy - miny)
+        lado_a, lado_b = _cortar(g, area / 2.0, preferido)
+        if _tem_ruas and _toca_via(g):
+            def _ambos_tocam(a, b):
+                return (a is not None and not a.is_empty and _toca_via(a)
+                        and b is not None and not b.is_empty and _toca_via(b))
+            if not _ambos_tocam(lado_a, lado_b):
+                alt_a, alt_b = _cortar(g, area / 2.0, not preferido)
+                if _ambos_tocam(alt_a, alt_b):
+                    lado_a, lado_b = alt_a, alt_b
         for parte in (lado_a, lado_b):
             if parte is None or parte.is_empty:
                 continue
@@ -3191,4 +3215,11 @@ def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, t
 
     for comp in sorted(_componentes(dominio), key=lambda c: -c.area):
         _dividir(comp)
+    # Parcela ILHADA (mata em volta — via não pode alcançá-la) não é chácara vendável:
+    # sai como remanescente/sobra ROTULADA, em vez de deixar o filtro urbano fundir
+    # vizinhos acima do teto ou descartar em silêncio.
+    if _tem_ruas:
+        com_via = [p for p in parcelas if _toca_via(p)]
+        sobras.extend(p for p in parcelas if not _toca_via(p))
+        parcelas = com_via
     return parcelas, sobras
