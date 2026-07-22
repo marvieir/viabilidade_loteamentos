@@ -1619,6 +1619,11 @@ def gerar_layout(
     piso_lote = float(diretrizes["piso_lote_efetivo_m2"])
     teto_lote = float(diretrizes["teto_lote_m2"])
     alvo_area = float(diretrizes.get("alvo_lote_m2", (piso_lote + teto_lote) / 2.0))
+    # RURAL-2 (decisão do operador, 21/07/2026 — parcela-cheia): a chácara ≥ FMP pode CONTER
+    # mata/APP/encosta (a restrição limita onde construir, não a composição da parcela). A
+    # subdivisão urbana de quadras dá lugar ao particionador de fatias (4.c) e a sanitização
+    # "lote não pisa em restrição" não remove chácara — o % edificável sai rotulado no meta.
+    regime_rural = str(diretrizes.get("regime") or "") == "rural"
 
     # Reserva de verde/institucional: o município é PISO — reserva o MAIOR entre o que a IA
     # propôs e o mínimo da LUOS (doacao_split). Pode propor mais, nunca menos (§0).
@@ -2188,17 +2193,32 @@ def gerar_layout(
     lote_quadra: list[str] = []
     residuais_reg: list[BaseGeometry] = []
     vias_internas_reg: list[BaseGeometry] = []
-    for qi, q in enumerate(pool, start=1):
-        # Fase 10.5 — face funda demais → injeta acesso interno e loteia as bandas rasas (mata sobra
-        # de miolo). Faces normais voltam intactas de `_adensar_face`.
-        subfaces, vias_int = _adensar_face(q, prof, via_local)
-        vias_internas_reg.extend(vias_int)
-        for sf in subfaces:
-            sub, res = _lotear_melhor_eixo(sf, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
-            for lote in sub:
-                lotes_reg.append(lote)
-                lote_quadra.append(f"Q{qi}")
-            residuais_reg.extend(res)
+    if regime_rural:
+        # RURAL-2 — parcela-cheia: o domínio das chácaras é a GLEBA INTEIRA (aproveitável +
+        # restrição interna) menos vias e reservas já feitas; fatias de ~FMP no eixo maior.
+        _mata_reg = (rotate(restricao_raw, -ang_deg, origin=cen)
+                     if (restricao_raw is not None and not restricao_raw.is_empty and ang_deg)
+                     else restricao_raw)
+        _dominio_rural = _diferenca_segura(
+            _uniao_segura([g for g in (reg, _mata_reg) if g is not None]),
+            _uniao_segura([g for g in (ruas_reg, inst_reg, clube_reg, *pracas_reg, *verdes_reg)
+                           if g is not None]),
+        )
+        lotes_reg, _sobras_rural = _parcelar_rural(_dominio_rural, alvo_area, piso_lote, teto_lote)
+        lote_quadra = [f"R{i + 1}" for i in range(len(lotes_reg))]
+        residuais_reg.extend(_sobras_rural)
+    else:
+        for qi, q in enumerate(pool, start=1):
+            # Fase 10.5 — face funda demais → injeta acesso interno e loteia as bandas rasas
+            # (mata sobra de miolo). Faces normais voltam intactas de `_adensar_face`.
+            subfaces, vias_int = _adensar_face(q, prof, via_local)
+            vias_internas_reg.extend(vias_int)
+            for sf in subfaces:
+                sub, res = _lotear_melhor_eixo(sf, testada_alvo, prof, alvo_area, piso_lote, teto_lote)
+                for lote in sub:
+                    lotes_reg.append(lote)
+                    lote_quadra.append(f"Q{qi}")
+                residuais_reg.extend(res)
     # as vias internas injetadas entram na malha ANTES do frente-via (p/ os lotes do miolo contarem
     # como lindeiros) e no arruamento medido.
     if vias_internas_reg:
@@ -2837,9 +2857,14 @@ def gerar_layout(
                         f"Sanitização: {_corte_via:,.0f} m² de via sobre restrição declarada "
                         "REMOVIDOS (mata/APP bloqueia via; só a declividade ≥30% pode, com laudo)."
                     )
-        _novos, _lq, _perdidos_m2, _slivers = [], [], 0.0, []
         _tem_lq = bool(lote_quadra) and len(lote_quadra) == len(lotes)
-        for _i, _l in enumerate(lotes):
+        # RURAL-2 — parcela-cheia: a restrição interna COMPÕE a chácara (rotulada no meta);
+        # a régua "lote não pisa em restrição" é urbana e não remove parcela rural.
+        if regime_rural:
+            _novos, _lq, _perdidos_m2, _slivers = list(lotes), list(lote_quadra), 0.0, []
+        else:
+            _novos, _lq, _perdidos_m2, _slivers = [], [], 0.0, []
+        for _i, _l in enumerate([] if regime_rural else lotes):
             if not _intersecta_segura(_l, restricao_raw):
                 _novos.append(_l)
                 if _tem_lq:
@@ -2970,7 +2995,23 @@ def gerar_layout(
                                if lazer_total is not None else None)
                 inst = _diferenca_segura(inst, _novo_solo) if inst is not None else None
 
+    # RURAL-2 — % edificável por chácara (parcela-cheia): quanto da parcela está FORA da
+    # restrição declarada (mata/APP/≥30%). Rotulado, com a proveniência da restrição do estudo.
+    def _pct_edificavel(_l):
+        if restricao_raw is None or restricao_raw.is_empty or _l.area <= 0:
+            return 100.0
+        try:
+            dentro = min(_l.intersection(restricao_raw).area, _l.area)
+        except Exception:  # noqa: BLE001 — falha geométrica não derruba o meta
+            return 100.0
+        return round(100.0 * (1.0 - dentro / _l.area), 1)
+
     meta = {
+        "regime_rural": regime_rural,
+        "parcelas_rural": ([
+            {"area_m2": round(_l.area, 1), "edificavel_pct": _pct_edificavel(_l)}
+            for _l in lotes
+        ] if regime_rural else None),
         "lazer_alvo_pct": round(pct_lazer0, 4),
         "lazer_usado_pct": round(lazer_reservado_m2 / aprov_area, 4) if aprov_area else 0.0,
         # fidelidade do lazer usa a RESERVA materializada (clube + verde formado).
@@ -3063,3 +3104,63 @@ def orientacao_contorno(dem) -> Optional[float]:
     if abs(gx) < 1e-12 and abs(gy) < 1e-12:
         return None  # plano → grelha axial
     return math.atan2(gy, gx) + math.pi / 2.0  # curva de nível ⟂ gradiente
+
+
+# ====================== RURAL-2 — particionador parcela-cheia (21/07/2026) ======================
+
+def _corte_por_area_rural(geom: BaseGeometry, alvo: float, horizontal: bool) -> float:
+    """Posição de corte (bissecção determinística) que deixa ~``alvo`` m² à esquerda/abaixo."""
+    minx, miny, maxx, maxy = geom.bounds
+    lo, hi = (minx, maxx) if horizontal else (miny, maxy)
+    for _ in range(42):
+        mid = (lo + hi) / 2.0
+        caixa = box(minx, miny, mid, maxy) if horizontal else box(minx, miny, maxx, mid)
+        try:
+            a = geom.intersection(caixa).area
+        except Exception:  # noqa: BLE001 — geometria degenerada não decide o corte
+            a = 0.0
+        if a < alvo:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, teto: float):
+    """Chácaras por FATIAS (parcela-cheia — decisão do operador, 21/07/2026): cada componente
+    do domínio (gleba INTEIRA − vias − reservas; a mata/encosta interna COMPÕE a chácara) é
+    varrido no eixo maior e cortado em fatias de ~``alvo`` m² (a FMP), dentro de [piso, teto].
+    É a divisão clássica de sítios: tiras com frente para a via e o corpo subindo o terreno.
+    Fragmento menor que o módulo NUNCA vira chácara (ilegal) — cai em sobra→verde. A frente
+    para via fica a cargo do ``garantir_frente_via`` (funde/filtra), como no urbano.
+    Determinístico: varredura + bissecção de área, sem aleatoriedade."""
+    parcelas: list[Polygon] = []
+    sobras: list[BaseGeometry] = []
+    if dominio is None or dominio.is_empty:
+        return parcelas, sobras
+    for comp in sorted(_componentes(dominio), key=lambda c: -c.area):
+        if comp.area < piso - 1.0:
+            sobras.append(comp)
+            continue
+        n = max(1, int(comp.area // max(alvo, 1.0)))
+        while comp.area / n > teto and comp.area / (n + 1) >= piso - 1.0:
+            n += 1
+        alvo_ef = comp.area / n
+        minx, miny, maxx, maxy = comp.bounds
+        horizontal = (maxx - minx) >= (maxy - miny)
+        restante: Optional[BaseGeometry] = comp
+        for _ in range(n - 1):
+            if restante is None or restante.is_empty or restante.area <= alvo_ef + 1.0:
+                break
+            corte = _corte_por_area_rural(restante, alvo_ef, horizontal)
+            rb = restante.bounds
+            caixa = (box(rb[0], rb[1], corte, rb[3]) if horizontal
+                     else box(rb[0], rb[1], rb[2], corte))
+            fatia = _valido(restante.intersection(caixa))
+            restante = _diferenca_segura(restante, caixa)
+            for p in (_componentes(fatia) if fatia is not None else []):
+                (parcelas if p.area >= piso - 1.0 else sobras).append(p)
+        if restante is not None and not restante.is_empty:
+            for p in _componentes(restante):
+                (parcelas if p.area >= piso - 1.0 else sobras).append(p)
+    return parcelas, sobras
