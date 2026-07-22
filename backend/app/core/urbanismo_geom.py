@@ -3242,4 +3242,30 @@ def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, t
         com_via = [p for p in parcelas if _toca_via(p)]
         sobras.extend(p for p in parcelas if not _toca_via(p))
         parcelas = com_via
+    # RURAL-3 (achado do operador, 21/07/2026): fragmento sub-módulo que ENCOSTA numa chácara
+    # com capacidade (soma ≤ teto) é ABSORVIDO por ela — sobra geométrica vira patrimônio da
+    # parcela vizinha em vez de "verde de doação" (instituto urbano que não existe no rural).
+    # Sem vizinho com capacidade → permanece remanescente rotulado.
+    if parcelas and sobras:
+        restantes: list[BaseGeometry] = []
+        for s in sorted(sobras, key=lambda g_: -g_.area):
+            melhor, melhor_borda = None, 0.0
+            for i, p in enumerate(parcelas):
+                if p.area + s.area > teto + 1.0:
+                    continue
+                try:
+                    if s.distance(p) > 0.5:
+                        continue
+                    borda = s.buffer(0.6).intersection(p).area
+                except Exception:  # noqa: BLE001 — geometria degenerada não funde
+                    continue
+                if borda > melhor_borda:
+                    melhor, melhor_borda = i, borda
+            fundida = (_valido(_uniao_segura([parcelas[melhor], s]))
+                       if melhor is not None else None)
+            if fundida is not None and fundida.geom_type == "Polygon":
+                parcelas[melhor] = fundida
+            else:
+                restantes.append(s)
+        sobras = restantes
     return parcelas, sobras
