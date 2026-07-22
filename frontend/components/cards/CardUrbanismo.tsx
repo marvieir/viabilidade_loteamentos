@@ -832,7 +832,11 @@ export function CardUrbanismo({
                         geométrica em LINHAS SEPARADAS; a sobra nunca é chamada de "área verde". */}
                     {q.area_verde_reserva ? (
                       <LinhaArea
-                        rotulo="Área verde de doação/reserva"
+                        rotulo={
+                          proposta?.diretrizes?.regime === "rural"
+                            ? "Reserva ambiental (mata/APP sem acesso viário)"
+                            : "Área verde de doação/reserva"
+                        }
                         m2={q.area_verde_reserva.m2_fmt}
                         pct={q.area_verde_reserva.pct_fmt}
                       />

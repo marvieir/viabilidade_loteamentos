@@ -3,6 +3,11 @@
 > Leia este arquivo e o `ARCHITECTURE.md` no início de cada sessão.
 > A spec da fase atual está em `docs/fase-N-*.md`. Esses três são a fonte de verdade.
 
+## Idioma (INEGOCIÁVEL)
+- **Fale SEMPRE em português com o operador. Nunca em outra língua**, em nenhuma
+  circunstância (respostas, resumos, status, avisos). Código/identificadores em inglês
+  quando for a convenção da linguagem, mas toda comunicação com o operador é em português.
+
 ## O projeto
 Ferramenta de **pré-viabilidade de loteamento**: recebe o KMZ de uma gleba e produz
 uma análise de triagem (não decide aprovação municipal). Backend FastAPI + frontend

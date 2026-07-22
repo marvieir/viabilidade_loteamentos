@@ -1716,6 +1716,10 @@ export interface Diretrizes {
   doacao_min_pct: number | null;
   doacao_split: Record<string, number | null> | null;
   aviso: string;
+  // Regime RURAL (parcela-cheia): piso = FMP do município (INCRA), com proveniência.
+  regime?: string | null; // "rural" no parcelamento rural
+  fmp_m2?: number | null;
+  fmp_origem?: string | null;
 }
 export interface ConformidadeLegal {
   item: string;

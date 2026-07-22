@@ -2153,10 +2153,13 @@ def gerar_layout(
         else:
             _rb = reg.bounds
             hub_pref = Point((_rb[0] + _rb[2]) / 2.0, _rb[1])
+    # RURAL-4: no regime rural NÃO se reservam amenidades urbanas (clube/praças de bolso) — o
+    # chacreamento não tem áreas comuns de lazer da Lei 6.766. Todo o chão (menos vias e a
+    # reserva ambiental sem acesso) vira chácara; o quadro fecha em 100% da gleba.
     clube_target = LAZER_CLUBE_FRAC * lazer_area
     clube_reg, clube_diag = (
         clube_como_quadra(pool, ruas_reg, clube_target, preferencia=hub_pref)
-        if _pode_reservar(pool) else (None, {})
+        if (not regime_rural and _pode_reservar(pool)) else (None, {})
     )
     # só materializa o clube se couber no orçamento de lazer (degradação: gleba não comporta).
     if clube_reg is not None and clube_reg.area > lazer_area * 1.5 + 1e-6:
@@ -2175,7 +2178,7 @@ def gerar_layout(
     n_min_pracas = max(1, len(pool) // ppq) if ppq > 0 else 0
     pracas_reg, pool = (
         _selecionar_pracas(pool, ruas_reg, clube_reg, pracas_budget, n_min=n_min_pracas)
-        if _pode_reservar(pool) else ([], pool)
+        if (not regime_rural and _pode_reservar(pool)) else ([], pool)
     )
     pracas_m2 = sum(p.area for p in pracas_reg)
 
@@ -2214,6 +2217,12 @@ def gerar_layout(
                            if g is not None]),
         )
         verdes_reg = []  # o orçamento de verde urbano não reserva quadra no rural
+        # RURAL-4 (achado do operador 21/07: quadro somava > gleba): o ≥30% preservado da régua
+        # urbana (nao_edif_reg) recai sobre chão que agora está DENTRO das chácaras — reservá-lo
+        # à parte contava a mesma terra duas vezes (369.538 m² sobrepostos, medido no dump de
+        # Gonçalves). No rural a reserva é recomputada como o LEFTOVER (domínio − chácaras),
+        # sem sobreposição com o vendável.
+        nao_edif_reg = []
         lotes_reg, _sobras_rural = _parcelar_rural(
             _dominio_rural, alvo_area, piso_lote, teto_lote, ruas=ruas_reg
         )
@@ -2223,13 +2232,13 @@ def gerar_layout(
         # ``avisos`` só nasce mais adiante — o texto entra na lista junto dos demais avisos.
         aviso_rural = (
             f"Parcelamento RURAL (parcela-cheia): {len(lotes_reg)} chácara(s) no módulo da "
-            f"FMP, todas com frente para via; mata/encosta internas COMPÕEM cada chácara "
-            f"(% edificável rotulado por parcela). {_rem_m2:,.0f} m² permanecem como "
-            "remanescente/verde: fragmentos abaixo do módulo ou terreno ILHADO por mata "
-            "(via não pode alcançar — Lei 11.428/2006). SEM doação institucional: exigência "
-            "do parcelamento urbano (art. 4º, Lei 6.766), não se aplica ao regime rural. "
-            "Divisão esquemática de triagem; georreferenciamento e registro (INCRA/CRI) "
-            "são do agrimensor."
+            "FMP, todas com frente para via; mata/encosta internas COMPÕEM cada chácara "
+            "(% edificável rotulado por parcela — a Reserva Legal/APP é averbada no CAR de "
+            "cada imóvel, Lei 12.651/2012). A 'Área verde' do quadro é RESERVA AMBIENTAL: "
+            "mata/APP sem acesso viário possível (abrir via exigiria supressão autorizada — "
+            "Lei 11.428/2006, fora do escopo da triagem). SEM doação urbana (art. 4º, Lei "
+            "6.766, não se aplica ao rural). Divisão esquemática; georreferenciamento e "
+            "registro (INCRA/CRI) são do agrimensor."
         )
     else:
         aviso_rural = None
@@ -2329,11 +2338,29 @@ def gerar_layout(
     # entra no verde RESERVADO, fora da sobra. (Idealmente ganha linha própria "não-edificável" no
     # quadro; por ora soma ao verde de reserva/doação, que é o destino honesto.)
     # U6a P4 — corredores verdes entre pods são doação verde legítima (rede de pedestres).
-    verde_reservado_reg = _uniao_segura([*verdes_reg, *nao_edif_reg, *corredores_reg])
-    sobra_reg = _uniao_segura([*residuais_reg, *verdes_min])
-    # Fase 9.14 — regra D: o que virou LOTE/ via de contorno (recuperado) sai da sobra-verde (cai).
-    if lotes_rec_reg or contorno_mat_reg:
-        sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura([*lotes_rec_reg, *contorno_mat_reg]))
+    if regime_rural:
+        # RURAL-4 — RESERVA AMBIENTAL = leftover: tudo que NÃO virou chácara/via/amenidade.
+        # Por construção NÃO sobrepõe o vendável (a mata acessível já está DENTRO das chácaras;
+        # aqui fica só a mata/APP ILHADA sem acesso viário + a APP d'água). Sem "doação" urbana,
+        # sem "sobra a reduzir": em terreno rural o leftover é reserva ambiental legítima, e o
+        # quadro fecha em 100% da gleba (chácaras + reserva + via + amenidade).
+        _mata_reserva = (rotate(restricao_raw, -ang_deg, origin=cen)
+                         if (restricao_raw is not None and not restricao_raw.is_empty and ang_deg)
+                         else restricao_raw)
+        _dominio_total = _uniao_segura([g for g in (reg, _mata_reserva) if g is not None])
+        _ocupado = _uniao_segura(
+            [g for g in (*lotes_reg, ruas_reg, inst_reg, clube_reg, *pracas_reg) if g is not None]
+        )
+        # Valor PROVISÓRIO (as vias ainda crescem — solda/vias internas abaixo). A reserva
+        # DEFINITIVA é recomputada dos geoms FINAIS logo antes do Layout (fecha o quadro em 100%).
+        verde_reservado_reg = _diferenca_segura(_dominio_total, _ocupado)
+        sobra_reg = None  # no rural o leftover inteiro é reserva ambiental (não "sobra")
+    else:
+        verde_reservado_reg = _uniao_segura([*verdes_reg, *nao_edif_reg, *corredores_reg])
+        sobra_reg = _uniao_segura([*residuais_reg, *verdes_min])
+        # Fase 9.14 — regra D: o que virou LOTE/ via de contorno (recuperado) sai da sobra-verde.
+        if lotes_rec_reg or contorno_mat_reg:
+            sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura([*lotes_rec_reg, *contorno_mat_reg]))
 
     # U6a REGRA E — CAÇA À SOBRA (benchmark do operador: vendável 45–49%): bloco de sobra
     # ≥ MIN_QUADRA com FRENTE para via existente é terra LOTEÁVEL desperdiçada — loteia
@@ -3084,6 +3111,21 @@ def gerar_layout(
         },
     }
 
+    # RURAL-4 — RESERVA AMBIENTAL DEFINITIVA (do estado FINAL): as vias crescem depois da 1ª
+    # estimativa (solda + vias internas), comendo chácara; recomputar aqui, dos geoms finais no
+    # frame ORIGINAL, garante que chácaras + reserva + via + amenidade = gleba (quadro fecha em
+    # 100%, sem double-count nem buraco — achado do operador no dump de Gonçalves).
+    if regime_rural:
+        _gleba_orig = _uniao_segura(
+            [g for g in (aproveitavel, restricao_raw) if g is not None and not g.is_empty]
+        )
+        _ocupado_final = _uniao_segura(
+            [g for g in (*lotes, arruamento, lazer_total, inst) if g is not None and not g.is_empty]
+        )
+        verde_reservado = _diferenca_segura(_gleba_orig, _ocupado_final)
+        verde = verde_reservado  # no rural não há "sobra"; o leftover é reserva ambiental
+        sobra_ponta = None
+
     return Layout(
         lotes=lotes,
         arruamento=arruamento,  # 9.7 — a MALHA medida (não mais subtração)
@@ -3172,10 +3214,15 @@ def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, t
         return parcelas, sobras
 
     _tem_ruas = ruas is not None and not ruas.is_empty
+    _ruas_buf = ruas.buffer(0.6) if _tem_ruas else None
 
     def _toca_via(g: BaseGeometry) -> bool:
+        # FRENTE real (comprimento do contato com a via), não toque pontual: chácara que só
+        # encosta a via num CANTO (distância ~0, frente ~0) não tem acesso — o antigo
+        # ``distance < 0.75`` deixava passar 6 parcelas de frente ZERO no dump de Gonçalves,
+        # e o garantir_frente_via não conseguia fundir todas (sobrava lote encravado).
         try:
-            return _tem_ruas and g.distance(ruas) < 0.75
+            return _ruas_buf is not None and g.boundary.intersection(_ruas_buf).length >= FRENTE_MIN_M
         except Exception:  # noqa: BLE001
             return False
 

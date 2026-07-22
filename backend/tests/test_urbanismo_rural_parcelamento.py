@@ -11,6 +11,7 @@ import dataclasses
 import json
 
 from shapely import wkt as W
+from shapely.ops import unary_union
 
 from app.core import urbanismo_geom as geom
 from app.core.urbanismo_medida import medir
@@ -57,5 +58,29 @@ def test_goncalves_rural_parcela_cheia():
     pr = lay.meta.get("parcelas_rural")
     assert pr and len(pr) == len(lay.lotes)
     assert all(0.0 <= p["edificavel_pct"] <= 100.0 for p in pr)
-    # O remanescente é declarado no aviso (nunca silêncio).
-    assert any("remanescente" in a for a in lay.avisos)
+    # A reserva ambiental (mata sem acesso) é declarada no aviso (nunca silêncio).
+    assert any("RESERVA AMBIENTAL" in a for a in lay.avisos)
+
+
+def test_goncalves_quadro_fecha_sem_double_count():
+    """RURAL-4 — invariante DURO do achado do operador: o quadro do rural fecha em 100% da
+    gleba (chácaras + reserva + via ≈ gleba bruta) e a reserva ambiental NÃO sobrepõe o
+    vendável. Antes: vendável e mata contados em dobro (quadro somava 122% da gleba)."""
+    d, lay = _replay()
+    mata = W.loads(d["wkt"]["restricao_externa"])
+    aprov = W.loads(d["wkt"]["aproveitavel"])
+    gleba = unary_union([aprov, mata]).area
+
+    chac = unary_union(list(lay.lotes)) if lay.lotes else None
+    verde = lay.areas_verdes
+    via = lay.arruamento
+
+    def A(x):
+        return x.area if (x is not None and not x.is_empty) else 0.0
+
+    soma = A(chac) + A(verde) + A(via) + A(getattr(lay, "sistema_lazer", None))
+    # Fecha em 100% ± 2% (folga de buffer/rasterização entre geometrias vizinhas).
+    assert abs(soma - gleba) <= 0.02 * gleba, f"quadro {soma:.0f} vs gleba {gleba:.0f}"
+    # A reserva ambiental não pode sobrepor o vendável (era o double-count de 369 mil m²).
+    if chac is not None and verde is not None and not verde.is_empty:
+        assert chac.intersection(verde).area <= 0.01 * gleba
