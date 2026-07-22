@@ -3139,33 +3139,56 @@ def _parcelar_rural(dominio: Optional[BaseGeometry], alvo: float, piso: float, t
     Fragmento menor que o módulo NUNCA vira chácara (ilegal) — cai em sobra→verde. A frente
     para via fica a cargo do ``garantir_frente_via`` (funde/filtra), como no urbano.
     Determinístico: varredura + bissecção de área, sem aleatoriedade."""
+    # Guilhotina RECURSIVA (calibração no dump de Gonçalves): a varredura linear cortava o
+    # domínio de ~1,06 km² em tiras de ~17 m de largura que se espatifavam no contorno (93
+    # cacos, 762 mil m² de sobra). Dividir ao meio pelo eixo maior, recursivamente, produz
+    # parcelas GORDAS na proporção do terreno.
     parcelas: list[Polygon] = []
     sobras: list[BaseGeometry] = []
     if dominio is None or dominio.is_empty:
         return parcelas, sobras
-    for comp in sorted(_componentes(dominio), key=lambda c: -c.area):
-        if comp.area < piso - 1.0:
-            sobras.append(comp)
-            continue
-        n = max(1, int(comp.area // max(alvo, 1.0)))
-        while comp.area / n > teto and comp.area / (n + 1) >= piso - 1.0:
-            n += 1
-        alvo_ef = comp.area / n
-        minx, miny, maxx, maxy = comp.bounds
+
+    def _dividir(g: BaseGeometry, prof_rec: int = 0) -> None:
+        area = g.area
+        if area < piso - 1.0:
+            sobras.append(g)
+            return
+        if area <= teto + 1.0:
+            parcelas.append(g)
+            return
+        if area < 2.0 * piso or prof_rec > 48:
+            # Zona sem divisão legal possível (duas metades ficariam < FMP): apara a
+            # parcela no teto e o resto (< FMP) vira sobra — honesto, nunca chácara ilegal.
+            minx, miny, maxx, maxy = g.bounds
+            horizontal = (maxx - minx) >= (maxy - miny)
+            corte = _corte_por_area_rural(g, teto, horizontal)
+            caixa = box(minx, miny, corte, maxy) if horizontal else box(minx, miny, maxx, corte)
+            pedaco = _valido(g.intersection(caixa))
+            resto = _diferenca_segura(g, caixa)
+            maior = max(_componentes(pedaco), key=lambda p: p.area, default=None) if pedaco is not None else None
+            if maior is not None and piso - 1.0 <= maior.area:
+                parcelas.append(maior)
+                for p in _componentes(pedaco):
+                    if p is not maior:
+                        sobras.append(p)
+            elif pedaco is not None and not pedaco.is_empty:
+                sobras.extend(_componentes(pedaco))
+            if resto is not None and not resto.is_empty:
+                sobras.extend(_componentes(resto))
+            return
+        # metade por ÁREA no eixo maior do bbox — pedaços proporcionais, não tiras.
+        minx, miny, maxx, maxy = g.bounds
         horizontal = (maxx - minx) >= (maxy - miny)
-        restante: Optional[BaseGeometry] = comp
-        for _ in range(n - 1):
-            if restante is None or restante.is_empty or restante.area <= alvo_ef + 1.0:
-                break
-            corte = _corte_por_area_rural(restante, alvo_ef, horizontal)
-            rb = restante.bounds
-            caixa = (box(rb[0], rb[1], corte, rb[3]) if horizontal
-                     else box(rb[0], rb[1], rb[2], corte))
-            fatia = _valido(restante.intersection(caixa))
-            restante = _diferenca_segura(restante, caixa)
-            for p in (_componentes(fatia) if fatia is not None else []):
-                (parcelas if p.area >= piso - 1.0 else sobras).append(p)
-        if restante is not None and not restante.is_empty:
-            for p in _componentes(restante):
-                (parcelas if p.area >= piso - 1.0 else sobras).append(p)
+        corte = _corte_por_area_rural(g, area / 2.0, horizontal)
+        caixa = box(minx, miny, corte, maxy) if horizontal else box(minx, miny, maxx, corte)
+        lado_a = _valido(g.intersection(caixa))
+        lado_b = _diferenca_segura(g, caixa)
+        for parte in (lado_a, lado_b):
+            if parte is None or parte.is_empty:
+                continue
+            for c in _componentes(parte):
+                _dividir(c, prof_rec + 1)
+
+    for comp in sorted(_componentes(dominio), key=lambda c: -c.area):
+        _dividir(comp)
     return parcelas, sobras
