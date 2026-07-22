@@ -2199,11 +2199,16 @@ def gerar_layout(
         _mata_reg = (rotate(restricao_raw, -ang_deg, origin=cen)
                      if (restricao_raw is not None and not restricao_raw.is_empty and ang_deg)
                      else restricao_raw)
+        # As QUADRAS VERDES da régua urbana NÃO saem do domínio: na parcela-cheia o verde
+        # mora DENTRO das chácaras (é o % preservado de cada uma) — reservá-lo fora seria
+        # contar o verde duas vezes e comer chão de parcela. Ficam fora só vias e as
+        # amenidades formadas (institucional/clube/praças — referência da decisão B).
         _dominio_rural = _diferenca_segura(
             _uniao_segura([g for g in (reg, _mata_reg) if g is not None]),
-            _uniao_segura([g for g in (ruas_reg, inst_reg, clube_reg, *pracas_reg, *verdes_reg)
+            _uniao_segura([g for g in (ruas_reg, inst_reg, clube_reg, *pracas_reg)
                            if g is not None]),
         )
+        verdes_reg = []  # o orçamento de verde urbano não reserva quadra no rural
         lotes_reg, _sobras_rural = _parcelar_rural(_dominio_rural, alvo_area, piso_lote, teto_lote)
         lote_quadra = [f"R{i + 1}" for i in range(len(lotes_reg))]
         residuais_reg.extend(_sobras_rural)
