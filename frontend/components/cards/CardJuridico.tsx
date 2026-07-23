@@ -182,36 +182,41 @@ export function CardJuridico({
       <CardContent className="space-y-4">
         {/* Fase UX-3 — guia do fluxo documental com STATUS derivado (o fluxo é contínuo:
             várias matrículas passam pelos mesmos 3 passos; o guia mostra onde você está). */}
-        {!carregando && (
-          <GuiaPassos
-            passos={[
-              {
-                rotulo: "Enviar o documento",
-                estado: resultado || rascunho ? "ok" : "pendente",
-                detalhe:
-                  resultado || rascunho
-                    ? "Documento processado — envie outros quando quiser (matrículas e certidões)."
-                    : "PDF ou foto legível da matrícula. Escolha o tipo abaixo e clique em Analisar jurídico (~1 a 2 min).",
-              },
-              {
-                rotulo: "Revisar e confirmar a ficha",
-                estado: resultado ? "ok" : rascunho ? "atencao" : "pendente",
-                detalhe: rascunho
-                  ? "A ficha proposta está logo abaixo — confira os campos contra o documento e confirme."
-                  : resultado
-                    ? "Ficha(s) confirmada(s) — nada entra na síntese sem a sua validação."
-                    : "A leitura propõe a ficha (proprietários, ônus com o ato, área); nada vale sem você confirmar.",
-              },
-              {
-                rotulo: "Diligência",
-                estado: resultado ? "ok" : "pendente",
-                detalhe: resultado
-                  ? "Síntese de risco e checklist de documentos prontos abaixo."
-                  : "Com a ficha confirmada, saem a síntese de risco e o checklist do que verificar com o advogado.",
-              },
-            ]}
-          />
-        )}
+        {!carregando && (() => {
+          // A síntese roda mesmo SEM documento (só alertas geográficos) — o guia mede o
+          // fluxo DOCUMENTAL: só há check com documento de verdade confirmado.
+          const temDocs = (resultado?.documentos?.length ?? 0) > 0;
+          return (
+            <GuiaPassos
+              passos={[
+                {
+                  rotulo: "Enviar o documento",
+                  estado: temDocs || rascunho ? "ok" : "pendente",
+                  detalhe:
+                    temDocs || rascunho
+                      ? "Documento processado — envie outros quando quiser (matrículas e certidões)."
+                      : "PDF ou foto legível da matrícula. Clique em Extrair documento (~1 a 2 min).",
+                },
+                {
+                  rotulo: "Revisar e confirmar a ficha",
+                  estado: temDocs ? "ok" : rascunho ? "atencao" : "pendente",
+                  detalhe: rascunho
+                    ? "A ficha proposta está logo abaixo — confira os campos contra o documento e confirme."
+                    : temDocs
+                      ? "Ficha(s) confirmada(s) — nada entra na síntese sem a sua validação."
+                      : "A leitura propõe a ficha (proprietários, ônus com o ato, área); nada vale sem você confirmar.",
+                },
+                {
+                  rotulo: "Diligência",
+                  estado: temDocs ? "ok" : "pendente",
+                  detalhe: temDocs
+                    ? "Síntese de risco e checklist de documentos prontos abaixo."
+                    : "Com a ficha confirmada, saem a síntese de risco e o checklist do que verificar com o advogado.",
+                },
+              ]}
+            />
+          );
+        })()}
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={analisar} disabled={carregando}>
             {carregando ? "Processando…" : "Analisar jurídico"}

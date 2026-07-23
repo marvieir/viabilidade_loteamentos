@@ -32,6 +32,41 @@ class ProvedorAlertasGeo(Protocol):
     def coletar(self, analise_id: str) -> list[AlertaGeo]: ...
 
 
+def alerta_declividade(ha: float, rural: bool) -> AlertaGeo:
+    """Texto e severidade do alerta de ≥30% conforme o REGIME do projeto (função pura,
+    coberta por teste-ouro). Urbano: vedação (Lei 6.766) → crítico. Rural: não veda a
+    divisão — vira atenção com a base legal correta."""
+    if rural:
+        return AlertaGeo(
+            "declividade",
+            f"{ha:.2f} ha em declividade ≥30% — no regime RURAL não veda a divisão (a "
+            "vedação de 30% é do parcelamento urbano, Lei 6.766 art. 3º); restringe "
+            "construção/uso, e APP de encosta só existe acima de 45° (Lei 12.651, art. 4º, V)",
+            "atencao",
+        )
+    return AlertaGeo(
+        "declividade",
+        f"{ha:.2f} ha em declividade ≥30% (vedação de parcelamento urbano — Lei 6.766, "
+        "art. 3º; se o projeto for RURAL, gere o urbanismo como 'Loteamento rural' e a "
+        "régua muda)",
+        "vedado",
+    )
+
+
+def _projeto_rural(analise_id: str) -> bool:
+    """Última proposta de urbanismo é rural? (mesma fonte de intenção usada pela trilha)."""
+    try:
+        from app.core.urbanismo_store import get_fonte_urbanismo
+
+        props = get_fonte_urbanismo().listar(analise_id)
+        ult = props[-1] if props else {}
+        tipo = ((ult.get("perfil") or {}).get("tipo_loteamento")
+                or (ult.get("_contexto_variantes") or {}).get("tipo_loteamento") or "")
+        return tipo == "loteamento_rural"
+    except Exception:  # noqa: BLE001 — na dúvida, régua urbana (conservador)
+        return False
+
+
 class ProvedorAlertasGeoReal:
     """Deriva os alertas das fontes reais. Cada fonte é opcional e isolada em try/except —
     indisponibilidade de uma não afeta as outras nem a síntese."""
@@ -63,7 +98,12 @@ class ProvedorAlertasGeoReal:
         except Exception:  # noqa: BLE001 — degrada honesto
             pass
 
-        # Declividade ≥30% (2.5).
+        # Declividade ≥30% (2.5). Regime-aware (achado do operador, 22/07 + pesquisa legal):
+        # a vedação de 30% é do parcelamento URBANO (Lei 6.766, art. 3º, § único, II); no
+        # RURAL (INCRA/Lei 5.868) não veda a divisão — restringe construção/uso, e a APP de
+        # encosta só nasce ≥45° (Lei 12.651, art. 4º, V). A intenção do projeto fica
+        # registrada na proposta de urbanismo (mesma fonte da trilha); sem proposta, mantém
+        # a régua urbana (conservador, nunca esconde).
         try:
             fonte_dem = get_fonte_dem()
             if fonte_dem is not None:
@@ -71,13 +111,7 @@ class ProvedorAlertasGeoReal:
                 rd = declividade_motor.analisar_declividade(gleba, dem)
                 if rd.flag_vedacao is not None:
                     ha = rd.flag_vedacao.area_m2 / 10000
-                    alertas.append(
-                        AlertaGeo(
-                            "declividade",
-                            f"{ha:.2f} ha em declividade ≥30% (vedação de parcelamento)",
-                            "vedado",
-                        )
-                    )
+                    alertas.append(alerta_declividade(ha, _projeto_rural(analise_id)))
         except Exception:  # noqa: BLE001
             pass
 
