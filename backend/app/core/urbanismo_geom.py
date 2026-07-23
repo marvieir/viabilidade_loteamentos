@@ -3049,6 +3049,27 @@ def gerar_layout(
                                if lazer_total is not None else None)
                 inst = _diferenca_segura(inst, _novo_solo) if inst is not None else None
 
+    # RURAL-5 — SEGUNDA PASSADA (achado do operador no dump de Gonçalves: 120.355 m² de reserva
+    # tinham via na frente e tamanho de módulo, mas não viravam chácara). A 1ª partição decide
+    # com as vias AINDA CRESCENDO (solda/vias internas vêm depois); o chão que só então ganha
+    # acesso ficava preso na reserva. Aqui, com as vias FINAIS, reparticiona a reserva: bloco com
+    # frente real (≥ FRENTE_MIN_M) e área ≥ FMP vira chácara; o resto segue reserva ambiental.
+    if regime_rural:
+        _gleba0 = _uniao_segura(
+            [g for g in (aproveitavel, restricao_raw) if g is not None and not g.is_empty]
+        )
+        _ocup0 = _uniao_segura(
+            [g for g in (*lotes, arruamento, lazer_total, inst) if g is not None and not g.is_empty]
+        )
+        _reserva0 = _diferenca_segura(_gleba0, _ocup0)
+        if _reserva0 is not None and not _reserva0.is_empty:
+            _extra, _ = _parcelar_rural(_reserva0, alvo_area, piso_lote, teto_lote, ruas=arruamento)
+            for _e in _extra:
+                _ev = _valido(_e)
+                if _ev is not None and not _ev.is_empty and _ev.geom_type == "Polygon":
+                    lotes.append(_ev)
+                    lote_quadra.append(f"R{len(lote_quadra) + 1}")
+
     # RURAL-2 — % edificável por chácara (parcela-cheia): quanto da parcela está FORA da
     # restrição declarada (mata/APP/≥30%). Rotulado, com a proveniência da restrição do estudo.
     def _pct_edificavel(_l):
