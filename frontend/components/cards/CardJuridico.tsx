@@ -11,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EstadoVazio } from "@/components/cards/EstadoVazio";
+import { GuiaPassos } from "@/components/cards/GuiaPassos";
 import {
   anexarDocumento,
   baixarAnexo,
@@ -180,12 +180,36 @@ export function CardJuridico({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Fase UX-2 — estado vazio orientado (some quando há ficha/resultado) */}
-        {!resultado && !carregando && (
-          <EstadoVazio
-            entrega="A ficha do imóvel extraída da matrícula: proprietários, ônus e averbações com a referência ao ato, divergência de área contra o KMZ e o checklist de documentos para a diligência."
-            precisa="O PDF (ou foto legível) da matrícula do imóvel — escolha o tipo ao lado e clique em Analisar jurídico para enviar."
-            tempo="~1 a 2 minutos por documento"
+        {/* Fase UX-3 — guia do fluxo documental com STATUS derivado (o fluxo é contínuo:
+            várias matrículas passam pelos mesmos 3 passos; o guia mostra onde você está). */}
+        {!carregando && (
+          <GuiaPassos
+            passos={[
+              {
+                rotulo: "Enviar o documento",
+                estado: resultado || rascunho ? "ok" : "pendente",
+                detalhe:
+                  resultado || rascunho
+                    ? "Documento processado — envie outros quando quiser (matrículas e certidões)."
+                    : "PDF ou foto legível da matrícula. Escolha o tipo abaixo e clique em Analisar jurídico (~1 a 2 min).",
+              },
+              {
+                rotulo: "Revisar e confirmar a ficha",
+                estado: resultado ? "ok" : rascunho ? "atencao" : "pendente",
+                detalhe: rascunho
+                  ? "A ficha proposta está logo abaixo — confira os campos contra o documento e confirme."
+                  : resultado
+                    ? "Ficha(s) confirmada(s) — nada entra na síntese sem a sua validação."
+                    : "A leitura propõe a ficha (proprietários, ônus com o ato, área); nada vale sem você confirmar.",
+              },
+              {
+                rotulo: "Diligência",
+                estado: resultado ? "ok" : "pendente",
+                detalhe: resultado
+                  ? "Síntese de risco e checklist de documentos prontos abaixo."
+                  : "Com a ficha confirmada, saem a síntese de risco e o checklist do que verificar com o advogado.",
+              },
+            ]}
           />
         )}
         <div className="flex flex-wrap items-center gap-2">

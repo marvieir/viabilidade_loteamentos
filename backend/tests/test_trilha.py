@@ -93,6 +93,28 @@ def test_ficha_juridica_muda_o_passo(client, fonte_juridica):
     assert _passo(t2, "juridico")["estado"] == "concluido"
 
 
+def test_proposta_rural_muda_o_passo_diretrizes(client, gerador_urbanismo, fonte_urbanismo, fmp):
+    """Achado do operador (22/07): projeto RURAL não tem plano diretor/doação/zoneamento —
+    a intenção fica registrada na proposta de urbanismo, e a trilha adapta o passo 2:
+    vira concluído com o texto do regime INCRA/FMP (nada a enviar)."""
+    fmp({"3550605": 20000.0})
+    aid = _upload(client)
+    # Antes da proposta: aviso urbano, mas com a dica do caminho rural.
+    d0 = _passo(_trilha(client, aid), "diretrizes")
+    assert d0["estado"] == "atencao"
+    assert "Loteamento rural" in d0["motivo"]
+    # Gera a proposta RURAL → o passo 2 muda de regime.
+    r = client.post(
+        f"/api/analises/{aid}/urbanismo/propor",
+        json={"tipo_loteamento": "loteamento_rural", "publico_alvo": "media"},
+    )
+    assert r.status_code == 200, r.text
+    d1 = _passo(_trilha(client, aid), "diretrizes")
+    assert d1["estado"] == "concluido"
+    assert "FMP" in d1["motivo"] and "INCRA" in d1["motivo"]
+    assert "plano diretor" in d1["motivo"]  # nomeia o que NÃO se aplica
+
+
 def test_trilha_exige_login(client_anon):
     # anônimo → 401 (a guarda de login roda antes de qualquer lookup)
     assert client_anon.get("/api/analises/qualquer-id/trilha").status_code == 401

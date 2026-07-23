@@ -12,7 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { EstadoVazio } from "@/components/cards/EstadoVazio";
+import { GuiaPassos } from "@/components/cards/GuiaPassos";
 import {
   proporUrbanismo,
   listarUrbanismo,
@@ -506,13 +506,56 @@ export function CardUrbanismo({
           </p>
           {levErro && <p className="mt-1 text-[11px] text-rose-700">{levErro}</p>}
         </div>
-        {/* Fase UX-2 — estado vazio orientado (some quando existe proposta) */}
+        {/* Fase UX-3 — guia de pré-requisitos com STATUS derivado (some quando há proposta).
+            Substitui o estado vazio simples: cada insumo mostra se está pronto/pendente. */}
         {!proposta && !carregando && (
-          <EstadoVazio
+          <GuiaPassos
             className="mt-3"
-            entrega="O pré-projeto do parcelamento: traçado de vias, lotes com quadro de áreas fechando 100%, heatmap de valor por lote e variantes para comparar — tudo medido pelo motor, com o mínimo legal aplicado."
-            precisa="Escolher o tipo e o público-alvo acima. Opcional: levantamento DWG (cota real) e o plano diretor no menu Diretriz (LUOS) para usar a régua do município."
-            tempo="~1 a 3 minutos por geração (cada Gerar/Regenerar consome 1 geração de IA da análise)"
+            passos={[
+              {
+                rotulo: "Perfil do projeto",
+                estado: "ok",
+                detalhe:
+                  "Escolha acima o tipo, o público e o objetivo — os padrões já funcionam; ajuste ao seu produto.",
+              },
+              tipo === "loteamento_rural"
+                ? {
+                    rotulo: "Régua legal: FMP/INCRA (regime rural)",
+                    estado: "ok",
+                    detalhe:
+                      "Chácaras no módulo rural do município — sem plano diretor, doação ou zoneamento.",
+                  }
+                : perfil?.status === "confirmado"
+                  ? {
+                      rotulo: "Régua legal: diretriz do município confirmada",
+                      estado: "ok",
+                      detalhe: "Lote mínimo, doação e zoneamento da LUOS aplicados ao traçado.",
+                    }
+                  : {
+                      rotulo: "Régua legal: piso federal (125 m²)",
+                      estado: "atencao",
+                      detalhe:
+                        "Sem a LUOS confirmada, vale o piso federal. Envie o PDF no menu Diretriz (LUOS) para a régua do seu município — dá para gerar mesmo assim.",
+                    },
+              lev
+                ? {
+                    rotulo: "Terreno real: levantamento anexado",
+                    estado: "ok",
+                    detalhe: `${lev.n_curvas} curvas de nível guiando o traçado (cota real).`,
+                  }
+                : {
+                    rotulo: "Terreno real: relevo de satélite (30 m)",
+                    estado: "opcional",
+                    detalhe:
+                      "Anexe o DXF/DWG do agrimensor abaixo e as ruas passam a seguir a cota real.",
+                  },
+              {
+                rotulo: "Gerar o estudo de massa",
+                estado: "pendente",
+                detalhe:
+                  "Você recebe traçado, quadro de áreas fechando 100% e valor por lote. Leva ~1 a 3 min e consome 1 geração de IA.",
+              },
+            ]}
           />
         )}
 

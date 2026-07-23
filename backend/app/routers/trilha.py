@@ -70,6 +70,18 @@ def trilha_da_analise(
     ))
 
     # 2) Município e diretrizes — o warning de cobertura mora aqui (nunca bloqueia).
+    # REGIME RURAL (achado do operador, 22/07): a intenção não é conhecível no upload (não há
+    # zoneamento nacional) — mas fica REGISTRADA na proposta de urbanismo. Se a última proposta
+    # é "loteamento_rural", plano diretor/doação/zoneamento não se aplicam (a régua é a FMP do
+    # INCRA, buscada pelo município) e o passo vira concluído com o texto do regime certo.
+    try:
+        _propostas = fonte_urbanismo.listar(analise_id)
+    except Exception:  # noqa: BLE001
+        _propostas = []
+    _ultima = _propostas[-1] if _propostas else {}
+    _tipo_prop = ((_ultima.get("perfil") or {}).get("tipo_loteamento")
+                  or (_ultima.get("_contexto_variantes") or {}).get("tipo_loteamento") or "")
+    proposta_rural = _tipo_prop == "loteamento_rural"
     perfil = None
     if fonte_perfil is not None and getattr(jur, "cod_ibge", None):
         try:
@@ -77,7 +89,16 @@ def trilha_da_analise(
         except Exception:  # noqa: BLE001 — fonte de perfil indisponível → segue sem perfil
             perfil = None
     perfil_ok = perfil is not None and getattr(perfil, "status", "") == "confirmado"
-    if perfil_ok:
+    if proposta_rural:
+        passos.append(TrilhaPasso(
+            id="diretrizes", titulo="Município e diretrizes", estado="concluido",
+            motivo=((f"{jur.municipio}/{jur.uf} detectado — " if getattr(jur, "municipio", None)
+                     else "") +
+                    "projeto RURAL: a régua é a FMP/módulo do INCRA (Lei 5.868/72), sem plano "
+                    "diretor, doação ou zoneamento municipal. Nada a enviar neste passo."),
+            cobertura=jur.cobertura,
+        ))
+    elif perfil_ok:
         passos.append(TrilhaPasso(
             id="diretrizes", titulo="Município e diretrizes", estado="concluido",
             motivo=(f"Perfil de {jur.municipio}/{jur.uf} confirmado — a análise usa o lote "
@@ -97,7 +118,9 @@ def trilha_da_analise(
             motivo=(f"{jur.municipio}/{jur.uf} detectado, mas sem o plano diretor/LUOS a "
                     "análise roda no nível federal: lote mínimo municipal, doação e zoneamento "
                     "não são considerados. Envie o PDF no menu Diretriz (LUOS) para a "
-                    "cobertura completa."),
+                    "cobertura completa. Projeto RURAL (chácaras)? Este passo não se aplica — "
+                    "selecione 'Loteamento rural' no card Urbanismo e a régua vira a FMP do "
+                    "INCRA."),
             cobertura=jur.cobertura,
         ))
 
