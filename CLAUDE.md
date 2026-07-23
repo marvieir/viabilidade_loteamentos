@@ -74,6 +74,14 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
 ## Deploy
 - Docker Compose com dois serviços: `api` (FastAPI) e `web` (Next.js). Alvo: Lightsail.
 
+## Produção (AWS Lightsail) — dados fixos da operação
+- **IP da instância:** `54.245.119.252` (SSH: `ssh ubuntu@54.245.119.252`)
+- **Domínio:** `https://viabilidade.homeeye.ai` (o `DOMINIO` do compose de produção)
+- Código na instância em `~/viabilidade_loteamentos`, branch `main`; deploy:
+  `DOMINIO=viabilidade.homeeye.ai docker compose -f docker-compose.prod.yml up -d --build`
+  (com `NEXT_PUBLIC_GOOGLE_CLIENT_ID` exportado na sessão).
+- Fluxo obrigatório: alterações → teste no Mac do operador (podman) → só então AWS.
+
 ## Comunicação com o operador (INEGOCIÁVEL)
 - **Sempre passe instruções COMPLETAS e prontas para colar.** Nada de comando pela metade.
   Para qualquer passo no Mac do operador, inclua: **de qual diretório** rodar (`cd …` com o
