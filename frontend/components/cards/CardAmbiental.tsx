@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import {
   buscarAmbiental,
   type AlertaAmbiental,
@@ -99,6 +100,15 @@ export function CardAmbiental({
         <Button onClick={analisar} disabled={carregando}>
           {carregando ? "Analisando…" : "Analisar ambiental"}
         </Button>
+
+        {/* Fase UX-2 — estado vazio orientado (some após a primeira execução) */}
+        {!data && !carregando && !erro && (
+          <EstadoVazio
+            entrega="A lista do que incide sobre a gleba — APP de rios, unidades de conservação, processos de mineração, Mata Atlântica — cada alerta com a área atingida, a fonte oficial e a data."
+            precisa="Nada além da gleba carregada. É um clique."
+            tempo="alguns segundos a ~1 minuto (consulta as fontes oficiais)"
+          />
+        )}
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>

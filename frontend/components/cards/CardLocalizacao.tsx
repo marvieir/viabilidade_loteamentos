@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import { buscarLocalizacao, type Localizacao } from "@/lib/api";
 
 /* Fase 6 — Localização: enriquecimento socioeconômico IBGE (INFORMATIVO, §1-A).
@@ -78,6 +79,15 @@ export function CardLocalizacao({
         <Button onClick={carregar} disabled={carregando}>
           {carregando ? "Carregando…" : "Carregar localização"}
         </Button>
+
+        {/* Fase UX-2 — estado vazio orientado (some após a primeira execução) */}
+        {!data && !carregando && !erro && (
+          <EstadoVazio
+            entrega="O retrato do município para o seu estudo de demanda: população e crescimento, PIB per capita, domicílios e déficit habitacional — dados IBGE/FJP com ano de referência."
+            precisa="O município detectado (ou selecionado) na análise."
+            tempo="instantâneo"
+          />
+        )}
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>

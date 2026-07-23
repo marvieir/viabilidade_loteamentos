@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import {
   buscarDeclividade,
   type ChaveOverlay,
@@ -113,6 +114,15 @@ export function CardDeclividade({
         <Button onClick={analisar} disabled={carregando}>
           {carregando ? "Analisando…" : "Analisar declividade"}
         </Button>
+
+        {/* Fase UX-2 — estado vazio orientado (some após a primeira execução) */}
+        {!data && !carregando && !erro && (
+          <EstadoVazio
+            entrega="O relevo da gleba por faixas (suave, média, íngreme), quanto está acima dos 30% em que a lei veda lote (Lei 6.766, art. 3º) e o mapa das encostas."
+            precisa="Nada além da gleba carregada. É um clique (usa o relevo de satélite; se você anexar o levantamento DWG no Urbanismo, o traçado usa a cota real)."
+            tempo="alguns segundos a ~1 minuto"
+          />
+        )}
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>

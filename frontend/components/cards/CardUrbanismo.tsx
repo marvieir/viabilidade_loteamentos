@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import {
   proporUrbanismo,
   listarUrbanismo,
@@ -505,6 +506,16 @@ export function CardUrbanismo({
           </p>
           {levErro && <p className="mt-1 text-[11px] text-rose-700">{levErro}</p>}
         </div>
+        {/* Fase UX-2 — estado vazio orientado (some quando existe proposta) */}
+        {!proposta && !carregando && (
+          <EstadoVazio
+            className="mt-3"
+            entrega="O pré-projeto do parcelamento: traçado de vias, lotes com quadro de áreas fechando 100%, heatmap de valor por lote e variantes para comparar — tudo medido pelo motor, com o mínimo legal aplicado."
+            precisa="Escolher o tipo e o público-alvo acima. Opcional: levantamento DWG (cota real) e o plano diretor no menu Diretriz (LUOS) para usar a régua do município."
+            tempo="~1 a 3 minutos por geração (cada Gerar/Regenerar consome 1 geração de IA da análise)"
+          />
+        )}
+
         {proposta && !carregando && (
           <p className="-mt-1 text-[11px] text-slate-400">
             Layout carregado do último salvo — não consumiu IA. Clique em “Regenerar” só se quiser

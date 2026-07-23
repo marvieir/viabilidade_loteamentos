@@ -11,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import {
   anexarDocumento,
   baixarAnexo,
@@ -179,6 +180,14 @@ export function CardJuridico({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Fase UX-2 — estado vazio orientado (some quando há ficha/resultado) */}
+        {!resultado && !carregando && (
+          <EstadoVazio
+            entrega="A ficha do imóvel extraída da matrícula: proprietários, ônus e averbações com a referência ao ato, divergência de área contra o KMZ e o checklist de documentos para a diligência."
+            precisa="O PDF (ou foto legível) da matrícula do imóvel — escolha o tipo ao lado e clique em Analisar jurídico para enviar."
+            tempo="~1 a 2 minutos por documento"
+          />
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={analisar} disabled={carregando}>
             {carregando ? "Processando…" : "Analisar jurídico"}

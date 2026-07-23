@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import {
   buscarVegetacao,
   type ChaveOverlay,
@@ -110,6 +111,15 @@ export function CardVegetacao({
         <Button onClick={analisar} disabled={carregando}>
           {carregando ? "Analisando…" : "Analisar área verde"}
         </Button>
+
+        {/* Fase UX-2 — estado vazio orientado (some após a primeira execução) */}
+        {!data && !carregando && !erro && (
+          <EstadoVazio
+            entrega="O bioma da gleba, quanto dela é vegetação (por imagem de satélite de 10 m) e a severidade do desconto de área verde — com a fonte e a data de cada número."
+            precisa="Nada além da gleba carregada. É um clique."
+            tempo="alguns segundos a ~1 minuto"
+          />
+        )}
 
         {erro && (
           <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-800">{erro}</p>

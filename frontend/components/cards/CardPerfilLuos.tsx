@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { EstadoVazio } from "@/components/cards/EstadoVazio";
 import {
   confirmarPerfil,
   extrairPerfil,
@@ -160,6 +161,14 @@ export function CardPerfilLuos({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Fase UX-2 — estado vazio orientado: é o passo "diretrizes" da trilha */}
+        {!perfil && !carregando && !erro && (
+          <EstadoVazio
+            entrega="A régua do SEU município aplicada em toda a análise: lote mínimo por zona, percentual de doação e zoneamento — cada índice com a citação da lei ao lado, valendo após a sua confirmação."
+            precisa="O PDF do plano diretor / LUOS / lei de parcelamento do município (a prefeitura publica no site oficial). Sem ele, a análise roda no piso federal e avisa a cobertura."
+            tempo="~1 a 2 minutos de leitura do PDF + sua revisão"
+          />
+        )}
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-xs font-medium text-slate-700">
             PDF da LUOS / lei de parcelamento
