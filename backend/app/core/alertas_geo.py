@@ -53,18 +53,8 @@ def alerta_declividade(ha: float, rural: bool) -> AlertaGeo:
     )
 
 
-def _projeto_rural(analise_id: str) -> bool:
-    """Última proposta de urbanismo é rural? (mesma fonte de intenção usada pela trilha)."""
-    try:
-        from app.core.urbanismo_store import get_fonte_urbanismo
-
-        props = get_fonte_urbanismo().listar(analise_id)
-        ult = props[-1] if props else {}
-        tipo = ((ult.get("perfil") or {}).get("tipo_loteamento")
-                or (ult.get("_contexto_variantes") or {}).get("tipo_loteamento") or "")
-        return tipo == "loteamento_rural"
-    except Exception:  # noqa: BLE001 — na dúvida, régua urbana (conservador)
-        return False
+# Fonte única da intenção URBANO×RURAL (core/regime.py) — mesma leitura da trilha/conformidade.
+from app.core.regime import projeto_rural as _projeto_rural  # noqa: E402
 
 
 class ProvedorAlertasGeoReal:

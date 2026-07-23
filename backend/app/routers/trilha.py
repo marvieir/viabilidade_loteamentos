@@ -22,6 +22,7 @@ from app.core.db import get_db
 from app.core.financeira_store import FonteFinanceira, get_fonte_financeira
 from app.core.juridico_store import FonteJuridica, get_fonte_juridica
 from app.core.perfil_municipal import FontePerfilMunicipal, get_fonte_perfil
+from app.core.regime import projeto_rural
 from app.core.urbanismo_store import FonteUrbanismo, get_fonte_urbanismo
 from app.models.db_models import Analise, Usuario
 from app.models.schemas import TrilhaOut, TrilhaPasso
@@ -74,14 +75,7 @@ def trilha_da_analise(
     # zoneamento nacional) — mas fica REGISTRADA na proposta de urbanismo. Se a última proposta
     # é "loteamento_rural", plano diretor/doação/zoneamento não se aplicam (a régua é a FMP do
     # INCRA, buscada pelo município) e o passo vira concluído com o texto do regime certo.
-    try:
-        _propostas = fonte_urbanismo.listar(analise_id)
-    except Exception:  # noqa: BLE001
-        _propostas = []
-    _ultima = _propostas[-1] if _propostas else {}
-    _tipo_prop = ((_ultima.get("perfil") or {}).get("tipo_loteamento")
-                  or (_ultima.get("_contexto_variantes") or {}).get("tipo_loteamento") or "")
-    proposta_rural = _tipo_prop == "loteamento_rural"
+    proposta_rural = projeto_rural(analise_id, fonte_urbanismo)
     perfil = None
     if fonte_perfil is not None and getattr(jur, "cod_ibge", None):
         try:

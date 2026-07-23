@@ -408,27 +408,27 @@ export function CardAproveitamento({
               <THead>
                 <TR>
                   <TH>Regime rural</TH>
-                  <TH>Área aproveitável</TH>
+                  <TH>Área total (base do módulo)</TH>
                   <TH>FMP</TH>
                   <TH>Origem da FMP</TH>
-                  <TH>Parcelas</TH>
+                  <TH>Parcelas (teto)</TH>
                 </TR>
               </THead>
               <TBody>
                 <TR>
                   <TD className="font-medium">Parcelamento rural</TD>
-                  <TD>
-                    {ha(res.rural.area_m2)}
-                    {res.pct_sobre_total != null
-                      ? ` (${pct(res.pct_sobre_total)} da gleba)`
-                      : ""}
-                  </TD>
+                  <TD>{ha(res.rural.area_m2)}</TD>
                   <TD>{ha(res.rural.fmp_m2)}</TD>
                   <TD className="text-xs text-slate-500">{res.rural.fmp_origem}</TD>
                   <TD className="font-semibold">{res.rural.n_parcelas}</TD>
                 </TR>
               </TBody>
             </Table>
+            {res.rural.leitura && (
+              <p className="rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                {res.rural.leitura}
+              </p>
+            )}
             <p className="rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
               {res.rural.flag_conversao}
             </p>

@@ -933,16 +933,59 @@ def conformidade_legal(med: "Medicao", layout: "Layout", diretrizes: dict) -> li
             return "nao_atende"
         return "atende_com_folga" if medido > exigido * 1.25 + 1e-9 else "atende"
 
+    # RURAL-6 (auditoria 22/07 — base legal verificada na fonte): no parcelamento RURAL a
+    # régua é INCRA/Estatuto da Terra, não a Lei 6.766 — doação/verde/institucional urbanos
+    # NÃO se aplicam e dão lugar aos itens do regime (FMP, Reserva Legal/CAR, georreferenciamento).
+    rural = str(diretrizes.get("regime") or "") == "rural"
+
     # lote mínimo (piso efetivo) — o menor lote medido ≥ piso?
     piso = float(diretrizes.get("piso_lote_efetivo_m2", 125.0))
-    exig_lote = diretrizes.get("lote_min_zona_m2") or 125.0
+    exig_lote = (piso if rural else (diretrizes.get("lote_min_zona_m2") or 125.0))
     min_lote = round(min(areas), 2) if areas else 0.0
     itens.append({
         "item": "lote_minimo", "exigido": round(exig_lote, 2), "medido": min_lote,
         "unidade": "m2", "status": _status(min_lote, exig_lote),
-        "leitura": f"menor lote {_fmt(min_lote)} m² — piso efetivo {_fmt(piso)} m² "
-                   f"(zona {_fmt(exig_lote)} m² / federal 125 m²).",
+        "leitura": (
+            f"menor chácara {_fmt(min_lote)} m² — FMP/módulo rural {_fmt(piso)} m² "
+            f"({diretrizes.get('fmp_origem') or 'INCRA'}; Lei 5.868/72, art. 8º)."
+            if rural else
+            f"menor lote {_fmt(min_lote)} m² — piso efetivo {_fmt(piso)} m² "
+            f"(zona {_fmt(exig_lote)} m² / federal 125 m²)."
+        ),
     })
+
+    if rural:
+        # Reserva Legal — POR IMÓVEL, averbada no CAR (não é área comum do parcelamento).
+        itens.append({
+            "item": "reserva_legal", "exigido": 0.2, "medido": None, "unidade": "pct",
+            "status": "nao_avaliado",
+            "leitura": "Reserva Legal de 20% POR CHÁCARA (Lei 12.651/2012, art. 12, I) — "
+                       "averbada no CAR de cada imóvel; o % edificável por parcela do estudo "
+                       "ajuda a alocar. Verificação documental, com o ambiental.",
+        })
+        # Georreferenciamento/registro — etapa formal do parcelamento rural.
+        itens.append({
+            "item": "georreferenciamento", "exigido": None, "medido": None, "unidade": "doc",
+            "status": "nao_avaliado",
+            "leitura": "Parcelamento rural exige georreferenciamento certificado e registro "
+                       "(Lei 10.267/2001; CCIR/INCRA e CRI) — etapa do agrimensor/advogado, "
+                       "fora do estudo geométrico.",
+        })
+        # Frente de acesso — premissa de projeto (não há testada mínima federal rural).
+        _frente_ok = bool((getattr(layout, "viario_diagnostico", None) or {})
+                          .get("todos_lotes_com_frente_via"))
+        itens.append({
+            "item": "frente_acesso", "exigido": None,
+            "medido": 1.0 if _frente_ok else 0.0, "unidade": "bool",
+            "status": "atende" if _frente_ok else "nao_atende",
+            "leitura": ("toda chácara com frente para via interna — PREMISSA de projeto "
+                        "(não há testada mínima federal no regime rural; o acesso é o que "
+                        "torna a parcela vendável)."
+                        if _frente_ok else
+                        "há chácara sem frente para via — revisar o traçado (parcela sem "
+                        "acesso não é vendável)."),
+        })
+        return itens
 
     # doação total (verde + institucional + viário) × mínimo do município.
     doa_med = round((q["areas_verdes"]["m2"] + q["sistema_lazer"]["m2"]

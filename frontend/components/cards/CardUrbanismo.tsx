@@ -947,7 +947,11 @@ export function CardUrbanismo({
                         pct={vc.preservada.pct_fmt}
                       />
                       <LinhaArea
-                        rotulo="+ Verde de doação/reserva"
+                        rotulo={
+                          proposta?.diretrizes?.regime === "rural"
+                            ? "+ Reserva ambiental (sem acesso viário)"
+                            : "+ Verde de doação/reserva"
+                        }
                         m2={vc.reserva.m2_fmt}
                         pct={vc.reserva.pct_fmt}
                       />

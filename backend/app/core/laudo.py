@@ -57,7 +57,7 @@ def _luz_aproveitamento(ap: Optional[dict]) -> schemas.LuzSemaforo:
 
 
 def _luz_ambiental(
-    amb: Optional[dict], veg: Optional[dict], dec: Optional[dict]
+    amb: Optional[dict], veg: Optional[dict], dec: Optional[dict], rural: bool = False
 ) -> schemas.LuzSemaforo:
     if amb is None and veg is None and dec is None:
         return schemas.LuzSemaforo(
@@ -72,7 +72,14 @@ def _luz_ambiental(
             else:
                 moles.append(a.get("tipo", "alerta"))
     if _get(dec, "flag_vedacao"):
-        duros.append("declividade ≥30% vedada (Lei 6.766)")
+        # RURAL-6 — a vedação de 30% é do parcelamento URBANO (Lei 6.766, art. 3º); no
+        # regime rural não veda a divisão (restringe construção/uso; APP só ≥45°, Lei
+        # 12.651 art. 4º V) → vira atenção, não restrição dura.
+        if rural:
+            moles.append("declividade ≥30% (no regime rural não veda a divisão — "
+                         "restringe construção/uso; APP de encosta só ≥45°, Lei 12.651)")
+        else:
+            duros.append("declividade ≥30% vedada (Lei 6.766)")
     a_verificar = _get(veg, "severidade", "a_verificar", "area_m2") or 0.0
     if duros:
         return schemas.LuzSemaforo(
@@ -167,11 +174,18 @@ def _luz_localizacao(loc: Optional[dict]) -> schemas.LuzSemaforo:
     )
 
 
+def _regime_rural(dims: dict) -> bool:
+    """O snapshot do urbanismo carrega a intenção do projeto (perfil.tipo_loteamento)."""
+    urb = dims.get("urbanismo") or {}
+    return ((urb.get("perfil") or {}).get("tipo_loteamento") or "") == "loteamento_rural"
+
+
 def semaforo(dims: dict) -> list[schemas.LuzSemaforo]:
     """Uma luz por dimensão, derivada do que cada dimensão já reportou (determinístico)."""
     return [
         _luz_aproveitamento(dims.get("aproveitamento")),
-        _luz_ambiental(dims.get("ambiental"), dims.get("vegetacao"), dims.get("declividade")),
+        _luz_ambiental(dims.get("ambiental"), dims.get("vegetacao"), dims.get("declividade"),
+                       rural=_regime_rural(dims)),
         _luz_juridico(dims.get("juridico")),
         _luz_financeiro(dims.get("financeira"), dims.get("economica")),
         _luz_localizacao(dims.get("localizacao")),

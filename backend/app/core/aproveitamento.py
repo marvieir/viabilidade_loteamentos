@@ -9,7 +9,11 @@ urbanístico; o % de doação depende da diretriz de cada prefeitura (a platafor
 carrega isso). Por isso o nº de lotes urbano é um TETO (limite superior), não um projeto.
 """
 
-PROV_RURAL = "FMP por município — Lei 5.868/72 art. 8º; Estatuto da Terra art. 65"
+PROV_RURAL = (
+    "FMP por município — Lei 5.868/72 art. 8º; Estatuto da Terra art. 65. Parcela-cheia: "
+    "o módulo incide sobre a área TOTAL do imóvel (a parcela pode conter mata/APP — a "
+    "restrição da Lei 12.651 é de uso/edificação, não de composição da parcela)."
+)
 FLAG_CONVERSAO_RURAL = (
     "loteamento urbano exige conversão rural→urbano (gleba dentro do perímetro urbano)"
 )
@@ -155,18 +159,27 @@ def reconciliacao_aproveitamento(
     }
 
 
-def aproveitamento_rural(area: float, fmp_m2: float) -> dict:
-    """Parcelamento RURAL: nº de parcelas = floor(área aproveitável / FMP do município).
+def aproveitamento_rural(area_total: float, fmp_m2: float) -> dict:
+    """Parcelamento RURAL (parcela-cheia): teto de parcelas = floor(área TOTAL / FMP).
 
-    Não aplica lote de 125 m² (regra urbana da Lei 6.766). Sinaliza que o uso urbano
-    dependeria de conversão (perímetro urbano). Determinístico.
+    O módulo rural (FMP) incide sobre a área TOTAL do imóvel — a parcela pode conter
+    mata/APP/encosta; a Lei 12.651 restringe uso/edificação, não a composição da parcela
+    (mesma régua do motor de urbanismo rural). Não aplica lote de 125 m² (regra urbana da
+    Lei 6.766). O nº REAL de chácaras depende de traçado e acesso viário (estudo de massa,
+    aba Urbanismo). Determinístico.
     """
     if fmp_m2 <= 0:
         raise ValueError("FMP deve ser > 0.")
     return {
         "fmp_m2": round(fmp_m2, 2),
-        "n_parcelas": int(area // fmp_m2),
-        "area_m2": round(area, 2),
+        "n_parcelas": int(area_total // fmp_m2),
+        "area_m2": round(area_total, 2),
+        "leitura": (
+            "Teto teórico: módulo (FMP) sobre a área TOTAL da gleba — parcela-cheia; a "
+            "chácara pode conter mata/APP (restrição de uso, não de composição). O nº real "
+            "de chácaras depende do traçado e do acesso viário — ver o estudo de massa na "
+            "aba Urbanismo."
+        ),
         "flag_conversao": FLAG_CONVERSAO_RURAL,
         "proveniencia": PROV_RURAL,
     }

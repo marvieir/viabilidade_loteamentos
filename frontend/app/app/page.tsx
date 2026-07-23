@@ -15,6 +15,7 @@ import { MapHero } from "@/components/dashboard/MapHero";
 import { VisaoGeral } from "@/components/dashboard/VisaoGeral";
 import { CardAproveitamento } from "@/components/cards/CardAproveitamento";
 import { CardUrbanismo } from "@/components/cards/CardUrbanismo";
+import type { PropostaUrbanistica } from "@/lib/api";
 import { CardCustoInfra } from "@/components/cards/CardCustoInfra";
 import { CardPerfilLuos } from "@/components/cards/CardPerfilLuos";
 import { CardAmbiental } from "@/components/cards/CardAmbiental";
@@ -64,6 +65,7 @@ export default function Home() {
   const [dadosJuridico, setDadosJuridico] = useState<JuridicoDocumental | null>(null);
   const [dadosFinanceira, setDadosFinanceira] = useState<Financeira | null>(null);
   const [dadosEconomica, setDadosEconomica] = useState<Economica | null>(null);
+  const [dadosUrb, setDadosUrb] = useState<PropostaUrbanistica | null>(null);
   const [dadosLocalizacao, setDadosLocalizacao] = useState<Localizacao | null>(null);
 
   // "Analisar tudo": incrementa um sinal que cada card observa para disparar a análise.
@@ -108,6 +110,7 @@ export default function Home() {
         financeira: dadosFinanceira,
         economica: dadosEconomica,
         localizacao: dadosLocalizacao,
+        urbanismo: dadosUrb,
       };
       const blob = await gerarLaudo(analise.analise_id, dims);
       const url = URL.createObjectURL(blob);
@@ -400,6 +403,7 @@ export default function Home() {
                 glebaGeojson={analise.geometria.geojson}
                 perfil={perfil}
                 declividade={dadosDecliv}
+                onData={setDadosUrb}
               />
             </div>
             <div className={secao === "custo" ? "" : "hidden"}>

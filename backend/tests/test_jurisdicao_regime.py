@@ -141,7 +141,7 @@ def test_fora_da_malha(client, malha):
 # ---------- Critério 6: RURAL FMP — VALOR-OURO (FMP do município, não 2 ha chumbado) ----------
 def test_rural_golden_motor():
     """Valor-ouro direto no motor: floor(109,41 ha ÷ 2 ha) = 54 parcelas."""
-    r = motor.aproveitamento_rural(area=1_094_111.1, fmp_m2=20_000)
+    r = motor.aproveitamento_rural(area_total=1_094_111.1, fmp_m2=20_000)
     assert r["n_parcelas"] == 54
     assert r["fmp_m2"] == 20_000
     assert "5.868" in r["proveniencia"]  # FMP por município — Lei 5.868/72

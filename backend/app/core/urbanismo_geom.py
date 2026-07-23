@@ -2237,7 +2237,8 @@ def gerar_layout(
             "cada imóvel, Lei 12.651/2012). A 'Área verde' do quadro é RESERVA AMBIENTAL: "
             "mata/APP sem acesso viário possível (abrir via exigiria supressão autorizada — "
             "Lei 11.428/2006, fora do escopo da triagem). SEM doação urbana (art. 4º, Lei "
-            "6.766, não se aplica ao rural). Divisão esquemática; georreferenciamento e "
+            "6.766, não se aplica ao rural). Largura de via e frente mínima são PREMISSAS "
+            "de projeto (sem exigência federal no rural). Divisão esquemática; georreferenciamento e "
             "registro (INCRA/CRI) são do agrimensor."
         )
     else:

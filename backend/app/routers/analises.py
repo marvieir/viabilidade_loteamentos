@@ -739,7 +739,9 @@ def calcular_aproveitamento(
             fmp, fmp_origem = da_tabela, FMP_ORIGEM_TABELA
         else:
             fmp, fmp_origem = FMP_DEFAULT_M2, FMP_ORIGEM_DEFAULT
-        rural = motor.aproveitamento_rural(area=area_aproveitavel, fmp_m2=fmp)
+        # RURAL-6 (achado do operador, 22/07): parcela-cheia — o módulo (FMP) incide sobre a
+        # área TOTAL da gleba, não sobre o "chão limpo" (a chácara pode conter mata/APP).
+        rural = motor.aproveitamento_rural(area_total=total, fmp_m2=fmp)
         return schemas.AproveitamentoOut(
             regime="RURAL",
             premissa=PREMISSA_RURAL,

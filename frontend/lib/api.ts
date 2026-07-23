@@ -118,8 +118,9 @@ export type ModalidadeUrbana =
 
 export interface RuralResult {
   fmp_m2: number;
-  n_parcelas: number;
-  area_m2: number;
+  n_parcelas: number; // teto teórico = floor(área TOTAL / FMP); o real depende do traçado
+  area_m2: number; // área TOTAL da gleba (parcela-cheia) usada na divisão por FMP
+  leitura?: string; // texto pronto do backend (o front só renderiza)
   fmp_origem: string; // "tabela INCRA" | "informado pelo usuário" | "default 2 ha (confirmar no CCIR)"
   flag_conversao: string;
   proveniencia: string;

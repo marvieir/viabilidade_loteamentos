@@ -24,12 +24,16 @@ def test_lotes_teto_lote_invalido():
 
 
 def test_rural_parcelas_por_fmp():
-    r = m.aproveitamento_rural(area=100_000.0, fmp_m2=20_000.0)
+    # PARCELA-CHEIA (RURAL-6): o módulo incide sobre a área TOTAL do imóvel — a chácara
+    # pode conter mata/APP (Lei 12.651 restringe uso/edificação, não a composição).
+    r = m.aproveitamento_rural(area_total=100_000.0, fmp_m2=20_000.0)
     assert r["n_parcelas"] == 5
     assert r["area_m2"] == 100_000.0
     assert "FMP" in r["proveniencia"]
+    assert "parcela-cheia" in r["proveniencia"].lower()
+    assert "Urbanismo" in r["leitura"]  # aponta o estudo de massa como nº realista
 
 
 def test_rural_fmp_invalida():
     with pytest.raises(ValueError):
-        m.aproveitamento_rural(area=100_000.0, fmp_m2=0.0)
+        m.aproveitamento_rural(area_total=100_000.0, fmp_m2=0.0)

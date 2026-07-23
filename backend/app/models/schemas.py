@@ -123,8 +123,9 @@ class AproveitamentoIn(BaseModel):
 
 class RuralOut(BaseModel):
     fmp_m2: float
-    n_parcelas: int
-    area_m2: float  # área aproveitável (após restrições) usada na divisão por FMP
+    n_parcelas: int  # teto teórico = floor(área TOTAL / FMP); o real depende do traçado
+    area_m2: float  # área TOTAL da gleba (parcela-cheia) usada na divisão por FMP
+    leitura: str = ""  # texto pronto do backend (o front só renderiza)
     fmp_origem: str  # "tabela INCRA" | "informado pelo usuário" | "default 2 ha (confirmar no CCIR)"
     flag_conversao: str
     proveniencia: str
@@ -1296,6 +1297,9 @@ class LaudoIn(BaseModel):
     financeira: Optional[dict] = None
     economica: Optional[dict] = None
     localizacao: Optional[dict] = None
+    # RURAL-6 — o snapshot do urbanismo carrega o REGIME (perfil.tipo_loteamento): o laudo
+    # precisa dele p/ citar a régua certa (a vedação de 30% é urbana; no rural não veda).
+    urbanismo: Optional[dict] = None
 
 
 class LuzSemaforo(BaseModel):
