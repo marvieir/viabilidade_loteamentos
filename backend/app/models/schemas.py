@@ -1734,8 +1734,16 @@ class UsuarioOut(BaseModel):
     id: str
     email: str
     nome: Optional[str] = None
+    celular: Optional[str] = None  # dígitos (DDD+número); None → o front pede no login
     papel: str
     criado_em: str
+
+
+class PerfilContatoIn(BaseModel):
+    """Contato obrigatório coletado no 1º login (modal bloqueante do front)."""
+
+    nome: str = Field(..., description="nome completo")
+    celular: str = Field(..., description="celular com DDD (formato livre; backend normaliza)")
 
 
 # ----- Recuperação/troca de senha + login com Google -----

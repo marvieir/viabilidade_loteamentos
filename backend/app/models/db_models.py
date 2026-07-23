@@ -32,6 +32,9 @@ class Usuario(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     senha_hash: Mapped[str] = mapped_column(Text, nullable=False)
     nome: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Contato obrigatório (pedido do operador, 23/07): o app bloqueia com um modal no login
+    # até nome+celular existirem. Nullable no banco — contas antigas preenchem no 1º login.
+    celular: Mapped[str | None] = mapped_column(String(30), nullable=True)
     papel: Mapped[str] = mapped_column(String(20), default="cliente", nullable=False)  # cliente|admin
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_agora, nullable=False)

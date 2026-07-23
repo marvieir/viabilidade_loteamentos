@@ -39,3 +39,26 @@ def criar_tabelas() -> None:
     from app.models import db_models  # noqa: F401 — registra os modelos no metadata
 
     Base.metadata.create_all(bind=engine)
+    _migrar_colunas_novas()
+
+
+# Colunas adicionadas a tabelas que JÁ existem em bancos rodando (create_all não altera
+# tabela existente). Formato: (tabela, coluna, DDL do tipo) — SQL válido em SQLite e Postgres.
+_COLUNAS_NOVAS = [
+    ("usuarios", "celular", "VARCHAR(30)"),
+]
+
+
+def _migrar_colunas_novas() -> None:
+    """Migração leve pré-Alembic: ADD COLUMN idempotente para bancos existentes."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    tabelas = set(insp.get_table_names())
+    for tabela, coluna, tipo in _COLUNAS_NOVAS:
+        if tabela not in tabelas:
+            continue
+        existentes = {c["name"] for c in insp.get_columns(tabela)}
+        if coluna not in existentes:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {coluna} {tipo}"))

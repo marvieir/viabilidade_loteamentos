@@ -9,6 +9,7 @@ export interface Usuario {
   id: string;
   email: string;
   nome: string | null;
+  celular: string | null; // dígitos (DDD+número); null → modal obrigatório no login
   papel: "cliente" | "admin";
   criado_em: string;
 }
@@ -94,6 +95,20 @@ export async function logout(): Promise<void> {
 
 export async function me(): Promise<Usuario> {
   return apiFetch("/api/auth/me").then((r) => r.json());
+}
+
+// Contato obrigatório do 1º login (nome + celular). O backend valida e normaliza o
+// celular (dígitos, DDD + número); devolve o usuário atualizado.
+export async function atualizarPerfil(
+  nome: string,
+  celular: string,
+): Promise<Usuario> {
+  const res = await apiFetch("/api/auth/perfil", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ nome, celular }),
+  });
+  return jsonOrThrow(res);
 }
 
 // "Esqueci minha senha": o backend responde a MESMA mensagem exista ou não a conta

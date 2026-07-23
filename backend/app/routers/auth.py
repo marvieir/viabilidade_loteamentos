@@ -51,6 +51,7 @@ from app.models.schemas import (
     GoogleLoginIn,
     LoginIn,
     MensagemOut,
+    PerfilContatoIn,
     RedefinirSenhaIn,
     RegistrarIn,
     TokenOut,
@@ -68,7 +69,8 @@ _COOKIE_SECURE = os.getenv("COOKIE_SECURE", "0") == "1"
 
 def _usuario_out(u: Usuario) -> UsuarioOut:
     return UsuarioOut(
-        id=u.id, email=u.email, nome=u.nome, papel=u.papel, criado_em=u.criado_em.isoformat()
+        id=u.id, email=u.email, nome=u.nome, celular=u.celular, papel=u.papel,
+        criado_em=u.criado_em.isoformat(),
     )
 
 
@@ -157,6 +159,34 @@ def logout(resp: Response) -> Response:
 
 @router.get("/me", response_model=UsuarioOut)
 def me(usuario: Usuario = Depends(usuario_atual)) -> UsuarioOut:
+    return _usuario_out(usuario)
+
+
+@router.patch("/perfil", response_model=UsuarioOut)
+@limiter.limit(LIMITE_AUTH)
+def atualizar_perfil(
+    request: Request,
+    body: PerfilContatoIn,
+    usuario: Usuario = Depends(usuario_atual),
+    db: Session = Depends(get_db),
+) -> UsuarioOut:
+    """Contato obrigatório (modal do 1º login): nome + celular. O celular é normalizado
+    para dígitos (aceita "(24) 99999-8888", "+55 24 ...", etc.) — DDD + número BR."""
+    nome = " ".join(body.nome.split())
+    if len(nome) < 2:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Informe seu nome.")
+    digitos = "".join(ch for ch in body.celular if ch.isdigit())
+    if digitos.startswith("55") and len(digitos) in (12, 13):  # veio com +55 → tira o país
+        digitos = digitos[2:]
+    if len(digitos) not in (10, 11):
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            "Celular inválido — informe DDD + número (ex.: 24 99999-8888).",
+        )
+    usuario.nome = nome
+    usuario.celular = digitos
+    db.commit()
+    db.refresh(usuario)
     return _usuario_out(usuario)
 
 

@@ -6,6 +6,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { DialogPerfilObrigatorio } from "@/components/auth/DialogPerfilObrigatorio";
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { usuario, carregando } = useAuth();
@@ -22,5 +23,13 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
       </main>
     );
   }
-  return <>{children}</>;
+  // Contato obrigatório: sem nome+celular o app fica visível ao fundo, mas o modal
+  // bloqueia tudo até salvar (o backend valida; o contexto atualiza e ele some).
+  const perfilIncompleto = !usuario.nome?.trim() || !usuario.celular;
+  return (
+    <>
+      {children}
+      {perfilIncompleto && <DialogPerfilObrigatorio />}
+    </>
+  );
 }

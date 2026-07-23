@@ -21,6 +21,8 @@ interface AuthContextValue {
   entrarComGoogle: (credential: string) => Promise<void>;
   cadastrar: (email: string, senha: string, nome?: string) => Promise<void>;
   sair: () => Promise<void>;
+  // Atualiza o usuário em memória (ex.: após completar o perfil no modal obrigatório).
+  atualizarUsuario: (u: Usuario) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -71,9 +73,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUsuario(null);
   }, []);
 
+  const atualizarUsuario = useCallback((u: Usuario) => setUsuario(u), []);
+
   return (
     <AuthContext.Provider
-      value={{ usuario, carregando, entrar, entrarComGoogle, cadastrar, sair }}
+      value={{
+        usuario,
+        carregando,
+        entrar,
+        entrarComGoogle,
+        cadastrar,
+        sair,
+        atualizarUsuario,
+      }}
     >
       {children}
     </AuthContext.Provider>
