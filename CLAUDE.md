@@ -83,6 +83,26 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
   gitignored — nada de export manual; no Mac o export vive no `~/.bash_profile`).
 - Fluxo obrigatório: alterações → teste no Mac do operador (podman) → só então AWS.
 
+## Verdade antes de resposta (INEGOCIÁVEL)
+- **Nunca responder "para dar uma resposta".** Se não houver certeza fundamentada
+  (conhecimento treinado sólido OU verificação feita agora), a resposta certa é: pesquisar
+  primeiro, perguntar depois — nunca chutar.
+- **Matéria legal/regulatória** (parcelamento urbano × rural, Lei 6.766, Estatuto da
+  Terra/Lei 5.868/INCRA, Código Florestal/Lei 12.651, LUOS, registro imobiliário):
+  VERIFICAR a base legal ANTES de implementar qualquer regra no produto, citando
+  lei/artigo na resposta e no código. Regra de produto sem base legal identificada =
+  parar e perguntar ao operador.
+- **Fontes de pesquisa, nesta ordem:** texto da lei (Planalto), doutrina/artigos
+  técnicos e sites confiáveis do setor registral/urbanístico, livros, e conteúdo de
+  referência do mercado de loteamentos (ex.: podcast **Jornada do Loteamento**).
+- Se após pesquisar a dúvida persistir → **perguntar ao operador como resolver**, com as
+  opções encontradas. Ele é do setor; a decisão de produto é dele.
+- **Lição registrada (21-22/07/2026):** o regime RURAL difere do urbano em pontos que
+  estavam em lei e foram herdados sem verificação — sem doação institucional, sem área
+  verde de doação, vedação de declividade 30% é urbana (rural: APP só ≥45°), piso de
+  lote é a FMP/INCRA. Cada um custou uma rodada de teste do operador. Não repetir o
+  padrão: régua legal se verifica na fonte, não se assume.
+
 ## Comunicação com o operador (INEGOCIÁVEL)
 - **Sempre passe instruções COMPLETAS e prontas para colar.** Nada de comando pela metade.
   Para qualquer passo no Mac do operador, inclua: **de qual diretório** rodar (`cd …` com o
