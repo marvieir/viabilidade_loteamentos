@@ -511,19 +511,44 @@ def _fechar_faces(segs: list) -> list:
         return []
 
 
-def _best_fit(geoms_uniao, gleba_m):
-    """Similaridade (escala uniforme + rotação + translação) do desenho ao contorno da gleba.
+def _escala_por_rotulos(segs: dict, rotulos: list[dict]) -> Optional[float]:
+    """Escala unidade-do-desenho → metros pelos PRÓPRIOS rótulos de área do CAD: fecha as
+    faces nas coordenadas brutas e toma a mediana de sqrt(declarada ÷ área bruta).
 
-    Determinístico: escala = razão de área dos cascos; rotação por busca em grade (2° → 0,25°)
-    maximizando IoU dos cascos; translação centróide→centróide. Devolve ``(aplicar, score)``.
-    """
+    Muito mais robusto que a razão de cascos (achado do operador, 24/07: desenho com
+    guias/contexto além da gleba inflava o casco e ENCOLHIA todos os lotes ~72%).
+    None → menos de 3 rótulos casados (sem base p/ estimar)."""
+    from shapely.geometry import Point
+
+    faces = _fechar_faces(segs.get("lote", []) + segs.get("via", []))
+    if not faces or not rotulos:
+        return None
+    razoes = []
+    for r in rotulos:
+        pt = Point(r["x"], r["y"])
+        f = next((f for f in faces if f.contains(pt)), None)
+        if f is not None and f.area > 0:
+            razoes.append(r["area_m2"] / f.area)
+    if len(razoes) < 3:
+        return None
+    razoes.sort()
+    return math.sqrt(razoes[len(razoes) // 2])
+
+
+def _best_fit(geoms_uniao, gleba_m, escala_fixa: Optional[float] = None):
+    """Encaixe do desenho ao contorno da gleba: escala + rotação + translação.
+
+    Escala: ``escala_fixa`` (dos rótulos de área — régua do próprio desenho) quando
+    existe; senão razão de área dos cascos (desenho sem rótulos). Rotação por busca em
+    grade (2° → 0,25°) maximizando IoU dos cascos; translação centróide→centróide.
+    Determinístico. Devolve ``(aplicar, score)``."""
     from shapely import affinity
 
     casco_d = geoms_uniao.convex_hull
     casco_g = gleba_m.convex_hull
     if casco_d.area <= 0 or casco_g.area <= 0:
         return (lambda g: g), 0.0
-    s = math.sqrt(casco_g.area / casco_d.area)
+    s = escala_fixa if escala_fixa else math.sqrt(casco_g.area / casco_d.area)
     c_d, c_g = casco_d.centroid, casco_g.centroid
 
     def _transformado(geom, ang):
@@ -584,11 +609,20 @@ def processar_importacao(
         if not todas_ls:
             return {"erro": "sem_geometria",
                     "detalhe": "Nenhuma camada mapeada como lote/via tem geometria."}
-        aplicar_fit, score = _best_fit(unary_union(todas_ls), gleba_m)
+        # Escala pela régua do PRÓPRIO desenho (rótulos de área) — o casco engana quando o
+        # arquivo traz contexto além da gleba (caso real: todos os lotes encolhiam ~72%).
+        escala = _escala_por_rotulos(segs, rotulos)
+        aplicar_fit, score = _best_fit(unary_union(todas_ls), gleba_m, escala_fixa=escala)
 
         def aplicar(g):
             return aplicar_fit(g)
 
+        if escala is not None:
+            avisos.append(
+                "Escala do desenho determinada pelos rótulos de área do próprio CAD "
+                f"(1 unidade = {round(escala, 4)} m); rotação/posição ajustadas ao "
+                "contorno da gleba — confirme visualmente."
+            )
         aviso_fit = (None if score >= 0.80 else
                      "Encaixe de baixa confiança (desenho sem georreferência) — confirme "
                      "visualmente ou use um arquivo em UTM/SIRGAS.")

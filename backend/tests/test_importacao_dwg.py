@@ -303,6 +303,28 @@ def test_confirmar_best_fit_recupera_rotacao(client, tmp_path):
     assert resumo["dif_mediana_pct"] < 0.02  # rotação/translação não mudam área
 
 
+def test_best_fit_contexto_alem_da_gleba_nao_encolhe_lotes(client, tmp_path):
+    """Caso REAL do operador (24/07): o DWG traz guias/vias do ENTORNO além do loteamento —
+    o casco inflado encolhia todos os lotes ~72% (dif uniforme). A escala agora vem dos
+    rótulos de área do próprio desenho; contexto extra não muda o tamanho dos lotes."""
+    aid = _upload_gleba(client)
+    _, w, h, _ = _gleba_local()
+    caminho = tmp_path / "proj.dxf"
+    _dxf_na_escala(str(caminho), w, h, rot_graus=3.0, dx=200.0, dy=100.0)
+    # Contexto além da gleba: estrada de acesso longa FORA do desenho dos lotes, na camada
+    # de via (infla o casco ~3× sem cortar nenhuma quadra).
+    doc = ezdxf.readfile(str(caminho))
+    doc.modelspace().add_line((1.5 * w, -h), (3 * w, 2 * h), dxfattribs={"layer": "01 GUIA"})
+    doc.saveas(str(caminho))
+    r = _importar(client, aid, caminho.read_bytes())
+    assert r.status_code == 200, r.text
+    body = _confirmar(client, aid, r.json()["importacao_id"]).json()
+    resumo = body["auditoria"]["resumo"]
+    assert resumo["lotes_medidos"] == 6
+    assert resumo["dif_mediana_pct"] < 0.02  # escala pelos rótulos: lote não encolhe
+    assert any("rótulos de área" in a for a in body["avisos"])  # proveniência da escala
+
+
 def test_pendencias_rotulo_orfao_e_lote_sem_rotulo(client, tmp_path):
     aid, iid, w, h = _preparar(client, tmp_path, rotulo_orfao=True, pular_rotulo=2)
     body = _confirmar(client, aid, iid).json()
