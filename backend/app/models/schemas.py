@@ -1738,6 +1738,62 @@ class InventarioImportacaoOut(BaseModel):
     avisos: list[str] = []
 
 
+class ConfirmarImportacaoIn(BaseModel):
+    """IMP-2 — de-para de camadas confirmado pelo usuário no wizard. ``salvar=False`` =
+    preview (passo 3 do wizard); ``True`` = grava como proposta no store de urbanismo."""
+
+    mapeamento: dict[str, Literal["lote", "via", "verde", "institucional", "ignorar"]]
+    salvar: bool = False
+
+
+class AuditoriaLoteImportadoOut(BaseModel):
+    id: str  # L-001… (varredura noroeste→sudeste, determinística)
+    area_medida_m2: float  # medição geodésica NOSSA
+    area_declarada_m2: Optional[float] = None  # rótulo do CAD (None = lote sem rótulo)
+    dif_pct: Optional[float] = None  # |medida − declarada| / declarada
+
+
+class AuditoriaImportacaoOut(BaseModel):
+    resumo: dict  # {lotes_medidos, com_rotulo, dif_mediana_pct, acima_2pct}
+    lotes: list[AuditoriaLoteImportadoOut]
+
+
+class PendenciaImportacaoOut(BaseModel):
+    """O que NÃO fechou/casou — informação, nunca correção automática (§5)."""
+
+    tipo: Literal["rotulo_sem_lote", "lote_sem_rotulo"]
+    area_m2: Optional[float] = None  # declarada (rótulo órfão) ou medida (face sem rótulo)
+    lon: float
+    lat: float
+
+
+class EncaixeImportacaoOut(BaseModel):
+    metodo: Literal["utm", "best_fit"]
+    epsg: Optional[int] = None
+    score: Optional[float] = None  # IoU dos cascos após o ajuste (best_fit)
+    aviso: Optional[str] = None
+
+
+class PropostaImportadaOut(BaseModel):
+    """Proposta nascida de um projeto PRONTO (DWG/DXF) — mesmo miolo das geradas
+    (geometria/quadro/indicadores) + auditoria medido×declarado + pendências."""
+
+    proposta_id: str  # "preview" quando salvar=False
+    versao: int  # 0 no preview
+    rotulo: str = "PROJETO IMPORTADO"
+    arquivo: str
+    origem_geracao: str = "importado"
+    geometria: dict
+    quadro_areas: QuadroAreasOut
+    indicadores: IndicadoresUrbOut
+    heatmap: Optional[HeatmapOut] = None
+    auditoria: AuditoriaImportacaoOut
+    pendencias: list[PendenciaImportacaoOut] = []
+    encaixe: EncaixeImportacaoOut
+    proveniencia: str
+    avisos: list[str] = []
+
+
 class RegistrarIn(BaseModel):
     email: str = Field(..., description="e-mail de login")
     senha: str = Field(..., min_length=8, description="mínimo 8 caracteres")

@@ -20,6 +20,7 @@ import os
 from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 from shapely.ops import transform, unary_union
 
 from app.core.uploads import ler_upload_limitado
@@ -1135,6 +1136,10 @@ def obter(
     snap = fonte_urb.carregar(analise_id, proposta_id)
     if snap is None:
         raise HTTPException(404, "Proposta não encontrada.")
+    # URB-IMPORT: proposta IMPORTADA tem contrato próprio (sem programa/fidelidade de IA) —
+    # devolve como está (JSONResponse pula a validação do response_model das geradas).
+    if snap.get("origem_geracao") == "importado":
+        return JSONResponse(content=snap)
     return snap
 
 
@@ -1193,3 +1198,62 @@ async def importar_projeto(
     }
     imp.salvar_inventario(analise_id, importacao_id, saida)
     return schemas.InventarioImportacaoOut(**saida)
+
+
+@router.post(
+    "/analises/{analise_id}/urbanismo/importar/{importacao_id}/confirmar",
+    response_model=schemas.PropostaImportadaOut,
+)
+def confirmar_importacao(
+    analise_id: str,
+    importacao_id: str,
+    body: schemas.ConfirmarImportacaoIn,
+    registro: dict = Depends(analise_do_dono),
+    fonte_urb: FonteUrbanismo = Depends(get_fonte_urbanismo),
+) -> schemas.PropostaImportadaOut:
+    """IMP-2 — com o de-para confirmado: fecha os lotes (costura de pontas soltas), encaixa
+    na gleba (UTM direto ou best-fit com score), MEDE tudo (motor de urbanismo) e devolve a
+    proposta importada + auditoria medido×declarado + pendências. ``salvar=true`` grava no
+    store de urbanismo — a proposta passa a aparecer no seletor do card, e financeira/laudo/
+    trilha a consomem sem mudança. Determinístico (mesmo arquivo + mesmo de-para → idem)."""
+    from app.core import importacao_dwg as imp
+
+    dxf = imp.caminho_dxf(analise_id, importacao_id)
+    inventario = imp.carregar_inventario(analise_id, importacao_id)
+    if dxf is None or inventario is None:
+        raise HTTPException(
+            404, "Importação não encontrada — envie o arquivo de novo (passo 1 do wizard)."
+        )
+    if not any(p == "lote" for p in body.mapeamento.values()):
+        raise HTTPException(422, "Marque ao menos uma camada como 'lote' para importar.")
+
+    resultado = imp.processar_importacao(
+        dxf, dict(body.mapeamento), registro["poly"], inventario["georref"],
+        inventario.get("arquivo") or "projeto",
+    )
+    if resultado is None:
+        raise HTTPException(422, imp.MSG_DXF_ILEGIVEL)
+    if resultado.get("erro"):
+        raise HTTPException(422, resultado.get("detalhe") or "Importação sem geometria útil.")
+    if not resultado["auditoria"]["lotes"] and not resultado["pendencias"]:
+        raise HTTPException(
+            422,
+            "Nenhum lote fechou com as camadas marcadas. Confira o de-para (a camada de "
+            "lotes precisa das linhas de divisa; a de via, das guias que fecham as quadras).",
+        )
+
+    if body.salvar:
+        versao = fonte_urb.proxima_versao(analise_id)
+        resultado["proposta_id"] = f"imp_{analise_id[:8]}_{versao:03d}"
+        resultado["versao"] = versao
+        # Perfil vazio (não é proposta gerada): trilha/conformidade seguem a régua urbana
+        # conservadora; o snapshot completo permite reabrir a conferência depois.
+        resultado["perfil"] = {}
+        resultado["_importacao_id"] = importacao_id
+        fonte_urb.salvar(analise_id, resultado)
+    else:
+        resultado["proposta_id"] = "preview"
+        resultado["versao"] = 0
+    return schemas.PropostaImportadaOut(**{
+        k: v for k, v in resultado.items() if not k.startswith("_") and k != "perfil"
+    })

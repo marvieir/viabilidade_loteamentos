@@ -130,3 +130,179 @@ def test_extensao_invalida(client):
     aid = _upload_gleba(client)
     r = _importar(client, aid, b"nada", nome="projeto.txt")
     assert r.status_code == 422
+
+
+# ===================== IMP-2 — confirmar: fechamento, encaixe, auditoria =====================
+
+import math
+
+from shapely.geometry import Polygon
+from shapely.ops import transform as sh_transform
+
+
+def _gleba_local():
+    """Gleba de teste no frame métrico do motor (mesma conta do backend)."""
+    from app.core import urbanismo_medida as medida
+
+    gleba = Polygon(RET_RETANGULO)
+    to_local, _ = medida.transformadores([gleba])
+    g = sh_transform(to_local, gleba)
+    minx, miny, maxx, maxy = g.bounds
+    return g, (maxx - minx), (maxy - miny), (minx, miny)
+
+
+def _fmt_ptbr(v: float) -> str:
+    return f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _dxf_na_escala(caminho, w, h, *, rot_graus=0.0, dx=0.0, dy=0.0, n=6,
+                   rotulo_orfao=False, pular_rotulo=None, transf=None):
+    """Quadra W×H (escala da GLEBA) com ``n`` faixas verticais de lote, UMA divisória com
+    ponta solta de 0,3 m (costura), guia coincidente e rótulos pt-BR exatos. Rotação e
+    translação simulam o desenho em coordenada local arbitrária (caso best-fit);
+    ``transf(x, y)`` arbitrário (ex.: imagem UTM verdadeira) tem precedência."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    for nome in ("LOTES", "01 GUIA", "cotas"):
+        doc.layers.add(nome)
+    rad = math.radians(rot_graus)
+
+    def t(x, y):
+        if transf is not None:
+            return transf(x, y)
+        return (x * math.cos(rad) - y * math.sin(rad) + dx,
+                x * math.sin(rad) + y * math.cos(rad) + dy)
+
+    def linha(a, b, camada):
+        msp.add_line(t(*a), t(*b), dxfattribs={"layer": camada})
+
+    for cam in ("LOTES", "01 GUIA"):  # contorno (guia coincide — típico de teste-ouro)
+        linha((0, 0), (w, 0), cam)
+        linha((w, 0), (w, h), cam)
+        linha((w, h), (0, h), cam)
+        linha((0, h), (0, 0), cam)
+    passo = w / n
+    for i in range(1, n):
+        if i == 1:  # ponta solta de 0,3 m — a costura (dangle-extend) fecha
+            linha((i * passo, 0), (i * passo, h - 0.3), "LOTES")
+        else:
+            linha((i * passo, 0), (i * passo, h), "LOTES")
+    area_lote = passo * h
+    for i in range(n):
+        if pular_rotulo is not None and i == pular_rotulo:
+            continue
+        mt = msp.add_mtext(f"A.: {_fmt_ptbr(area_lote)}m²", dxfattribs={"layer": "LOTES"})
+        mt.set_location(t(i * passo + passo / 2, h / 2))
+    if rotulo_orfao:
+        mt = msp.add_mtext("A.: 310,50m²", dxfattribs={"layer": "LOTES"})
+        mt.set_location(t(w + 50, h / 2))
+    doc.saveas(caminho)
+
+
+_MAPEAMENTO = {"LOTES": "lote", "01 GUIA": "via", "cotas": "ignorar"}
+
+
+def _confirmar(client, aid, iid, salvar=False, mapeamento=None):
+    return client.post(
+        f"/api/analises/{aid}/urbanismo/importar/{iid}/confirmar",
+        json={"mapeamento": mapeamento or _MAPEAMENTO, "salvar": salvar},
+    )
+
+
+def _preparar(client, tmp_path, **kw):
+    """Upload da gleba + do DXF; devolve (analise_id, importacao_id, w, h)."""
+    aid = _upload_gleba(client)
+    _, w, h, _ = _gleba_local()
+    caminho = tmp_path / "proj.dxf"
+    _dxf_na_escala(str(caminho), w, h, **kw)
+    r = _importar(client, aid, caminho.read_bytes())
+    assert r.status_code == 200, r.text
+    return aid, r.json()["importacao_id"], w, h
+
+
+def test_confirmar_utm_fecha_audita_e_quadra(client, tmp_path):
+    # Desenha na imagem UTM VERDADEIRA da gleba (frame local → WGS → UTM 23S): é como um
+    # projeto georreferenciado real fica no CAD — inclusive a convergência de grade.
+    from pyproj import Transformer
+
+    from app.core import urbanismo_medida as medida
+
+    gleba = Polygon(RET_RETANGULO)
+    _, to_wgs = medida.transformadores([gleba])
+    _, w0, h0, (minx, miny) = _gleba_local()
+    utm = Transformer.from_crs(4326, 31983, always_xy=True).transform
+
+    def transf(x, y):
+        return utm(*to_wgs(x + minx, y + miny))
+
+    aid, iid, w, h = _preparar(client, tmp_path, transf=transf)
+    r = _confirmar(client, aid, iid)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["proposta_id"] == "preview" and body["versao"] == 0
+    assert body["encaixe"]["metodo"] == "utm"
+    assert body["encaixe"]["epsg"] == 31983
+    resumo = body["auditoria"]["resumo"]
+    assert resumo["lotes_medidos"] == 6  # a ponta solta de 0,3 m foi costurada
+    assert resumo["com_rotulo"] == 6
+    assert resumo["dif_mediana_pct"] < 0.02
+    assert resumo["acima_2pct"] == 0
+    assert body["indicadores"]["n_lotes"] == 6
+    # Quadro fecha na gleba (arruamento = fecho): líquida ≈ área da gleba (±1%).
+    gleba_m, *_ = _gleba_local()
+    assert abs(body["quadro_areas"]["area_liquida_m2"] - gleba_m.area) / gleba_m.area < 0.01
+    assert body["geometria"]["lotes_features"]["features"], "mapa sem lotes"
+
+
+def test_confirmar_best_fit_recupera_rotacao(client, tmp_path):
+    aid, iid, w, h = _preparar(client, tmp_path, rot_graus=7.0, dx=500.0, dy=300.0)
+    r = _confirmar(client, aid, iid)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["encaixe"]["metodo"] == "best_fit"
+    assert body["encaixe"]["score"] >= 0.9  # IoU dos cascos após o ajuste
+    resumo = body["auditoria"]["resumo"]
+    assert resumo["lotes_medidos"] == 6
+    assert resumo["dif_mediana_pct"] < 0.02  # rotação/translação não mudam área
+
+
+def test_pendencias_rotulo_orfao_e_lote_sem_rotulo(client, tmp_path):
+    aid, iid, w, h = _preparar(client, tmp_path, rotulo_orfao=True, pular_rotulo=2)
+    body = _confirmar(client, aid, iid).json()
+    tipos = [p["tipo"] for p in body["pendencias"]]
+    assert "rotulo_sem_lote" in tipos  # rótulo plantado fora de qualquer face
+    assert "lote_sem_rotulo" in tipos  # faixa 3 ficou sem rótulo → NÃO vira lote (§5)
+    assert body["auditoria"]["resumo"]["lotes_medidos"] == 5
+    orfao = next(p for p in body["pendencias"] if p["tipo"] == "rotulo_sem_lote")
+    assert orfao["area_m2"] == 310.5
+
+
+def test_salvar_vira_proposta_no_store(client, tmp_path, fonte_urbanismo):
+    aid, iid, *_ = _preparar(client, tmp_path)
+    body = _confirmar(client, aid, iid, salvar=True).json()
+    assert body["proposta_id"].startswith("imp_") and body["versao"] == 1
+    # Aparece na listagem e reabre pelo GET de proposta (contrato próprio, sem validação IA).
+    lista = client.get(f"/api/analises/{aid}/urbanismo").json()
+    assert any(p.get("origem_geracao") == "importado" for p in lista)
+    aberto = client.get(f"/api/analises/{aid}/urbanismo/{body['proposta_id']}")
+    assert aberto.status_code == 200
+    assert aberto.json()["origem_geracao"] == "importado"
+    # Trilha passa a marcar o passo de urbanismo como concluído (consumo sem mudança).
+    trilha = client.get(f"/api/analises/{aid}/trilha").json()
+    passo = next(p for p in trilha["passos"] if p["id"] == "urbanismo")
+    assert passo["estado"] == "concluido"
+
+
+def test_determinismo_confirmar(client, tmp_path):
+    aid, iid, *_ = _preparar(client, tmp_path)
+    b1 = _confirmar(client, aid, iid).json()
+    b2 = _confirmar(client, aid, iid).json()
+    assert b1 == b2  # mesma entrada → mesma saída, sempre (§4)
+
+
+def test_sem_camada_lote_422(client, tmp_path):
+    aid, iid, *_ = _preparar(client, tmp_path)
+    r = _confirmar(client, aid, iid,
+                   mapeamento={"LOTES": "ignorar", "01 GUIA": "via", "cotas": "ignorar"})
+    assert r.status_code == 422
+    assert "lote" in r.json()["detail"]
