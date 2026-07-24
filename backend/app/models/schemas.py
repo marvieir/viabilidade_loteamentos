@@ -1712,6 +1712,32 @@ class PropostaUrbanisticaOut(BaseModel):
 
 # ----- Fase 12 — autenticação / multi-tenant -----
 
+# ----- Fase URB-IMPORT (docs/fase-urb-import.md) — IMP-1: inventário da importação -----
+
+class CamadaImportacaoOut(BaseModel):
+    nome: str
+    entidades: dict[str, int]  # tipo de entidade DXF → contagem (LINE, ARC, MTEXT…)
+    rotulos_area: int  # nº de TEXT/MTEXT no padrão "A.: 429,94m²"
+    sugestao: Literal["lote", "via", "verde", "institucional", "ignorar"]
+
+
+class GeorrefImportacaoOut(BaseModel):
+    utm_detectado: bool
+    epsg_sugerido: Optional[int] = None  # SIRGAS 2000/UTM pela longitude da GLEBA
+    cobre_gleba: bool = False
+    largura_m: float
+    altura_m: float
+
+
+class InventarioImportacaoOut(BaseModel):
+    importacao_id: str  # SHA-256 (16 hex) do arquivo — determinístico
+    arquivo: str
+    formato: str  # "DXF" | "DWG 2004" | …
+    camadas: list[CamadaImportacaoOut]
+    georref: GeorrefImportacaoOut
+    avisos: list[str] = []
+
+
 class RegistrarIn(BaseModel):
     email: str = Field(..., description="e-mail de login")
     senha: str = Field(..., min_length=8, description="mínimo 8 caracteres")

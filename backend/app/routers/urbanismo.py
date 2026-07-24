@@ -19,8 +19,10 @@ import math
 import os
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from shapely.ops import transform, unary_union
+
+from app.core.uploads import ler_upload_limitado
 
 from app.core import conexao as conexao_mod
 from app.core import urbanismo_geom as geom
@@ -1134,3 +1136,60 @@ def obter(
     if snap is None:
         raise HTTPException(404, "Proposta não encontrada.")
     return snap
+
+
+# ----- Fase URB-IMPORT (docs/fase-urb-import.md) — IMP-1: upload → inventário -----
+
+@router.post(
+    "/analises/{analise_id}/urbanismo/importar",
+    response_model=schemas.InventarioImportacaoOut,
+)
+async def importar_projeto(
+    analise_id: str,
+    arquivo: UploadFile = File(...),
+    registro: dict = Depends(analise_do_dono),
+) -> schemas.InventarioImportacaoOut:
+    """Importa um projeto de loteamento PRONTO (DWG/DXF): persiste o arquivo, converte se
+    preciso e devolve o INVENTÁRIO de camadas + diagnóstico de georreferência. Só leitura —
+    o de-para de camadas é confirmado pelo usuário antes de qualquer fechamento (IMP-2).
+    Determinístico: mesmo arquivo → mesmo ``importacao_id`` e mesmo inventário."""
+    from app.core import importacao_dwg as imp
+
+    nome = arquivo.filename or "projeto"
+    if not nome.lower().endswith((".dxf", ".dwg")):
+        raise HTTPException(422, "Envie o projeto em DWG ou DXF (planta do loteamento).")
+    conteudo = await ler_upload_limitado(arquivo)
+
+    importacao_id = imp.importacao_id_de(conteudo)
+    original = imp.salvar_arquivo(analise_id, importacao_id, nome, conteudo)
+    dxf = imp.garantir_dxf(analise_id, importacao_id, original)
+    if dxf is None:
+        raise HTTPException(422, imp.MSG_SEM_CONVERSOR)
+    inventario = imp.inventariar(dxf, registro.get("poly"))
+    if inventario is None or not inventario["camadas"]:
+        raise HTTPException(422, imp.MSG_DXF_ILEGIVEL)
+
+    avisos: list[str] = []
+    if not nome.lower().endswith(".dxf"):
+        avisos.append("DWG convertido para leitura (dwg2dxf).")
+    if not inventario["georref"]["utm_detectado"]:
+        avisos.append(
+            "O desenho está em coordenada local (não georreferenciada) — o encaixe na "
+            "gleba será por ajuste automático, com a sua confirmação visual."
+        )
+    elif not inventario["georref"]["cobre_gleba"]:
+        avisos.append(
+            "O desenho parece georreferenciado (UTM), mas NÃO cobre a gleba desta "
+            "análise — confira se é o projeto da gleba certa."
+        )
+
+    saida = {
+        "importacao_id": importacao_id,
+        "arquivo": nome,
+        "formato": imp.formato_de(conteudo, nome),
+        "camadas": inventario["camadas"],
+        "georref": inventario["georref"],
+        "avisos": avisos,
+    }
+    imp.salvar_inventario(analise_id, importacao_id, saida)
+    return schemas.InventarioImportacaoOut(**saida)
