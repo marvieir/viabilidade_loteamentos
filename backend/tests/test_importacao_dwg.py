@@ -132,6 +132,22 @@ def test_extensao_invalida(client):
     assert r.status_code == 422
 
 
+def test_dxf_com_lixo_pontual_e_saneado(client, tmp_path):
+    """Achado do Mac (24/07): dwg2dxf em ARM grava código de grupo inválido no meio do
+    DXF ('y' na linha N) — nem o recover do ezdxf engole. O saneador descarta as linhas
+    corrompidas e o inventário sai normal."""
+    aid = _upload_gleba(client)
+    caminho = tmp_path / "proj.dxf"
+    _dxf_projeto(str(caminho))
+    linhas = caminho.read_text(encoding="utf-8").splitlines()
+    meio = len(linhas) // 2 - (len(linhas) // 2) % 2  # fronteira de par (código, valor)
+    corrompido = "\n".join(linhas[:meio] + ["y", "lixo"] + linhas[meio:]) + "\n"
+    r = _importar(client, aid, corrompido.encode("utf-8"))
+    assert r.status_code == 200, r.text
+    lotes = _camada(r.json(), "LOTES")
+    assert lotes["rotulos_area"] == 6  # o conteúdo bom sobreviveu ao saneamento
+
+
 def test_arquivo_sem_rotulos_avisa_no_inventario(client, tmp_path):
     """Achado do operador (24/07): DWG de perfil/infra (sem rótulo de área em camada
     alguma) deve avisar JÁ no passo 2 que não parece ser a planta de lotes — e a camada

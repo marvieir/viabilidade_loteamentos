@@ -153,20 +153,55 @@ def garantir_dxf(analise_id: str, importacao_id: str, caminho_original: str) -> 
     return destino
 
 
+def _sanitizar_dxf(caminho: str) -> Optional[str]:
+    """Última defesa p/ conversão com LIXO pontual (dwg2dxf em ARM grava código de grupo
+    inválido no meio do arquivo — achado do Mac, 24/07). DXF ASCII é uma sequência estrita
+    de pares (código inteiro, valor): linha de código que não parseia como inteiro é
+    descartada (o descarte re-sincroniza os pares). Devolve o caminho do DXF saneado, ou
+    None se não havia nada a sanear (o problema é outro)."""
+    import tempfile
+
+    try:
+        with open(caminho, encoding="utf-8", errors="ignore") as f:
+            linhas = f.read().splitlines()
+    except OSError:
+        return None
+    saida: list[str] = []
+    descartadas = 0
+    i = 0
+    while i + 1 < len(linhas):
+        try:
+            int(linhas[i].strip())
+        except ValueError:
+            descartadas += 1
+            i += 1  # joga fora SÓ a linha inválida e tenta re-sincronizar os pares
+            continue
+        saida.append(linhas[i])
+        saida.append(linhas[i + 1])
+        i += 2
+    if descartadas == 0:
+        return None
+    tmp = tempfile.mktemp(suffix=".dxf")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(saida) + "\n")
+    _log.warning("DXF %s saneado: %d linha(s) corrompida(s) descartada(s).",
+                 caminho, descartadas)
+    return tmp
+
+
 def _ler_dxf(caminho: str):
-    """Documento ezdxf do caminho — leitura normal e, se falhar, o modo RECOVER do ezdxf
-    (tolerante a DXF malformado/parcial, recomendado p/ arquivos de outros CADs e p/ a
-    saída do dwg2dxf). None → ilegível mesmo em recover (com o motivo no log)."""
+    """Documento ezdxf do caminho — em camadas de tolerância: leitura normal → modo
+    RECOVER do ezdxf (malformações comuns) → SANEAMENTO de linhas corrompidas + recover.
+    None → ilegível em todas (com o motivo no log)."""
     try:
         import ezdxf
+        from ezdxf import recover
     except ImportError:
         return None
     try:
         return ezdxf.readfile(caminho)
     except Exception as exc1:  # noqa: BLE001
         try:
-            from ezdxf import recover
-
             doc, auditor = recover.readfile(caminho)
             _log.warning(
                 "DXF %s lido em modo RECOVER (leitura normal falhou: %s; %d erro(s) auditado(s)).",
@@ -174,6 +209,18 @@ def _ler_dxf(caminho: str):
             )
             return doc
         except Exception as exc2:  # noqa: BLE001
+            saneado = _sanitizar_dxf(caminho)
+            if saneado is not None:
+                try:
+                    doc, auditor = recover.readfile(saneado)
+                    _log.warning(
+                        "DXF %s lido após SANEAMENTO (%d erro(s) auditado(s) no recover).",
+                        caminho, len(auditor.errors),
+                    )
+                    return doc
+                except Exception as exc3:  # noqa: BLE001
+                    _log.error("DXF %s ilegível mesmo saneado: %r", caminho, exc3)
+                    return None
             _log.error("DXF %s ilegível: readfile=%r; recover=%r", caminho, exc1, exc2)
             return None
 
