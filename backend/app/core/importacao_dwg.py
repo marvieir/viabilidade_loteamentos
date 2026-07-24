@@ -42,6 +42,9 @@ _VERSOES_DWG = {
 _NOMES_VIA = ("GUIA", "VIA", "RUA", "EIXO", "PISTA", "MEIO-FIO", "MEIO FIO")
 _NOMES_VERDE = ("VERDE",)
 _NOMES_INSTITUCIONAL = ("INSTITUCIONAL",)
+# Divisa do imóvel (levantamento da cerca) — a ÂNCORA do encaixe sem georreferência:
+# o contorno no desenho casa com o contorno do KMZ (aceita camada só de POINTs).
+_NOMES_PERIMETRO = ("CERCA", "DIVISA", "PERIMETRO", "PERÍMETRO", "LIMITE")
 _NOMES_IGNORAR = (
     "COTA", "ESTACA", "GREIDE", "CORTE", "ATERRO", "PERFIL", "MOLDURA", "GRADE",
     "LEGENDA", "MDT", "CURVA", "NIVEL", "NÍVEL", "TEXTO", "SELO", "CARIMBO", "HACHURA",
@@ -267,6 +270,8 @@ def _sugestao(nome: str, ent: Counter, rotulos: int, max_rotulos: int) -> str:
     geometricas = sum(ent.get(t, 0) for t in ("LINE", "LWPOLYLINE", "POLYLINE", "ARC"))
     if rotulos > 0 and rotulos == max_rotulos:
         return "lote"
+    if any(k in up for k in _NOMES_PERIMETRO):  # cerca/divisa pode ser SÓ pontos
+        return "perimetro"
     if geometricas == 0:  # só texto/pontos/blocos → nada a fechar (achado do operador:
         return "ignorar"  # camada "RUA" de POINTs era sugerida como via)
     if any(k in up for k in _NOMES_VERDE):
@@ -419,6 +424,7 @@ def extrair_para_confirmar(caminho_dxf_: str, mapeamento: dict[str, str]) -> Opt
 
     segmentos: dict[str, list] = {"lote": [], "via": [], "verde": [], "institucional": []}
     rotulos: list[dict] = []  # {x, y, area_m2} — ponto de inserção do TEXT/MTEXT
+    perimetro: list[tuple[float, float]] = []  # pontos da divisa/cerca (âncora do encaixe)
     ativos = {c for c, papel in mapeamento.items() if papel != "ignorar"}
     for e in doc.modelspace():
         camada = str(e.dxf.layer or "0")
@@ -434,6 +440,9 @@ def extrair_para_confirmar(caminho_dxf_: str, mapeamento: dict[str, str]) -> Opt
                 except Exception:  # noqa: BLE001
                     pass
             continue
+        if papel == "perimetro":
+            perimetro.extend(_pontos_extensao(e))
+            continue
         if papel not in segmentos:
             continue
         for pts in _segmentos_de(e):
@@ -443,7 +452,7 @@ def extrair_para_confirmar(caminho_dxf_: str, mapeamento: dict[str, str]) -> Opt
                     segmentos[papel].append(ls)
             except Exception:  # noqa: BLE001
                 continue
-    return {"segmentos": segmentos, "rotulos": rotulos}
+    return {"segmentos": segmentos, "rotulos": rotulos, "perimetro": perimetro}
 
 
 def _costurar_pontas(segs: list, tol: float = _TOL_COSTURA_M) -> list:
@@ -535,16 +544,18 @@ def _escala_por_rotulos(segs: dict, rotulos: list[dict]) -> Optional[float]:
     return math.sqrt(razoes[len(razoes) // 2])
 
 
-def _best_fit(geoms_uniao, gleba_m, escala_fixa: Optional[float] = None):
+def _best_fit(geoms_uniao, gleba_m, escala_fixa: Optional[float] = None, ancora=None):
     """Encaixe do desenho ao contorno da gleba: escala + rotação + translação.
 
     Escala: ``escala_fixa`` (dos rótulos de área — régua do próprio desenho) quando
-    existe; senão razão de área dos cascos (desenho sem rótulos). Rotação por busca em
-    grade (2° → 0,25°) maximizando IoU dos cascos; translação centróide→centróide.
-    Determinístico. Devolve ``(aplicar, score)``."""
+    existe; senão razão de área dos cascos. ``ancora``: geometria que REPRESENTA a gleba
+    no desenho (pontos da cerca/divisa do levantamento) — o casco dela guia rotação e
+    translação (sem âncora, usa o desenho inteiro, que pode ter contexto do entorno).
+    Rotação por busca em grade (2° → 0,25°) maximizando IoU dos cascos; translação
+    centróide→centróide. Determinístico. Devolve ``(aplicar, score)``."""
     from shapely import affinity
 
-    casco_d = geoms_uniao.convex_hull
+    casco_d = (ancora if ancora is not None else geoms_uniao).convex_hull
     casco_g = gleba_m.convex_hull
     if casco_d.area <= 0 or casco_g.area <= 0:
         return (lambda g: g), 0.0
@@ -612,7 +623,17 @@ def processar_importacao(
         # Escala pela régua do PRÓPRIO desenho (rótulos de área) — o casco engana quando o
         # arquivo traz contexto além da gleba (caso real: todos os lotes encolhiam ~72%).
         escala = _escala_por_rotulos(segs, rotulos)
-        aplicar_fit, score = _best_fit(unary_union(todas_ls), gleba_m, escala_fixa=escala)
+        # Âncora de posição/rotação: a DIVISA/CERCA do levantamento (papel "perimetro") —
+        # o contorno no desenho casa com o contorno do KMZ; os lotes caem no lugar certo.
+        pts_per = bruto.get("perimetro") or []
+        ancora = None
+        if len(pts_per) >= 8:
+            from shapely.geometry import MultiPoint
+
+            ancora = MultiPoint(pts_per)
+        aplicar_fit, score = _best_fit(
+            unary_union(todas_ls), gleba_m, escala_fixa=escala, ancora=ancora
+        )
 
         def aplicar(g):
             return aplicar_fit(g)
@@ -623,12 +644,19 @@ def processar_importacao(
                 f"(1 unidade = {round(escala, 4)} m); rotação/posição ajustadas ao "
                 "contorno da gleba — confirme visualmente."
             )
+        if ancora is not None:
+            avisos.append(
+                f"Encaixe ancorado na DIVISA do levantamento ({len(pts_per)} pontos da "
+                "camada de cerca/divisa) casada com o contorno da gleba do KMZ."
+            )
         aviso_fit = (None if score >= 0.80 else
                      "Encaixe de baixa confiança (desenho sem georreferência) — confirme "
-                     "visualmente ou use um arquivo em UTM/SIRGAS.")
+                     "visualmente; marcar a camada da CERCA/DIVISA como 'Divisa do "
+                     "terreno' melhora o encaixe, e arquivo em UTM/SIRGAS o torna exato.")
         if aviso_fit:
             avisos.append(aviso_fit)
-        encaixe = {"metodo": "best_fit", "epsg": None, "score": score, "aviso": aviso_fit}
+        encaixe = {"metodo": "best_fit", "epsg": None, "score": score, "aviso": aviso_fit,
+                   "ancora": "perimetro" if ancora is not None else "desenho"}
 
     segs_m = {papel: [aplicar(ls) for ls in lista] for papel, lista in segs.items()}
     rotulos_m = [{**r, "pt": aplicar(Point(r["x"], r["y"]))} for r in rotulos]

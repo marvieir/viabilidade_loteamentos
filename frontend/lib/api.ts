@@ -349,7 +349,13 @@ export async function anexarLevantamento(
 
 // ----- Fase URB-IMPORT — importar projeto de loteamento PRONTO (DWG/DXF) -----
 
-export type PapelCamada = "lote" | "via" | "verde" | "institucional" | "ignorar";
+export type PapelCamada =
+  | "lote"
+  | "via"
+  | "verde"
+  | "institucional"
+  | "perimetro"
+  | "ignorar";
 
 export interface CamadaImportacao {
   nome: string;
@@ -411,6 +417,7 @@ export interface PropostaImportada {
     metodo: "utm" | "best_fit";
     epsg: number | null;
     score: number | null;
+    ancora?: string | null; // "perimetro" (cerca/divisa) | "desenho"
     aviso: string | null;
   };
   proveniencia: string;

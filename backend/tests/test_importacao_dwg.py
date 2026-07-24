@@ -325,6 +325,59 @@ def test_best_fit_contexto_alem_da_gleba_nao_encolhe_lotes(client, tmp_path):
     assert any("rótulos de área" in a for a in body["avisos"])  # proveniência da escala
 
 
+def test_best_fit_ancorado_na_cerca_posiciona_fora_do_centro(client, tmp_path):
+    """Solução p/ desenho sem georreferência (achado do operador, 24/07): a camada da
+    CERCA/DIVISA do levantamento casa com o contorno do KMZ e ancora o encaixe. Quadra
+    pequena no CANTO da divisa: sem âncora ela cairia no centro da gleba; com âncora, cai
+    deslocada do centro (na posição relativa certa)."""
+    aid = _upload_gleba(client)
+    gleba_m, w, h, _ = _gleba_local()
+    caminho = tmp_path / "proj.dxf"
+    # Quadra de 6 lotes ocupando SÓ o quadrante SW da divisa (metade das dimensões).
+    _dxf_na_escala(str(caminho), w / 2, h / 2, rot_graus=5.0, dx=300.0, dy=150.0)
+    doc = ezdxf.readfile(str(caminho))
+    doc.layers.add("CERCA")
+    rad = math.radians(5.0)
+
+    def t(x, y):
+        return (x * math.cos(rad) - y * math.sin(rad) + 300.0,
+                x * math.sin(rad) + y * math.cos(rad) + 150.0)
+
+    # Pontos da cerca traçando a DIVISA inteira (retângulo w×h), como no levantamento real.
+    for i in range(25):
+        f = i / 24
+        for p in ((f * w, 0), (f * w, h), (0, f * h), (w, f * h)):
+            doc.modelspace().add_point(t(*p), dxfattribs={"layer": "CERCA"})
+    doc.saveas(str(caminho))
+
+    r = _importar(client, aid, caminho.read_bytes())
+    assert r.status_code == 200, r.text
+    assert _camada(r.json(), "CERCA")["sugestao"] == "perimetro"
+    body = _confirmar(client, aid, r.json()["importacao_id"],
+                      mapeamento={**_MAPEAMENTO, "CERCA": "perimetro"}).json()
+    assert body["encaixe"]["ancora"] == "perimetro"
+    assert body["encaixe"]["score"] >= 0.9  # a cerca casa com o contorno da gleba
+    resumo = body["auditoria"]["resumo"]
+    assert resumo["lotes_medidos"] == 6
+    assert resumo["dif_mediana_pct"] < 0.02
+    # A quadra fica DESLOCADA do centro (posição relativa à divisa), não jogada no meio.
+    from shapely.geometry import shape
+    from shapely.ops import transform as _sht
+
+    from app.core import urbanismo_medida as medida
+
+    to_local, _ = medida.transformadores([Polygon(RET_RETANGULO)])
+    lotes_m = [
+        _sht(to_local, shape(f["geometry"]))
+        for f in body["geometria"]["lotes_features"]["features"]
+    ]
+    from shapely.ops import unary_union
+
+    centro_lotes = unary_union(lotes_m).centroid
+    dist_centro = centro_lotes.distance(gleba_m.centroid)
+    assert dist_centro > w / 8  # longe do centro = a âncora mandou na posição
+
+
 def test_pendencias_rotulo_orfao_e_lote_sem_rotulo(client, tmp_path):
     aid, iid, w, h = _preparar(client, tmp_path, rotulo_orfao=True, pular_rotulo=2)
     body = _confirmar(client, aid, iid).json()

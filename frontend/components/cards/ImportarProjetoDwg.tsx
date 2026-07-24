@@ -30,6 +30,7 @@ const PAPEIS: { v: PapelCamada; r: string }[] = [
   { v: "via", r: "Vias / guias" },
   { v: "verde", r: "Área verde" },
   { v: "institucional", r: "Institucional" },
+  { v: "perimetro", r: "Divisa/cerca do terreno" },
   { v: "ignorar", r: "Ignorar" },
 ];
 

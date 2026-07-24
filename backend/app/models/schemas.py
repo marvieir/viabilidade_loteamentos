@@ -1718,7 +1718,7 @@ class CamadaImportacaoOut(BaseModel):
     nome: str
     entidades: dict[str, int]  # tipo de entidade DXF → contagem (LINE, ARC, MTEXT…)
     rotulos_area: int  # nº de TEXT/MTEXT no padrão "A.: 429,94m²"
-    sugestao: Literal["lote", "via", "verde", "institucional", "ignorar"]
+    sugestao: Literal["lote", "via", "verde", "institucional", "perimetro", "ignorar"]
 
 
 class GeorrefImportacaoOut(BaseModel):
@@ -1742,7 +1742,9 @@ class ConfirmarImportacaoIn(BaseModel):
     """IMP-2 — de-para de camadas confirmado pelo usuário no wizard. ``salvar=False`` =
     preview (passo 3 do wizard); ``True`` = grava como proposta no store de urbanismo."""
 
-    mapeamento: dict[str, Literal["lote", "via", "verde", "institucional", "ignorar"]]
+    mapeamento: dict[
+        str, Literal["lote", "via", "verde", "institucional", "perimetro", "ignorar"]
+    ]
     salvar: bool = False
 
 
@@ -1775,6 +1777,7 @@ class EncaixeImportacaoOut(BaseModel):
     metodo: Literal["utm", "best_fit"]
     epsg: Optional[int] = None
     score: Optional[float] = None  # IoU dos cascos após o ajuste (best_fit)
+    ancora: Optional[str] = None  # "perimetro" (cerca/divisa do levantamento) | "desenho"
     aviso: Optional[str] = None
 
 
