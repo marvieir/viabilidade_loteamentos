@@ -295,6 +295,11 @@ def _num_ptbr(texto: str) -> Optional[float]:
         return None
 
 
+def _fmt_br(v: float, casas: int = 2) -> str:
+    """2740.99 → '2.740,99' (o front só RENDERIZA — §regra 2: número formatado vem daqui)."""
+    return f"{v:,.{casas}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def _segmentos_de(e) -> list[list[tuple[float, float]]]:
     """Cadeias de vértices de uma entidade de DESENHO (curvas achatadas p/ flecha de 5 cm)."""
     t = e.dxftype()
@@ -585,19 +590,31 @@ def processar_importacao(
         dif = round(abs(medida_m2 - decl) / decl, 4) if decl else None
         if dif is not None:
             difs.append(dif)
-        lotes_aud.append({"id": f"L-{i+1:03d}", "area_medida_m2": medida_m2,
-                          "area_declarada_m2": decl, "dif_pct": dif})
+        lotes_aud.append({
+            "id": f"L-{i+1:03d}",
+            "area_medida_m2": medida_m2, "area_medida_fmt": _fmt_br(medida_m2),
+            "area_declarada_m2": decl,
+            "area_declarada_fmt": _fmt_br(decl) if decl is not None else None,
+            "dif_pct": dif,
+            "dif_fmt": _fmt_br(dif * 100, 2) + "%" if dif is not None else None,
+        })
     difs.sort()
+    mediana = difs[len(difs) // 2] if difs else None
     resumo = {
         "lotes_medidos": len(lotes_aud),
         "com_rotulo": sum(1 for x in lotes_aud if x["area_declarada_m2"] is not None),
-        "dif_mediana_pct": difs[len(difs) // 2] if difs else None,
+        "dif_mediana_pct": mediana,
+        "dif_mediana_fmt": _fmt_br(mediana * 100, 2) + "%" if mediana is not None else None,
         "acima_2pct": sum(1 for d in difs if d > 0.02),
     }
     pend_out = []
     for p in pendencias:
         lon, lat = _wgs_pt(p["pt"])
-        pend_out.append({"tipo": p["tipo"], "area_m2": p["area_m2"], "lon": lon, "lat": lat})
+        pend_out.append({
+            "tipo": p["tipo"], "area_m2": p["area_m2"],
+            "area_fmt": _fmt_br(p["area_m2"]) if p["area_m2"] is not None else None,
+            "lon": lon, "lat": lat,
+        })
 
     return {
         "rotulo": "PROJETO IMPORTADO",

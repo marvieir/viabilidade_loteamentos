@@ -28,11 +28,16 @@ import {
   type Declividade,
   type ItemFidelidadeArea,
   type PerfilMunicipal,
+  type PropostaImportada,
   type PropostaUrbanistica,
   type PublicoAlvo,
   type TipoLoteamento,
   type ValorPosicional,
 } from "@/lib/api";
+import {
+  ImportarProjetoDwg,
+  PainelImportado,
+} from "@/components/cards/ImportarProjetoDwg";
 import {
   CORES_OVERLAY,
   CORES_QUINTIL,
@@ -143,6 +148,9 @@ export function CardUrbanismo({
   const [valor, setValor] = useState<ValorPosicional | null>(null);
   const [valorErro, setValorErro] = useState<string | null>(null);
   const [valorCarregando, setValorCarregando] = useState(false);
+  // URB-IMPORT (IMP-3) — projeto PRONTO carregado pelo usuário (caminho adicional ao gerar).
+  const [importada, setImportada] = useState<PropostaImportada | null>(null);
+  const [mostrarImportar, setMostrarImportar] = useState(false);
 
   useEffect(() => {
     if (!zona && zonas.length > 0) setZona(zonas[0]);
@@ -157,9 +165,22 @@ export function CardUrbanismo({
       try {
         const lista = await listarUrbanismo(analiseId);
         if (vivo && lista.length > 0) {
-          const ultima = lista[lista.length - 1];
-          setProposta(ultima);
-          onData?.(ultima);
+          // URB-IMPORT: importadas têm contrato próprio — separa das geradas para o
+          // render de proposta de IA não receber um snapshot sem programa/heatmap.
+          const geradas = lista.filter(
+            (p) => (p as { origem_geracao?: string }).origem_geracao !== "importado"
+          );
+          const importadas = lista.filter(
+            (p) => (p as { origem_geracao?: string }).origem_geracao === "importado"
+          );
+          if (geradas.length > 0) {
+            const ultima = geradas[geradas.length - 1];
+            setProposta(ultima);
+            onData?.(ultima);
+          }
+          if (importadas.length > 0) {
+            setImportada(importadas[importadas.length - 1] as unknown as PropostaImportada);
+          }
         }
       } catch {
         /* sem snapshot salvo → começa vazio, sem erro */
@@ -464,7 +485,30 @@ export function CardUrbanismo({
               ? "Regenerar (consome IA)"
               : "Gerar estudo de massa (IA)"}
           </Button>
+          {/* URB-IMPORT (IMP-3) — caminho ADICIONAL: carregar um projeto já pronto. */}
+          <button
+            type="button"
+            onClick={() => setMostrarImportar((v) => !v)}
+            className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+            title="Já tem o projeto de loteamento desenhado? Carregue o DWG/DXF — ele vira uma proposta com quadro de áreas real e auditoria das áreas declaradas."
+          >
+            📐 Carregar projeto pronto (DWG/DXF)
+          </button>
         </div>
+        {mostrarImportar && (
+          <ImportarProjetoDwg
+            analiseId={analiseId}
+            glebaGeojson={glebaGeojson}
+            onFechar={() => setMostrarImportar(false)}
+            onSalvo={(p) => {
+              setImportada(p);
+              setMostrarImportar(false);
+            }}
+          />
+        )}
+        {importada && !mostrarImportar && (
+          <PainelImportado proposta={importada} glebaGeojson={glebaGeojson} />
+        )}
         {/* Mov.1 — DIRETRIZES do operador: texto livre que orienta o PROGRAMA da IA
             ("inclua 3 quadras, academia, mirante, áreas de descanso..."). */}
         <textarea

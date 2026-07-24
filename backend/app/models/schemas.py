@@ -1749,8 +1749,11 @@ class ConfirmarImportacaoIn(BaseModel):
 class AuditoriaLoteImportadoOut(BaseModel):
     id: str  # L-001… (varredura noroeste→sudeste, determinística)
     area_medida_m2: float  # medição geodésica NOSSA
+    area_medida_fmt: str = ""
     area_declarada_m2: Optional[float] = None  # rótulo do CAD (None = lote sem rótulo)
+    area_declarada_fmt: Optional[str] = None
     dif_pct: Optional[float] = None  # |medida − declarada| / declarada
+    dif_fmt: Optional[str] = None
 
 
 class AuditoriaImportacaoOut(BaseModel):
@@ -1763,6 +1766,7 @@ class PendenciaImportacaoOut(BaseModel):
 
     tipo: Literal["rotulo_sem_lote", "lote_sem_rotulo"]
     area_m2: Optional[float] = None  # declarada (rótulo órfão) ou medida (face sem rótulo)
+    area_fmt: Optional[str] = None
     lon: float
     lat: float
 

@@ -347,6 +347,106 @@ export async function anexarLevantamento(
   return res.json();
 }
 
+// ----- Fase URB-IMPORT — importar projeto de loteamento PRONTO (DWG/DXF) -----
+
+export type PapelCamada = "lote" | "via" | "verde" | "institucional" | "ignorar";
+
+export interface CamadaImportacao {
+  nome: string;
+  entidades: Record<string, number>;
+  rotulos_area: number;
+  sugestao: PapelCamada;
+}
+
+export interface InventarioImportacao {
+  importacao_id: string;
+  arquivo: string;
+  formato: string;
+  camadas: CamadaImportacao[];
+  georref: {
+    utm_detectado: boolean;
+    epsg_sugerido: number | null;
+    cobre_gleba: boolean;
+    largura_m: number;
+    altura_m: number;
+  };
+  avisos: string[];
+}
+
+export interface PropostaImportada {
+  proposta_id: string; // "preview" antes de salvar
+  versao: number;
+  rotulo: string;
+  arquivo: string;
+  origem_geracao: string; // "importado"
+  geometria: GeometriaUrb;
+  quadro_areas: QuadroAreas;
+  indicadores: IndicadoresUrb;
+  auditoria: {
+    resumo: {
+      lotes_medidos: number;
+      com_rotulo: number;
+      dif_mediana_pct: number | null;
+      dif_mediana_fmt: string | null;
+      acima_2pct: number;
+    };
+    lotes: {
+      id: string;
+      area_medida_m2: number;
+      area_medida_fmt: string;
+      area_declarada_m2: number | null;
+      area_declarada_fmt: string | null;
+      dif_pct: number | null;
+      dif_fmt: string | null;
+    }[];
+  };
+  pendencias: {
+    tipo: "rotulo_sem_lote" | "lote_sem_rotulo";
+    area_m2: number | null;
+    area_fmt: string | null;
+    lon: number;
+    lat: number;
+  }[];
+  encaixe: {
+    metodo: "utm" | "best_fit";
+    epsg: number | null;
+    score: number | null;
+    aviso: string | null;
+  };
+  proveniencia: string;
+  avisos: string[];
+}
+
+export async function importarProjetoDwg(
+  analiseId: string,
+  arquivo: File
+): Promise<InventarioImportacao> {
+  const form = new FormData();
+  form.append("arquivo", arquivo);
+  const res = await apiFetch(`/api/analises/${analiseId}/urbanismo/importar`, {
+    method: "POST",
+    body: form,
+  });
+  return jsonOrThrow(res);
+}
+
+export async function confirmarImportacaoDwg(
+  analiseId: string,
+  importacaoId: string,
+  mapeamento: Record<string, PapelCamada>,
+  salvar: boolean
+): Promise<PropostaImportada> {
+  const res = await apiFetch(
+    `/api/analises/${analiseId}/urbanismo/importar/${importacaoId}/confirmar`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mapeamento, salvar }),
+    }
+  );
+  return jsonOrThrow(res);
+}
+
 export async function buscarMunicipios(q: string): Promise<MunicipioRef[]> {
   const termo = q.trim();
   if (termo.length === 0) return [];
