@@ -132,6 +132,27 @@ def test_extensao_invalida(client):
     assert r.status_code == 422
 
 
+def test_arquivo_sem_rotulos_avisa_no_inventario(client, tmp_path):
+    """Achado do operador (24/07): DWG de perfil/infra (sem rótulo de área em camada
+    alguma) deve avisar JÁ no passo 2 que não parece ser a planta de lotes — e a camada
+    'RUA' só de POINTs não pode ser sugerida como via."""
+    doc = ezdxf.new("R2010")
+    msp = doc.modelspace()
+    for nome in ("RDP ESTACAS", "RUA"):
+        doc.layers.add(nome)
+    msp.add_line((0, 0), (100, 0), dxfattribs={"layer": "RDP ESTACAS"})
+    msp.add_point((10, 10), dxfattribs={"layer": "RUA"})
+    caminho = tmp_path / "perfil.dxf"
+    doc.saveas(str(caminho))
+
+    aid = _upload_gleba(client)
+    r = _importar(client, aid, caminho.read_bytes(), nome="perfil.dxf")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert any("PLANTA DE URBANIZAÇÃO" in a for a in body["avisos"])
+    assert _camada(body, "RUA")["sugestao"] == "ignorar"  # POINTs não fecham nada
+
+
 # ===================== IMP-2 — confirmar: fechamento, encaixe, auditoria =====================
 
 import math

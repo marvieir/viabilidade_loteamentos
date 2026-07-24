@@ -182,21 +182,17 @@ def _pontos_extensao(e) -> list[tuple[float, float]]:
 def _sugestao(nome: str, ent: Counter, rotulos: int, max_rotulos: int) -> str:
     """Papel sugerido da camada — determinístico, sempre revisável pelo usuário."""
     up = nome.upper()
+    geometricas = sum(ent.get(t, 0) for t in ("LINE", "LWPOLYLINE", "POLYLINE", "ARC"))
     if rotulos > 0 and rotulos == max_rotulos:
         return "lote"
+    if geometricas == 0:  # só texto/pontos/blocos → nada a fechar (achado do operador:
+        return "ignorar"  # camada "RUA" de POINTs era sugerida como via)
     if any(k in up for k in _NOMES_VERDE):
         return "verde"
     if any(k in up for k in _NOMES_INSTITUCIONAL):
         return "institucional"
     if any(k in up for k in _NOMES_VIA):
         return "via"
-    if any(k in up for k in _NOMES_IGNORAR):
-        return "ignorar"
-    if ent.get("DIMENSION", 0) > sum(ent.values()) / 2:
-        return "ignorar"
-    geometricas = sum(ent.get(t, 0) for t in ("LINE", "LWPOLYLINE", "POLYLINE", "ARC"))
-    if geometricas == 0:  # só texto/pontos/blocos → nada a fechar
-        return "ignorar"
     return "ignorar"  # conservador: papel ativo é escolha explícita do usuário
 
 

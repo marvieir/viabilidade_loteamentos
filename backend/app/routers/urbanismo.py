@@ -1177,6 +1177,15 @@ async def importar_projeto(
     avisos: list[str] = []
     if not nome.lower().endswith(".dxf"):
         avisos.append("DWG convertido para leitura (dwg2dxf).")
+    # Achado do operador (24/07): sem rótulo de área em camada alguma, o arquivo quase
+    # certamente NÃO é a planta de lotes — avisa JÁ no passo 2, não no botão final.
+    if all(c["rotulos_area"] == 0 for c in inventario["camadas"]):
+        avisos.append(
+            "Nenhuma camada tem rótulos de área de lote (ex.: 'A.: 450,00m²') — este "
+            "arquivo parece ser outro desenho do projeto (perfil longitudinal, "
+            "levantamento, infra). Para importar os lotes, envie a PLANTA DE URBANIZAÇÃO "
+            "do loteamento."
+        )
     if not inventario["georref"]["utm_detectado"]:
         avisos.append(
             "O desenho está em coordenada local (não georreferenciada) — o encaixe na "
