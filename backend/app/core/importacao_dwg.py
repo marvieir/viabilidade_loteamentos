@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
 import os
 import re
 import shutil
+
+_log = logging.getLogger("app.importacao_dwg")
 from collections import Counter
 from typing import Optional
 
@@ -128,7 +131,8 @@ def formato_de(conteudo: bytes, nome: str) -> str:
 
 def garantir_dxf(analise_id: str, importacao_id: str, caminho_original: str) -> Optional[str]:
     """DXF utilizável: o próprio original, ou a conversão via dwg2dxf PERSISTIDA no
-    diretório da importação (o IMP-2 não reconverte). None → conversor indisponível/falhou."""
+    diretório da importação (o IMP-2 não reconverte). None → conversor indisponível/falhou.
+    Com LOG do que o conversor disse (diagnóstico direto no `podman logs api`)."""
     if caminho_original.lower().endswith(".dxf"):
         return caminho_original
     destino = os.path.join(_dir_importacao(analise_id, importacao_id), "convertido.dxf")
@@ -136,11 +140,42 @@ def garantir_dxf(analise_id: str, importacao_id: str, caminho_original: str) -> 
         return destino
     tmp = converter_dwg_para_dxf(caminho_original)
     if tmp is None or tmp == caminho_original:
+        _log.error(
+            "dwg2dxf não produziu DXF para %s (conversor ausente ou conversão falhou).",
+            caminho_original,
+        )
         return None
+    _log.info("dwg2dxf converteu %s → %s (%d bytes).",
+              caminho_original, destino, os.path.getsize(tmp))
     # shutil.move, NÃO os.replace: o tmp nasce em /tmp e o destino é o volume /data —
     # filesystems diferentes no container (os.replace estoura EXDEV; achado no Mac, 24/07).
     shutil.move(tmp, destino)
     return destino
+
+
+def _ler_dxf(caminho: str):
+    """Documento ezdxf do caminho — leitura normal e, se falhar, o modo RECOVER do ezdxf
+    (tolerante a DXF malformado/parcial, recomendado p/ arquivos de outros CADs e p/ a
+    saída do dwg2dxf). None → ilegível mesmo em recover (com o motivo no log)."""
+    try:
+        import ezdxf
+    except ImportError:
+        return None
+    try:
+        return ezdxf.readfile(caminho)
+    except Exception as exc1:  # noqa: BLE001
+        try:
+            from ezdxf import recover
+
+            doc, auditor = recover.readfile(caminho)
+            _log.warning(
+                "DXF %s lido em modo RECOVER (leitura normal falhou: %s; %d erro(s) auditado(s)).",
+                caminho, exc1, len(auditor.errors),
+            )
+            return doc
+        except Exception as exc2:  # noqa: BLE001
+            _log.error("DXF %s ilegível: readfile=%r; recover=%r", caminho, exc1, exc2)
+            return None
 
 
 # ---------------- inventário ----------------
@@ -236,13 +271,8 @@ def _georref(xs: list[float], ys: list[float], gleba_wgs: Optional[BaseGeometry]
 
 def inventariar(caminho_dxf_: str, gleba_wgs: Optional[BaseGeometry]) -> Optional[dict]:
     """Varre o modelspace e monta o inventário (camadas + georref). None → DXF ilegível."""
-    try:
-        import ezdxf
-    except ImportError:
-        return None
-    try:
-        doc = ezdxf.readfile(caminho_dxf_)
-    except Exception:  # noqa: BLE001 — corrompido/não-DXF
+    doc = _ler_dxf(caminho_dxf_)
+    if doc is None:
         return None
 
     por_camada: dict[str, Counter] = {}
@@ -333,13 +363,11 @@ def extrair_para_confirmar(caminho_dxf_: str, mapeamento: dict[str, str]) -> Opt
     ``mapeamento``: nome da camada → lote|via|verde|institucional|ignorar (confirmado pelo
     usuário no wizard). None → DXF ilegível."""
     try:
-        import ezdxf
         from shapely.geometry import LineString
     except ImportError:
         return None
-    try:
-        doc = ezdxf.readfile(caminho_dxf_)
-    except Exception:  # noqa: BLE001
+    doc = _ler_dxf(caminho_dxf_)
+    if doc is None:
         return None
 
     segmentos: dict[str, list] = {"lote": [], "via": [], "verde": [], "institucional": []}
