@@ -1171,6 +1171,16 @@ async def importar_projeto(
     if dxf is None:
         raise HTTPException(422, imp.MSG_SEM_CONVERSOR)
     inventario = imp.inventariar(dxf, registro.get("poly"))
+    if (inventario is None or not inventario["camadas"]) and dxf.endswith("convertido.dxf"):
+        # Conversão ANTIGA/parcial cacheada no volume (achado do Mac, 24/07): uma primeira
+        # conversão ruim ficava gravada e era reutilizada para sempre. Descarta e reconverte.
+        try:
+            os.remove(dxf)
+        except OSError:
+            pass
+        dxf = imp.garantir_dxf(analise_id, importacao_id, original)
+        if dxf is not None:
+            inventario = imp.inventariar(dxf, registro.get("poly"))
     if inventario is None or not inventario["camadas"]:
         raise HTTPException(422, imp.MSG_DXF_ILEGIVEL)
 
