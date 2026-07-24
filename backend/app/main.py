@@ -69,34 +69,47 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-# NUNCA 500 mudo: exceção não tratada em qualquer rota → loga o TRACEBACK completo no
-# servidor e devolve o tipo+mensagem no `detail` (o front exibe). Diagnóstico direto na
-# tela do operador, sem SSH — princípio da plataforma: nada falha em silêncio.
+# NUNCA 500 mudo: exceção não tratada → traceback completo no LOG e mensagem AMIGÁVEL na
+# tela (achado do operador, 24/07: o texto técnico não diz nada ao usuário final). O código
+# curto entre colchetes liga a tela ao log sem expor stack. IMPORTANTE: o catch mora no
+# middleware INTERNO (dentro do CORS) — o handler global do Starlette responde por FORA do
+# CORS, o navegador bloqueia a resposta e o front só vê "falha de rede".
 import logging as _logging
 
 _log_app = _logging.getLogger("app.erros")
 
+MSG_ERRO_INTERNO = (
+    "Algo deu errado do nosso lado ao processar este pedido — sua análise não foi "
+    "perdida. Tente de novo em alguns instantes; se continuar, fale com o suporte "
+    "citando o código entre colchetes."
+)
 
-@app.exception_handler(Exception)
-async def _erro_nao_tratado(request, exc):
+
+def _resposta_erro_interno(request, exc):
     from fastapi.responses import JSONResponse
 
     _log_app.exception("Erro não tratado em %s", request.url.path)
     return JSONResponse(
         status_code=500,
         content={
-            "detail": (
-                f"Erro interno — {type(exc).__name__}: {exc} "
-                f"(rota {request.url.path}). Detalhe completo no log do servidor."
-            )
+            "detail": f"{MSG_ERRO_INTERNO} [{type(exc).__name__} · {request.url.path}]"
         },
     )
+
+
+@app.exception_handler(Exception)
+async def _erro_nao_tratado(request, exc):
+    # Backstop (erros fora do middleware, ex.: no próprio CORS) — mesma mensagem amigável.
+    return _resposta_erro_interno(request, exc)
 
 
 # Fase 13 — security headers (defesa contra clickjacking / MIME sniffing; HSTS só em HTTPS/prod).
 class _SecurityHeaders(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        resp = await call_next(request)
+        try:
+            resp = await call_next(request)
+        except Exception as exc:  # noqa: BLE001 — vira 500 amigável DENTRO do CORS
+            resp = _resposta_erro_interno(request, exc)
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("X-Frame-Options", "DENY")
         resp.headers.setdefault("Referrer-Policy", "no-referrer")

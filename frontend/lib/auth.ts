@@ -168,12 +168,14 @@ export async function loginGoogle(credential: string): Promise<string> {
 async function _fetchOuErroDeRede(url: string, init: RequestInit): Promise<Response> {
   try {
     return await fetch(url, init);
-  } catch {
+  } catch (err) {
+    // Diagnóstico técnico fica no console (dev/suporte); o usuário recebe linguagem humana
+    // (achado do operador, 24/07 — "rebuild"/"logs do backend" não dizem nada a ele).
+    console.error("Falha de rede ao chamar a API:", url, err);
     throw new Error(
-      "Não foi possível falar com o servidor. O backend pode estar reiniciando (logo após um " +
-        "rebuild), a operação pode ter demorado demais e a conexão caiu, ou o serviço parou. " +
-        "Aguarde alguns segundos e tente de novo. Se persistir, veja os logs do backend " +
-        "(ex.: `podman-compose logs --tail=100 api`).",
+      "Não conseguimos falar com o servidor agora — normalmente é uma instabilidade " +
+        "passageira. Aguarde alguns segundos e tente de novo. Se continuar acontecendo, " +
+        "fale com o suporte.",
     );
   }
 }
