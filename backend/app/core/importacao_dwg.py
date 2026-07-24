@@ -18,6 +18,7 @@ import json
 import math
 import os
 import re
+import shutil
 from collections import Counter
 from typing import Optional
 
@@ -136,7 +137,9 @@ def garantir_dxf(analise_id: str, importacao_id: str, caminho_original: str) -> 
     tmp = converter_dwg_para_dxf(caminho_original)
     if tmp is None or tmp == caminho_original:
         return None
-    os.replace(tmp, destino)
+    # shutil.move, NÃO os.replace: o tmp nasce em /tmp e o destino é o volume /data —
+    # filesystems diferentes no container (os.replace estoura EXDEV; achado no Mac, 24/07).
+    shutil.move(tmp, destino)
     return destino
 
 
