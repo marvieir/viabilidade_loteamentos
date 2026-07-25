@@ -1249,6 +1249,7 @@ def confirmar_importacao(
     resultado = imp.processar_importacao(
         dxf, dict(body.mapeamento), registro["poly"], inventario["georref"],
         inventario.get("arquivo") or "projeto",
+        ajuste=[p.model_dump() for p in body.ajuste],
     )
     if resultado is None:
         raise HTTPException(422, imp.MSG_DXF_ILEGIVEL)

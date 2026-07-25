@@ -437,18 +437,26 @@ export async function importarProjetoDwg(
   return jsonOrThrow(res);
 }
 
+// Par do ajuste manual de encaixe (2 cliques): ponto do projeto como está no mapa ("de")
+// e onde ele deveria estar ("para") — ambos [lon, lat].
+export interface ParAjusteImportacao {
+  de: [number, number];
+  para: [number, number];
+}
+
 export async function confirmarImportacaoDwg(
   analiseId: string,
   importacaoId: string,
   mapeamento: Record<string, PapelCamada>,
-  salvar: boolean
+  salvar: boolean,
+  ajuste: ParAjusteImportacao[] = []
 ): Promise<PropostaImportada> {
   const res = await apiFetch(
     `/api/analises/${analiseId}/urbanismo/importar/${importacaoId}/confirmar`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mapeamento, salvar }),
+      body: JSON.stringify({ mapeamento, salvar, ajuste }),
     }
   );
   return jsonOrThrow(res);

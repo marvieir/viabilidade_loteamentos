@@ -1745,7 +1745,18 @@ class ConfirmarImportacaoIn(BaseModel):
     mapeamento: dict[
         str, Literal["lote", "via", "verde", "institucional", "perimetro", "ignorar"]
     ]
+    # Ajuste MANUAL do encaixe (2 cliques no mapa): cada par leva um ponto do projeto,
+    # como está no mapa ("de"), para onde ele deveria estar ("para") — [lon, lat].
+    # 1 par = translação; 2 pares = translação + rotação + escala. Aplicado APÓS o
+    # encaixe automático; determinístico (KMZ que não cobre a propriedade toda torna o
+    # encaixe automático ambíguo — achado do operador, 24/07).
+    ajuste: list["ParAjusteImportacaoIn"] = []
     salvar: bool = False
+
+
+class ParAjusteImportacaoIn(BaseModel):
+    de: list[float] = Field(..., min_length=2, max_length=2)  # [lon, lat] no mapa hoje
+    para: list[float] = Field(..., min_length=2, max_length=2)  # [lon, lat] correto
 
 
 class AuditoriaLoteImportadoOut(BaseModel):

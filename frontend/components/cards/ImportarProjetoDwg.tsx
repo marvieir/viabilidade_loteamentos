@@ -13,6 +13,7 @@ import {
   type ChaveOverlay,
   type InventarioImportacao,
   type PapelCamada,
+  type ParAjusteImportacao,
   type PropostaImportada,
 } from "@/lib/api";
 
@@ -50,9 +51,13 @@ function overlaysDe(p: PropostaImportada): Partial<Record<ChaveOverlay, GeoJSON.
 export function PainelImportado({
   proposta,
   glebaGeojson,
+  aoClicarMapa,
+  dicaMapa,
 }: {
   proposta: PropostaImportada;
   glebaGeojson: GeoJSON.Polygon;
+  aoClicarMapa?: (p: { lat: number; lng: number }) => void;
+  dicaMapa?: string | null;
 }) {
   const r = proposta.auditoria.resumo;
   return (
@@ -66,6 +71,11 @@ export function PainelImportado({
             importada
           </span>
         </div>
+        {dicaMapa && (
+          <p className="border-b border-pink-200 bg-pink-50 px-3 py-2 text-xs font-medium text-pink-800">
+            {dicaMapa}
+          </p>
+        )}
         <div className="h-[440px] w-full">
           <MapaLeaflet
             geojson={glebaGeojson}
@@ -73,6 +83,7 @@ export function PainelImportado({
             lotesFeatures={proposta.geometria.lotes_features}
             quadras={null}
             lazerFeatures={null}
+            aoClicar={aoClicarMapa}
           />
         </div>
       </div>
@@ -180,6 +191,10 @@ export function ImportarProjetoDwg({
   const [preview, setPreview] = useState<PropostaImportada | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
+  // Ajuste manual do encaixe (2 cliques): pares "de → para" acumulados (máx. 2).
+  const [ajuste, setAjuste] = useState<ParAjusteImportacao[]>([]);
+  const [clicandoDe, setClicandoDe] = useState<[number, number] | null>(null);
+  const [ajustando, setAjustando] = useState(false);
 
   async function enviarArquivo(arquivo: File) {
     setOcupado(true);
@@ -196,12 +211,14 @@ export function ImportarProjetoDwg({
     }
   }
 
-  async function conferir(salvar: boolean) {
+  async function conferir(salvar: boolean, ajusteAtual?: ParAjusteImportacao[]) {
     if (!inv) return;
     setOcupado(true);
     setErro(null);
     try {
-      const p = await confirmarImportacaoDwg(analiseId, inv.importacao_id, mapeamento, salvar);
+      const p = await confirmarImportacaoDwg(
+        analiseId, inv.importacao_id, mapeamento, salvar, ajusteAtual ?? ajuste
+      );
       if (salvar) {
         onSalvo(p);
       } else {
@@ -212,6 +229,29 @@ export function ImportarProjetoDwg({
     } finally {
       setOcupado(false);
     }
+  }
+
+  // Ajuste manual: 1º clique = ponto do PROJETO como está; 2º = onde deveria estar.
+  // Cada par completo re-renderiza o preview; o 2º par corrige rotação/escala.
+  function cliqueAjuste(p: { lat: number; lng: number }) {
+    if (!ajustando) return;
+    if (clicandoDe === null) {
+      setClicandoDe([p.lng, p.lat]);
+      return;
+    }
+    const par: ParAjusteImportacao = { de: clicandoDe, para: [p.lng, p.lat] };
+    const novo = [...ajuste, par].slice(-2); // no máx. 2 pares (translação + rotação)
+    setAjuste(novo);
+    setClicandoDe(null);
+    setAjustando(false);
+    conferir(false, novo);
+  }
+
+  function limparAjuste() {
+    setAjuste([]);
+    setClicandoDe(null);
+    setAjustando(false);
+    conferir(false, []);
   }
 
   const etapa = preview ? 3 : inv ? 2 : 1;
@@ -334,8 +374,19 @@ export function ImportarProjetoDwg({
 
       {etapa === 3 && preview && (
         <div className="space-y-3">
-          <PainelImportado proposta={preview} glebaGeojson={glebaGeojson} />
-          <div className="flex gap-2">
+          <PainelImportado
+            proposta={preview}
+            glebaGeojson={glebaGeojson}
+            aoClicarMapa={ajustando ? cliqueAjuste : undefined}
+            dicaMapa={
+              ajustando
+                ? clicandoDe === null
+                  ? "1º clique: um ponto RECONHECÍVEL do projeto, como ele está no mapa (ex.: canto de uma quadra)."
+                  : "2º clique: onde esse MESMO ponto deve ficar de verdade no terreno."
+                : null
+            }
+          />
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               disabled={ocupado}
@@ -344,10 +395,45 @@ export function ImportarProjetoDwg({
             >
               {ocupado ? "Salvando…" : "Salvar como proposta"}
             </button>
+            {/* Ajuste manual (padrão ALIGN do CAD): 1 par move; o 2º par corrige rotação/escala. */}
             <button
               type="button"
               disabled={ocupado}
-              onClick={() => setPreview(null)}
+              onClick={() => {
+                setAjustando((v) => !v);
+                setClicandoDe(null);
+              }}
+              className={`rounded-lg border px-4 py-2 text-sm transition-colors ${
+                ajustando
+                  ? "border-pink-300 bg-pink-50 text-pink-700"
+                  : "border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50"
+              }`}
+            >
+              {ajustando
+                ? "Clicando… (clique aqui para cancelar)"
+                : ajuste.length === 0
+                  ? "🎯 Ajustar posição no mapa"
+                  : "🎯 Refinar de novo (2º par corrige rotação)"}
+            </button>
+            {ajuste.length > 0 && (
+              <button
+                type="button"
+                disabled={ocupado}
+                onClick={limparAjuste}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
+              >
+                Desfazer ajuste manual
+              </button>
+            )}
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => {
+                setPreview(null);
+                setAjuste([]);
+                setAjustando(false);
+                setClicandoDe(null);
+              }}
               className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50"
             >
               Voltar às camadas

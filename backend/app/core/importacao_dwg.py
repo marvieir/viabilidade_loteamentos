@@ -578,12 +578,41 @@ def _best_fit(geoms_uniao, gleba_m, escala_fixa: Optional[float] = None, ancora=
     return (lambda g: _transformado(g, melhor)), round(_iou(melhor), 4)
 
 
+def _correcao_por_pares(pares: list[tuple]) -> "callable":
+    """Transformação de correção a partir de pares (p → q) no frame métrico: 1 par =
+    translação; 2+ pares = similaridade exata pelos dois primeiros (translação + rotação +
+    escala). Determinística — é o 'ajuste de 2 cliques' do wizard."""
+    from shapely import affinity
+
+    p1, q1 = pares[0]
+    if len(pares) == 1:
+        dx, dy = q1.x - p1.x, q1.y - p1.y
+        return lambda g: affinity.translate(g, dx, dy)
+    p2, q2 = pares[1]
+    vpx, vpy = p2.x - p1.x, p2.y - p1.y
+    vqx, vqy = q2.x - q1.x, q2.y - q1.y
+    lp, lq = math.hypot(vpx, vpy), math.hypot(vqx, vqy)
+    if lp < 1e-6 or lq < 1e-6:  # pares degenerados → só translação
+        dx, dy = q1.x - p1.x, q1.y - p1.y
+        return lambda g: affinity.translate(g, dx, dy)
+    s = lq / lp
+    ang = math.degrees(math.atan2(vqy, vqx) - math.atan2(vpy, vpx))
+
+    def f(g):
+        g2 = affinity.scale(g, s, s, origin=(p1.x, p1.y))
+        g2 = affinity.rotate(g2, ang, origin=(p1.x, p1.y))
+        return affinity.translate(g2, q1.x - p1.x, q1.y - p1.y)
+
+    return f
+
+
 def processar_importacao(
     caminho_dxf_: str,
     mapeamento: dict[str, str],
     gleba_wgs,
     georref: dict,
     arquivo: str,
+    ajuste: Optional[list[dict]] = None,
 ) -> Optional[dict]:
     """Fecha, encaixa, mede e monta a proposta importada (+ auditoria + pendências).
 
@@ -602,8 +631,39 @@ def processar_importacao(
     to_local, to_wgs = medida.transformadores([gleba_wgs])
     gleba_m = sh_transform(to_local, gleba_wgs)
 
-    # --- encaixe: UTM (reprojeção) ou best-fit (similaridade ao contorno da gleba) ---
+    # --- VISTA DESLOCADA NA PRANCHA (caso real, 24/07): o desenhista copia o loteamento
+    # ao lado da divisa na folha. Se a divisa (papel 'perimetro') existe e os lotes caem
+    # FORA dela nas coordenadas do arquivo, traz a vista de volta sobre a divisa. ---
     avisos: list[str] = []
+    pts_per_raw = bruto.get("perimetro") or []
+    if len(pts_per_raw) >= 8:
+        from shapely import affinity
+        from shapely.geometry import MultiPoint as _MP
+
+        casco_per = _MP(pts_per_raw).convex_hull
+        faces_raw = _fechar_faces(segs["lote"] + segs["via"])
+        lotes_raw = [
+            f for f in faces_raw
+            if any(f.contains(Point(r["x"], r["y"])) for r in rotulos)
+        ]
+        if lotes_raw and casco_per.area > 0:
+            uni_raw = unary_union(lotes_raw)
+            dentro = uni_raw.intersection(casco_per).area / uni_raw.area
+            if dentro < 0.5:
+                dx = casco_per.centroid.x - uni_raw.centroid.x
+                dy = casco_per.centroid.y - uni_raw.centroid.y
+                for papel in segs:
+                    segs[papel] = [affinity.translate(ls, dx, dy) for ls in segs[papel]]
+                for r in rotulos:
+                    r["x"], r["y"] = r["x"] + dx, r["y"] + dy
+                avisos.append(
+                    "A vista do loteamento estava DESLOCADA na prancha "
+                    f"(~{math.hypot(dx, dy):,.0f} unidades da divisa) — reposicionada "
+                    "sobre a divisa do terreno antes do encaixe. Confirme no mapa e use "
+                    "o ajuste manual se precisar de refino.".replace(",", ".")
+                )
+
+    # --- encaixe: UTM (reprojeção) ou best-fit (similaridade ao contorno da gleba) ---
     if georref.get("utm_detectado") and georref.get("epsg_sugerido"):
         from pyproj import Transformer
 
@@ -657,6 +717,27 @@ def processar_importacao(
             avisos.append(aviso_fit)
         encaixe = {"metodo": "best_fit", "epsg": None, "score": score, "aviso": aviso_fit,
                    "ancora": "perimetro" if ancora is not None else "desenho"}
+
+    # Ajuste MANUAL (2 cliques do wizard) — composto APÓS o encaixe automático. Necessário
+    # quando o KMZ não cobre a propriedade toda (a divisa do desenho ≠ polígono do KMZ):
+    # nenhum automático tem como adivinhar qual parte é — o usuário aponta.
+    if ajuste:
+        pares = []
+        for par in ajuste:
+            p = Point(*to_local(float(par["de"][0]), float(par["de"][1])))
+            q = Point(*to_local(float(par["para"][0]), float(par["para"][1])))
+            pares.append((p, q))
+        aplicar_auto = aplicar
+        correcao = _correcao_por_pares(pares)
+
+        def aplicar(g):  # noqa: F811 — composição intencional
+            return correcao(aplicar_auto(g))
+
+        encaixe["ancora"] = "manual"
+        avisos.append(
+            f"Encaixe ajustado manualmente por você ({len(pares)} par(es) de pontos de "
+            "referência no mapa)."
+        )
 
     segs_m = {papel: [aplicar(ls) for ls in lista] for papel, lista in segs.items()}
     rotulos_m = [{**r, "pt": aplicar(Point(r["x"], r["y"]))} for r in rotulos]

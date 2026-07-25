@@ -378,6 +378,73 @@ def test_best_fit_ancorado_na_cerca_posiciona_fora_do_centro(client, tmp_path):
     assert dist_centro > w / 8  # longe do centro = a âncora mandou na posição
 
 
+def test_vista_deslocada_na_prancha_e_reposicionada(client, tmp_path):
+    """Caso REAL (24/07): o desenhista copia a vista do loteamento AO LADO da divisa na
+    prancha (~360 m no arquivo do cliente). Com a divisa mapeada, o motor detecta os lotes
+    fora dela e traz a vista de volta antes do encaixe — 100% dos lotes na gleba."""
+    aid = _upload_gleba(client)
+    gleba_m, w, h, _ = _gleba_local()
+    caminho = tmp_path / "proj.dxf"
+    # Quadra (com guia) desenhada DESLOCADA 2·w à direita da divisa na folha.
+    _dxf_na_escala(str(caminho), w, h, dx=2 * w)
+    doc = ezdxf.readfile(str(caminho))
+    doc.layers.add("CERCA")
+    for i in range(25):  # divisa no lugar "certo" da folha: retângulo (0,0)–(w,h)
+        f = i / 24
+        for p in ((f * w, 0), (f * w, h), (0, f * h), (w, f * h)):
+            doc.modelspace().add_point(p, dxfattribs={"layer": "CERCA"})
+    doc.saveas(str(caminho))
+
+    r = _importar(client, aid, caminho.read_bytes())
+    body = _confirmar(client, aid, r.json()["importacao_id"],
+                      mapeamento={**_MAPEAMENTO, "CERCA": "perimetro"}).json()
+    assert any("DESLOCADA" in a for a in body["avisos"])
+    assert body["encaixe"]["ancora"] == "perimetro"
+    resumo = body["auditoria"]["resumo"]
+    assert resumo["lotes_medidos"] == 6
+    assert resumo["dif_mediana_pct"] < 0.02
+    # Os lotes terminam DENTRO da gleba (a vista voltou sobre a divisa antes do encaixe).
+    from shapely.geometry import shape
+    from shapely.ops import transform as _sht, unary_union
+
+    from app.core import urbanismo_medida as medida
+
+    to_local, _ = medida.transformadores([Polygon(RET_RETANGULO)])
+    uni = unary_union([
+        _sht(to_local, shape(f["geometry"]))
+        for f in body["geometria"]["lotes_features"]["features"]
+    ])
+    assert uni.intersection(gleba_m).area / uni.area > 0.99
+
+
+def test_ajuste_manual_um_par_translada(client, tmp_path):
+    """Ajuste de 2 cliques (1 par = translação): o preview re-renderiza com o projeto
+    deslocado exatamente pelo vetor apontado pelo usuário."""
+    aid, iid, w, h = _preparar(client, tmp_path, rot_graus=3.0, dx=100.0, dy=50.0)
+    antes = _confirmar(client, aid, iid).json()
+    from shapely.geometry import shape
+    from shapely.ops import unary_union
+
+    def centroide(body):
+        return unary_union(
+            [shape(f["geometry"]) for f in body["geometria"]["lotes_features"]["features"]]
+        ).centroid
+
+    c0 = centroide(antes)
+    dlon = 0.001  # ~100 m para leste
+    r = client.post(
+        f"/api/analises/{aid}/urbanismo/importar/{iid}/confirmar",
+        json={"mapeamento": _MAPEAMENTO, "salvar": False,
+              "ajuste": [{"de": [c0.x, c0.y], "para": [c0.x + dlon, c0.y]}]},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["encaixe"]["ancora"] == "manual"
+    c1 = centroide(body)
+    assert abs((c1.x - c0.x) - dlon) < dlon * 0.05  # transladou ~o vetor pedido
+    assert abs(c1.y - c0.y) < dlon * 0.05
+
+
 def test_pendencias_rotulo_orfao_e_lote_sem_rotulo(client, tmp_path):
     aid, iid, w, h = _preparar(client, tmp_path, rotulo_orfao=True, pular_rotulo=2)
     body = _confirmar(client, aid, iid).json()
