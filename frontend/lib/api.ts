@@ -1663,6 +1663,8 @@ export interface GeometriaUrb {
     | null;
   // Fase 11.3 — pórtico/entrada: marcador do acesso único (alto padrão) p/ o mapa.
   portico?: GeoJSON.Geometry | null;
+  // URB-IMPORT — eixos de via do PRÓPRIO desenho importado (guias mapeadas como 'via').
+  vias_eixos?: GeoJSON.Geometry | null;
   // Fase U3 — lago/espelho d'água criado (null sem lago).
   agua?: GeoJSON.Geometry | null;
   // Fase 9.8 — restrição recortada (mata/declividade/APP) p/ o mapa rotular (não "clarão").

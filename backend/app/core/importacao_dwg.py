@@ -404,9 +404,42 @@ def _segmentos_de(e) -> list[list[tuple[float, float]]]:
         if t == "SPLINE":
             pts = [(p[0], p[1]) for p in e.flattening(0.5)]
             return [pts] if len(pts) >= 2 else []
+        if t == "HATCH":  # verde/institucional/lazer costumam ser HACHURA no CAD
+            cadeias = []
+            for path in e.paths:
+                try:
+                    pv = [(v[0], v[1]) for v in path.vertices]  # PolylinePath
+                except Exception:  # noqa: BLE001 — EdgePath: junta as arestas de linha
+                    pv = []
+                    for edge in getattr(path, "edges", []):
+                        if getattr(edge, "EDGE_TYPE", "") == "LineEdge":
+                            pv.extend([(edge.start[0], edge.start[1]),
+                                       (edge.end[0], edge.end[1])])
+                if len(pv) >= 2:
+                    if pv[0] != pv[-1]:
+                        pv.append(pv[0])
+                    cadeias.append(pv)
+            return cadeias
     except Exception:  # noqa: BLE001 — entidade degenerada não derruba a importação
         return []
     return []
+
+
+# Textos do desenho que CLASSIFICAM a face que os contém (uso, não medida): "ÁREA VERDE",
+# "ÁREA INSTITUCIONAL", "LAZER/PRAÇA". A face marcada entra no quadro no balde certo.
+_MARCADORES_USO = (
+    ("verde", ("AREA VERDE", "ÁREA VERDE")),
+    ("institucional", ("INSTITUCIONAL",)),
+    ("lazer", ("LAZER", "PRAÇA", "PRACA", "RECREAÇ", "RECREAC")),
+)
+
+
+def _tipo_marcador(texto: str) -> Optional[str]:
+    up = texto.upper()
+    for tipo, chaves in _MARCADORES_USO:
+        if any(k in up for k in chaves):
+            return tipo
+    return None
 
 
 def extrair_para_confirmar(caminho_dxf_: str, mapeamento: dict[str, str]) -> Optional[dict]:
@@ -425,34 +458,62 @@ def extrair_para_confirmar(caminho_dxf_: str, mapeamento: dict[str, str]) -> Opt
     segmentos: dict[str, list] = {"lote": [], "via": [], "verde": [], "institucional": []}
     rotulos: list[dict] = []  # {x, y, area_m2} — ponto de inserção do TEXT/MTEXT
     perimetro: list[tuple[float, float]] = []  # pontos da divisa/cerca (âncora do encaixe)
+    marcadores: list[dict] = []  # {x, y, tipo} — textos de USO (verde/institucional/lazer)
+    camadas_geo: dict[str, list] = {}  # TODAS as camadas c/ pouca geometria → candidatas a divisa
     ativos = {c for c, papel in mapeamento.items() if papel != "ignorar"}
     for e in doc.modelspace():
         camada = str(e.dxf.layer or "0")
         papel = mapeamento.get(camada, "ignorar")
-        if camada not in ativos:
-            continue
         if e.dxftype() in ("TEXT", "MTEXT"):
-            m = _RE_ROTULO_AREA.search(_texto_de(e))
-            if m and (area := _num_ptbr(m.group(1))) is not None:
-                try:
-                    ins = e.dxf.insert
-                    rotulos.append({"x": float(ins.x), "y": float(ins.y), "area_m2": area})
-                except Exception:  # noqa: BLE001
-                    pass
+            texto = _texto_de(e)
+            try:
+                ins = e.dxf.insert
+                xy = (float(ins.x), float(ins.y))
+            except Exception:  # noqa: BLE001
+                continue
+            # Marcadores de USO valem de QUALQUER camada (o desenhista rotula onde quer).
+            if (tipo := _tipo_marcador(texto)) is not None:
+                marcadores.append({"x": xy[0], "y": xy[1], "tipo": tipo})
+            if camada in ativos:
+                m = _RE_ROTULO_AREA.search(texto)
+                if m and (area := _num_ptbr(m.group(1))) is not None:
+                    rotulos.append({"x": xy[0], "y": xy[1], "area_m2": area})
+            continue
+        cadeias = _segmentos_de(e)
+        # Candidatas a DIVISA automática: qualquer camada com pouca geometria (a divisa é
+        # uma poligonal simples; o usuário não precisa saber qual camada é — o motor testa).
+        if papel not in ("lote", "via"):
+            camadas_geo.setdefault(camada, []).extend(cadeias)
+        if camada not in ativos:
             continue
         if papel == "perimetro":
             perimetro.extend(_pontos_extensao(e))
             continue
         if papel not in segmentos:
             continue
-        for pts in _segmentos_de(e):
+        for pts in cadeias:
             try:
                 ls = LineString(pts)
                 if ls.length > 0:
                     segmentos[papel].append(ls)
             except Exception:  # noqa: BLE001
                 continue
-    return {"segmentos": segmentos, "rotulos": rotulos, "perimetro": perimetro}
+    camadas_divisa: dict[str, list] = {}
+    for nome, cadeias in camadas_geo.items():
+        if not 2 <= len(cadeias) <= 40:  # divisa é poligonal simples, não malha densa
+            continue
+        segs_c = []
+        for pts in cadeias:
+            try:
+                ls = LineString(pts)
+                if ls.length > 0:
+                    segs_c.append(ls)
+            except Exception:  # noqa: BLE001
+                continue
+        if segs_c:
+            camadas_divisa[nome] = segs_c
+    return {"segmentos": segmentos, "rotulos": rotulos, "perimetro": perimetro,
+            "marcadores": marcadores, "camadas_divisa": camadas_divisa}
 
 
 def _costurar_pontas(segs: list, tol: float = _TOL_COSTURA_M) -> list:
@@ -631,39 +692,10 @@ def processar_importacao(
     to_local, to_wgs = medida.transformadores([gleba_wgs])
     gleba_m = sh_transform(to_local, gleba_wgs)
 
-    # --- VISTA DESLOCADA NA PRANCHA (caso real, 24/07): o desenhista copia o loteamento
-    # ao lado da divisa na folha. Se a divisa (papel 'perimetro') existe e os lotes caem
-    # FORA dela nas coordenadas do arquivo, traz a vista de volta sobre a divisa. ---
+    marcadores = bruto.get("marcadores") or []
     avisos: list[str] = []
-    pts_per_raw = bruto.get("perimetro") or []
-    if len(pts_per_raw) >= 8:
-        from shapely import affinity
-        from shapely.geometry import MultiPoint as _MP
 
-        casco_per = _MP(pts_per_raw).convex_hull
-        faces_raw = _fechar_faces(segs["lote"] + segs["via"])
-        lotes_raw = [
-            f for f in faces_raw
-            if any(f.contains(Point(r["x"], r["y"])) for r in rotulos)
-        ]
-        if lotes_raw and casco_per.area > 0:
-            uni_raw = unary_union(lotes_raw)
-            dentro = uni_raw.intersection(casco_per).area / uni_raw.area
-            if dentro < 0.5:
-                dx = casco_per.centroid.x - uni_raw.centroid.x
-                dy = casco_per.centroid.y - uni_raw.centroid.y
-                for papel in segs:
-                    segs[papel] = [affinity.translate(ls, dx, dy) for ls in segs[papel]]
-                for r in rotulos:
-                    r["x"], r["y"] = r["x"] + dx, r["y"] + dy
-                avisos.append(
-                    "A vista do loteamento estava DESLOCADA na prancha "
-                    f"(~{math.hypot(dx, dy):,.0f} unidades da divisa) — reposicionada "
-                    "sobre a divisa do terreno antes do encaixe. Confirme no mapa e use "
-                    "o ajuste manual se precisar de refino.".replace(",", ".")
-                )
-
-    # --- encaixe: UTM (reprojeção) ou best-fit (similaridade ao contorno da gleba) ---
+    # --- encaixe: UTM (reprojeção) ou best-fit com SELEÇÃO AUTOMÁTICA de âncora ---
     if georref.get("utm_detectado") and georref.get("epsg_sugerido"):
         from pyproj import Transformer
 
@@ -683,17 +715,66 @@ def processar_importacao(
         # Escala pela régua do PRÓPRIO desenho (rótulos de área) — o casco engana quando o
         # arquivo traz contexto além da gleba (caso real: todos os lotes encolhiam ~72%).
         escala = _escala_por_rotulos(segs, rotulos)
-        # Âncora de posição/rotação: a DIVISA/CERCA do levantamento (papel "perimetro") —
-        # o contorno no desenho casa com o contorno do KMZ; os lotes caem no lugar certo.
-        pts_per = bruto.get("perimetro") or []
-        ancora = None
-        if len(pts_per) >= 8:
-            from shapely.geometry import MultiPoint
 
-            ancora = MultiPoint(pts_per)
-        aplicar_fit, score = _best_fit(
-            unary_union(todas_ls), gleba_m, escala_fixa=escala, ancora=ancora
-        )
+        # ÂNCORAS CANDIDATAS testadas pelo motor (o usuário NÃO precisa saber qual camada
+        # é a divisa — achado do operador, 24/07): (1) camada marcada como divisa;
+        # (2) divisas DETECTADAS: qualquer camada simples cuja poligonal fecha com a área
+        # da gleba (±escala dos rótulos); (3) contorno do desenho inteiro (fallback).
+        # Vence a de maior aderência (IoU) ao contorno do KMZ — determinístico.
+        from shapely.geometry import MultiPoint
+
+        candidatas: list[tuple[str, str, object]] = []
+        pts_per = bruto.get("perimetro") or []
+        if len(pts_per) >= 8:
+            candidatas.append(("camada marcada como divisa", "perimetro",
+                               MultiPoint(pts_per).convex_hull))
+        if escala:
+            area_gleba_raw = gleba_m.area / (escala * escala)
+            for nome in sorted(bruto.get("camadas_divisa") or {}):
+                for f in _fechar_faces(bruto["camadas_divisa"][nome]):
+                    if 0.4 * area_gleba_raw <= f.area <= 2.2 * area_gleba_raw:
+                        candidatas.append(
+                            (f"divisa detectada na camada '{nome}'", f"auto:{nome}", f)
+                        )
+        candidatas.append(("contorno do desenho", "desenho", None))
+
+        uniao_todas = unary_union(todas_ls)
+        melhor = None
+        for rotulo_anc, chave_anc, geom_anc in candidatas:
+            aplicar_c, score_c = _best_fit(
+                uniao_todas, gleba_m, escala_fixa=escala, ancora=geom_anc
+            )
+            if melhor is None or score_c > melhor[0] + 1e-9:
+                melhor = (score_c, rotulo_anc, chave_anc, geom_anc, aplicar_c)
+        score, rotulo_anc, chave_anc, geom_anc, aplicar_fit = melhor
+
+        # VISTA DESLOCADA NA PRANCHA (caso real): o desenhista copia o loteamento ao lado
+        # da divisa na folha — lotes fora da âncora escolhida voltam sobre ela.
+        if geom_anc is not None:
+            from shapely import affinity
+
+            casco_anc = geom_anc.convex_hull
+            faces_raw = _fechar_faces(segs["lote"] + segs["via"])
+            lotes_raw = [f for f in faces_raw
+                         if any(f.contains(Point(r["x"], r["y"])) for r in rotulos)]
+            if lotes_raw and casco_anc.area > 0:
+                uni_raw = unary_union(lotes_raw)
+                if uni_raw.intersection(casco_anc).area / uni_raw.area < 0.5:
+                    dx = casco_anc.centroid.x - uni_raw.centroid.x
+                    dy = casco_anc.centroid.y - uni_raw.centroid.y
+                    for papel in segs:
+                        segs[papel] = [affinity.translate(ls, dx, dy)
+                                       for ls in segs[papel]]
+                    for r in rotulos:
+                        r["x"], r["y"] = r["x"] + dx, r["y"] + dy
+                    for m in marcadores:
+                        m["x"], m["y"] = m["x"] + dx, m["y"] + dy
+                    avisos.append(
+                        "A vista do loteamento estava DESLOCADA na prancha "
+                        f"(~{math.hypot(dx, dy):,.0f} unidades da divisa) — reposicionada "
+                        "sobre a divisa do terreno antes do encaixe. Confirme no mapa e "
+                        "use o ajuste manual se precisar de refino.".replace(",", ".")
+                    )
 
         def aplicar(g):
             return aplicar_fit(g)
@@ -704,19 +785,15 @@ def processar_importacao(
                 f"(1 unidade = {round(escala, 4)} m); rotação/posição ajustadas ao "
                 "contorno da gleba — confirme visualmente."
             )
-        if ancora is not None:
-            avisos.append(
-                f"Encaixe ancorado na DIVISA do levantamento ({len(pts_per)} pontos da "
-                "camada de cerca/divisa) casada com o contorno da gleba do KMZ."
-            )
+        avisos.append(f"Encaixe ancorado em: {rotulo_anc}.")
         aviso_fit = (None if score >= 0.80 else
                      "Encaixe de baixa confiança (desenho sem georreferência) — confirme "
-                     "visualmente; marcar a camada da CERCA/DIVISA como 'Divisa do "
-                     "terreno' melhora o encaixe, e arquivo em UTM/SIRGAS o torna exato.")
+                     "visualmente e use o ajuste manual (🎯); arquivo em UTM/SIRGAS torna "
+                     "o encaixe exato.")
         if aviso_fit:
             avisos.append(aviso_fit)
         encaixe = {"metodo": "best_fit", "epsg": None, "score": score, "aviso": aviso_fit,
-                   "ancora": "perimetro" if ancora is not None else "desenho"}
+                   "ancora": chave_anc}
 
     # Ajuste MANUAL (2 cliques do wizard) — composto APÓS o encaixe automático. Necessário
     # quando o KMZ não cobre a propriedade toda (a divisa do desenho ≠ polígono do KMZ):
@@ -746,11 +823,31 @@ def processar_importacao(
     faces = _fechar_faces(segs_m["lote"] + segs_m["via"])
     maior_declarada = max((r["area_m2"] for r in rotulos_m), default=0.0)
 
+    # Marcadores de USO ("ÁREA VERDE", "ÁREA INSTITUCIONAL", "LAZER/PRAÇA") classificam a
+    # face que os contém — vira o balde certo do quadro, não pendência.
+    marcadores_m = [{**m, "pt": aplicar(Point(m["x"], m["y"]))} for m in marcadores]
+
     lotes: list = []
     auditoria_lotes: list[dict] = []
     pendencias: list[dict] = []
+    verde_marcada: list = []
+    inst_marcada: list = []
+    lazer_marcada: list = []
     rotulos_restantes = list(rotulos_m)
+    n_classificadas = 0
     for face in faces:
+        tipos = {m["tipo"] for m in marcadores_m if face.contains(m["pt"])}
+        if tipos:
+            n_classificadas += 1
+            if "verde" in tipos:
+                verde_marcada.append(face)
+            elif "institucional" in tipos:
+                inst_marcada.append(face)
+            else:
+                lazer_marcada.append(face)
+            # rótulo de área dentro de face de uso não vira lote nem pendência
+            rotulos_restantes = [r for r in rotulos_restantes if not face.contains(r["pt"])]
+            continue
         meus = [r for r in rotulos_restantes if face.contains(r["pt"])]
         if meus:
             lotes.append(face)
@@ -764,21 +861,31 @@ def processar_importacao(
                                "pt": c})
     for r in rotulos_restantes:
         pendencias.append({"tipo": "rotulo_sem_lote", "area_m2": r["area_m2"], "pt": r["pt"]})
+    if n_classificadas:
+        avisos.append(
+            f"{n_classificadas} área(s) classificadas pelos TEXTOS do desenho "
+            "(ÁREA VERDE / INSTITUCIONAL / LAZER) — entram no quadro no uso certo."
+        )
 
-    # --- verde/institucional: faces fechadas das próprias camadas ---
-    verde = unary_union(_fechar_faces(segs_m["verde"])) if segs_m["verde"] else None
-    inst = (unary_union(_fechar_faces(segs_m["institucional"]))
-            if segs_m["institucional"] else None)
+    # --- verde/institucional: faces das próprias camadas (polilinhas e HACHURAS) + marcadas ---
+    verde = medida._uniao(
+        (_fechar_faces(segs_m["verde"]) if segs_m["verde"] else []) + verde_marcada
+    )
+    inst = medida._uniao(
+        (_fechar_faces(segs_m["institucional"]) if segs_m["institucional"] else [])
+        + inst_marcada
+    )
+    lazer = medida._uniao(lazer_marcada)
 
-    # --- vias = fecho do quadro (gleba − lotes − verde − institucional), rotulado ---
-    ocupado = medida._uniao([*lotes, verde, inst])
+    # --- vias = fecho do quadro (gleba − lotes − verde − institucional − lazer), rotulado ---
+    ocupado = medida._uniao([*lotes, verde, inst, lazer])
     try:
         arruamento = gleba_m.difference(ocupado.buffer(0)) if ocupado is not None else gleba_m
     except Exception:  # noqa: BLE001
         arruamento = None
     avisos.append(
-        "Linha 'arruamento' = tudo na gleba que não é lote/verde/institucional (inclui "
-        "áreas não classificadas e pendências) — fecho do quadro, rotulado, sem inventar uso."
+        "Linha 'arruamento' = tudo na gleba que não é lote/verde/institucional/lazer "
+        "(inclui áreas não classificadas e pendências) — fecho do quadro, sem inventar uso."
     )
 
     # --- ids DETERMINÍSTICOS (varredura noroeste→sudeste) + medição geodésica ---
@@ -789,11 +896,22 @@ def processar_importacao(
 
     layout = medida.Layout(
         lotes=lotes, arruamento=arruamento, areas_verdes=verde, institucional=inst,
+        sistema_lazer=lazer,
         lote_quadra=[f"L-{i+1:03d}" for i in range(len(lotes))],
     )
     med = medida.medir(layout)
     fator = _fator_geodesico(gleba_wgs, gleba_m)
     geometria = medida.geojson_do_layout(layout, to_wgs, med.heatmap.get("por_lote"))
+    # Eixos de via DO DESENHO (guias mapeadas como 'via') — o mapa desenha o traçado real.
+    if segs_m["via"]:
+        try:
+            from shapely.geometry import mapping as sh_mapping
+
+            geometria["vias_eixos"] = sh_mapping(
+                sh_transform(to_wgs, unary_union(segs_m["via"]))
+            )
+        except Exception:  # noqa: BLE001 — sem eixos → mapa segue sem a camada
+            pass
 
     def _wgs_pt(pt) -> tuple[float, float]:
         lon, lat = to_wgs(pt.x, pt.y)

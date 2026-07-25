@@ -44,6 +44,9 @@ function overlaysDe(p: PropostaImportada): Partial<Record<ChaveOverlay, GeoJSON.
   const o: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {};
   if (p.geometria.areas_verdes) o.urb_verde = p.geometria.areas_verdes;
   if (p.geometria.institucional) o.urb_institucional = p.geometria.institucional;
+  if (p.geometria.sistema_lazer) o.urb_lazer = p.geometria.sistema_lazer;
+  // Traçado viário do PRÓPRIO desenho (guias) — linhas escuras sobre o satélite.
+  if (p.geometria.vias_eixos) o.urb_arruamento = p.geometria.vias_eixos;
   return o;
 }
 
