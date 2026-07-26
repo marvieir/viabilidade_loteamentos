@@ -3071,6 +3071,48 @@ def gerar_layout(
                     lotes.append(_ev)
                     lote_quadra.append(f"R{len(lote_quadra) + 1}")
 
+    # MOTOR-SOBRA — RECUPERAÇÃO DE SOBRA URBANA (achado do operador, 26/07, snapshot de Porto
+    # Real): faces com FRENTE DE VIA e tamanho de quadra morriam como "sobra geométrica"
+    # (31,8% da líquida; as 10 maiores eram quadras de ~58×60 m com 33–155 m de frente — o
+    # loteador direto nelas rendia 46 lotes). Mesma cura da RURAL-5: com as vias FINAIS,
+    # reloteia a sobra — componente grande, fora de restrição e com frente real volta ao
+    # loteador; só entram lotes com frente; o resto segue sobra/verde (honesto).
+    if (not regime_rural and sobra_ponta is not None and not sobra_ponta.is_empty
+            and arruamento is not None and not arruamento.is_empty):
+        _via_buf = arruamento.buffer(0.6)
+        _min_face = max(2.0 * piso_lote, 500.0)
+        _rec_lotes: list = []
+        for _f in _componentes(sobra_ponta):
+            if _f.area < _min_face:
+                continue
+            _fl = _f if restr_lote is None else _valido(_diferenca_segura(_f, restr_lote))
+            if _fl is None or _fl.is_empty:
+                continue
+            for _fc in _componentes(_fl):
+                if (_fc.area < _min_face
+                        or _fc.boundary.intersection(_via_buf).length < FRENTE_MIN_M):
+                    continue
+                _sub, _ = _lotear_melhor_eixo(
+                    _fc, testada_alvo, prof, alvo_area, piso_lote, teto_lote
+                )
+                for _l in _sub:
+                    _lv = _valido(_l)
+                    if (_lv is not None and not _lv.is_empty
+                            and _lv.geom_type == "Polygon"
+                            and _lv.boundary.intersection(_via_buf).length >= FRENTE_MIN_M):
+                        _rec_lotes.append(_lv)
+        if _rec_lotes:
+            lotes = lotes + _rec_lotes
+            if lote_quadra:
+                lote_quadra = lote_quadra + [f"S{_k + 1}" for _k in range(len(_rec_lotes))]
+            _solo_rec = _uniao_segura(_rec_lotes)
+            sobra_ponta = _diferenca_segura(sobra_ponta, _solo_rec)
+            verde = _diferenca_segura(verde, _solo_rec) if verde is not None else None
+            avisos.append(
+                f"Recuperação de sobra (2ª passada com as vias finais): {len(_rec_lotes)} "
+                "lote(s) com frente de via resgatados de faces que morreriam como sobra."
+            )
+
     # RURAL-2 — % edificável por chácara (parcela-cheia): quanto da parcela está FORA da
     # restrição declarada (mata/APP/≥30%). Rotulado, com a proveniência da restrição do estudo.
     def _pct_edificavel(_l):
