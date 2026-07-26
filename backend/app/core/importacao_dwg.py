@@ -779,6 +779,21 @@ def processar_importacao(
         def aplicar(g):
             return aplicar_fit(g)
 
+        # A DIVISA escolhida entra no FECHAMENTO: áreas de borda (verde/institucional nos
+        # cantos da gleba) só fecham contra a linha da divisa (achado do arquivo real —
+        # os "ÁREA VERDE" ficavam órfãos porque a face não fechava sem a borda).
+        if chave_anc.startswith("auto:"):
+            segs["lote"] = segs["lote"] + list(
+                bruto["camadas_divisa"].get(chave_anc[5:], [])
+            )
+        elif geom_anc is not None:  # divisa marcada por pontos → anel do casco fecha a borda
+            try:
+                from shapely.geometry import LineString as _LS
+
+                segs["lote"] = segs["lote"] + [_LS(geom_anc.convex_hull.exterior.coords)]
+            except Exception:  # noqa: BLE001
+                pass
+
         if escala is not None:
             avisos.append(
                 "Escala do desenho determinada pelos rótulos de área do próprio CAD "

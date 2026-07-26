@@ -16,6 +16,7 @@ import {
   type ParAjusteImportacao,
   type PropostaImportada,
 } from "@/lib/api";
+import { CORES_OVERLAY } from "@/components/mapa/overlays";
 
 const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
   ssr: false,
@@ -45,10 +46,21 @@ function overlaysDe(p: PropostaImportada): Partial<Record<ChaveOverlay, GeoJSON.
   if (p.geometria.areas_verdes) o.urb_verde = p.geometria.areas_verdes;
   if (p.geometria.institucional) o.urb_institucional = p.geometria.institucional;
   if (p.geometria.sistema_lazer) o.urb_lazer = p.geometria.sistema_lazer;
-  // Traçado viário do PRÓPRIO desenho (guias) — linhas escuras sobre o satélite.
-  if (p.geometria.vias_eixos) o.urb_arruamento = p.geometria.vias_eixos;
+  // Viário/fecho PREENCHIDO (mesma malha cinza do estudo gerado) + guias como tracejado.
+  if (p.geometria.arruamento) o.urb_arruamento = p.geometria.arruamento;
+  if (p.geometria.vias_eixos) o.urb_quadras = p.geometria.vias_eixos;
   return o;
 }
+
+// Legenda do painel importado — mesmas cores/rótulos do mapa do estudo gerado.
+const LEGENDA_IMPORTADO: { chave: ChaveOverlay; rotulo: string }[] = [
+  { chave: "urb_lotes", rotulo: "Lotes (auditados)" },
+  { chave: "urb_arruamento", rotulo: "Viário + não classificado (fecho)" },
+  { chave: "urb_quadras", rotulo: "Guias do desenho" },
+  { chave: "urb_verde", rotulo: "Área verde" },
+  { chave: "urb_institucional", rotulo: "Institucional" },
+  { chave: "urb_lazer", rotulo: "Lazer / praça" },
+];
 
 // Painel de conferência/resultado — usado no passo 3 do wizard E na proposta já salva.
 export function PainelImportado({
@@ -99,6 +111,25 @@ export function PainelImportado({
             lazerFeatures={null}
             aoClicar={aoClicarMapa}
           />
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-slate-50 px-3 py-2 text-[10px] text-slate-600">
+          {LEGENDA_IMPORTADO.filter(
+            (l) =>
+              l.chave === "urb_lotes" ||
+              overlaysDe(proposta)[l.chave] !== undefined
+          ).map((l) => (
+            <span key={l.chave} className="inline-flex items-center gap-1">
+              <span
+                className="inline-block h-2.5 w-3 rounded-sm border"
+                style={{
+                  backgroundColor: CORES_OVERLAY[l.chave],
+                  borderColor: CORES_OVERLAY[l.chave],
+                  opacity: 0.85,
+                }}
+              />
+              {l.rotulo}
+            </span>
+          ))}
         </div>
       </div>
 
