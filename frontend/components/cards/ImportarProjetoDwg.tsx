@@ -63,6 +63,8 @@ export function PainelImportado({
   dicaMapa?: string | null;
 }) {
   const r = proposta.auditoria.resumo;
+  // Mesmo recurso do estudo gerado (Fase 9.6): mapa maior sob demanda.
+  const [mapaExpandido, setMapaExpandido] = useState(false);
   return (
     <div className="space-y-3">
       <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -70,16 +72,25 @@ export function PainelImportado({
           <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
             Projeto importado — {proposta.arquivo}
           </span>
-          <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
-            importada
-          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setMapaExpandido((v) => !v)}
+              className="rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-600 hover:bg-slate-100"
+            >
+              {mapaExpandido ? "Recolher mapa" : "Expandir mapa"}
+            </button>
+            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+              importada
+            </span>
+          </div>
         </div>
         {dicaMapa && (
           <p className="border-b border-pink-200 bg-pink-50 px-3 py-2 text-xs font-medium text-pink-800">
             {dicaMapa}
           </p>
         )}
-        <div className="h-[440px] w-full">
+        <div className={`w-full ${mapaExpandido ? "h-[680px]" : "h-[440px]"}`}>
           <MapaLeaflet
             geojson={glebaGeojson}
             overlays={overlaysDe(proposta)}
