@@ -52,6 +52,7 @@ export default function MapaLeaflet({
   lotesFeatures,
   quadras,
   lazerFeatures,
+  pendencias,
   aoClicar,
   marcador,
 }: {
@@ -63,6 +64,8 @@ export default function MapaLeaflet({
   quadras?: GeoJSON.FeatureCollection | null;
   // Fase U2 — lazer rotulado: sub-parcelas do hub + praças de bolso (tooltip por rótulo).
   lazerFeatures?: GeoJSON.FeatureCollection | null;
+  // URB-IMPORT — pendências da importação: pinos clicáveis (props.rotulo no popup).
+  pendencias?: GeoJSON.FeatureCollection | null;
   // Modo "marcar no mapa": callback de clique + marcador [lat, lng] do ponto escolhido.
   aoClicar?: (p: { lat: number; lng: number }) => void;
   marcador?: [number, number] | null;
@@ -125,6 +128,28 @@ export default function MapaLeaflet({
             <GeoJSON key={`${chave}-${JSON.stringify(g)}`} data={g as GeoJsonObject} style={estilo} />
           );
         })}
+
+      {/* URB-IMPORT — PENDÊNCIAS da importação: pinos âmbar clicáveis (rótulo do backend).
+          O front só renderiza os pontos/textos que o backend mandou. */}
+      {pendencias && pendencias.features.length > 0 && (
+        <GeoJSON
+          key={`pendencias-${pendencias.features.length}`}
+          data={pendencias as GeoJsonObject}
+          pointToLayer={(f, latlng) =>
+            L.circleMarker(latlng, {
+              radius: 7,
+              color: "#92400e",
+              weight: 2,
+              fillColor: "#f59e0b",
+              fillOpacity: 0.9,
+            })
+          }
+          onEachFeature={(f, layer) => {
+            const rotulo = (f.properties as { rotulo?: string } | null)?.rotulo;
+            if (rotulo) layer.bindPopup(rotulo);
+          }}
+        />
+      )}
 
       {/* Fase 9.7 — QUADRAS (faces da malha): contorno por baixo dos lotes, p/ ver os miolos
           que as ruas cercam. Sem preenchimento (os lotes coloridos vêm por cima). */}

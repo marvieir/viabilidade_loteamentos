@@ -41,6 +41,21 @@ const ROTULO_PENDENCIA: Record<string, string> = {
   lote_sem_rotulo: "lote fechado sem rótulo de área",
 };
 
+// Pinos das pendências no mapa — só EMBALA os pontos/textos que o backend mandou (§regra 2).
+function pendenciasFC(p: PropostaImportada): GeoJSON.FeatureCollection | null {
+  if (!p.pendencias.length) return null;
+  return {
+    type: "FeatureCollection",
+    features: p.pendencias.map((pd) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [pd.lon, pd.lat] },
+      properties: {
+        rotulo: `${ROTULO_PENDENCIA[pd.tipo]}${pd.area_fmt ? ` (${pd.area_fmt} m²)` : ""}`,
+      },
+    })),
+  };
+}
+
 function overlaysDe(p: PropostaImportada): Partial<Record<ChaveOverlay, GeoJSON.Geometry>> {
   const o: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {};
   if (p.geometria.areas_verdes) o.urb_verde = p.geometria.areas_verdes;
@@ -109,6 +124,7 @@ export function PainelImportado({
             lotesFeatures={proposta.geometria.lotes_features}
             quadras={null}
             lazerFeatures={null}
+            pendencias={pendenciasFC(proposta)}
             aoClicar={aoClicarMapa}
           />
         </div>
@@ -216,6 +232,79 @@ export function PainelImportado({
           {a}
         </p>
       ))}
+    </div>
+  );
+}
+
+// Fase 1.5 — COMPARATIVO gerado × importado (só exibição: números prontos dos dois lados).
+export function ComparativoPropostas({
+  gerada,
+  importada,
+}: {
+  gerada: {
+    indicadores: { n_lotes: number };
+    quadro_areas: PropostaImportada["quadro_areas"];
+  };
+  importada: PropostaImportada;
+}) {
+  const linhas: {
+    r: string;
+    g: string;
+    i: string;
+  }[] = [
+    {
+      r: "Nº de lotes",
+      g: String(gerada.indicadores.n_lotes),
+      i: String(importada.indicadores.n_lotes),
+    },
+    {
+      r: "Vendável",
+      g: `${gerada.quadro_areas.vendavel.m2_fmt} m² · ${gerada.quadro_areas.vendavel.pct_fmt}`,
+      i: `${importada.quadro_areas.vendavel.m2_fmt} m² · ${importada.quadro_areas.vendavel.pct_fmt}`,
+    },
+    {
+      r: "Áreas verdes",
+      g: `${gerada.quadro_areas.areas_verdes.m2_fmt} m²`,
+      i: `${importada.quadro_areas.areas_verdes.m2_fmt} m²`,
+    },
+    {
+      r: "Institucional",
+      g: `${gerada.quadro_areas.institucional.m2_fmt} m²`,
+      i: `${importada.quadro_areas.institucional.m2_fmt} m²`,
+    },
+    {
+      r: "Viário / fecho",
+      g: `${gerada.quadro_areas.arruamento.m2_fmt} m² · ${gerada.quadro_areas.arruamento.pct_fmt}`,
+      i: `${importada.quadro_areas.arruamento.m2_fmt} m² · ${importada.quadro_areas.arruamento.pct_fmt}`,
+    },
+  ];
+  return (
+    <div className="rounded-xl border border-slate-200 p-3">
+      <p className="text-sm font-semibold text-slate-800">
+        Comparativo: estudo gerado × projeto importado
+      </p>
+      <p className="mt-0.5 text-[11px] text-slate-500">
+        Números de cada proposta como medidos pelo motor — bases diferentes (o importado usa o
+        fecho da gleba como viário/não classificado).
+      </p>
+      <table className="mt-2 w-full text-xs">
+        <thead className="text-left text-slate-500">
+          <tr>
+            <th className="py-1 pr-2" />
+            <th className="py-1 pr-2">Gerado (IA)</th>
+            <th className="py-1">Importado (DWG)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {linhas.map((l) => (
+            <tr key={l.r} className="border-t border-slate-100">
+              <td className="py-1 pr-2 font-medium">{l.r}</td>
+              <td className="py-1 pr-2 tabular-nums">{l.g}</td>
+              <td className="py-1 tabular-nums">{l.i}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

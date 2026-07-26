@@ -35,6 +35,7 @@ import {
   type ValorPosicional,
 } from "@/lib/api";
 import {
+  ComparativoPropostas,
   ImportarProjetoDwg,
   PainelImportado,
 } from "@/components/cards/ImportarProjetoDwg";
@@ -507,7 +508,12 @@ export function CardUrbanismo({
           />
         )}
         {importada && !mostrarImportar && (
-          <PainelImportado proposta={importada} glebaGeojson={glebaGeojson} />
+          <>
+            <PainelImportado proposta={importada} glebaGeojson={glebaGeojson} />
+            {proposta && (
+              <ComparativoPropostas gerada={proposta} importada={importada} />
+            )}
+          </>
         )}
         {/* Mov.1 — DIRETRIZES do operador: texto livre que orienta o PROGRAMA da IA
             ("inclua 3 quadras, academia, mirante, áreas de descanso..."). */}
