@@ -912,6 +912,48 @@ export function CardUrbanismo({
               </div>
             </div>
 
+            {/* Fase U4 — VARIANTES do otimizador, LOGO ABAIXO DO MAPA (pedido do operador,
+                26/07: no fim do card ninguém via a opção). Abrir alternativa não chama IA. */}
+            {(proposta.variantes ?? []).length > 1 && (
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Variantes do estudo (otimizador U4 — abrir alternativa não gasta gerações)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {(proposta.variantes ?? []).map((v) => {
+                    const ativa = v.escolhida;
+                    return (
+                      <button
+                        key={v.variante_id}
+                        onClick={() => !v.escolhida && abrirVariante(v.variante_id)}
+                        disabled={varianteCarregando !== null}
+                        className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
+                          ativa
+                            ? "border-indigo-300 bg-indigo-50 text-indigo-900"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                        }`}
+                        title={
+                          v.escolhida
+                            ? "variante escolhida pela função de valor"
+                            : "abrir esta variante (geometria pura — sem custo de IA)"
+                        }
+                      >
+                        <span className="font-semibold">
+                          {varianteCarregando === v.variante_id ? "Abrindo… " : ""}
+                          {v.rotulo}
+                          {v.escolhida ? " ★" : ""}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-slate-500">
+                          {v.n_lotes} lotes · valor {v.valor_indice ?? "—"}
+                          {v.score_medio != null ? ` · score ${v.score_medio}` : ""}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div>
               {/* Quadro de áreas */}
               <div className="rounded-xl border border-slate-200 p-4">
@@ -1205,48 +1247,6 @@ export function CardUrbanismo({
                     </li>
                   ))}
                 </ul>
-              </div>
-            )}
-
-            {/* Fase U4 — VARIANTES do otimizador: K estratégias geradas com UMA proposta de IA;
-                a função de valor escolheu; abrir alternativa não chama IA nem consome o cap. */}
-            {(proposta.variantes ?? []).length > 1 && (
-              <div className="rounded-xl border border-slate-200 p-4">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Variantes do estudo (otimizador U4 — abrir alternativa não gasta gerações)
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {(proposta.variantes ?? []).map((v) => {
-                    const ativa = v.escolhida;
-                    return (
-                      <button
-                        key={v.variante_id}
-                        onClick={() => !v.escolhida && abrirVariante(v.variante_id)}
-                        disabled={varianteCarregando !== null}
-                        className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
-                          ativa
-                            ? "border-indigo-300 bg-indigo-50 text-indigo-900"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                        }`}
-                        title={
-                          v.escolhida
-                            ? "variante escolhida pela função de valor"
-                            : "abrir esta variante (geometria pura — sem custo de IA)"
-                        }
-                      >
-                        <span className="font-semibold">
-                          {varianteCarregando === v.variante_id ? "Abrindo… " : ""}
-                          {v.rotulo}
-                          {v.escolhida ? " ★" : ""}
-                        </span>
-                        <span className="mt-0.5 block text-[11px] text-slate-500">
-                          {v.n_lotes} lotes · valor {v.valor_indice ?? "—"}
-                          {v.score_medio != null ? ` · score ${v.score_medio}` : ""}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
             )}
 
