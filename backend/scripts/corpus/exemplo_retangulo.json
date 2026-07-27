@@ -1,0 +1,4 @@
+{
+  "_comentario": "Caso sintético embarcado (INTEL-1): retângulo ~306×221 m (6,8 ha) na região de São Roque. Glebas reais de clientes NÃO entram no repositório — coloque-as no CORPUS_MOTOR_DIR do seu ambiente (/data/perfis/corpus no container).",
+  "gleba_wkt": "POLYGON ((-47.140 -23.530, -47.137 -23.530, -47.137 -23.528, -47.140 -23.528, -47.140 -23.530))"
+}
