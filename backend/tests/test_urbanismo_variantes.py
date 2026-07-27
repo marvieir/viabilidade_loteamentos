@@ -75,7 +75,11 @@ def test_variante_materializa_sem_ia_e_fora_do_cap(ambiente_u4, monkeypatch):
     assert rv.status_code == 200, rv.text
     corpo = rv.json()
     assert gerador.chamadas == 1  # NENHUMA chamada extra de IA
-    assert len(corpo["variantes"]) == 1 and corpo["variantes"][0]["variante_id"] == "V3"
+    # Fix 26/07 (achado do operador): devolve a lista COMPLETA (o seletor do card sumia
+    # quando vinha só a aberta) — com a marca na variante materializada.
+    assert len(corpo["variantes"]) == 5
+    marcadas = [v for v in corpo["variantes"] if v["escolhida"]]
+    assert len(marcadas) == 1 and marcadas[0]["variante_id"] == "V3"
     assert "sem chamada de IA" in " ".join(corpo["avisos"])
     assert fonte.listar(aid)[-1]["origem_geracao"] == "variante"
     # e o cap segue bloqueando só a IA (variante salva não conta)

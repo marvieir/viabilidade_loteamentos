@@ -1025,12 +1025,22 @@ def materializar_variante(
     prog = Programa(**{k: v for k, v in base["_programa_motor"].items() if k in campos})
     ctx = base.get("_contexto_variantes") or {}
     body_base = schemas.ProporUrbanismoIn(**{k: v for k, v in ctx.items() if v is not None})
-    return _propor_impl(
+    out = _propor_impl(
         analise_id, body_base, registro,
         fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
         fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
         prog=prog, variante_unica=var, origem_geracao="variante", fonte_fmp=fonte_fmp,
     )
+    # Achado do operador (26/07): materializar devolvia a lista de variantes SÓ com a aberta
+    # → o seletor do card sumia. Devolve a lista COMPLETA da proposta-base (números medidos
+    # na geração), com a marca na variante aberta agora.
+    base_vars = base.get("variantes") or []
+    if len(base_vars) > 1:
+        out.variantes = [
+            schemas.VarianteUrbOut(**{**v, "escolhida": v.get("variante_id") == var["id"]})
+            for v in base_vars
+        ]
+    return out
 
 
 # --------------------------------- /valor (Fase U1 — sem LLM) ---------------------------------
