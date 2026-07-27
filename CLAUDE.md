@@ -82,6 +82,11 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
   (`DOMINIO` e `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vivem no `.env` da RAIZ da instância,
   gitignored — nada de export manual; no Mac o export vive no `~/.bash_profile`).
 - Fluxo obrigatório: alterações → teste no Mac do operador (podman) → só então AWS.
+- **Ritual de atualização no Mac (lição de 26/07 — o `up -d` NÃO recria container com
+  imagem nova, e build sem espaço falha deixando a imagem velha no ar):**
+  `git pull` → `podman-compose build --no-cache <serviços>` → `podman-compose down` →
+  `podman-compose up -d` → **verificar com `podman-compose exec api grep -c "<string
+  do commit>" <arquivo>`** antes de testar no navegador. Nunca `up --build`.
 
 ## Verdade antes de resposta (INEGOCIÁVEL)
 - **Nunca responder "para dar uma resposta".** Se não houver certeza fundamentada
