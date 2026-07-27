@@ -86,7 +86,18 @@ def resolver_diretrizes(
     else:
         piso_lote = max(PISO_FEDERAL_M2, piso_mercado)
     # teto de MERCADO do perfil — ou o recomendado pelo operador (Fase 11.8), nunca abaixo do piso.
-    if lote_max_m2:
+    aviso_teto = None
+    if lote_max_m2 and float(lote_max_m2) < piso_lote:
+        # CONTRADIÇÃO (achado do operador, 27/07): teto do usuário ABAIXO do piso do público
+        # colapsava a janela ([piso, piso]) → 0-1 lote e ~63% de sobra, EM SILÊNCIO. A janela
+        # ganha a folga mínima e o aviso conta o ajuste — nunca lixo mudo.
+        teto_lote = float(round(piso_lote * 1.5))
+        aviso_teto = (
+            f"ATENÇÃO: o lote máx. informado ({float(lote_max_m2):.0f} m²) está ABAIXO do "
+            f"piso do público ({piso_lote:.0f} m²) e foi IGNORADO — faixa usada "
+            f"{piso_lote:.0f}–{teto_lote:.0f} m². Limpe o campo ou escolha outro público. "
+        )
+    elif lote_max_m2:
         teto_lote = max(float(lote_max_m2), piso_lote)
     else:
         # Fase 11.10 — FOLGA MÍNIMA de janela: quando a zona força o piso acima do teto de mercado
@@ -112,7 +123,7 @@ def resolver_diretrizes(
         "doacao_split": split,  # frações da gleba (viário/verde/institucional)
         "testada_alvo_m": perf["testada"],
         "prof_alvo_m": perf["prof"],
-        "aviso": (
+        "aviso": (aviso_teto or "") + (
             "Mínimos do município são PISO: o estudo pode propor MAIS, nunca menos. "
             "Lote/doação/verde/institucional verificados na prefeitura (art. 6º Lei 6.766)."
             if zona is not None
