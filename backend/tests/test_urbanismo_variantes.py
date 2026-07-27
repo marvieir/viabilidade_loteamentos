@@ -49,7 +49,7 @@ def test_propor_gera_k_variantes_e_a_funcao_de_valor_escolhe(ambiente_u4):
     assert r.status_code == 200, r.text
     corpo = r.json()
     vs = corpo["variantes"]
-    assert len(vs) == 4  # V1..V4 com UMA chamada de IA
+    assert len(vs) == 5  # V1..V5 com UMA chamada de IA (V5 = grelha eficiente, MOTOR-SOBRA)
     assert gerador.chamadas == 1
     escolhidas = [v for v in vs if v["escolhida"]]
     assert len(escolhidas) == 1

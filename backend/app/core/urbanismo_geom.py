@@ -1529,6 +1529,13 @@ def gerar_layout(
     variante = dict(variante or {})
     orientacao_rad = float(orientacao_rad) + float(variante.get("orientacao_extra_rad", 0.0))
     hub_estrategia = str(variante.get("hub_estrategia", "area"))
+    # MOTOR-SOBRA (achado do operador, 26/07): p/ objetivo RENDIMENTO, uma variante de GRELHA
+    # EFICIENTE compete no K mesmo quando a IA propõe arquétipo sinuoso — na gleba real de
+    # Porto Real a grelha rendia 58% vendável vs 39% do "misto" (a função de valor decide).
+    if variante.get("arquetipo"):
+        import dataclasses as _dc
+
+        programa = _dc.replace(programa, arquetipo_viario=str(variante["arquetipo"]))
     # Movimento 2 — PERFIL DE ESTILO: regras de composição por padrão (default embarcado =
     # comportamento testado; override do operador via ESTILO_URBANISMO_DIR).
     if estilo is None:

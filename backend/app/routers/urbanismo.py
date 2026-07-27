@@ -338,6 +338,12 @@ VARIANTES_U4: list[dict] = [
      "orientacao_extra_rad": 0.0, "hub_estrategia": "centro"},
     {"id": "V4", "rotulo": "Grelha girada 15°",
      "orientacao_extra_rad": math.radians(15.0), "hub_estrategia": "area"},
+    # MOTOR-SOBRA (26/07): grelha EFICIENTE como estratégia explícita — na gleba real de
+    # Porto Real, o arquétipo sinuoso da IA rendia 39% vendável e a grelha 58%. Compete no
+    # K normal (a função de valor escolhe); fora do modo paisagem (curvas reais mandam lá).
+    {"id": "V5", "rotulo": "Grelha eficiente (máximo aproveitamento)",
+     "orientacao_extra_rad": 0.0, "hub_estrategia": "area",
+     "arquetipo": "grelha_eficiente"},
 ]
 
 
@@ -684,8 +690,10 @@ def _propor_impl(
     # melhor; as alternativas ficam materializáveis depois SEM IA (POST /urbanismo/variante).
     candidatas = [variante_unica] if variante_unica is not None else VARIANTES_U4
     if getattr(body, "objetivo", None) == "paisagem" and variante_unica is None:
-        # modo paisagem: só variantes SEM rotação extra (curvas reais exigem o frame da cota)
-        candidatas = [v for v in VARIANTES_U4 if not v.get("orientacao_extra_rad")]
+        # modo paisagem: só variantes SEM rotação extra (curvas reais exigem o frame da
+        # cota) e SEM override de arquétipo (a grelha eficiente contradiz a paisagem).
+        candidatas = [v for v in VARIANTES_U4
+                      if not v.get("orientacao_extra_rad") and not v.get("arquetipo")]
     geradas: list[tuple[dict, object, object, float]] = []
     for var in candidatas:
         layout_v = geom.gerar_layout(
