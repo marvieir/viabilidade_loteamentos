@@ -421,6 +421,7 @@ def _propor_impl(
     origem_geracao: str = "llm",
     fonte_memoria: FonteMemoriaUrbanismo | None = None,
     fonte_fmp: FonteFMP | None = None,
+    variantes_completas: list | None = None,
 ) -> schemas.PropostaUrbanisticaOut:
     """Pipeline completo do estudo de massa (Fase U4): com ``prog`` fornecido NÃO chama a IA
     (materialização de variante); ``variante_unica`` restringe a UMA estratégia (senão gera as
@@ -752,6 +753,16 @@ def _propor_impl(
         )
         for var, lay, m, val in geradas
     ]
+    # Materialização de variante (achado 26/07): mantém a lista COMPLETA da proposta-base
+    # na resposta e no snapshot (senão o seletor do card some), com a marca na aberta.
+    if variantes_completas:
+        _id_aberta = str(variante_escolhida.get("id", ""))
+        variantes_out = [
+            schemas.VarianteUrbOut(
+                **{**v, "escolhida": str(v.get("variante_id")) == _id_aberta}
+            )
+            for v in variantes_completas
+        ]
     quadro, indicadores, heatmap = _medicao_dicts(med)
 
     # Fase 11.13 — declividade média por lote (orientativa, DSM 30 m): amostra o DEM nos lotes
@@ -1025,22 +1036,17 @@ def materializar_variante(
     prog = Programa(**{k: v for k, v in base["_programa_motor"].items() if k in campos})
     ctx = base.get("_contexto_variantes") or {}
     body_base = schemas.ProporUrbanismoIn(**{k: v for k, v in ctx.items() if v is not None})
-    out = _propor_impl(
+    # Achado do operador (26/07): materializar devolvia a lista de variantes SÓ com a aberta
+    # → o seletor do card sumia (na resposta E no snapshot salvo — cliques encadeados e o
+    # reload recaíam no bug). A lista COMPLETA da proposta-base entra nos DOIS.
+    base_vars = base.get("variantes") or []
+    return _propor_impl(
         analise_id, body_base, registro,
         fonte_urb=fonte_urb, fonte_veg=fonte_veg, fonte_camadas=fonte_camadas,
         fonte_dem=fonte_dem, fonte_perfil=fonte_perfil, fonte_vias=fonte_vias,
         prog=prog, variante_unica=var, origem_geracao="variante", fonte_fmp=fonte_fmp,
+        variantes_completas=(base_vars if len(base_vars) > 1 else None),
     )
-    # Achado do operador (26/07): materializar devolvia a lista de variantes SÓ com a aberta
-    # → o seletor do card sumia. Devolve a lista COMPLETA da proposta-base (números medidos
-    # na geração), com a marca na variante aberta agora.
-    base_vars = base.get("variantes") or []
-    if len(base_vars) > 1:
-        out.variantes = [
-            schemas.VarianteUrbOut(**{**v, "escolhida": v.get("variante_id") == var["id"]})
-            for v in base_vars
-        ]
-    return out
 
 
 # --------------------------------- /valor (Fase U1 — sem LLM) ---------------------------------
