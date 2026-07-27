@@ -73,9 +73,12 @@ def medir_caso(entrada: dict, publico: str) -> dict:
             variante=var, estilo=estilo,
         )
         med = medida.medir(layout, publico_alvo=publico)
-        valor = sum(
-            (p.get("area_m2") or 0.0) * (p.get("multiplicador") or 1.0)
-            for p in med.heatmap.get("por_lote", [])
+        # INTEL-2 — a MESMA função de valor do /propor (fonte única, §placar = juiz real).
+        from app.core.urbanismo_valor import valor_variante
+
+        valor, _detalhe = valor_variante(
+            layout, med, publico, estilo=estilo,
+            alvo_lote_m2=diretrizes.get("alvo_lote_m2"),
         )
         cand = (valor, len(layout.lotes), str(var["id"]), layout, med)
         if melhor is None or (cand[0], cand[1]) > (melhor[0], melhor[1]):

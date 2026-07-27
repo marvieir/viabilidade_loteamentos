@@ -28,6 +28,7 @@ from app.core.uploads import ler_upload_limitado
 from app.core import conexao as conexao_mod
 from app.core import urbanismo_geom as geom
 from app.core import urbanismo_medida as medida
+from app.core import urbanismo_valor
 from app.core import uso_llm
 from app.core.camadas import FonteCamadas, get_fonte_camadas
 from app.core.declividade import FonteDEM, amostrar_declividade, get_fonte_dem
@@ -731,9 +732,12 @@ def _propor_impl(
         layout_v.restricao_via_ok = _via_ok if (_via_ok is not None and not _via_ok.is_empty) else None
         # Fase U1 — o perfil do público-alvo escolhe os PESOS do score de valor v2.
         med_v = medida.medir(layout_v, publico_alvo=body.publico_alvo)
-        valor_v = sum(
-            (p.get("area_m2") or 0.0) * (p.get("multiplicador") or 1.0)
-            for p in med_v.heatmap.get("por_lote", [])
+        # INTEL-2 — função de valor POR PÚBLICO (fonte única: core/urbanismo_valor):
+        # VGV posicional × fator (− sobra − excesso de viário − dispersão do alvo
+        # + amenidade), pesos do público com override no perfil de estilo.
+        valor_v, _detalhe_v = urbanismo_valor.valor_variante(
+            layout_v, med_v, str(body.publico_alvo), estilo=estilo,
+            alvo_lote_m2=diretrizes.get("alvo_lote_m2"),
         )
         geradas.append((var, layout_v, med_v, valor_v))
 
