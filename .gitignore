@@ -58,3 +58,4 @@ backend/*.db
 
 # Dados de custo/uso + perfis do operador (dev bind mount)
 backend/app/perfis/_dados/
+backend/scripts/corpus/placar.json
