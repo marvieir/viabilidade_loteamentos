@@ -61,10 +61,16 @@ def test_portico_evita_mata_externa_descontada():
     distância dela. Repro sintética determinística (não depende de fixture).
 
     ATUALIZADO em 28/07: a versão anterior começava afirmando que SEM o veto a portaria caía na
-    mata — fixava o BUG para depois provar a correção. Com a evolução do traçado (MOTOR-SOBRA), o
-    motor passou a escolher a face oeste sozinho e o bug não reproduz mais nem sem o veto, o que
-    deixava o teste vermelho por um MOTIVO BOM. Agora o teste pinta a garantia, que é o que
-    precisa valer para sempre: a portaria fora da mata nos DOIS caminhos."""
+    mata — fixava o BUG para depois provar a correção. Nesta geometria sintética o motor passou a
+    escolher a face oeste sozinho (evolução do traçado, MOTOR-SOBRA) e o bug não reproduz mais nem
+    sem o veto, o que deixava o teste vermelho sem informar nada. Agora ele pinta a GARANTIA.
+
+    ATENÇÃO — o problema de produto NÃO está resolvido (relato do operador, 28/07): em glebas
+    REAIS a portaria ainda cai sobre a mata em alguns casos, e ele reposiciona à mão e regenera.
+    O veto CHEGA ao motor no fluxo real (routers/urbanismo.py passa ``restricao_externa=restr_m``),
+    então a falha está no peso do afastamento diante dos demais critérios em geometria complexa —
+    este caso sintético é simples demais para reproduzi-la. Investigação #33 SEGUE ABERTA; falta
+    um caso-ouro derivado de gleba real que reproduza o desvio."""
     from shapely.geometry import Point, Polygon, box
 
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
