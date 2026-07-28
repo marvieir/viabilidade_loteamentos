@@ -15,6 +15,7 @@ import {
   type PapelCamada,
   type ParAjusteImportacao,
   type PropostaImportada,
+  type PublicoAlvo,
 } from "@/lib/api";
 import { CORES_OVERLAY } from "@/components/mapa/overlays";
 
@@ -329,6 +330,9 @@ export function ImportarProjetoDwg({
   const [ajuste, setAjuste] = useState<ParAjusteImportacao[]>([]);
   const [clicandoDe, setClicandoDe] = useState<[number, number] | null>(null);
   const [ajustando, setAjustando] = useState(false);
+  // INTEL-4 — padrão do projeto, declarado por QUEM CARREGA (ele conhece o empreendimento).
+  // Alimenta a calibração dos alvos de estilo; não muda nada na medição deste projeto.
+  const [publicoAlvo, setPublicoAlvo] = useState<PublicoAlvo | "">("");
 
   async function enviarArquivo(arquivo: File) {
     setOcupado(true);
@@ -351,7 +355,8 @@ export function ImportarProjetoDwg({
     setErro(null);
     try {
       const p = await confirmarImportacaoDwg(
-        analiseId, inv.importacao_id, mapeamento, salvar, ajusteAtual ?? ajuste
+        analiseId, inv.importacao_id, mapeamento, salvar, ajusteAtual ?? ajuste,
+        publicoAlvo || null
       );
       if (salvar) {
         onSalvo(p);
@@ -484,6 +489,30 @@ export function ImportarProjetoDwg({
                 ))}
               </tbody>
             </table>
+          </div>
+          {/* INTEL-4 — quem carrega declara o padrão; a plataforma usa isso só para aprender
+              com projetos reais. Não altera nenhuma medida DESTE projeto. */}
+          <div className="rounded-lg border border-slate-200 bg-white p-3">
+            <label className="flex flex-col gap-1 text-xs text-slate-700">
+              <span className="font-medium">
+                Para que público é este projeto?{" "}
+                <span className="font-normal text-slate-500">(opcional)</span>
+              </span>
+              <select
+                value={publicoAlvo}
+                onChange={(e) => setPublicoAlvo(e.target.value as PublicoAlvo | "")}
+                className="w-full max-w-xs rounded-md border border-slate-300 bg-white px-2 py-1 text-xs"
+              >
+                <option value="">Não informar</option>
+                <option value="baixa">Baixa renda (densidade alta)</option>
+                <option value="media">Média renda</option>
+                <option value="alta">Alto padrão</option>
+              </select>
+              <span className="text-[11px] text-slate-500">
+                Serve para a plataforma aprender com projetos reais de urbanistas e afinar as
+                próprias propostas. Não muda nada na medição nem na conferência deste projeto.
+              </span>
+            </label>
           </div>
           <div className="flex gap-2">
             <button

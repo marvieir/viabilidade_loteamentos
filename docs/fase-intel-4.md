@@ -41,28 +41,38 @@ de número vindo de IA, nada recalculado no front (§1, §2).
 | `lote_testada_mediana_m` | menor lado do retângulo mínimo rotacionado de cada lote |
 | `lote_prof_mediana_m` | maior lado do mesmo retângulo |
 | `lote_razao_prof_testada` | mediana da razão — o "formato" do lote do projetista |
-| `via_largura_mediana_m` | área do viário ÷ comprimento dos eixos de via (`vias_eixos`) |
-| `quadra_area_mediana_m2` | mediana da área das quadras (união de lotes contíguos) |
+| `quadra_area_mediana_m2` | mediana da área das quadras (agrupamento por `quadra_id`) |
 | `quadra_lotes_mediana` | mediana de lotes por quadra |
-| `verde_frac`, `institucional_frac`, `lazer_frac`, `viario_frac`, `vendavel_frac` | do `quadro_areas` já medido |
+| `verde_frac`, `institucional_frac`, `lazer_frac`, `viario_frac`, `vendavel_frac`, `agua_frac` | do `quadro_areas` já medido |
 
-Projeto sem eixos de via mapeados → `via_largura_mediana_m` fica `null` (não estima).
 Métrica ausente nunca vira zero — vira "não medido", e a agregação a ignora.
+
+**Largura de via ficou de fora** (estava prevista no rascunho desta spec). Ela sairia de
+área do viário ÷ comprimento dos eixos, mas a camada de via do CAD do cliente costuma trazer
+as **duas guias** (meios-fios), não o eixo — o comprimento viria dobrado e a largura pela
+metade, sem como distinguir automaticamente. Número que não se sustenta não entra (§verdade
+antes de resposta). Volta quando houver como separar eixo de guia com confiança.
 
 ## Classificação por padrão (decisão de design)
 
-Os projetos importados **não carregam público-alvo**: o `perfil` do snapshot é `{}` (a
+Os projetos importados não carregavam público-alvo: o `perfil` do snapshot é `{}` (a
 importação não passa pelo gerador). Sem essa etiqueta não há como agregar por padrão.
 
-**Escolha: inferir do próprio projeto, deterministicamente, pela mediana da área de lote**,
-usando as faixas que o produto já usa em `PERFIL_LOTE` — e **rotular a inferência** em toda
-proposta, para o operador poder discordar. Não inventamos etiqueta: se a mediana cair fora
-de qualquer faixa conhecida, o projeto entra como `indefinido` e fica **fora** da agregação.
+**Decisão do operador (28/07): QUEM CARREGA declara o padrão, num campo do wizard.** Quem
+sobe o DWG conhece o empreendimento. A alternativa — inferir pela mediana de área de lote —
+erra justamente no caso que mais aparece: gleba mista, com quadras econômicas e nobres no
+mesmo projeto, cuja mediana cai num padrão que o projeto inteiro não é. Errar a etiqueta
+contamina a mediana daquele padrão, que é exatamente o que a calibração não pode fazer.
 
-Alternativa considerada e descartada por ora: pedir o padrão ao usuário no wizard de
-importação. Adiciona fricção numa tela que o operador já validou, e a inferência por área
-de lote é justamente o critério que ele usa ao olhar um projeto. Se a inferência errar na
-prática, viramos para o campo explícito — é reversível.
+O campo é **opcional** (não trava a importação de quem só quer conferir o desenho) e diz na
+própria tela para que serve: aprender com projetos reais, sem alterar nada na medição
+daquele projeto.
+
+A inferência pela área de lote **continua no código como fallback rotulado**, para os
+projetos importados antes do campo existir. Toda proposta mostra quantos projetos são
+`declarado` e quantos são `inferido`, para o operador saber em que confiar. Mediana fora de
+qualquer faixa conhecida → `indefinido`, fora da agregação: não empurramos para a faixa mais
+próxima.
 
 ## Agregação e o piso de evidência
 

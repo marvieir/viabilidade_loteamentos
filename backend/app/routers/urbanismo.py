@@ -1292,6 +1292,10 @@ def confirmar_importacao(
             "lotes precisa das linhas de divisa; a de via, das guias que fecham as quadras).",
         )
 
+    # INTEL-4 — padrão DECLARADO por quem carregou (o wizard pergunta). Entra no snapshot
+    # para a calibração agregar pelo padrão certo, sem adivinhar.
+    resultado["publico_alvo"] = body.publico_alvo
+
     if body.salvar:
         versao = fonte_urb.proxima_versao(analise_id)
         resultado["proposta_id"] = f"imp_{analise_id[:8]}_{versao:03d}"

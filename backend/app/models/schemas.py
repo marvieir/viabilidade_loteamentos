@@ -1862,6 +1862,12 @@ class ConfirmarImportacaoIn(BaseModel):
     # encaixe automático ambíguo — achado do operador, 24/07).
     ajuste: list["ParAjusteImportacaoIn"] = []
     salvar: bool = False
+    # INTEL-4 (decisão do operador, 28/07): QUEM CARREGA declara o padrão do projeto — ele
+    # conhece o empreendimento. Sem isso a calibração teria que adivinhar pela área mediana
+    # do lote, e projeto misto (quadras econômicas + nobres na mesma gleba) cairia no padrão
+    # errado, contaminando a mediana daquele padrão. None = não declarado (importações
+    # anteriores ao campo): a calibração INFERE e rotula a inferência.
+    publico_alvo: Optional[Literal["baixa", "media", "alta"]] = None
 
 
 class ParAjusteImportacaoIn(BaseModel):
@@ -1911,6 +1917,8 @@ class PropostaImportadaOut(BaseModel):
     rotulo: str = "PROJETO IMPORTADO"
     arquivo: str
     origem_geracao: str = "importado"
+    # INTEL-4 — padrão declarado por quem carregou (None = não declarado).
+    publico_alvo: Optional[str] = None
     geometria: dict
     quadro_areas: QuadroAreasOut
     indicadores: IndicadoresUrbOut

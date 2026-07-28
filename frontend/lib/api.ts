@@ -385,6 +385,7 @@ export interface PropostaImportada {
   rotulo: string;
   arquivo: string;
   origem_geracao: string; // "importado"
+  publico_alvo?: PublicoAlvo | null; // INTEL-4 — declarado por quem carregou
   geometria: GeometriaUrb;
   quadro_areas: QuadroAreas;
   indicadores: IndicadoresUrb;
@@ -449,14 +450,20 @@ export async function confirmarImportacaoDwg(
   importacaoId: string,
   mapeamento: Record<string, PapelCamada>,
   salvar: boolean,
-  ajuste: ParAjusteImportacao[] = []
+  ajuste: ParAjusteImportacao[] = [],
+  publicoAlvo: PublicoAlvo | null = null
 ): Promise<PropostaImportada> {
   const res = await apiFetch(
     `/api/analises/${analiseId}/urbanismo/importar/${importacaoId}/confirmar`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mapeamento, salvar, ajuste }),
+      body: JSON.stringify({
+        mapeamento,
+        salvar,
+        ajuste,
+        publico_alvo: publicoAlvo,
+      }),
     }
   );
   return jsonOrThrow(res);
