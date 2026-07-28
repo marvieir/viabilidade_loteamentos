@@ -112,6 +112,14 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
   ZONA quando a LUOS está confirmada. O "piso de mercado" do perfil é mira/orientação
   rotulada, nunca trava. O piso inventado colapsava a janela do alto padrão ([450,450])
   e gerava 1 lote / 63% de sobra em silêncio. Restrição no produto exige base legal.
+- **Regra geral (28/07/2026, decisão do operador):** índice que NÃO estiver no documento
+  carregado não vira restrição. Se a LUOS/diretriz do município não traz o lote mínimo,
+  o motor usa SEMPRE o piso federal de 125 m² (Lei 6.766/79, art. 4º, II) e rotula
+  `BASE_FEDERAL` — vale para qualquer urbanismo gerado. **Nunca hardcode número de
+  município no código**, mesmo que o operador cite o valor em conversa (ex.: "sei que
+  nesse município é 180 m²"): informação de conversa não é fonte legal. O caminho para
+  o valor entrar é o documento extraído + confirmação humana, ou o campo de piso
+  informado na tela (que só pode SUBIR o piso, nunca descer abaixo da lei).
 
 ## Comunicação com o operador (INEGOCIÁVEL)
 - **Sempre passe instruções COMPLETAS e prontas para colar.** Nada de comando pela metade.

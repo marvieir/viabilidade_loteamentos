@@ -240,3 +240,45 @@ def test_piso_e_lei_nao_mercado_e_teto_do_usuario_vale_em_qualquer_padrao():
     d5 = resolver_diretrizes(None, None, None, "media", lote_min_m2=90.0)
     assert d5["piso_lote_efetivo_m2"] == 125.0
     assert "abaixo do mínimo legal" in d5["aviso"]
+
+
+def test_sem_lote_minimo_na_lei_sempre_cai_no_federal_125():
+    """REGRA GERAL (decisão do operador, 28/07): quando o lote mínimo NÃO for encontrado na
+    diretriz municipal carregada, o motor usa SEMPRE o piso federal de 125 m² (Lei 6.766/79,
+    art. 4º, II). Nada de número por município no código — o que não está no documento não
+    vira restrição.
+
+    Três caminhos levam ao mesmo piso:
+      a) sem perfil nenhum, em QUALQUER público;
+      b) perfil existente mas ainda em rascunho (não confirmado);
+      c) perfil CONFIRMADO cuja zona não traz lote_min_m2 (caso real: plano diretor que
+         delega os índices para uma LUOS que o município não publicou).
+    """
+    from app.core.urbanismo_diretrizes import PISO_FEDERAL_M2, resolver_diretrizes
+    from app.models.schemas import PerfilMunicipal
+
+    # (a) sem jurisdição: o piso é o federal em todos os padrões — mercado não restringe.
+    for publico in ("baixa", "media", "alta"):
+        d = resolver_diretrizes(None, None, None, publico)
+        assert d["piso_lote_efetivo_m2"] == PISO_FEDERAL_M2 == 125.0
+        assert d["cobertura"] == "BASE_FEDERAL"
+
+    # (b) rascunho não confirmado não alimenta o cálculo (gate da 1.8).
+    rascunho = PerfilMunicipal.model_validate(
+        {"cod_ibge": "0000000", "status": "proposto",
+         "zonas": [{"codigo": "ZR1", "params": {"lote_min_m2": {"valor": 400, "artigo": "Art. 1"}}}]}
+    )
+    d = resolver_diretrizes(rascunho, "ZR1", None, "media")
+    assert d["piso_lote_efetivo_m2"] == 125.0 and d["cobertura"] == "BASE_FEDERAL"
+
+    # (c) LUOS confirmada SEM lote mínimo na zona: usa a doação que a lei traz, mas o piso
+    # continua o federal — ausência de índice não vira índice inventado.
+    confirmado = PerfilMunicipal.model_validate(
+        {"cod_ibge": "0000000", "status": "confirmado",
+         "zonas": [{"codigo": "MACROZONA_URBANA",
+                    "params": {"doacao_pct": {"valor": 0.35, "artigo": "Art. 28"}}}]}
+    )
+    d = resolver_diretrizes(confirmado, "MACROZONA_URBANA", None, "media")
+    assert d["piso_lote_efetivo_m2"] == 125.0
+    assert d["lote_min_zona_m2"] is None  # não encontrado ≠ zero, ≠ chute
+    assert d["doacao_min_pct"] == 0.35  # o que a lei traz, vale
