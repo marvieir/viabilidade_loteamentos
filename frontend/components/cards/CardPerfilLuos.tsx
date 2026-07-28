@@ -73,11 +73,11 @@ export function CardPerfilLuos({
     );
   }
 
-  async function enviarPdf(file: File) {
+  async function enviarPdf(files: File[]) {
     setCarregando(true);
     setErro(null);
     try {
-      const p = await extrairPerfil(codIbge!, file, municipio, uf);
+      const p = await extrairPerfil(codIbge!, files, municipio, uf);
       setPerfil(p);
       onConfirmado(null); // novo rascunho → invalida o cenário até confirmar
     } catch (e) {
@@ -171,14 +171,17 @@ export function CardPerfilLuos({
         )}
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-xs font-medium text-slate-700">
-            PDF da LUOS / lei de parcelamento
+            PDF(s) da LUOS / lei de parcelamento — selecione a lei E os anexos juntos
+            (Ctrl/Cmd+clique; leis como a do Rio fatiam os índices em anexos)
             <input
               type="file"
               accept="application/pdf"
+              multiple
               disabled={carregando}
               onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) enviarPdf(f);
+                const fs = Array.from(e.target.files ?? []);
+                if (fs.length) enviarPdf(fs);
+                e.target.value = "";
               }}
               className="mt-1 block text-xs text-slate-600 file:mr-2 file:rounded-lg file:border file:border-slate-300 file:bg-white file:px-3 file:py-1.5 file:text-xs"
             />

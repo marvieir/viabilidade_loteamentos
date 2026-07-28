@@ -844,12 +844,12 @@ export interface PerfilMunicipal {
 // 503 = sem credencial de LLM; 422 = PDF ilegível. NÃO persiste.
 export async function extrairPerfil(
   codIbge: string,
-  pdf: File,
+  pdf: File | File[], // multi-doc (28/07): lei + anexos numa extração só
   municipio?: string | null,
   uf?: string | null
 ): Promise<PerfilMunicipal> {
   const form = new FormData();
-  form.append("pdf", pdf);
+  for (const f of Array.isArray(pdf) ? pdf : [pdf]) form.append("pdf", f);
   const qs = new URLSearchParams();
   if (municipio) qs.set("municipio", municipio);
   if (uf) qs.set("uf", uf);

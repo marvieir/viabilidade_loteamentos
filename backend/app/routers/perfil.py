@@ -58,27 +58,35 @@ def _sem_citacao(perfil: schemas.PerfilMunicipal) -> list[str]:
 )
 async def extrair_perfil(
     cod_ibge: str,
-    pdf: UploadFile = File(...),
+    pdf: list[UploadFile] = File(...),
     municipio: str | None = None,
     uf: str | None = None,
     extrator: ExtratorLUOS | None = Depends(get_extrator_luos),
     usuario: Usuario = Depends(usuario_atual),
 ):
-    """Dispara a extração assistida (LLM lê o PDF e PROPÕE). Devolve um RASCUNHO
-    (``status='proposto'``) — NÃO persiste e NÃO entra no cálculo até o PUT confirmar."""
+    """Dispara a extração assistida (LLM lê o(s) PDF(s) e PROPÕE). Aceita MÚLTIPLOS
+    documentos — lei + anexos numa extração só (pedido do operador, 28/07: a LC 270/2024
+    do Rio fatia os índices no Anexo XXI). Devolve um RASCUNHO (``status='proposto'``) —
+    NÃO persiste e NÃO entra no cálculo até o PUT confirmar."""
     if extrator is None:
         raise HTTPException(
             503,
             "Extração assistida indisponível — configure a credencial de LLM "
             "(ANTHROPIC_API_KEY) ou cadastre o perfil manualmente.",
         )
-    conteudo = await ler_upload_limitado(pdf)
-    if not conteudo:
+    conteudos: list[bytes] = []
+    nomes: list[str] = []
+    for arq in pdf:
+        dados = await ler_upload_limitado(arq)
+        if dados:
+            conteudos.append(dados)
+            nomes.append(arq.filename or "documento")
+    if not conteudos:
         raise HTTPException(422, "PDF vazio.")
     try:
         with uso_llm.contexto("luos", cod_ibge=cod_ibge, usuario_id=str(usuario.id)):
             perfil = extrator.extrair(
-                conteudo, cod_ibge, municipio, uf, nome_arquivo=pdf.filename
+                conteudos, cod_ibge, municipio, uf, nome_arquivo=nomes
             )
     except PdfIlegivel as exc:
         raise HTTPException(422, str(exc))

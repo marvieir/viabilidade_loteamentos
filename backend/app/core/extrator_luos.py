@@ -54,11 +54,11 @@ class ExtratorLUOS(Protocol):
 
     def extrair(
         self,
-        pdf_bytes: bytes,
+        pdf_bytes: "bytes | list[bytes]",  # multi-doc: lei + anexos numa extração (28/07)
         cod_ibge: str,
         municipio: Optional[str],
         uf: Optional[str],
-        nome_arquivo: Optional[str] = None,
+        nome_arquivo: "Optional[str] | list[str]" = None,
     ) -> PerfilMunicipal: ...
 
 
@@ -225,14 +225,23 @@ class ExtratorLUOSClaude:
 
     def extrair(
         self,
-        pdf_bytes: bytes,
+        pdf_bytes: "bytes | list[bytes]",
         cod_ibge: str,
         municipio: Optional[str],
         uf: Optional[str],
-        nome_arquivo: Optional[str] = None,
+        nome_arquivo: "Optional[str] | list[str]" = None,
     ) -> PerfilMunicipal:
-        if not pdf_bytes:
+        # MULTI-DOCUMENTO (pedido do operador, 28/07 — caso Rio de Janeiro): leis grandes
+        # fatiam os índices em ANEXOS separados (LC 270/2024: Anexo XXI/XXIV). Aceita a lei
+        # + anexos numa extração só — cada PDF vira um bloco 'document' da MESMA chamada,
+        # e a IA lê o conjunto citando artigo/página de onde cada valor veio.
+        lista_pdfs = pdf_bytes if isinstance(pdf_bytes, list) else [pdf_bytes]
+        lista_pdfs = [p for p in lista_pdfs if p]
+        if not lista_pdfs:
             raise PdfIlegivel("PDF vazio — nada para extrair.")
+        nomes = (nome_arquivo if isinstance(nome_arquivo, list)
+                 else ([nome_arquivo] if nome_arquivo else []))
+        nome_fonte = " + ".join(n for n in nomes if n) or None
         try:
             import base64
 
@@ -244,7 +253,17 @@ class ExtratorLUOSClaude:
 
         # max_retries: o PRÓPRIO SDK reTENTA 429/5xx/529 com backoff (sem aninhar wrappers).
         client = anthropic.Anthropic(api_key=self.api_key, max_retries=4, **_opcoes_tls())
-        b64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+        blocos = [
+            {
+                "type": "document",
+                "source": {
+                    "type": "base64",
+                    "media_type": "application/pdf",
+                    "data": base64.standard_b64encode(p).decode("utf-8"),
+                },
+            }
+            for p in lista_pdfs
+        ]
         try:
             resp = client.messages.create(
                 model=self.modelo,
@@ -262,14 +281,7 @@ class ExtratorLUOSClaude:
                     {
                         "role": "user",
                         "content": [
-                            {
-                                "type": "document",
-                                "source": {
-                                    "type": "base64",
-                                    "media_type": "application/pdf",
-                                    "data": b64,
-                                },
-                            },
+                            *blocos,
                             {"type": "text", "text": _INSTRUCAO_FORMATO},
                         ],
                     }
@@ -312,7 +324,7 @@ class ExtratorLUOSClaude:
                     "municipio": municipio,
                     "uf": uf,
                     "status": "proposto",
-                    "fonte_documento": nome_arquivo,
+                    "fonte_documento": nome_fonte,
                     "zonas": bruto.get("zonas", []),
                     "normas_urbanisticas": bruto.get("normas_urbanisticas") or None,
                     "avisos": bruto.get("avisos", []),
