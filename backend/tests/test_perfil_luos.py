@@ -201,3 +201,80 @@ def test_zona_inexistente_no_perfil(client, fonte_perfil):
     r = _aprov(client, aid, zona="ZX9").json()
     assert r["cenario_diretriz"] is None
     assert "ZX9" in r["aviso_diretriz"]
+
+
+# ---------------------------------------------------------------------------
+# Tolerância a desvios do LLM (caso real 28/07 — Porto Real + LC 270 do Rio):
+# a lei brasileira escreve "1,5", "250 m²", "35%"; transcrito como string isso
+# derrubava a extração INTEIRA com ValidationError. Formatação não é invenção;
+# o que não reduz a um número único degrada para None ("não encontrado").
+# ---------------------------------------------------------------------------
+
+
+def test_paramprov_tolera_formatos_de_lei_brasileira():
+    from app.models.schemas import ParamProv
+
+    assert ParamProv(valor="1,5").valor == 1.5
+    assert ParamProv(valor="250 m²").valor == 250.0
+    assert ParamProv(valor="35%").valor == 35.0
+    assert ParamProv(valor="1.234,56").valor == 1234.56
+    assert ParamProv(valor="12 m").valor == 12.0
+    # Faixa/texto NÃO vira número (anti-alucinação §1): degrada para "não encontrado".
+    assert ParamProv(valor="125 a 450").valor is None
+    assert ParamProv(valor="ver Anexo XXI").valor is None
+    # Página: primeiro inteiro de "8-9"/"fls. 12"; ilegível → None.
+    assert ParamProv(pagina="8-9").pagina == 8
+    assert ParamProv(pagina="fls. 12").pagina == 12
+    assert ParamProv(pagina="s/p").pagina is None
+    # Base fora do vocabulário → None; sinônimos normalizam.
+    assert ParamProv(base="área total da gleba").base == "total"
+    assert ParamProv(base="área líquida").base == "liquida"
+    assert ParamProv(base="sobre o VGV").base is None
+
+
+def test_paramprov_aceita_escalar_direto_sem_citacao():
+    from app.models.schemas import ParamProv, ZonaPerfil
+
+    # LLM manda "doacao_pct": 0.35 direto → vira valor sem citação (gate barra depois).
+    z = ZonaPerfil.model_validate(
+        {"codigo": "ZR1", "params": {"doacao_pct": 0.35, "lote_min_m2": "360 m²"}}
+    )
+    assert z.params.doacao_pct.valor == 0.35
+    assert z.params.doacao_pct.artigo is None
+    assert z.params.lote_min_m2.valor == 360.0
+
+
+def test_zona_tolera_nulos_do_llm():
+    from app.models.schemas import PerfilMunicipal, ZonaPerfil
+
+    z = ZonaPerfil.model_validate(
+        {"codigo": "ZM2", "params": None,
+         "modalidades": {"desmembramento": None, "loteamento": {"doacao_pct": {"valor": 0}}}}
+    )
+    assert z.params.lote_min_m2 is None
+    assert list(z.modalidades) == ["loteamento"]
+    p = PerfilMunicipal.model_validate(
+        {"cod_ibge": "3304110", "zonas": None, "avisos": [None, "ok", 42]}
+    )
+    assert p.zonas == [] and p.avisos == ["ok", "42"]
+
+
+def test_falha_de_validacao_gera_dump_e_resumo(tmp_path, monkeypatch):
+    """Quando MESMO com a tolerância a validação falhar, o JSON cru + erros vão para
+    LUOS_DUMP_DIR e o resumo aponta o campo problemático (diagnóstico sem container)."""
+    import json
+
+    import pydantic
+    import pytest as _pytest
+
+    from app.core.extrator_luos import _dump_falha_validacao
+    from app.models.schemas import PerfilMunicipal
+
+    monkeypatch.setenv("LUOS_DUMP_DIR", str(tmp_path))
+    bruto = {"zonas": "isto não é uma lista"}
+    with _pytest.raises(pydantic.ValidationError) as info:
+        PerfilMunicipal.model_validate({"cod_ibge": "9999999", "zonas": bruto["zonas"]})
+    resumo = _dump_falha_validacao(bruto, info.value, "9999999")
+    assert "zonas" in resumo
+    dump = json.loads((tmp_path / "perfil_9999999_bruto_falha.json").read_text())
+    assert dump["bruto"] == bruto and dump["erros"]

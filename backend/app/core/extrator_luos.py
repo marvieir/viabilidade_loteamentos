@@ -264,6 +264,16 @@ class ExtratorLUOSClaude:
             }
             for p in lista_pdfs
         ]
+        # Município-alvo no prompt (caso real de 28/07: PD de Porto Real + LC 270 do RIO na
+        # mesma extração). Documento de OUTRO município deve virar AVISO, não índice.
+        alvo = (
+            f"MUNICÍPIO ALVO desta extração: {municipio or 'não informado'}"
+            + (f" ({uf})" if uf else "")
+            + f" — código IBGE {cod_ibge}. Os documentos anexados devem ser a lei e os "
+            "anexos DESTE município. Se algum documento pertencer claramente a OUTRO "
+            "município, NÃO extraia índices dele — registre em `avisos` qual documento "
+            "foi ignorado e por quê.\n\n"
+        )
         try:
             resp = client.messages.create(
                 model=self.modelo,
@@ -282,7 +292,7 @@ class ExtratorLUOSClaude:
                         "role": "user",
                         "content": [
                             *blocos,
-                            {"type": "text", "text": _INSTRUCAO_FORMATO},
+                            {"type": "text", "text": alvo + _INSTRUCAO_FORMATO},
                         ],
                     }
                 ],
@@ -331,13 +341,57 @@ class ExtratorLUOSClaude:
                 }
             )
         except ValueError as exc:
+            # NUNCA descartar a resposta em silêncio (lição 28/07 — Porto Real + LC 270):
+            # dump do JSON cru + erros do Pydantic para diagnóstico, e um resumo curto na
+            # mensagem (o operador vê o campo problemático sem entrar no container).
+            detalhe = _dump_falha_validacao(bruto, exc, cod_ibge)
             raise PdfIlegivel(
-                f"Índices extraídos em formato inesperado ({type(exc).__name__}). "
-                "Revise manualmente."
+                f"Índices extraídos em formato inesperado ({type(exc).__name__}"
+                + (f" em {detalhe}" if detalhe else "")
+                + "). Revise manualmente."
             ) from exc
         # Garante a marca de origem em todo valor proposto pelo LLM (não confiar no modelo).
         _marcar_origem_llm(perfil)
         return perfil
+
+
+def _dump_falha_validacao(bruto, exc, cod_ibge: str) -> str:
+    """Grava o JSON cru do LLM + os erros do Pydantic em ``LUOS_DUMP_DIR`` e loga.
+
+    Devolve um resumo curto ("zonas.3.params.ca.valor='1,5'; …") para a mensagem ao
+    usuário. Best-effort: falha de escrita nunca mascara o erro original."""
+    import json
+    import logging
+
+    erros = []
+    try:
+        fn = getattr(exc, "errors", None)
+        if callable(fn):
+            erros = fn()
+    except Exception:  # noqa: BLE001
+        erros = []
+    try:
+        import os as _os
+        from pathlib import Path as _Path
+
+        _dest = _Path(_os.getenv("LUOS_DUMP_DIR", "/tmp/luos_dumps"))
+        _dest.mkdir(parents=True, exist_ok=True)
+        (_dest / f"perfil_{cod_ibge}_bruto_falha.json").write_text(
+            json.dumps({"bruto": bruto, "erros": erros}, ensure_ascii=False,
+                       indent=2, default=str),
+            encoding="utf-8",
+        )
+    except Exception:  # noqa: BLE001 — dump é diagnóstico
+        pass
+    logging.getLogger(__name__).error(
+        "LUOS %s: resposta do LLM reprovada na validação — %s", cod_ibge, erros
+    )
+    partes = []
+    for e in erros[:3]:
+        loc = ".".join(str(x) for x in e.get("loc", ()))
+        ent = repr(e.get("input"))
+        partes.append(f"{loc}={ent[:40]}" if loc else ent[:40])
+    return "; ".join(partes)
 
 
 def _marcar_origem_llm(perfil: PerfilMunicipal) -> None:

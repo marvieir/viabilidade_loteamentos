@@ -2,7 +2,7 @@
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ----- POST /api/analises -----
@@ -457,6 +457,55 @@ OrigemParam = Literal["proposto_llm", "editado_humano"]
 BaseDoacao = Literal["total", "liquida", "combinada"]
 
 
+def _num_llm_tolerante(v):
+    """Coerção de número vindo do LLM (a lei brasileira escreve "1,5", "250 m²", "35%").
+
+    Formatação não é invenção: converte decimal com vírgula e descarta unidade colada.
+    O que NÃO reduz a um número único (faixa "125 a 450", texto solto) degrada para
+    ``None`` = "não encontrado" — nunca chuta um dos extremos (regra anti-alucinação §1).
+    Descoberto no caso real de 28/07: o PD do Rio (LC 270/2024) é todo em tabelas com
+    vírgula decimal e o ValidationError derrubava a extração inteira.
+    """
+    if v is None or isinstance(v, (int, float)) and not isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        s = v.strip().replace("m²", "").replace("m2", "").replace("%", "").strip()
+        s = s.removesuffix("m").strip()
+        # "1.234,56" → "1234.56"; "1,5" → "1.5" (vírgula decimal pt-BR)
+        if "," in s:
+            s = s.replace(".", "").replace(",", ".")
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    return None
+
+
+def _int_llm_tolerante(v):
+    """Página vinda do LLM: "8" → 8; "8-9"/"fls. 12" → primeiro inteiro; ilegível → None."""
+    if v is None or isinstance(v, int) and not isinstance(v, bool):
+        return v
+    import re as _re
+
+    m = _re.search(r"\d+", str(v))
+    return int(m.group()) if m else None
+
+
+def _base_llm_tolerante(v):
+    """Base da doação vinda do LLM: normaliza sinônimos ("área total" → "total");
+    fora do vocabulário → None (o humano decide na revisão, não a gente por ele)."""
+    if v is None:
+        return None
+    s = str(v).strip().lower()
+    if "combinad" in s:
+        return "combinada"
+    if "liquid" in s or "líquid" in s:
+        return "liquida"
+    if "total" in s or "bruta" in s or "gleba" in s:
+        return "total"
+    return None
+
+
 class ParamProv(BaseModel):
     """Um índice da LUOS + sua proveniência por artigo. ``valor=None`` = não encontrado
     (o LLM NUNCA inventa número). Valor sem ``artigo`` não é confirmável (gate da 1.8)."""
@@ -467,6 +516,19 @@ class ParamProv(BaseModel):
     trecho: Optional[str] = None  # verbatim da LUOS, para o humano conferir
     origem: OrigemParam = "proposto_llm"
     base: Optional[BaseDoacao] = None  # só em doacao_pct: sobre o que o % incide
+
+    _v_valor = field_validator("valor", mode="before")(_num_llm_tolerante)
+    _v_pagina = field_validator("pagina", mode="before")(_int_llm_tolerante)
+    _v_base = field_validator("base", mode="before")(_base_llm_tolerante)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _escalar_vira_valor(cls, data):
+        """LLM às vezes manda o número direto ("doacao_pct": 0.35) em vez do objeto
+        {valor, artigo, ...} — aceita como valor sem citação (o gate barra na confirmação)."""
+        if isinstance(data, (int, float, str)) and not isinstance(data, bool):
+            return {"valor": data}
+        return data
 
 
 class DoacaoSplit(BaseModel):
@@ -479,6 +541,11 @@ class DoacaoSplit(BaseModel):
     artigo: Optional[str] = None
     pagina: Optional[int] = None
 
+    _v_nums = field_validator("viario", "verde", "institucional", mode="before")(
+        _num_llm_tolerante
+    )
+    _v_pagina = field_validator("pagina", mode="before")(_int_llm_tolerante)
+
 
 class ParamBoolProv(BaseModel):
     """Regra BOOLEANA da diretriz + proveniência (ex.: cul-de-sac obrigatório). ``valor=None`` =
@@ -489,6 +556,19 @@ class ParamBoolProv(BaseModel):
     pagina: Optional[int] = None
     trecho: Optional[str] = None
     origem: OrigemParam = "proposto_llm"
+
+    _v_pagina = field_validator("pagina", mode="before")(_int_llm_tolerante)
+
+    @field_validator("valor", mode="before")
+    @classmethod
+    def _bool_llm_tolerante(cls, v):
+        if isinstance(v, str):
+            s = v.strip().lower()
+            if s in ("sim", "obrigatorio", "obrigatório"):
+                return True
+            if s in ("não", "nao"):
+                return False
+        return v
 
 
 class NormasUrbanisticas(BaseModel):
@@ -550,6 +630,21 @@ class ZonaPerfil(BaseModel):
     params: ZonaParams = Field(default_factory=ZonaParams)
     modalidades: dict[str, ModalidadeOverride] = {}
 
+    @field_validator("params", mode="before")
+    @classmethod
+    def _params_nulo_vira_vazio(cls, v):
+        return {} if v is None else v
+
+    @field_validator("modalidades", mode="before")
+    @classmethod
+    def _modalidades_tolerante(cls, v):
+        """LLM às vezes manda ``null`` (no mapa ou numa modalidade) — degrada para vazio."""
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            return {k: mv for k, mv in v.items() if mv is not None}
+        return v
+
 
 class PerfilMunicipal(BaseModel):
     """Perfil municipal extraído da LUOS. Nasce ``proposto`` (não alimenta cálculo);
@@ -566,6 +661,18 @@ class PerfilMunicipal(BaseModel):
     avisos: list[str] = []
     validado_por: Optional[str] = None
     data_referencia: Optional[str] = None
+
+    @field_validator("zonas", "avisos", mode="before")
+    @classmethod
+    def _lista_nula_vira_vazia(cls, v):
+        return [] if v is None else v
+
+    @field_validator("avisos", mode="before")
+    @classmethod
+    def _avisos_como_texto(cls, v):
+        if isinstance(v, list):
+            return [a if isinstance(a, str) else str(a) for a in v if a is not None]
+        return v
 
 
 class PerfilConfirmarIn(PerfilMunicipal):
