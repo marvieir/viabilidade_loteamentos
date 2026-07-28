@@ -213,3 +213,30 @@ def test_determinismo():
     a = _dist(*prog_args)[1]
     b = _dist(*prog_args)[1]
     assert a["media_m2"] == b["media_m2"] and a["faixas"] == b["faixas"]
+
+
+def test_piso_e_lei_nao_mercado_e_teto_do_usuario_vale_em_qualquer_padrao():
+    """Decisão do operador (27/07, base legal verificada): o piso do lote é a LEI — 125 m²
+    federal (Lei 6.766/79, art. 4º, II) ou o mínimo da zona quando a LUOS está confirmada.
+    O 'piso de mercado' do perfil NÃO restringe (vira só a mira/alvo): alta renda com teto
+    345 do usuário gera janela [125, 345] com alvo 345 — nunca mais [450, 450] colapsada
+    (1 lote / 63% de sobra em silêncio)."""
+    from app.core.urbanismo_diretrizes import resolver_diretrizes
+
+    d = resolver_diretrizes(None, None, None, "alta", lote_max_m2=345.0)
+    assert d["piso_lote_efetivo_m2"] == 125.0  # só a lei federal (sem LUOS confirmada)
+    assert d["teto_lote_m2"] == 345.0  # o teto do usuário vale em QUALQUER padrão
+    assert d["alvo_lote_m2"] == 345.0  # mercado vira MIRA, clampada à janela do usuário
+    assert "IGNORADO" not in d["aviso"].upper() or "MÍNIMO LEGAL" not in d["aviso"]
+    # Sem teto do usuário, a mira de mercado do alto padrão segue orientando (465 m²).
+    d2 = resolver_diretrizes(None, None, None, "alta")
+    assert d2["piso_lote_efetivo_m2"] == 125.0 and d2["alvo_lote_m2"] == 465.0
+    # Só fere a LEI se o teto ficar abaixo de 125 m² — aí sim avisa e corrige.
+    d3 = resolver_diretrizes(None, None, None, "alta", lote_max_m2=100.0)
+    assert d3["teto_lote_m2"] > 125.0 and "MÍNIMO LEGAL" in d3["aviso"]
+    # Piso INFORMADO (27/07): sobe o piso acima do federal; abaixo do legal → ignora e avisa.
+    d4 = resolver_diretrizes(None, None, None, "media", lote_min_m2=300.0)
+    assert d4["piso_lote_efetivo_m2"] == 300.0
+    d5 = resolver_diretrizes(None, None, None, "media", lote_min_m2=90.0)
+    assert d5["piso_lote_efetivo_m2"] == 125.0
+    assert "abaixo do mínimo legal" in d5["aviso"]

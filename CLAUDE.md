@@ -107,6 +107,11 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
   verde de doação, vedação de declividade 30% é urbana (rural: APP só ≥45°), piso de
   lote é a FMP/INCRA. Cada um custou uma rodada de teste do operador. Não repetir o
   padrão: régua legal se verifica na fonte, não se assume.
+- **Lição registrada (27/07/2026):** NÃO existe "piso de lote por padrão/público" em lei —
+  o piso é o federal de 125 m² (Lei 6.766/79, art. 4º, II) e, acima dele, só o mínimo da
+  ZONA quando a LUOS está confirmada. O "piso de mercado" do perfil é mira/orientação
+  rotulada, nunca trava. O piso inventado colapsava a janela do alto padrão ([450,450])
+  e gerava 1 lote / 63% de sobra em silêncio. Restrição no produto exige base legal.
 
 ## Comunicação com o operador (INEGOCIÁVEL)
 - **Sempre passe instruções COMPLETAS e prontas para colar.** Nada de comando pela metade.

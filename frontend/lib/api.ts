@@ -1897,7 +1897,8 @@ export async function proporUrbanismo(
   acessoPonto?: [number, number] | null, // [lon, lat] — acesso marcado no mapa (âncora do pórtico)
   criarLago?: boolean, // Fase U3 — sintetizar lago no ponto baixo do DEM
   instrucoes?: string | null, // Mov.1 — diretrizes livres do operador p/ o programa
-  objetivo?: "rendimento" | "paisagem" | null // Trilha 2 — objetivo do estudo (rendimento × paisagem)
+  objetivo?: "rendimento" | "paisagem" | null, // Trilha 2 — objetivo do estudo (rendimento × paisagem)
+  loteMinM2?: number | null // 27/07 — piso informado (≥125 federal; abaixo é ignorado c/ aviso)
 ): Promise<PropostaUrbanistica> {
   const res = await apiFetch(
     `/api/analises/${analiseId}/urbanismo/propor`,
@@ -1910,6 +1911,7 @@ export async function proporUrbanismo(
         ...(zona ? { zona } : {}),
         ...(overrides ? { overrides } : {}),
         ...(loteMaxM2 ? { lote_max_m2: loteMaxM2 } : {}),
+        ...(loteMinM2 ? { lote_min_m2: loteMinM2 } : {}),
         ...(acessoPonto ? { acesso_ponto: acessoPonto } : {}),
         ...(criarLago ? { criar_lago: true } : {}),
         ...(instrucoes?.trim() ? { instrucoes: instrucoes.trim() } : {}),

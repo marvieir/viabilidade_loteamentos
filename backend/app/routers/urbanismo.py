@@ -533,7 +533,8 @@ def _propor_impl(
         else None
     )
     diretrizes = resolver_diretrizes(
-        perfil, body.zona, body.modalidade, body.publico_alvo, body.lote_max_m2
+        perfil, body.zona, body.modalidade, body.publico_alvo, body.lote_max_m2,
+        lote_min_m2=getattr(body, "lote_min_m2", None),
     )
     # Regime RURAL: piso do lote = FMP do município (INCRA), não o piso urbano (achado do
     # operador 21/07/2026 — chácara saía com lote de 300 m²). Decisão B: o restante do quadro
@@ -887,6 +888,7 @@ def _propor_impl(
         "zona": body.zona,
         "modalidade": body.modalidade,
         "lote_max_m2": body.lote_max_m2,
+        "lote_min_m2": getattr(body, "lote_min_m2", None),
         "acesso_ponto": body.acesso_ponto,
         "criar_lago": body.criar_lago,  # U3 — a variante rematerializa com o mesmo lago
         "instrucoes": body.instrucoes,  # Mov.1 — proveniência do pedido do operador

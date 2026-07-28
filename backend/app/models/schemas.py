@@ -1371,6 +1371,9 @@ class ProporUrbanismoIn(BaseModel):
     # Fase 11.8 — teto de lote recomendado pelo operador (m²): sobrepõe o teto de mercado do perfil
     # (nunca abaixo do piso legal). Vazio = padrão do perfil.
     lote_max_m2: Optional[float] = None
+    # 27/07 — piso INFORMADO (sem diretriz carregada): sobe o piso acima do federal/zona;
+    # abaixo do mínimo legal é ignorado com aviso curto (Lei 6.766 art. 4º, II).
+    lote_min_m2: Optional[float] = Field(default=None, gt=0)
     # Acesso marcado PELO OPERADOR no mapa ([lon, lat] WGS84): âncora DEFINITIVA do pórtico —
     # tem prioridade sobre o OSM (zona rural tem via mal mapeada; o dado do operador vence).
     acesso_ponto: Optional[list[float]] = None

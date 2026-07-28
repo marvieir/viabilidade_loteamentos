@@ -7,7 +7,8 @@ FONTES, sem inventar número (a lição das 9.2/9.3). Ordem (§0 da spec):
        tamanho/testada/profundidade por perfil (``PERFIL_LOTE``).
     3. PISO LEGAL FEDERAL (clamp absoluto) — Lei 6.766/79: lote ≥ 125 m², frente ≥ 5 m.
 
-A lei sempre vence o mercado: ``piso_lote = max(125, lote_zona, piso_mercado)``. Sem LUOS
+PISO É LEI, NÃO MERCADO (27/07): ``piso_lote = max(125, lote_zona)`` — Lei 6.766 art. 4º II
+e LUOS confirmada; o "piso de mercado" do perfil é só a MIRA (alvo) rotulada. Sem LUOS
 confirmada → degrada para piso federal + mercado e ROTULA (``BASE_FEDERAL``). Python puro.
 """
 
@@ -26,6 +27,7 @@ FRENTE_FEDERAL_M = 5.0
 def resolver_diretrizes(
     perfil, zona_codigo: Optional[str], modalidade: Optional[str], publico_alvo: str,
     lote_max_m2: Optional[float] = None,
+    lote_min_m2: Optional[float] = None,
 ) -> dict:
     """Resolve os limites de dimensionamento e doação pela hierarquia de fontes. Nunca chuta:
     o que a LUOS não fixa cai no mercado (rotulado) e no piso federal. ``lote_max_m2`` (Fase 11.8):
@@ -77,36 +79,51 @@ def resolver_diretrizes(
             if p is not None and getattr(p, "valor", None) is not None:
                 normas[_campo] = {"valor": p.valor, "artigo": getattr(p, "artigo", None)}
 
-    # Piso LEGAL do lote: a ZONA (LUOS) é o piso quando confirmada (a lei vence); sem zona,
-    # usa o piso de mercado do perfil como mínimo prático. SEMPRE ≥ 125 m² (federal). Decisão
-    # de contrato: o piso de mercado NÃO sobe acima da zona — o histograma fica em [zona, teto]
-    # (ex.: São Roque/MUE = 360–640), fiel à distribuição real e ao que o operador espera ver.
+    # PISO É LEI, NÃO MERCADO (decisão do operador, 27/07 — regra com base legal verificada):
+    # o mínimo federal é 125 m² (Lei 6.766/79, art. 4º, II) e, acima dele, só LEI MUNICIPAL
+    # (LUOS/zona confirmada) pode exigir mais. O "piso de mercado" do perfil NÃO restringe
+    # nada — vira apenas a MIRA (alvo) da subdivisão, rotulada como boa prática.
     if zona is not None:
         piso_lote = max(PISO_FEDERAL_M2, lote_zona or PISO_FEDERAL_M2)
     else:
-        piso_lote = max(PISO_FEDERAL_M2, piso_mercado)
-    # teto de MERCADO do perfil — ou o recomendado pelo operador (Fase 11.8), nunca abaixo do piso.
+        piso_lote = PISO_FEDERAL_M2
+    # Piso INFORMADO pelo usuário (27/07): sem diretriz carregada, ele pode subir o piso
+    # (nunca descer abaixo da lei). Aviso curto quando fere o mínimo legal.
+    aviso_piso = None
+    if lote_min_m2:
+        if float(lote_min_m2) < piso_lote:
+            aviso_piso = (
+                f"Piso informado ({float(lote_min_m2):.0f} m²) abaixo do mínimo legal "
+                f"({piso_lote:.0f} m²) — usando o legal. "
+            )
+        else:
+            piso_lote = float(lote_min_m2)
+    # teto: o recomendado pelo operador (Fase 11.8) vale em qualquer padrão, desde que não
+    # fira o MÍNIMO LEGAL; sem teto do operador, cai no teto de mercado do perfil (default
+    # rotulado, não lei).
     aviso_teto = None
     if lote_max_m2 and float(lote_max_m2) < piso_lote:
-        # CONTRADIÇÃO (achado do operador, 27/07): teto do usuário ABAIXO do piso do público
-        # colapsava a janela ([piso, piso]) → 0-1 lote e ~63% de sobra, EM SILÊNCIO. A janela
-        # ganha a folga mínima e o aviso conta o ajuste — nunca lixo mudo.
         teto_lote = float(round(piso_lote * 1.5))
         aviso_teto = (
-            f"ATENÇÃO: o lote máx. informado ({float(lote_max_m2):.0f} m²) está ABAIXO do "
-            f"piso do público ({piso_lote:.0f} m²) e foi IGNORADO — faixa usada "
-            f"{piso_lote:.0f}–{teto_lote:.0f} m². Limpe o campo ou escolha outro público. "
+            f"ATENÇÃO: o lote máx. informado ({float(lote_max_m2):.0f} m²) está abaixo do "
+            f"MÍNIMO LEGAL ({piso_lote:.0f} m² — "
+            f"{'lote mínimo da zona/LUOS' if zona is not None else 'Lei 6.766/79, art. 4º, II'}) "
+            f"e foi ignorado; faixa usada {piso_lote:.0f}–{teto_lote:.0f} m². "
         )
     elif lote_max_m2:
-        teto_lote = max(float(lote_max_m2), piso_lote)
+        teto_lote = float(lote_max_m2)
     else:
         # Fase 11.10 — FOLGA MÍNIMA de janela: quando a zona força o piso acima do teto de mercado
         # (ex.: baixa renda em zona de mín. 360 vs mercado 250), [piso, teto] COLAPSA (≈ [360, 360])
         # e quase nenhuma faixa cabe num lote de área exata → sobra enorme. Garante ~1,5× o piso de
         # janela p/ a subdivisão respirar. (Operador que fixa lote_max assume o aperto.)
         teto_lote = max(teto_mercado, round(piso_lote * 1.5))
-    # alvo = mira geométrica de mercado (testada × profundidade), clampada à faixa legal.
-    alvo_lote = max(min(perf["testada"] * perf["prof"], teto_lote), piso_lote)
+    # ALVO = mira de MERCADO do público (testada × profundidade, ancorada no piso de mercado
+    # do perfil quando cabe), clampada à janela LEGAL [piso, teto]. Mercado orienta; lei limita.
+    alvo_lote = max(
+        min(perf["testada"] * perf["prof"], teto_lote),
+        min(max(piso_mercado, piso_lote), teto_lote),
+    )
 
     return {
         "fonte": fonte,
@@ -123,7 +140,7 @@ def resolver_diretrizes(
         "doacao_split": split,  # frações da gleba (viário/verde/institucional)
         "testada_alvo_m": perf["testada"],
         "prof_alvo_m": perf["prof"],
-        "aviso": (aviso_teto or "") + (
+        "aviso": (aviso_piso or "") + (aviso_teto or "") + (
             "Mínimos do município são PISO: o estudo pode propor MAIS, nunca menos. "
             "Lote/doação/verde/institucional verificados na prefeitura (art. 6º Lei 6.766)."
             if zona is not None

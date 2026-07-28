@@ -124,6 +124,7 @@ export function CardUrbanismo({
   const [publico, setPublico] = useState<PublicoAlvo>("media");
   const [zona, setZona] = useState<string>("");
   const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
+  const [loteMin, setLoteMin] = useState<string>(""); // 27/07 — piso informado; vazio = 125 federal/zona
   const [criarLago, setCriarLago] = useState(false); // Fase U3 — lago no ponto baixo do DEM
   const [objetivo, setObjetivo] = useState<"rendimento" | "paisagem">("rendimento"); // Trilha 2
   const [instrucoes, setInstrucoes] = useState(""); // Mov.1 — diretrizes livres do operador
@@ -198,13 +199,15 @@ export function CardUrbanismo({
     setErro(null);
     try {
       const loteMaxNum = loteMax.trim() ? Number(loteMax) : null;
+      const loteMinNum = loteMin.trim() ? Number(loteMin) : null;
       const p = await proporUrbanismo(
         analiseId, tipo, publico, zona || null, undefined,
         loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null,
         acessoPonto ? [acessoPonto[1], acessoPonto[0]] : null,
         criarLago,
         instrucoes,
-        objetivo
+        objetivo,
+        loteMinNum && loteMinNum > 0 ? loteMinNum : null
       );
       setProposta(p);
       onData?.(p);
@@ -443,6 +446,19 @@ export function CardUrbanismo({
               </select>
             </>
           )}
+          {/* 27/07 — piso INFORMADO: sem diretriz carregada vale o federal (125 m²); o
+              usuário pode subir. Abaixo do mínimo legal o backend ignora com aviso. */}
+          <label className="text-sm text-slate-600">Lote mín. (m²)</label>
+          <input
+            type="number"
+            min={0}
+            step={25}
+            value={loteMin}
+            onChange={(e) => setLoteMin(e.target.value)}
+            placeholder={perfil ? "diretriz" : "125 federal"}
+            title="Sem diretriz municipal carregada, vale o mínimo federal de 125 m² (Lei 6.766). Quer um piso maior? Informe aqui."
+            className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+          />
           <label className="text-sm text-slate-600">Lote máx. (m²)</label>
           <input
             type="number"
