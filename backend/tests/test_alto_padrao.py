@@ -56,9 +56,15 @@ def test_portico_nao_invade_mata_preservada():
 
 def test_portico_evita_mata_externa_descontada():
     """Fase 11.4: a mata/APP/≥30% é DESCONTADA da gleba pelo chamador → vira um BURACO na
-    aproveitável que a via de contorno acompanha. Sem informar essa restrição ao motor, a portaria
-    cai justamente na frente da mata (o maior contato via-borda). Passando ``restricao_externa``, o
-    veto afasta o pórtico da mata. Repro sintética determinística (não depende de fixture)."""
+    aproveitável que a via de contorno acompanha. A GARANTIA: a portaria nunca nasce dentro da
+    mata preservada, e passar ``restricao_externa`` mantém o disco a pelo menos um raio de
+    distância dela. Repro sintética determinística (não depende de fixture).
+
+    ATUALIZADO em 28/07: a versão anterior começava afirmando que SEM o veto a portaria caía na
+    mata — fixava o BUG para depois provar a correção. Com a evolução do traçado (MOTOR-SOBRA), o
+    motor passou a escolher a face oeste sozinho e o bug não reproduz mais nem sem o veto, o que
+    deixava o teste vermelho por um MOTIVO BOM. Agora o teste pinta a garantia, que é o que
+    precisa valer para sempre: a portaria fora da mata nos DOIS caminhos."""
     from shapely.geometry import Point, Polygon, box
 
     dd = resolver_diretrizes(_perfil_mue(), "MUE", None, "alta")
@@ -72,10 +78,12 @@ def test_portico_evita_mata_externa_descontada():
     pt_bug = Point(bug.viario_diagnostico["alto_padrao"]["portico_ponto"])
     pt_fix = Point(fix.viario_diagnostico["alto_padrao"]["portico_ponto"])
 
-    assert bug.portico.intersects(mata)            # sem o veto, a portaria invade a mata (regressão)
-    assert not fix.portico.intersects(mata)        # com o veto, o disco fica fora da mata preservada
+    # A garantia vale nos dois caminhos: a portaria jamais nasce dentro da mata preservada.
+    assert not fix.portico.intersects(mata)        # com o veto, o disco fica fora da mata
+    assert not bug.portico.intersects(mata)        # e o motor já acerta sozinho (robustez ganha)
+    # Com o veto informado, o disco fica a pelo menos um raio da mata — folga real, não tangência.
     assert mata.distance(pt_fix) >= geom.RAIO_PORTICO_M
-    assert mata.distance(pt_fix) > mata.distance(pt_bug)
+    assert mata.distance(pt_bug) >= geom.RAIO_PORTICO_M
 
 
 def test_institucional_na_entrada_e_tags():
