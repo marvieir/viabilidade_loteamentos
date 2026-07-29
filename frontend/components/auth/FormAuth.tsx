@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { BotaoGoogle } from "@/components/auth/BotaoGoogle";
-import { IconMap } from "@/components/Icons";
+import { Logo } from "@/components/marca/Logo";
 
 const VALOR = [
   {
@@ -72,22 +72,27 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
       {/* Painel de marca — a primeira impressão do produto (desktop) */}
-      <aside className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-indigo-700 via-indigo-600 to-violet-600 p-10 text-white lg:flex">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-violet-400/20 blur-3xl" />
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-marinho-900 p-10 text-creme-100 lg:flex">
+        {/* Malha de quadras: o motivo da marca é a saída do próprio motor (heatmap de valor
+            por lote), não uma forma abstrata de estoque. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-10 -top-10 h-72 w-72 opacity-[0.13]"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(0deg,#ff914d 0 2px,transparent 2px 26px),"
+              + "repeating-linear-gradient(90deg,#ff914d 0 2px,transparent 2px 34px)",
+          }}
+        />
+        <div className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-laranja/10 blur-3xl" />
 
-        <div className="relative flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 shadow-sm backdrop-blur">
-            <IconMap width={22} height={22} />
-          </div>
-          <p className="text-sm font-bold tracking-tight">
-            Pré-Viabilidade <span className="font-medium text-indigo-200">· Loteamento</span>
-          </p>
+        <div className="relative">
+          <Logo tamanho={34} />
         </div>
 
         <div className="relative max-w-md">
-          <h2 className="text-3xl font-bold leading-tight tracking-tight">
-            A triagem da gleba antes da due diligence.
+          <h2 className="text-3xl font-black leading-tight tracking-tight text-creme-100">
+            A gleba fecha a conta? Responda antes de gastar com projeto.
           </h2>
           <ul className="mt-8 space-y-5">
             {VALOR.map((v) => (
@@ -99,20 +104,20 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2.5"
-                  className="mt-0.5 shrink-0 text-emerald-300"
+                  className="mt-0.5 shrink-0 text-verde-claro"
                 >
                   <path d="M20 6L9 17l-5-5" />
                 </svg>
                 <div>
                   <p className="text-sm font-semibold">{v.t}</p>
-                  <p className="mt-0.5 text-[13px] leading-snug text-indigo-100/90">{v.d}</p>
+                  <p className="mt-0.5 text-[13px] leading-snug text-marinho-200">{v.d}</p>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="relative text-[11px] text-indigo-200/80">
+        <p className="relative text-[11px] text-marinho-300">
           Ferramenta de pré-viabilidade/triagem — não decide aprovação municipal.
         </p>
       </aside>
@@ -121,19 +126,14 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
       <section className="grid place-items-center px-4 py-12 sm:py-16">
         <div className="w-full max-w-sm">
           {/* Marca no mobile (o painel esquerdo some) */}
-          <div className="mb-8 flex items-center justify-center gap-2.5 lg:hidden">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
-              <IconMap width={22} height={22} />
-            </div>
-            <p className="text-sm font-bold tracking-tight">
-              Pré-Viabilidade <span className="font-medium text-slate-400">· Loteamento</span>
-            </p>
+          <div className="mb-8 flex items-center justify-center lg:hidden">
+            <Logo tamanho={32} tom="laranja-escuro" />
           </div>
 
           <h1 className="text-2xl font-bold tracking-tight">
             {cadastro ? "Criar sua conta" : "Bem-vindo de volta"}
           </h1>
-          <p className="mt-1.5 text-sm text-slate-500">
+          <p className="mt-1.5 text-sm text-marinho-500">
             {cadastro
               ? "Comece a analisar glebas em minutos — salve e reabra suas análises."
               : "Entre para acessar suas análises de pré-viabilidade."}
@@ -173,7 +173,7 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
               <p className="text-right text-sm">
                 <Link
                   href="/esqueci"
-                  className="font-medium text-indigo-600 hover:underline"
+                  className="font-semibold text-laranja-600 hover:underline"
                 >
                   Esqueci minha senha
                 </Link>
@@ -189,7 +189,7 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
             <button
               type="submit"
               disabled={enviando}
-              className="h-10 w-full rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-2 disabled:opacity-60"
+              className="h-11 w-full rounded-lg bg-laranja px-4 text-sm font-bold text-marinho-900 shadow-sm transition hover:bg-laranja-600 hover:text-white disabled:opacity-60"
             >
               {enviando ? "Aguarde…" : cadastro ? "Criar conta" : "Entrar"}
             </button>
@@ -198,18 +198,18 @@ export function FormAuth({ modo }: { modo: "login" | "registrar" }) {
           {/* Entrar/criar conta com o Google — só aparece com NEXT_PUBLIC_GOOGLE_CLIENT_ID */}
           <BotaoGoogle onCredential={onGoogle} onErro={setErro} />
 
-          <p className="mt-6 text-center text-sm text-slate-500">
+          <p className="mt-6 text-center text-sm text-marinho-500">
             {cadastro ? (
               <>
                 Já tem conta?{" "}
-                <Link href="/login" className="font-semibold text-indigo-600 hover:underline">
+                <Link href="/login" className="font-semibold text-laranja-600 hover:underline">
                   Entrar
                 </Link>
               </>
             ) : (
               <>
                 Não tem conta?{" "}
-                <Link href="/registrar" className="font-semibold text-indigo-600 hover:underline">
+                <Link href="/registrar" className="font-semibold text-laranja-600 hover:underline">
                   Criar conta
                 </Link>
               </>
@@ -233,11 +233,11 @@ function Campo({
 } & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{rotulo}</span>
+      <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-marinho-500">{rotulo}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        className="h-11 w-full rounded-lg border border-marinho-200 bg-white px-3 text-sm text-marinho-900 shadow-sm outline-none transition-colors placeholder:text-marinho-300 focus:border-laranja focus:ring-2 focus:ring-laranja-100"
         {...rest}
       />
     </label>

@@ -24,21 +24,37 @@ table,
 
 /* Seleção com a cor da marca (detalhe que separa MVP de produto). */
 ::selection {
-  background: #e0e7ff;
-  color: #1e1b4b;
+  background: #ffe4d1; /* laranja-100 */
+  color: #170d48; /* marinho */
 }
 
-/* Scrollbar discreta (estética de produto) */
+/* Scrollbar discreta, no tom da marca */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #c3b8e8; /* marinho-200 */
   border-radius: 8px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: #9287c4; /* marinho-300 */
+}
+
+/* Foco visível SEMPRE em laranja — o acento único da marca também é o de acessibilidade.
+   Sem isto, quem navega por teclado perde o rastro no fundo marinho. */
+:focus-visible {
+  outline: 2px solid #ff914d;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Número é DADO: monoespaçada + tabular onde o backend manda valor. Marcar com
+   data-numeric (ou usar font-mono) mantém as colunas de área alinhadas à vista. */
+.num,
+[data-numeric] {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------- Marketing (páginas públicas) ------- */

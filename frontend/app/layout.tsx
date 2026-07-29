@@ -3,9 +3,20 @@ import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 
 export const metadata: Metadata = {
-  title: "Pré-Viabilidade de Loteamento",
+  title: "voaz.app — pré-viabilidade de loteamento",
   description:
-    "Triagem determinística de viabilidade de loteamento a partir do KMZ da gleba.",
+    "Envie o KMZ da gleba e receba a triagem determinística: geometria, ambiental, "
+    + "declividade, urbanismo e financeiro, com a lei citada em cada número.",
+  applicationName: "voaz.app",
+  openGraph: {
+    title: "voaz.app — a gleba fecha a conta?",
+    description:
+      "Pré-viabilidade de loteamento a partir do KMZ. Número com procedência, "
+      + "mesma gleba e mesmo resultado sempre.",
+    siteName: "voaz.app",
+    locale: "pt_BR",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -34,7 +45,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-slate-100 text-slate-900 antialiased">
+      <body className="min-h-screen bg-creme-100 text-marinho-900 antialiased">
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
