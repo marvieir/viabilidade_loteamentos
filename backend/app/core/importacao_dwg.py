@@ -1006,6 +1006,30 @@ def processar_importacao(
         "dif_mediana_fmt": _fmt_br(mediana * 100, 2) + "%" if mediana is not None else None,
         "acima_2pct": sum(1 for d in difs if d > 0.02),
     }
+    # RECUPERAÇÃO (28/07 — a métrica que faltava): o desenho DECLARA quanto de lote existe,
+    # somando os rótulos de área. Se a plataforma fecha bem menos que isso, está perdendo lote
+    # — e até agora isso passava despercebido porque o que fechava batia com 0,05% de precisão.
+    # No caso de Porto Real o CAD declarava 129 lotes / 42.167 m² e fechávamos 115 / 32.943 m²
+    # (78%): a diferença era uma camada de contorno de quadra deixada em "Ignorar".
+    _decl_total = sum(r["area_m2"] for r in rotulos_m if r.get("area_m2"))
+    _vend = sum(f.area for f in lotes) * fator
+    resumo["area_declarada_total_m2"] = round(_decl_total, 2)
+    resumo["area_declarada_total_fmt"] = _fmt_br(_decl_total)
+    resumo["rotulos_no_desenho"] = len(rotulos_m)
+    resumo["recuperado_pct"] = round(_vend / _decl_total, 4) if _decl_total else None
+    resumo["recuperado_fmt"] = (
+        _fmt_br(100 * _vend / _decl_total, 1) + "%" if _decl_total else None
+    )
+    if _decl_total and _vend < 0.95 * _decl_total:
+        _falta = _decl_total - _vend
+        avisos.append(
+            f"ATENÇÃO — LOTE FALTANDO: o desenho declara {len(rotulos_m)} áreas somando "
+            f"{_fmt_br(_decl_total)} m², mas só fecharam {len(lotes)} lotes com "
+            f"{_fmt_br(_vend)} m² ({_fmt_br(100 * _vend / _decl_total, 1)}% do declarado). "
+            f"Faltam {_fmt_br(_falta)} m². Quase sempre é uma CAMADA deixada em 'Ignorar' que "
+            "fecha os contornos de quadra — volte ao passo 2 e marque as camadas restantes "
+            "(comece pelas que têm poucas linhas mas cruzam o desenho todo)."
+        )
     pend_out = []
     for p in pendencias:
         lon, lat = _wgs_pt(p["pt"])

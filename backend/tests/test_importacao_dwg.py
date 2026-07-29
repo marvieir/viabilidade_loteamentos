@@ -543,3 +543,15 @@ def test_tipos_de_pendencia_do_contrato():
     for tipo in ("area_nao_resolvida", "marcador_sem_area"):
         p = PendenciaImportacaoOut(tipo=tipo, lon=-44.3, lat=-22.4)
         assert p.tipo == tipo
+
+
+def test_resumo_traz_recuperacao_do_declarado():
+    """28/07 — a métrica que faltava. O desenho DECLARA quanto de lote existe (soma dos rótulos
+    de área); se a plataforma fecha bem menos, está PERDENDO lote. Em Porto Real o CAD declarava
+    129 áreas / 42.166,79 m² e fechávamos 115 lotes / 32.943 m² — 78% — e ninguém percebia,
+    porque o que fechava batia com 0,05% de precisão. A régua de qualidade era 'os lotes que
+    achei estão certos?' quando deveria ser também 'achei todos os lotes?'."""
+    declarado, fechado = 42166.79, 32943.35
+    assert fechado / declarado < 0.95, "78% do declarado precisa disparar o aviso"
+    # Marcar a camada certa recupera quase tudo (medido no arquivo real: P2 como via → 97,7%).
+    assert 41180.35 / declarado > 0.95
