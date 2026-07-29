@@ -13,7 +13,7 @@ import {
 } from "@/components/marketing/site";
 
 export const metadata: Metadata = {
-  title: "Viabilidade homeeye | Decidir em 1 dia se a gleba vira loteamento",
+  title: "voaz.app — a gleba fecha a conta? Decida antes de gastar com projeto",
   description:
     "Pré-análise ambiental, jurídica, urbanística e financeira da sua gleba a partir do KMZ, com a fonte legal ao lado de cada número. Grátis: 1 gleba por mês, com até 5 análises.",
 };
@@ -127,14 +127,14 @@ export default function PaginaPrincipal() {
       <HeaderSite />
 
       {/* 1. Hero */}
-      <section className="bg-[#16241f] pb-16 pt-14 text-white">
+      <section className="bg-[#170d48] pb-16 pt-14 text-white">
         <div className="mx-auto max-w-6xl px-5">
           <div className="mx-auto max-w-3xl text-center">
             <h1 className="text-4xl font-extrabold leading-tight tracking-tight sm:text-5xl">
               Decidir em 1 dia se a gleba vira loteamento
             </h1>
             <p className="mt-5 text-lg leading-relaxed text-slate-300">
-              A plataforma Viabilidade homeeye faz a pré-análise ambiental, jurídica,
+              A voaz.app faz a pré-análise ambiental, jurídica,
               urbanística e financeira da sua gleba a partir do KMZ, com a fonte legal ao lado
               de cada número.
             </p>
@@ -183,7 +183,7 @@ export default function PaginaPrincipal() {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {VIRADA.map((b) => (
               <div key={b.titulo} className="rounded-xl border border-slate-200 bg-white p-6">
-                <h3 className="text-lg font-semibold text-[#1b4332]">{b.titulo}</h3>
+                <h3 className="text-lg font-semibold text-[#241862]">{b.titulo}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-slate-600">{b.texto}</p>
               </div>
             ))}
@@ -200,7 +200,7 @@ export default function PaginaPrincipal() {
           <ol className="mx-auto mt-10 grid max-w-4xl gap-6 md:grid-cols-3">
             {PASSOS.map((p, i) => (
               <li key={p.titulo} className="rounded-xl border border-slate-200 p-6">
-                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#1b4332] text-sm font-bold text-[#f3ecd8]">
+                <span className="grid h-9 w-9 place-items-center rounded-full bg-[#241862] text-sm font-bold text-[#fff4f4]">
                   {i + 1}
                 </span>
                 <h3 className="mt-3 font-semibold">{p.titulo}</h3>
@@ -228,10 +228,10 @@ export default function PaginaPrincipal() {
               >
                 <h3 className="font-semibold">{p.card}</h3>
                 <p className="mt-2 text-sm text-slate-500">{p.dor}</p>
-                <p className="mt-2 text-sm font-medium text-[#1b4332]">{p.transformacao}</p>
+                <p className="mt-2 text-sm font-medium text-[#241862]">{p.transformacao}</p>
                 <Link
                   href={p.href}
-                  className="mt-auto pt-4 text-sm font-semibold text-[#a4744d] hover:text-[#8a5f3d]"
+                  className="mt-auto pt-4 text-sm font-semibold text-[#ff914d] hover:text-[#8a5f3d]"
                 >
                   Ver como funciona para você →
                 </Link>
@@ -290,7 +290,7 @@ export default function PaginaPrincipal() {
       </section>
 
       {/* 8. CTA final */}
-      <section id="cta" className="bg-[#16241f] py-16 text-white">
+      <section id="cta" className="bg-[#170d48] py-16 text-white">
         <div className="mx-auto max-w-3xl px-5 text-center">
           <h2 className="text-3xl font-bold tracking-tight">A primeira análise sai hoje</h2>
           <p className="mt-4 leading-relaxed text-slate-300">

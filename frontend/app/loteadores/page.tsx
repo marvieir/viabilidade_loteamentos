@@ -12,7 +12,7 @@ import { Reveal } from "@/components/marketing/Reveal";
 import { BotoesCta, FooterSite, HeaderSite, LINK_DEMO } from "@/components/marketing/site";
 
 export const metadata: Metadata = {
-  title: "Viabilidade homeeye para loteadores | Triar 10 glebas no tempo de 1 estudo",
+  title: "voaz.app para loteadores | Triar 10 glebas no tempo de 1 estudo",
   description:
     "A pré-análise que corta do seu funil a gleba que morre na diligência, antes de você pagar o estudo caro por ela. Grátis: 1 gleba por mês, com até 5 análises.",
 };
@@ -50,7 +50,7 @@ const OBJECOES = [
   {
     objecao: "Já tenho engenheiro e topógrafo de confiança.",
     quebra:
-      "O laboratório não substitui o médico; faz a consulta render. A Viabilidade homeeye entrega à sua equipe as glebas pré-qualificadas com mapa e fontes, e a hora sênior deles rende no que exige julgamento. O que você economiza descartando mico por método caro paga a triagem do ano.",
+      "O laboratório não substitui o médico; faz a consulta render. A voaz.app entrega à sua equipe as glebas pré-qualificadas com mapa e fontes, e a hora sênior deles rende no que exige julgamento. O que você economiza descartando mico por método caro paga a triagem do ano.",
   },
   {
     objecao: "Se a análise errar, quem paga sou eu.",
@@ -234,13 +234,13 @@ function Capitulo({
   return (
     <div className="mx-auto grid max-w-5xl gap-8 px-5 md:grid-cols-[200px,1fr] md:gap-14">
       <div className="md:sticky md:top-24 md:self-start">
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#a4744d]">
+        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#ff914d]">
           Capítulo {numero}
         </p>
-        <h2 className="font-display mt-2 text-2xl leading-snug text-[#1c2a24]">{titulo}</h2>
-        {nota && <p className="mt-3 text-xs italic text-[#9a937f]">{nota}</p>}
+        <h2 className="font-display mt-2 text-2xl leading-snug text-[#1d1252]">{titulo}</h2>
+        {nota && <p className="mt-3 text-xs italic text-[#96796a]">{nota}</p>}
       </div>
-      <div className="space-y-5 text-[17px] leading-[1.75] text-[#3c4a42]">{children}</div>
+      <div className="space-y-5 text-[17px] leading-[1.75] text-[#4a3f7a]">{children}</div>
     </div>
   );
 }
@@ -258,11 +258,11 @@ function Prancha({
   selo: string;
 }) {
   return (
-    <figure className="overflow-hidden rounded-2xl border border-[#e2dac6] bg-[#fdfbf5] shadow-xl shadow-[#1b4332]/10">
+    <figure className="overflow-hidden rounded-2xl border border-[#f3e9e0] bg-[#fdfbf5] shadow-xl shadow-[#241862]/10">
       <PrintReal src={src} alt={alt} className="[&_img]:rounded-none [&_img]:border-0 [&_img]:shadow-none [&_figure]:rounded-none [&_figure]:border-0" />
       <figcaption className="flex items-center justify-between gap-3 border-t border-[#eee7d4] px-4 py-2.5">
-        <span className="text-xs font-medium text-[#5a5546]">{titulo}</span>
-        <span className="rounded-full bg-[#1b4332]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#1b4332]">
+        <span className="text-xs font-medium text-[#5b4a3e]">{titulo}</span>
+        <span className="rounded-full bg-[#241862]/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#241862]">
           {selo}
         </span>
       </figcaption>
@@ -272,11 +272,11 @@ function Prancha({
 
 export default function PaginaLoteadores() {
   return (
-    <div className="bg-[#f7f3ea] text-[#1c2a24]">
+    <div className="bg-[#fbf6f1] text-[#1d1252]">
       <HeaderSite />
 
       {/* 1. Abertura (dor + Promessa) */}
-      <section className="relative overflow-hidden bg-[#16241f] pb-20 pt-16 text-white">
+      <section className="relative overflow-hidden bg-[#170d48] pb-20 pt-16 text-white">
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-[0.16]"
@@ -287,31 +287,31 @@ export default function PaginaLoteadores() {
         />
         <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 lg:grid-cols-[1.05fr,1fr]">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#9cc0ab]">
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[#ffad78]">
               Para quem vive de originar áreas
             </p>
-            <h1 className="font-display mt-5 text-[2.6rem] font-medium leading-[1.08] text-[#f6f1e2] sm:text-6xl">
+            <h1 className="font-display mt-5 text-[2.6rem] font-medium leading-[1.08] text-[#fffafa] sm:text-6xl">
               Triar 10 glebas no tempo de 1 estudo tradicional
             </h1>
-            <p className="mt-6 max-w-xl text-lg leading-relaxed text-[#c9d4c9]">
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-[#c3b8e8]">
               A pré-análise que corta do seu funil a gleba que morre na diligência, antes de
               você pagar o estudo caro por ela.
             </p>
             <div className="mt-9 flex flex-col items-start gap-3 sm:flex-row">
               <Link
                 href="/registrar"
-                className="inline-flex h-12 items-center rounded-xl bg-[#e9dfc4] px-7 text-base font-semibold text-[#16241f] shadow-lg shadow-black/30 transition hover:bg-[#f3ecd8]"
+                className="inline-flex h-12 items-center rounded-xl bg-[#ff914d] px-7 text-base font-semibold text-[#170d48] shadow-lg shadow-black/30 transition hover:bg-[#fff4f4]"
               >
                 Criar conta grátis
               </Link>
               <a
                 href={LINK_DEMO}
-                className="inline-flex h-12 items-center rounded-xl border border-[#4a6557] px-7 text-base font-semibold text-[#e6e0cd] transition hover:bg-[#22362d]"
+                className="inline-flex h-12 items-center rounded-xl border border-[#4a3f7a] px-7 text-base font-semibold text-[#fdeae4] transition hover:bg-[#241862]"
               >
                 Agendar demonstração online
               </a>
             </div>
-            <p className="mt-4 text-sm text-[#8fa396]">
+            <p className="mt-4 text-sm text-[#9287c4]">
               Grátis: 1 gleba por mês, com até 5 análises.
             </p>
           </div>
@@ -329,12 +329,12 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* Banda de fatos */}
-      <section className="border-b border-[#e2dac6] bg-[#f3efe4]">
+      <section className="border-b border-[#f3e9e0] bg-[#fbf6f1]">
         <div className="mx-auto grid max-w-6xl gap-8 px-5 py-10 sm:grid-cols-2 lg:grid-cols-4">
           {FATOS.map((f, i) => (
             <Reveal key={f.numero} atraso={i * 90}>
-              <p className="font-display text-4xl text-[#1b4332]">{f.numero}</p>
-              <p className="mt-2 text-[13px] leading-relaxed text-[#5a5546]">{f.rotulo}</p>
+              <p className="font-display text-4xl text-[#241862]">{f.numero}</p>
+              <p className="mt-2 text-[13px] leading-relaxed text-[#5b4a3e]">{f.rotulo}</p>
             </Reveal>
           ))}
         </div>
@@ -354,7 +354,7 @@ export default function PaginaLoteadores() {
               derruba um terço dos lotes, e a conta que fechava bonita no guardanapo não fecha no
               papel. O dinheiro do estudo foi, o mês foi, e o funil continua vazio.
             </p>
-            <blockquote className="font-display border-l-2 border-[#a4744d] py-1 pl-6 text-[26px] leading-snug text-[#1b4332]">
+            <blockquote className="font-display border-l-2 border-[#ff914d] py-1 pl-6 text-[26px] leading-snug text-[#241862]">
               Enquanto isso, a área boa daquele mês foi para o concorrente que respondeu em três
               dias. A diferença foi a velocidade de dizer sim.
             </blockquote>
@@ -368,7 +368,7 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* 3. O custo de continuar assim */}
-      <section className="bg-[#efe8d9] py-20">
+      <section className="bg-[#fff4f4] py-20">
         <Reveal>
           <Capitulo numero="02" titulo="O custo de continuar assim">
             <p>
@@ -377,7 +377,7 @@ export default function PaginaLoteadores() {
               consumiu dinheiro de diligência e semanas de calendário que não voltam.
             </p>
             <div className="rounded-2xl border border-[#ddd2b8] bg-[#faf6ec] p-6">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#a4744d]">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#ff914d]">
                 A conta invisível do ano
               </p>
               <ul className="mt-4 space-y-3 text-[15px]">
@@ -388,7 +388,7 @@ export default function PaginaLoteadores() {
                   "Horas sênior da equipe queimadas descartando mico",
                 ].map((item) => (
                   <li key={item} className="flex items-start gap-3">
-                    <span className="mt-1 text-[#b25b38]">✕</span>
+                    <span className="mt-1 text-[#db6b1a]">✕</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -404,32 +404,32 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* 4. A virada: Análise com Proveniência */}
-      <section className="bg-[#16241f] py-20 text-[#d8d2c0]">
+      <section className="bg-[#170d48] py-20 text-[#d8d2c0]">
         <Reveal>
           <div className="mx-auto grid max-w-5xl gap-10 px-5 md:grid-cols-[200px,1fr] md:gap-14">
             <div className="md:sticky md:top-24 md:self-start">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#a4744d]">
+              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#ff914d]">
                 Capítulo 03
               </p>
-              <h2 className="font-display mt-2 text-2xl leading-snug text-[#f6f1e2]">
+              <h2 className="font-display mt-2 text-2xl leading-snug text-[#fffafa]">
                 A virada: Análise com Proveniência
               </h2>
             </div>
             <div className="space-y-5 text-[17px] leading-[1.75]">
               <p>
-                A Viabilidade homeeye roda a pré-análise da gleba em minutos a partir do KMZ,
+                A voaz.app roda a pré-análise da gleba em minutos a partir do KMZ,
                 sobre um princípio que batizamos de{" "}
-                <strong className="text-[#f6f1e2]">Análise com Proveniência</strong>: todo número
+                <strong className="text-[#fffafa]">Análise com Proveniência</strong>: todo número
                 sai com a origem impressa ao lado, a lei que incide, o perfil de jurisdição
                 aplicado e a data de referência.
               </p>
               {/* Chip de proveniência — o conceito central, mostrado como o produto mostra */}
               <div className="rounded-2xl border border-[#33503f] bg-[#1d3229] p-5">
-                <p className="font-display text-3xl text-[#f6f1e2]">52.253,23 m²</p>
-                <p className="mt-1 text-sm text-[#c9d4c9]">
+                <p className="font-display text-3xl text-[#fffafa]">52.253,23 m²</p>
+                <p className="mt-1 text-sm text-[#c3b8e8]">
                   Mata/APP preservada (não-edificável) · 27,9% da gleba bruta
                 </p>
-                <p className="mt-3 border-t border-[#33503f] pt-3 text-xs text-[#8fa396]">
+                <p className="mt-3 border-t border-[#33503f] pt-3 text-xs text-[#9287c4]">
                   Fonte: Lei 11.428/2006 (Mata Atlântica) · Lei 12.651/2012 (Código Florestal) ·
                   perfil São Roque/SP · data de referência da análise
                 </p>
@@ -460,13 +460,13 @@ export default function PaginaLoteadores() {
       <section className="py-20">
         <div className="mx-auto max-w-6xl px-5">
           <Reveal>
-            <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-[#a4744d]">
+            <p className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-[#ff914d]">
               Capítulo 04
             </p>
             <h2 className="font-display mx-auto mt-2 max-w-2xl text-center text-3xl leading-snug">
               O caminho inteiro, tela a tela
             </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-[#7d786a]">
+            <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-[#96796a]">
               Tudo abaixo é a plataforma de verdade rodando sobre uma gleba real de São Roque ·
               SP: prints da interface e desenhos gerados pelo motor. Nada foi montado à mão.
             </p>
@@ -481,15 +481,15 @@ export default function PaginaLoteadores() {
                   }`}
                 >
                   <div>
-                    <p className="font-display text-xl text-[#a4744d]">{i + 1}</p>
+                    <p className="font-display text-xl text-[#ff914d]">{i + 1}</p>
                     <h3 className="font-display mt-1 text-2xl">{etapa.titulo}</h3>
-                    <p className="mt-3 leading-relaxed text-[#3c4a42]">{etapa.texto}</p>
+                    <p className="mt-3 leading-relaxed text-[#4a3f7a]">{etapa.texto}</p>
                     {etapa.itens && (
                       <ul className="mt-4 flex flex-wrap gap-1.5">
                         {etapa.itens.map((it) => (
                           <li
                             key={it}
-                            className="rounded-full border border-[#d8cfb8] bg-[#faf6ec] px-2.5 py-1 text-[11px] font-medium text-[#5a5546]"
+                            className="rounded-full border border-[#d8cfb8] bg-[#faf6ec] px-2.5 py-1 text-[11px] font-medium text-[#5b4a3e]"
                           >
                             {it}
                           </li>
@@ -511,7 +511,7 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* 6. O que muda na operação */}
-      <section className="bg-[#efe8d9] py-20">
+      <section className="bg-[#fff4f4] py-20">
         <div className="mx-auto max-w-5xl px-5">
           <Reveal>
             <h2 className="font-display text-center text-3xl">O que muda na sua operação</h2>
@@ -519,8 +519,8 @@ export default function PaginaLoteadores() {
           <ul className="mt-10 grid gap-3 sm:grid-cols-2">
             {MUDANCAS.map((m, i) => (
               <Reveal key={m} atraso={(i % 2) * 80}>
-                <li className="flex items-start gap-3 rounded-xl border border-[#ddd2b8] bg-[#faf6ec] p-4 text-[15px] leading-relaxed text-[#3c4a42]">
-                  <span className="mt-0.5 font-semibold text-[#1b4332]">✓</span>
+                <li className="flex items-start gap-3 rounded-xl border border-[#ddd2b8] bg-[#faf6ec] p-4 text-[15px] leading-relaxed text-[#4a3f7a]">
+                  <span className="mt-0.5 font-semibold text-[#241862]">✓</span>
                   {m}
                 </li>
               </Reveal>
@@ -533,14 +533,14 @@ export default function PaginaLoteadores() {
       <section className="py-20">
         <Reveal>
           <div className="mx-auto max-w-3xl px-5 text-center">
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#a4744d]">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[#ff914d]">
               A prova é o produto
             </p>
-            <p className="font-display mt-6 text-[28px] leading-snug text-[#1b4332]">
+            <p className="font-display mt-6 text-[28px] leading-snug text-[#241862]">
               Não vamos pedir que você acredite em depoimento. Crie a conta gratuita, suba uma
               gleba que você conhece bem e compare o resultado com o que a realidade mostrou.
             </p>
-            <p className="mt-5 text-[15px] leading-relaxed text-[#5a5546]">
+            <p className="mt-5 text-[15px] leading-relaxed text-[#5b4a3e]">
               A análise que erra por esconder, você descarta. A análise que mostra a fonte de
               cada número, você audita.
             </p>
@@ -549,11 +549,11 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* 8. Planos */}
-      <section id="planos" className="bg-[#16241f] py-20">
+      <section id="planos" className="bg-[#170d48] py-20">
         <div className="mx-auto max-w-4xl px-5">
           <Reveal>
-            <h2 className="font-display text-center text-3xl text-[#f6f1e2]">Planos</h2>
-            <p className="mt-3 text-center text-sm text-[#8fa396]">
+            <h2 className="font-display text-center text-3xl text-[#fffafa]">Planos</h2>
+            <p className="mt-3 text-center text-sm text-[#9287c4]">
               Cada rodada de dimensão conta como 1 análise. Regenerar o urbanismo da mesma gleba
               consome 1 análise.
             </p>
@@ -561,9 +561,9 @@ export default function PaginaLoteadores() {
           <div className="mt-10 grid gap-6 md:grid-cols-2">
             <Reveal>
               <div className="flex h-full flex-col rounded-2xl border border-[#33503f] bg-[#1d3229] p-7">
-                <h3 className="font-display text-xl text-[#f6f1e2]">Gratuito</h3>
-                <p className="font-display mt-4 text-4xl text-[#f6f1e2]">R$ 0,00</p>
-                <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#c9d4c9]">
+                <h3 className="font-display text-xl text-[#fffafa]">Gratuito</h3>
+                <p className="font-display mt-4 text-4xl text-[#fffafa]">R$ 0,00</p>
+                <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#c3b8e8]">
                   <li>1 gleba por mês (fixa no mês)</li>
                   <li>Até 5 análises, somando as dimensões</li>
                   <li>Todas as dimensões: ambiental, jurídica, urbanística, financeira</li>
@@ -571,20 +571,20 @@ export default function PaginaLoteadores() {
                 </ul>
                 <Link
                   href="/registrar"
-                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl border border-[#4a6557] text-sm font-semibold text-[#e6e0cd] transition hover:bg-[#22362d]"
+                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl border border-[#4a3f7a] text-sm font-semibold text-[#fdeae4] transition hover:bg-[#241862]"
                 >
                   Começar de graça
                 </Link>
               </div>
             </Reveal>
             <Reveal atraso={120}>
-              <div className="relative flex h-full flex-col rounded-2xl border-2 border-[#e9dfc4] bg-[#f7f3ea] p-7 shadow-2xl shadow-black/30">
-                <span className="absolute -top-3 left-6 rounded-full bg-[#a4744d] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
+              <div className="relative flex h-full flex-col rounded-2xl border-2 border-[#ff914d] bg-[#fbf6f1] p-7 shadow-2xl shadow-black/30">
+                <span className="absolute -top-3 left-6 rounded-full bg-[#ff914d] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
                   Para a operação
                 </span>
-                <h3 className="font-display text-xl text-[#1c2a24]">Assinatura anual</h3>
-                <p className="font-display mt-4 text-4xl text-[#1b4332]">Fale com a gente</p>
-                <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#3c4a42]">
+                <h3 className="font-display text-xl text-[#1d1252]">Assinatura anual</h3>
+                <p className="font-display mt-4 text-4xl text-[#241862]">Fale com a gente</p>
+                <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#4a3f7a]">
                   <li>200 áreas por ano</li>
                   <li>600 análises por ano (cerca de 12 glebas completas por mês)</li>
                   <li>Todas as dimensões, com proveniência</li>
@@ -592,7 +592,7 @@ export default function PaginaLoteadores() {
                 </ul>
                 <a
                   href={LINK_DEMO}
-                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl bg-[#1b4332] text-sm font-semibold text-[#f3ecd8] transition hover:bg-[#16382a]"
+                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl bg-[#241862] text-sm font-semibold text-[#fff4f4] transition hover:bg-[#1d1252]"
                 >
                   Agendar demonstração online
                 </a>
@@ -611,14 +611,14 @@ export default function PaginaLoteadores() {
           <div className="mt-10 space-y-3">
             {OBJECOES.map((o, i) => (
               <Reveal key={o.objecao} atraso={i * 60}>
-                <details className="group rounded-2xl border border-[#e2dac6] bg-[#fdfbf5] p-6 open:shadow-lg open:shadow-[#1b4332]/5">
-                  <summary className="font-display cursor-pointer list-none text-lg leading-snug text-[#1c2a24] marker:hidden">
+                <details className="group rounded-2xl border border-[#f3e9e0] bg-[#fdfbf5] p-6 open:shadow-lg open:shadow-[#241862]/5">
+                  <summary className="font-display cursor-pointer list-none text-lg leading-snug text-[#1d1252] marker:hidden">
                     “{o.objecao}”
-                    <span className="float-right text-[#a4744d] transition group-open:rotate-45">
+                    <span className="float-right text-[#ff914d] transition group-open:rotate-45">
                       +
                     </span>
                   </summary>
-                  <p className="mt-4 text-[15px] leading-[1.75] text-[#3c4a42]">{o.quebra}</p>
+                  <p className="mt-4 text-[15px] leading-[1.75] text-[#4a3f7a]">{o.quebra}</p>
                 </details>
               </Reveal>
             ))}
@@ -627,11 +627,11 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* 10. Risco reverso */}
-      <section className="bg-[#efe8d9] py-16">
+      <section className="bg-[#fff4f4] py-16">
         <Reveal>
           <div className="mx-auto max-w-2xl px-5 text-center">
             <h2 className="font-display text-2xl">Risco reverso</h2>
-            <p className="mt-4 leading-relaxed text-[#3c4a42]">
+            <p className="mt-4 leading-relaxed text-[#4a3f7a]">
               O plano gratuito é permanente: 1 gleba por mês, até 5 análises, todas as
               dimensões, com proveniência. Você valida o método na sua área real, no seu ritmo,
               e assina quando o funil pedir mais. A decisão de pagar chega depois da prova.
@@ -650,12 +650,12 @@ export default function PaginaLoteadores() {
             {FAQ_OPERACIONAL.map((f) => (
               <details
                 key={f.pergunta}
-                className="rounded-xl border border-[#e2dac6] bg-[#fdfbf5] p-5"
+                className="rounded-xl border border-[#f3e9e0] bg-[#fdfbf5] p-5"
               >
                 <summary className="cursor-pointer list-none font-semibold marker:hidden">
                   {f.pergunta}
                 </summary>
-                <p className="mt-3 text-sm leading-relaxed text-[#3c4a42]">{f.resposta}</p>
+                <p className="mt-3 text-sm leading-relaxed text-[#4a3f7a]">{f.resposta}</p>
               </details>
             ))}
           </div>
@@ -663,13 +663,13 @@ export default function PaginaLoteadores() {
       </section>
 
       {/* 12. Fechamento */}
-      <section className="bg-[#16241f] py-20 text-white">
+      <section className="bg-[#170d48] py-20 text-white">
         <Reveal>
           <div className="mx-auto max-w-3xl px-5 text-center">
-            <h2 className="font-display text-4xl leading-tight text-[#f6f1e2]">
+            <h2 className="font-display text-4xl leading-tight text-[#fffafa]">
               O próximo KMZ que chegar já pode ser decidido em 1 dia
             </h2>
-            <p className="mt-5 leading-relaxed text-[#c9d4c9]">
+            <p className="mt-5 leading-relaxed text-[#c3b8e8]">
               Crie a conta gratuita agora e rode a primeira gleba hoje. Se quiser ver o fluxo
               com um especialista antes, agende a demonstração online.
             </p>
@@ -677,7 +677,7 @@ export default function PaginaLoteadores() {
               <BotoesCta escuro />
             </div>
             <p className="mt-8 text-xs text-[#6f8577]">
-              <Link href="/" className="transition hover:text-[#c9d4c9]">
+              <Link href="/" className="transition hover:text-[#c3b8e8]">
                 ← Voltar para a página principal
               </Link>
             </p>
