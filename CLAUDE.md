@@ -121,6 +121,18 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
   o valor entrar é o documento extraído + confirmação humana, ou o campo de piso
   informado na tela (que só pode SUBIR o piso, nunca descer abaixo da lei).
 
+- **Lição registrada (28/07/2026) — medir COBERTURA, não só precisão:** na importação de DWG
+  a auditoria dizia "diferença mediana 0,05%" e passava total confiança, enquanto o motor
+  achava só 115 dos 129 lotes que o desenho declara (78% da área). A régua media *"os lotes
+  que achei estão certos?"* e nunca *"achei todos os lotes?"*. Sempre que o insumo DECLARA um
+  total (soma dos rótulos de área do CAD, quadro-resumo da planta, área do levantamento),
+  comparar o que produzimos contra esse total — e avisar quando não bate. Precisão alta sobre
+  amostra incompleta é o pior tipo de número: parece confiável e está errado.
+- **Lição registrada (28/07/2026) — não abandonar pista por relato:** cheguei a testar a
+  camada certa ('P2'), vi 127 lotes, e ABANDONEI a pista porque o relato repassado dizia 115
+  lotes. O desenho declarava 129, e o dono do projeto confirmou 129 depois. Relato de memória
+  não vence medição do arquivo: quando divergem, medir de novo antes de descartar a hipótese.
+
 ## Comunicação com o operador (INEGOCIÁVEL)
 - **Sempre passe instruções COMPLETAS e prontas para colar.** Nada de comando pela metade.
   Para qualquer passo no Mac do operador, inclua: **de qual diretório** rodar (`cd …` com o
