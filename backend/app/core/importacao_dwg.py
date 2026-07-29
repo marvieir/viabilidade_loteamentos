@@ -351,7 +351,100 @@ def inventariar(caminho_dxf_: str, gleba_wgs: Optional[BaseGeometry]) -> Optiona
         # Maiores primeiro: o usuário vê o que importa no topo do wizard.
         for nome, ent in sorted(por_camada.items(), key=lambda kv: -sum(kv[1].values()))
     ]
-    return {"camadas": camadas, "georref": _georref(xs, ys, gleba_wgs)}
+    avisos_inv = _completar_sugestao_por_recuperacao(doc, camadas)
+    return {"camadas": camadas, "georref": _georref(xs, ys, gleba_wgs),
+            "avisos_sugestao": avisos_inv}
+
+
+def _segmentos_por_camada(doc) -> tuple[dict, list]:
+    """``({camada: [LineString]}, [rótulos])`` lidos UMA vez do documento — a busca pela
+    camada faltante testa combinações em memória, sem reler o DXF a cada tentativa."""
+    from shapely.geometry import LineString, Point
+
+    por_camada: dict[str, list] = {}
+    rotulos: list[dict] = []
+    for e in doc.modelspace():
+        nome = str(e.dxf.layer or "0")
+        for cadeia in _segmentos_de(e):  # cadeias de vértices → LineString
+            if len(cadeia) >= 2:
+                try:
+                    por_camada.setdefault(nome, []).append(LineString(cadeia))
+                except Exception:  # noqa: BLE001 — cadeia degenerada
+                    continue
+        if e.dxftype() in ("TEXT", "MTEXT"):
+            texto = _texto_de(e)
+            m = _RE_ROTULO_AREA.search(texto)
+            if m:
+                area = _num_ptbr(m.group(1) if m.groups() else m.group(0))
+                try:
+                    p = e.dxf.insert
+                except Exception:  # noqa: BLE001
+                    continue
+                if area:
+                    rotulos.append({"pt": Point(p[0], p[1]), "area_m2": area})
+    return por_camada, rotulos
+
+
+def _recuperado(segs: list, rotulos: list) -> float:
+    """Área DECLARADA que as faces fechadas por ``segs`` conseguem cobrir. É a régua honesta:
+    o desenho diz quanto de lote existe; isto mede quanto disso a gente encontra."""
+    if not segs or not rotulos:
+        return 0.0
+    total = 0.0
+    faces = [f for f in _fechar_faces(segs) if f.area >= _AREA_MIN_FACE_M2]
+    for f in faces:
+        casados = [r for r in rotulos if f.contains(r["pt"])]
+        if len(casados) == 1:
+            total += casados[0]["area_m2"]
+    return total
+
+
+def _completar_sugestao_por_recuperacao(doc, camadas: list[dict]) -> list[str]:
+    """Descobre a camada em 'Ignorar' que fecha os contornos de quadra e PRÉ-MARCA ela.
+
+    Caso real (Porto Real, 28/07): a camada 'P2' tinha só 10 linhas e estava sugerida como
+    'Ignorar', mas era ela que fechava as quadras — sem ela o motor achava 78% da área
+    declarada (115 de 129 lotes) e ninguém percebia, porque os lotes encontrados batiam com
+    0,05% de precisão. A régua é do PRÓPRIO desenho: a soma dos rótulos de área DECLARA
+    quanto de lote existe, então "melhor" aqui é medido, não chutado. A sugestão continua
+    revisável no passo 2 — o gate humano não muda."""
+    try:
+        por_camada, rotulos = _segmentos_por_camada(doc)
+    except Exception:  # noqa: BLE001 — diagnóstico nunca derruba o inventário
+        return []
+    declarado = sum(r["area_m2"] for r in rotulos)
+    if declarado <= 0:
+        return []
+
+    ativas = [c["nome"] for c in camadas if c["sugestao"] in ("lote", "via")]
+    base_segs = [s for n in ativas for s in por_camada.get(n, [])]
+    base = _recuperado(base_segs, rotulos)
+    if base >= 0.95 * declarado:
+        return []  # já achamos quase tudo — nada a sugerir
+
+    candidatas = [c for c in camadas
+                  if c["sugestao"] == "ignorar" and por_camada.get(c["nome"])]
+    candidatas.sort(key=lambda c: -sum(c["entidades"].values()))
+    # 'lote' e 'via' caem na MESMA sopa de fechamento, então o GANHO medido é igual nos dois;
+    # sugerimos 'via' porque a camada que faltava é contorno de quadra (delimita a rua, não é
+    # o lote em si) — foi o papel que, no arquivo real, deu o quadro coerente: 63,5% vendável,
+    # 25,8% de viário e 6,7% de institucional, contra 42,3%/1,5% com ela marcada como lote.
+    papel_melhor = "via"
+    melhor, ganho_melhor = None, 0.0
+    for c in candidatas[:8]:  # teto de custo: as 8 maiores bastam no material real
+        r = _recuperado(base_segs + por_camada[c["nome"]], rotulos)
+        if r - base > ganho_melhor:
+            melhor, ganho_melhor = c, r - base
+    if melhor is None or ganho_melhor < 0.05 * declarado:
+        return []
+
+    melhor["sugestao"] = papel_melhor
+    return [
+        f"A camada '{melhor['nome']}' estava sem papel, mas é ela que fecha os contornos de "
+        f"quadra: incluí-la recupera {_fmt_br(ganho_melhor)} m² de lote "
+        f"({_fmt_br(100 * ganho_melhor / declarado, 1)}% do que o desenho declara). "
+        f"Pré-marquei como '{papel_melhor}' — confira e ajuste se discordar."
+    ]
 
 
 # ================= IMP-2 — confirmar: fechamento, encaixe, proposta importada =================

@@ -555,3 +555,24 @@ def test_resumo_traz_recuperacao_do_declarado():
     assert fechado / declarado < 0.95, "78% do declarado precisa disparar o aviso"
     # Marcar a camada certa recupera quase tudo (medido no arquivo real: P2 como via → 97,7%).
     assert 41180.35 / declarado > 0.95
+
+
+def test_sugestao_automatica_da_camada_que_fecha_quadras():
+    """28/07 — o motor descobre sozinho a camada deixada em 'Ignorar' que fecha os contornos
+    de quadra, medindo quanto da área DECLARADA pelo desenho ela recupera. No arquivo real
+    (Porto Real) a camada 'P2' tinha 10 linhas e nenhum indício no nome, mas incluí-la leva o
+    achado de 78% para 98% do declarado — de 115 para 127 lotes. A sugestão continua revisável
+    no passo 2: o gate humano não muda, só o default deixa de estar errado."""
+    from app.core.importacao_dwg import _recuperado
+    from shapely.geometry import LineString, Point
+
+    # Duas faces lado a lado; a linha do meio (a "camada faltante") separa as duas.
+    quadro = [LineString([(0, 0), (20, 0)]), LineString([(20, 0), (20, 10)]),
+              LineString([(20, 10), (0, 10)]), LineString([(0, 10), (0, 0)])]
+    meio = [LineString([(10, 0), (10, 10)])]
+    rotulos = [{"pt": Point(5, 5), "area_m2": 100.0}, {"pt": Point(15, 5), "area_m2": 100.0}]
+
+    # Sem a linha do meio: uma face só de 200 m², que não casa com nenhum rótulo de 100.
+    assert _recuperado(quadro, rotulos) == 0.0
+    # Com ela: as duas faces fecham e recuperam os 200 m² declarados.
+    assert _recuperado(quadro + meio, rotulos) == 200.0

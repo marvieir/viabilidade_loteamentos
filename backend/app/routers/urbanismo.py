@@ -1219,6 +1219,9 @@ async def importar_projeto(
         avisos.append("DWG convertido para leitura (dwg2dxf).")
     # Achado do operador (24/07): sem rótulo de área em camada alguma, o arquivo quase
     # certamente NÃO é a planta de lotes — avisa JÁ no passo 2, não no botão final.
+    # 28/07 — camada que fecha as quadras, achada MEDINDO a recuperação da área declarada
+    # (caso Porto Real: a 'P2' pré-marcada leva o achado de 78% para 98% do que o CAD declara).
+    avisos.extend(inventario.get("avisos_sugestao") or [])
     if all(c["rotulos_area"] == 0 for c in inventario["camadas"]):
         avisos.append(
             "Nenhuma camada tem rótulos de área de lote (ex.: 'A.: 450,00m²') — este "
