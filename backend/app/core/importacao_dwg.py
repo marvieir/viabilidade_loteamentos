@@ -366,6 +366,11 @@ def inventariar(caminho_dxf_: str, gleba_wgs: Optional[BaseGeometry]) -> Optiona
 _TOL_COSTURA_M = 0.5      # ponta solta até isto do segmento vizinho é prolongada (CAD real)
 _FLECHA_ARCO_M = 0.05     # achatamento de ARC/CIRCLE/LWPOLYLINE com bulge (5 cm de flecha)
 _AREA_MIN_FACE_M2 = 40.0  # face menor que isto nunca é lote (ruído de desenho)
+# Teto de credibilidade do MARCADOR de uso, em múltiplos da maior área ROTULADA pelo próprio
+# desenho. Régua tirada do caso real de 28/07 (Porto Real): maior rótulo 502,87 m²; áreas de
+# uso legítimas em 1,8–2,8×; a face residual que inflava o institucional em 46×. O fator 10
+# aceita com folga qualquer área verde/institucional de verdade e rejeita o resíduo.
+_FATOR_MAX_MARCADOR = 10.0
 
 
 def _num_ptbr(texto: str) -> Optional[float]:
@@ -850,10 +855,29 @@ def processar_importacao(
     lazer_marcada: list = []
     rotulos_restantes = list(rotulos_m)
     n_classificadas = 0
+    # Teto de credibilidade do marcador (achado do caso real de 28/07, Porto Real): quando o
+    # miolo não se subdivide, o fechamento com a divisa deixa UMA face residual gigante — e um
+    # único texto "ÁREA INSTITUCIONAL" caído nela pintava 12.767 m² (23% da gleba) de
+    # institucional, em silêncio. A régua vem do PRÓPRIO desenho, não de um número inventado:
+    # nenhuma área rotulada pelo projetista passava de 502,87 m², as áreas de uso reais mediam
+    # 2–3× isso, e a face residual media 46×. Acima do teto o texto NÃO classifica: a face vira
+    # pendência para o operador decidir (§não inventar dado).
+    teto_marcador = _FATOR_MAX_MARCADOR * maior_declarada if maior_declarada else None
+    marcadores_usados: set[int] = set()
     for face in faces:
-        tipos = {m["tipo"] for m in marcadores_m if face.contains(m["pt"])}
+        casados = [(i, m) for i, m in enumerate(marcadores_m) if face.contains(m["pt"])]
+        tipos = {m["tipo"] for _, m in casados}
+        if tipos and teto_marcador is not None and face.area > teto_marcador:
+            # Face desproporcional: não recebe uso de texto solto — vira pendência VISÍVEL.
+            pendencias.append({
+                "tipo": "area_nao_resolvida", "area_m2": round(face.area, 2),
+                "pt": face.centroid,
+            })
+            rotulos_restantes = [r for r in rotulos_restantes if not face.contains(r["pt"])]
+            continue
         if tipos:
             n_classificadas += 1
+            marcadores_usados.update(i for i, _ in casados)
             if "verde" in tipos:
                 verde_marcada.append(face)
             elif "institucional" in tipos:
@@ -876,10 +900,35 @@ def processar_importacao(
                                "pt": c})
     for r in rotulos_restantes:
         pendencias.append({"tipo": "rotulo_sem_lote", "area_m2": r["area_m2"], "pt": r["pt"]})
+    # Texto de uso que não caiu em face nenhuma: a área existe no projeto e NÃO entrou no
+    # quadro. Silenciar isso seria perder área do empreendimento sem avisar.
+    for i, m in enumerate(marcadores_m):
+        if i not in marcadores_usados:
+            pendencias.append({"tipo": "marcador_sem_area", "area_m2": None, "pt": m["pt"]})
     if n_classificadas:
         avisos.append(
             f"{n_classificadas} área(s) classificadas pelos TEXTOS do desenho "
             "(ÁREA VERDE / INSTITUCIONAL / LAZER) — entram no quadro no uso certo."
+        )
+    # Área que não fechou em nada reconhecível: DIZER o tamanho, não deixar escondida dentro
+    # do 'arruamento'. Sem isso o operador lê 43% de viário e não entende de onde veio.
+    _nao_resolvida = sum(p["area_m2"] for p in pendencias
+                         if p["tipo"] == "area_nao_resolvida" and p.get("area_m2"))
+    if _nao_resolvida > 0:
+        _pct = 100.0 * _nao_resolvida / gleba_m.area if gleba_m.area else 0.0
+        avisos.append(
+            f"ATENÇÃO: {_fmt_br(_nao_resolvida)} m² ({_fmt_br(_pct, 1)}% da gleba) NÃO fecharam "
+            "em lote nem em área de uso reconhecível — o desenho tem um texto de uso ali, mas a "
+            "região é grande demais para ser aquela área. Está marcada como pendência no mapa e "
+            "somada na linha 'arruamento' do quadro (não foi classificada como institucional/"
+            "verde). Confira o de-para de camadas: falta marcar a camada que fecha essas quadras."
+        )
+    _sem_area = sum(1 for p in pendencias if p["tipo"] == "marcador_sem_area")
+    if _sem_area:
+        avisos.append(
+            f"{_sem_area} texto(s) de uso (ÁREA VERDE / INSTITUCIONAL / LAZER) do desenho não "
+            "caíram em nenhuma área fechada — essas áreas NÃO entraram no quadro. Veja os pinos "
+            "no mapa."
         )
 
     # --- verde/institucional: faces das próprias camadas (polilinhas e HACHURAS) + marcadas ---

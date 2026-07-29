@@ -1893,7 +1893,11 @@ class AuditoriaImportacaoOut(BaseModel):
 class PendenciaImportacaoOut(BaseModel):
     """O que NÃO fechou/casou — informação, nunca correção automática (§5)."""
 
-    tipo: Literal["rotulo_sem_lote", "lote_sem_rotulo"]
+    # 28/07 — dois tipos novos vindos do caso real de Porto Real: região grande que ficou sem
+    # uso reconhecível (antes era pintada de institucional por um texto solto) e texto de uso
+    # que não caiu em área fechada (antes sumia em silêncio).
+    tipo: Literal["rotulo_sem_lote", "lote_sem_rotulo",
+                  "area_nao_resolvida", "marcador_sem_area"]
     area_m2: Optional[float] = None  # declarada (rótulo órfão) ou medida (face sem rótulo)
     area_fmt: Optional[str] = None
     lon: float

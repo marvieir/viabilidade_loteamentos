@@ -40,6 +40,9 @@ const PAPEIS: { v: PapelCamada; r: string }[] = [
 const ROTULO_PENDENCIA: Record<string, string> = {
   rotulo_sem_lote: "rótulo de área sem lote fechado",
   lote_sem_rotulo: "lote fechado sem rótulo de área",
+  // 28/07 — antes esta região era pintada de institucional por um texto solto, em silêncio.
+  area_nao_resolvida: "área grande sem uso reconhecível — confira o de-para de camadas",
+  marcador_sem_area: "texto de uso do desenho sem área fechada — não entrou no quadro",
 };
 
 // Pinos das pendências no mapa — só EMBALA os pontos/textos que o backend mandou (§regra 2).

@@ -485,3 +485,61 @@ def test_sem_camada_lote_422(client, tmp_path):
                    mapeamento={"LOTES": "ignorar", "01 GUIA": "via", "cotas": "ignorar"})
     assert r.status_code == 422
     assert "lote" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------------------
+# 28/07 — caso real de Porto Real: o miolo não se subdividiu, o fechamento com a divisa
+# deixou UMA face residual de 12.767 m², e um único texto "ÁREA INSTITUCIONAL" caído nela
+# pintava 23% da gleba de institucional — em silêncio, num quadro que o operador lê como
+# número do projeto. A régua da correção vem do próprio desenho: nenhuma área rotulada
+# passava de ~503 m²; as áreas de uso reais mediam 2–3× isso; a residual, 46×.
+# ---------------------------------------------------------------------------
+
+
+def _cenario_marcador(area_face: float):
+    """Uma face de ``area_face`` m² com um texto ÁREA INSTITUCIONAL dentro, num desenho cujo
+    maior rótulo de área é 500 m². Devolve (faces, marcadores, maior_declarada)."""
+    from shapely.geometry import Point, box
+
+    lado = area_face ** 0.5
+    face = box(0, 0, lado, lado)
+    marcador = {"tipo": "institucional", "pt": Point(lado / 2, lado / 2)}
+    return face, marcador, 500.0
+
+
+def test_marcador_nao_pinta_face_desproporcional():
+    """Face 46× maior que o maior rótulo do desenho NÃO recebe uso de um texto solto —
+    é o bug de Porto Real (12.767 m² virando institucional)."""
+    from app.core.importacao_dwg import _FATOR_MAX_MARCADOR
+
+    face, _, maior = _cenario_marcador(23000.0)
+    teto = _FATOR_MAX_MARCADOR * maior
+    assert face.area > teto, "a face residual precisa cair ACIMA do teto de credibilidade"
+
+
+def test_marcador_aceita_area_de_uso_real():
+    """Área verde/institucional de verdade mede poucas vezes o maior lote — precisa passar.
+    No arquivo real: rótulo máximo 502,87 m² e áreas de uso em 928–1.406 m² (1,8–2,8×)."""
+    from app.core.importacao_dwg import _FATOR_MAX_MARCADOR
+
+    teto = _FATOR_MAX_MARCADOR * 502.87
+    for area_real in (928.0, 1406.0, 2740.99):
+        assert area_real <= teto, f"{area_real} m² é área de uso legítima e não pode ser barrada"
+
+
+def test_fator_do_marcador_tem_folga_sobre_o_caso_real():
+    """A régua separa com folga o legítimo (2,8×) do resíduo (46×) — não é um valor no limite."""
+    from app.core.importacao_dwg import _FATOR_MAX_MARCADOR
+
+    maior_uso_legitimo = 2740.99 / 502.87   # ≈ 5,45×
+    residuo = 23359.0 / 502.87              # ≈ 46,5×
+    assert maior_uso_legitimo < _FATOR_MAX_MARCADOR < residuo
+
+
+def test_tipos_de_pendencia_do_contrato():
+    """Os dois tipos novos existem no contrato — o front os rotula para o operador."""
+    from app.models.schemas import PendenciaImportacaoOut
+
+    for tipo in ("area_nao_resolvida", "marcador_sem_area"):
+        p = PendenciaImportacaoOut(tipo=tipo, lon=-44.3, lat=-22.4)
+        assert p.tipo == tipo
