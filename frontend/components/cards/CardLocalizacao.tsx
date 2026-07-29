@@ -260,7 +260,7 @@ function BlocoHabitacao({ loc }: { loc: Localizacao }) {
 
 function BlocoFaixaEtaria({ loc }: { loc: Localizacao }) {
   const f = loc.faixa_etaria;
-  const cores = ["bg-indigo-400", "bg-sky-400", "bg-emerald-400", "bg-amber-400"];
+  const cores = ["bg-laranja-400", "bg-sky-400", "bg-emerald-400", "bg-amber-400"];
   return (
     <Bloco titulo="Faixa etária" fonte={f.fonte} indisponivel={!f.disponivel} aviso={f.aviso}>
       {/* Barra empilhada — largura proporcional ao pct vindo do backend (sem cálculo aqui). */}

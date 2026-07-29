@@ -206,6 +206,7 @@ def clientes(
                 id=u.id,
                 email=u.email,
                 nome=u.nome,
+                celular=u.celular,
                 papel=u.papel,
                 ativo=u.ativo,
                 criado_em=u.criado_em.isoformat(),

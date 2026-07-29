@@ -2059,6 +2059,9 @@ class AdminClienteOut(BaseModel):
     id: str
     email: str
     nome: Optional[str] = None
+    # Contato do modal obrigatório do 1º login (CONTATO-1) — o admin precisa ver para
+    # conseguir falar com o cliente; até agora o dado existia no banco e não aparecia.
+    celular: Optional[str] = None
     papel: str
     ativo: bool
     criado_em: str

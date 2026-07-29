@@ -24,7 +24,7 @@ const CHIP: Record<StatusConformidade, { rotulo: string; classe: string }> = {
   },
   exigencia_projeto: {
     rotulo: "exigência de projeto",
-    classe: "bg-indigo-100 text-indigo-800",
+    classe: "bg-laranja-100 text-marinho-800",
   },
   atencao: { rotulo: "atenção", classe: "bg-amber-200 text-amber-900" },
   nao_extraido: { rotulo: "não avaliado", classe: "bg-slate-200 text-slate-600" },

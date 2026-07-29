@@ -37,7 +37,7 @@ function ThumbGleba({ aneis }: { aneis?: number[][][] | null }) {
     .map((anel) => "M" + anel.map(([x, y]) => `${x},${y}`).join(" L") + " Z")
     .join(" ");
   return (
-    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border border-indigo-100 bg-indigo-50/60">
+    <div className="grid h-16 w-16 shrink-0 place-items-center rounded-lg border border-laranja-100 bg-laranja-50/60">
       <svg viewBox="0 0 100 100" className="h-14 w-14">
         <path
           d={d}
@@ -148,7 +148,7 @@ export function MinhasAnalises({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por título ou cidade…"
-            className="h-9 w-64 rounded-lg border border-slate-200 bg-white px-3 text-sm placeholder:text-slate-400 focus:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            className="h-9 w-64 rounded-lg border border-slate-200 bg-white px-3 text-sm placeholder:text-slate-400 focus:border-laranja-300 focus:outline-none focus:ring-2 focus:ring-laranja/20"
           />
         )}
       </div>
@@ -183,8 +183,8 @@ export function MinhasAnalises({
                 onKeyDown={(e) => e.key === "Enter" && ocupadoId === null && abrir(a.id)}
                 className={`group flex h-full cursor-pointer gap-3 rounded-xl border bg-white p-4 text-left shadow-sm transition-all ${
                   ocupadoId === a.id
-                    ? "border-indigo-300 opacity-70"
-                    : "border-slate-200 hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-md"
+                    ? "border-laranja-300 opacity-70"
+                    : "border-slate-200 hover:-translate-y-0.5 hover:border-laranja-300 hover:shadow-md"
                 }`}
               >
                 <ThumbGleba aneis={a.silhueta} />

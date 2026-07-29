@@ -35,7 +35,7 @@ const SECAO_DO_PASSO: Record<string, Secao> = {
 
 const COR_BOLINHA: Record<TrilhaPasso["estado"], string> = {
   concluido: "bg-emerald-500",
-  disponivel: "bg-indigo-400",
+  disponivel: "bg-laranja-400",
   atencao: "bg-amber-400",
   pendente: "bg-slate-300",
 };
@@ -49,7 +49,7 @@ const ROTULO_ESTADO: Record<TrilhaPasso["estado"], string> = {
 
 const COR_ETIQUETA: Record<TrilhaPasso["estado"], string> = {
   concluido: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  disponivel: "bg-indigo-50 text-indigo-700 border-indigo-200",
+  disponivel: "bg-laranja-50 text-laranja-700 border-laranja-200",
   atencao: "bg-amber-50 text-amber-800 border-amber-200",
   pendente: "bg-slate-50 text-slate-500 border-slate-200",
 };
@@ -162,7 +162,7 @@ export function TrilhaAnalise({
               <li
                 key={p.id}
                 className={`flex items-start gap-3 rounded-lg p-2.5 ${
-                  ativo ? "bg-indigo-50/60" : ""
+                  ativo ? "bg-laranja-50/60" : ""
                 }`}
               >
                 <span

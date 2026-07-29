@@ -14,6 +14,8 @@ export interface AdminCliente {
   id: string;
   email: string;
   nome: string | null;
+  // Contato do modal obrigatório do 1º login — o admin precisa conseguir falar com o cliente.
+  celular: string | null;
   papel: string;
   ativo: boolean;
   criado_em: string;

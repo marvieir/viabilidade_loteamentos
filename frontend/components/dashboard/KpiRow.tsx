@@ -120,14 +120,14 @@ export function KpiRow({
 const TONS = {
   slate: "border-slate-200 bg-white text-slate-900",
   emerald: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  indigo: "border-indigo-200 bg-indigo-50 text-indigo-900",
+  indigo: "border-laranja-200 bg-laranja-50 text-marinho-900",
   rose: "border-rose-200 bg-rose-50 text-rose-900",
 } as const;
 
 const TONS_ROTULO = {
   slate: "text-slate-500",
   emerald: "text-emerald-700",
-  indigo: "text-indigo-700",
+  indigo: "text-laranja-700",
   rose: "text-rose-700",
 } as const;
 

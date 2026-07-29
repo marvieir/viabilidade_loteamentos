@@ -33,16 +33,16 @@ export function Sidebar({
                 sub ? "ml-3 w-[calc(100%-0.75rem)] pl-3 pr-2" : "px-2.5"
               } ${
                 ativo
-                  ? "bg-indigo-50 font-medium text-indigo-700"
+                  ? "bg-laranja-50 font-medium text-laranja-700"
                   : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
               }`}
             >
               {/* barra de acento do item ativo (padrão de produto profissional) */}
               {ativo && (
-                <span className="absolute -left-0.5 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-indigo-600" />
+                <span className="absolute -left-0.5 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-laranja-600" />
               )}
               <Icone
-                className={ativo ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-500"}
+                className={ativo ? "text-laranja-600" : "text-slate-400 group-hover:text-slate-500"}
                 width={sub ? 14 : 16}
                 height={sub ? 14 : 16}
               />

@@ -397,14 +397,14 @@ function Revisao({
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+    <div className="space-y-4 rounded-xl border border-laranja-200 bg-laranja-50/40 p-4">
       <div className="flex items-center gap-2">
-        <span className="rounded-full bg-indigo-200 px-2 py-0.5 text-[11px] font-semibold text-indigo-800">
+        <span className="rounded-full bg-laranja-200 px-2 py-0.5 text-[11px] font-semibold text-marinho-800">
           PROPOSTO PELO LLM
         </span>
         <span className="text-xs text-slate-500">
           {ficha.fonte_documento} · confira cada achado contra a referência ao ato.{" "}
-          <strong className="text-indigo-700">
+          <strong className="text-laranja-700">
             Isto é só um rascunho — clique em “Confirmar” para SALVAR esta matrícula antes de
             carregar a próxima.
           </strong>
@@ -501,7 +501,7 @@ function Revisao({
               </div>
               <button
                 onClick={addProp}
-                className="mt-1 text-xs font-medium text-indigo-700 hover:underline"
+                className="mt-1 text-xs font-medium text-laranja-700 hover:underline"
               >
                 + adicionar proprietário
               </button>
@@ -606,7 +606,7 @@ function Revisao({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-indigo-200 pt-3">
+      <div className="flex flex-wrap items-center gap-2 border-t border-laranja-200 pt-3">
         <input
           value={validadoPor}
           onChange={(e) => setValidadoPor(e.target.value)}
@@ -855,7 +855,7 @@ function Resultado({
           <p className="mb-2 text-[11px] text-slate-500">
             Gerado a partir dos proprietários e da jurisdição.{" "}
             <strong>Triagem, não parecer.</strong>{" "}
-            <span className="rounded bg-indigo-100 px-1 text-indigo-700">auto</span> = poderá
+            <span className="rounded bg-laranja-100 px-1 text-laranja-700">auto</span> = poderá
             ser baixado por CPF/CNPJ (Fase C).
           </p>
           <div className="space-y-3">
@@ -889,7 +889,7 @@ function Resultado({
                             </span>
                           )}
                           {i.auto_disponivel && (
-                            <span className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                            <span className="rounded-full bg-laranja-100 px-1.5 py-0.5 text-[10px] font-semibold text-laranja-700">
                               auto
                             </span>
                           )}
@@ -977,7 +977,7 @@ function ItemAnexos({
       {anexos.map((a) => (
         <div key={a.id} className="flex items-center gap-2 text-xs text-slate-600">
           <span className="text-emerald-600">✓</span>
-          <button onClick={() => baixar(a)} className="truncate text-indigo-700 hover:underline">
+          <button onClick={() => baixar(a)} className="truncate text-laranja-700 hover:underline">
             {a.fonte_documento}
           </button>
           <span className="text-slate-400">
@@ -1005,7 +1005,7 @@ function ItemAnexos({
       <button
         onClick={() => inputRef.current?.click()}
         disabled={ocupado}
-        className="mt-0.5 text-xs font-medium text-slate-600 hover:text-indigo-700 disabled:opacity-50"
+        className="mt-0.5 text-xs font-medium text-slate-600 hover:text-laranja-700 disabled:opacity-50"
       >
         {ocupado ? "enviando…" : "+ anexar documento"}
       </button>

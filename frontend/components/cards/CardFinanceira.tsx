@@ -212,7 +212,7 @@ export function CardFinanceira({
                   <span
                     className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-bold transition-colors ${
                       atual
-                        ? "bg-indigo-600 text-white shadow-sm"
+                        ? "bg-laranja-600 text-white shadow-sm"
                         : feito
                           ? "bg-emerald-500 text-white group-hover:bg-emerald-600"
                           : "border border-slate-200 bg-white text-slate-400"
@@ -325,7 +325,7 @@ export function CardFinanceira({
             )}
             {f.modo === "parcelado" && <Campo rotulo="Nº de parcelas" ajuda="Em quantas vezes o saldo é dividido (sem juros)." valor={f.n_parcelas} on={(v) => set("n_parcelas", v)} />}
             {f.modo === "financiado" && (
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50/40 p-3">
+              <div className="rounded-lg border border-laranja-200 bg-laranja-50/40 p-3">
                 <p className="text-sm font-medium text-slate-700">Mesa de vendas (PRICE, corrigido por IPCA) <Badge>default — edite</Badge></p>
                 <p className="mb-2 text-[11px] text-slate-500">Como as vendas se repartem por prazo de financiamento (soma = 100%). Referência TIV 5.0 — calibre com sua corretora.</p>
                 <p className="mb-2 text-[11px] text-amber-700">A parcela já corrige por IPCA. O <strong>% a.m.</strong> abaixo é o juro <strong>real, além do IPCA</strong> (contrato “IPCA + X”): use <strong>0</strong> para correção pura. Tudo em R$ de hoje — o IPCA cancela no fluxo.</p>
@@ -341,7 +341,7 @@ export function CardFinanceira({
                   </div>
                 ))}
                 <div className="mt-1 flex items-center gap-3 text-xs">
-                  <button onClick={() => setMesa((m) => [...m, { participacao: 0, prazo_meses: 60, taxa_am: 1 }])} className="font-medium text-indigo-700">+ perfil</button>
+                  <button onClick={() => setMesa((m) => [...m, { participacao: 0, prazo_meses: 60, taxa_am: 1 }])} className="font-medium text-laranja-700">+ perfil</button>
                   <span className={mesa.reduce((s, l) => s + l.participacao, 0) === 100 ? "text-emerald-700" : "text-rose-600"}>soma: {mesa.reduce((s, l) => s + l.participacao, 0)}%</span>
                 </div>
               </div>
@@ -429,7 +429,7 @@ function Campo({
       <p className="flex items-center gap-1.5 text-[11px] font-medium text-slate-600">
         {rotulo} {badge && <Badge>default — edite</Badge>}
       </p>
-      <input type="number" step="any" value={valor} onChange={(e) => on(parseFloat(e.target.value) || 0)} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm shadow-sm outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100" />
+      <input type="number" step="any" value={valor} onChange={(e) => on(parseFloat(e.target.value) || 0)} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-2.5 text-sm shadow-sm outline-none transition-colors focus:border-laranja-400 focus:ring-2 focus:ring-laranja-100" />
       <p className="mt-0.5 text-[11px] text-slate-400">{ajuda}</p>
     </div>
   );
@@ -504,10 +504,10 @@ function Dashboard({ d, econ }: { d: Financeira; econ?: Economica | null }) {
         <div className="rounded-xl border border-slate-200 p-4">
           <p className="mb-2 text-sm font-semibold text-slate-800">Divisão da parceria</p>
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-              <p className="text-xs text-indigo-700">Incorporador {inc.pct != null ? `· ${(inc.pct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%` : ""}</p>
-              <p className="text-base font-bold text-indigo-900">{inc.vgv.geral_fmt}</p>
-              <p className="text-[11px] text-indigo-700">resultado {inc.resultado_nominal_fmt}</p>
+            <div className="rounded-lg border border-laranja-200 bg-laranja-50 p-3">
+              <p className="text-xs text-laranja-700">Incorporador {inc.pct != null ? `· ${(inc.pct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%` : ""}</p>
+              <p className="text-base font-bold text-marinho-900">{inc.vgv.geral_fmt}</p>
+              <p className="text-[11px] text-laranja-700">resultado {inc.resultado_nominal_fmt}</p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="text-xs text-slate-600">Terrenista {ter?.pct != null ? `· ${(ter.pct * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%` : ""}</p>

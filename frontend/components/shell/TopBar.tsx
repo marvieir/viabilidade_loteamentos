@@ -67,7 +67,7 @@ export function TopBar({
           title="Ir para Minhas análises"
           className="flex min-w-0 items-center gap-2.5 rounded-lg px-1 py-0.5 transition-colors hover:bg-slate-50"
         >
-          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-laranja text-white shadow-sm">
             <IconMap width={17} height={17} />
           </div>
           <p className="truncate text-sm font-bold tracking-tight">

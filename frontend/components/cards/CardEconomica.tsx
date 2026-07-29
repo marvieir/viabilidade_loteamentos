@@ -292,7 +292,7 @@ function CurvaVplTma({
       </svg>
       <div className="mt-1 flex justify-between text-[11px] text-slate-400">
         <span>{(xMin * 100).toLocaleString("pt-BR")}% a.a.</span>
-        <span className="text-indigo-500">┊ sua TMA</span>
+        <span className="text-laranja">┊ sua TMA</span>
         <span>{(xMax * 100).toLocaleString("pt-BR")}% a.a.</span>
       </div>
     </div>

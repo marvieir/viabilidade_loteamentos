@@ -37,7 +37,7 @@ export function Button({
     <button
       className={cn(
         "inline-flex select-none items-center justify-center whitespace-nowrap rounded-lg font-medium transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 focus-visible:ring-offset-1",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-laranja/40 focus-visible:ring-offset-1",
         "disabled:pointer-events-none disabled:opacity-50",
         VARIANTES[variant],
         TAMANHOS[size],

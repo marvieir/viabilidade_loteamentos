@@ -111,7 +111,7 @@ export function PainelImportado({
             >
               {mapaExpandido ? "Recolher mapa" : "Expandir mapa"}
             </button>
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700">
+            <span className="rounded-full bg-laranja-100 px-2 py-0.5 text-[10px] font-semibold text-laranja-700">
               importada
             </span>
           </div>
@@ -399,7 +399,7 @@ export function ImportarProjetoDwg({
   const etapa = preview ? 3 : inv ? 2 : 1;
 
   return (
-    <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+    <div className="space-y-3 rounded-xl border border-laranja-200 bg-laranja-50/40 p-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-slate-800">
           Carregar projeto pronto (DWG/DXF) — passo {etapa} de 3
@@ -421,7 +421,7 @@ export function ImportarProjetoDwg({
             que é lote/via/verde, e o projeto vira uma proposta com quadro de áreas real e
             auditoria das áreas declaradas.
           </p>
-          <label className="inline-flex cursor-pointer items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95">
+          <label className="inline-flex cursor-pointer items-center rounded-lg bg-laranja px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95">
             {ocupado ? "Lendo o arquivo…" : "Escolher arquivo DWG/DXF"}
             <input
               type="file"
@@ -522,7 +522,7 @@ export function ImportarProjetoDwg({
               type="button"
               disabled={ocupado}
               onClick={() => conferir(false)}
-              className="rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:opacity-60"
+              className="rounded-lg bg-laranja px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:opacity-60"
             >
               {ocupado ? "Processando…" : "Ver conferência"}
             </button>
@@ -572,7 +572,7 @@ export function ImportarProjetoDwg({
               className={`rounded-lg border px-4 py-2 text-sm transition-colors ${
                 ajustando
                   ? "border-pink-300 bg-pink-50 text-pink-700"
-                  : "border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50"
+                  : "border-laranja-300 bg-white text-laranja-700 hover:bg-laranja-50"
               }`}
             >
               {ajustando

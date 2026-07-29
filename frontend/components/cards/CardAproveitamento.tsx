@@ -335,17 +335,17 @@ export function CardAproveitamento({
                   sub="lote legal + doação aplicados"
                 />
               </div>
-              <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-                <p className="text-xs text-indigo-800">
+              <div className="rounded-lg border border-laranja-200 bg-laranja-50 p-3">
+                <p className="text-xs text-marinho-800">
                   Lote legal {m2(res.cenario_diretriz.lote_min_m2_legal)} · doação{" "}
                   {pct(res.cenario_diretriz.doacao_pct)} (base{" "}
                   {res.cenario_diretriz.doacao_base}) ={" "}
                   {ha(res.cenario_diretriz.doacao_m2)} descontados.
                 </p>
-                <p className="mt-1 text-xs text-indigo-700">
+                <p className="mt-1 text-xs text-laranja-700">
                   {res.cenario_diretriz.proveniencia}
                 </p>
-                <p className="mt-1 text-xs text-indigo-600">
+                <p className="mt-1 text-xs text-laranja-600">
                   {res.cenario_diretriz.ressalva}
                 </p>
               </div>

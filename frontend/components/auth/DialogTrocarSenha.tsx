@@ -64,7 +64,7 @@ export function DialogTrocarSenha({ onFechar }: { onFechar: () => void }) {
             <button
               type="button"
               onClick={onFechar}
-              className="h-10 w-full rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+              className="h-10 w-full rounded-lg bg-laranja px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
             >
               Fechar
             </button>
@@ -103,7 +103,7 @@ export function DialogTrocarSenha({ onFechar }: { onFechar: () => void }) {
             <button
               type="submit"
               disabled={enviando}
-              className="h-10 w-full rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:opacity-60"
+              className="h-10 w-full rounded-lg bg-laranja px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:opacity-60"
             >
               {enviando ? "Salvando…" : "Salvar senha nova"}
             </button>
@@ -139,7 +139,7 @@ function Campo({
         placeholder={placeholder}
         autoComplete={autoComplete}
         required={required}
-        className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+        className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm shadow-sm outline-none transition-colors placeholder:text-slate-400 focus:border-laranja focus:ring-2 focus:ring-laranja-100"
       />
     </label>
   );

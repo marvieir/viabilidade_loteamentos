@@ -290,11 +290,11 @@ export default function Home() {
               onIr={setSecao}
             />
             {analise.agrupamento && (
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+              <div className="rounded-xl border border-laranja-200 bg-laranja-50 p-3 text-sm text-marinho-900">
                 <p className="font-semibold">
                   Projeto unificado — {analise.agrupamento.n_glebas} glebas contíguas
                 </p>
-                <p className="text-indigo-800">
+                <p className="text-marinho-800">
                   {analise.agrupamento.proveniencia}. Área da união:{" "}
                   {analise.geometria.area_ha.toLocaleString("pt-BR")} ha (sem dupla
                   contagem). Arquivos: {analise.agrupamento.arquivos.join(", ")}.
@@ -477,7 +477,7 @@ function UploadHero({
     <main className="mx-auto grid w-full max-w-5xl gap-6 px-4 py-8 sm:py-10">
       {/* Faixa de nova análise — CTA claro, sem ocupar a tela toda */}
       <div className="flex flex-col items-center gap-5 rounded-2xl border border-slate-200 bg-white px-6 py-8 text-center shadow-sm sm:flex-row sm:text-left">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm">
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-laranja text-white shadow-sm">
           <IconMap width={24} height={24} />
         </div>
         <div className="min-w-0 flex-1">

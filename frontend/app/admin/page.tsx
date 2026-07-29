@@ -80,7 +80,7 @@ function PainelAdmin() {
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur">
         <div className="flex items-center gap-2.5">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 text-xs font-bold text-white shadow-sm">
+          <div className="grid h-8 w-8 place-items-center rounded-lg bg-laranja text-xs font-bold text-white shadow-sm">
             A
           </div>
           <div className="leading-tight">
@@ -139,6 +139,8 @@ function PainelAdmin() {
                   <thead className="text-[11px] uppercase tracking-wide text-slate-400">
                     <tr>
                       <th className="px-4 py-2 font-medium">E-mail</th>
+                      <th className="px-4 py-2 font-medium">Nome</th>
+                      <th className="px-4 py-2 font-medium">Telefone</th>
                       <th className="px-4 py-2 font-medium">Cadastro</th>
                       <th className="px-4 py-2 font-medium">Análises</th>
                       <th className="px-4 py-2 font-medium">Cidades</th>
@@ -151,10 +153,16 @@ function PainelAdmin() {
                         <td className="px-4 py-2">
                           {c.email}
                           {c.papel === "admin" && (
-                            <span className="ml-2 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">
+                            <span className="ml-2 rounded-full bg-laranja-100 px-2 py-0.5 text-[10px] font-medium text-laranja-700">
                               admin
                             </span>
                           )}
+                        </td>
+                        <td className="px-4 py-2 text-slate-700">
+                          {c.nome || <span className="text-slate-400">—</span>}
+                        </td>
+                        <td className="px-4 py-2 font-mono text-slate-700">
+                          {c.celular || <span className="font-sans text-slate-400">—</span>}
                         </td>
                         <td className="px-4 py-2 text-slate-500">
                           {new Date(c.criado_em).toLocaleDateString("pt-BR")}

@@ -506,7 +506,7 @@ export function CardUrbanismo({
           <button
             type="button"
             onClick={() => setMostrarImportar((v) => !v)}
-            className="rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100"
+            className="rounded-lg border border-laranja-300 bg-laranja-50 px-3 py-2 text-sm font-medium text-laranja-700 transition-colors hover:bg-laranja-100"
             title="Já tem o projeto de loteamento desenhado? Carregue o DWG/DXF — ele vira uma proposta com quadro de áreas real e auditoria das áreas declaradas."
           >
             📐 Carregar projeto pronto (DWG/DXF)
@@ -845,7 +845,7 @@ export function CardUrbanismo({
                     {/* Fase 9.9 — traçado sinuoso (curvo, contornando o íngreme). */}
                     {proposta.geometria.viario_diagnostico.eixos_curvos && (
                       <span className="inline-flex items-center gap-1">
-                        <span className="inline-block h-2 w-2 rounded-full bg-violet-500" />
+                        <span className="inline-block h-2 w-2 rounded-full bg-laranja" />
                         Traçado sinuoso (curva {proposta.geometria.viario_diagnostico.sinuosidade_media?.toFixed(2)}
                         {proposta.geometria.viario_diagnostico.esqueleto_origem === "llm" ? " · IA" : " · padrão"})
                       </span>
@@ -870,7 +870,7 @@ export function CardUrbanismo({
                     {proposta.geometria.viario_diagnostico.conexao?.loteamento_conexo &&
                       (proposta.geometria.viario_diagnostico.conexao?.porcoes_detectadas ?? 0) > 1 && (
                         <span className="inline-flex items-center gap-1">
-                          <span className="inline-block h-2 w-2 rounded-full bg-indigo-600" />
+                          <span className="inline-block h-2 w-2 rounded-full bg-laranja-600" />
                           Loteamento único — porções ligadas pela travessia
                           {proposta.geometria.viario_diagnostico.conexao?.travessia?.modelo === "diagonal_minimax" &&
                             " (via diagonal)"}
@@ -945,7 +945,7 @@ export function CardUrbanismo({
                         disabled={varianteCarregando !== null}
                         className={`rounded-lg border px-3 py-2 text-left text-xs transition ${
                           ativa
-                            ? "border-indigo-300 bg-indigo-50 text-indigo-900"
+                            ? "border-laranja-300 bg-laranja-50 text-marinho-900"
                             : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                         }`}
                         title={
@@ -1127,9 +1127,9 @@ export function CardUrbanismo({
             </div>
 
             {/* Programa proposto pela IA (proveniência) */}
-            <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900">
+            <div className="rounded-xl border border-laranja-200 bg-laranja-50 p-3 text-sm text-marinho-900">
               <p className="font-semibold">Programa proposto pela IA ({proposta.programa.origem})</p>
-              <p className="text-indigo-800">
+              <p className="text-marinho-800">
                 Lote-alvo {proposta.programa.lote_alvo_m2.toLocaleString("pt-BR")} m² ·
                 densidade {proposta.programa.densidade} · lazer{" "}
                 {(proposta.programa.pct_lazer * 100).toLocaleString("pt-BR")}% · viário{" "}
@@ -1520,7 +1520,7 @@ function ConvergeBar({ a }: { a: ItemFidelidadeArea }) {
       ? "bg-emerald-500"
       : a.status === "degradado"
       ? "bg-amber-500"
-      : "bg-indigo-500";
+      : "bg-laranja";
   const esc = (v: number) => `${Math.min(Math.round(v * 100), 100)}%`;
   return (
     <div className="text-sm">
