@@ -27,6 +27,7 @@ from app.core.config import EH_PRODUCAO, validar_seguranca_producao
 from app.core.db import criar_tabelas
 from app.core.ratelimit import limiter
 from app.routers import (
+    exemplo,
     admin,
     ambiental,
     analises,
@@ -140,6 +141,9 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api")
+# Laudo de exemplo — PÚBLICO (sem auth). É o que responde "o que sai daí?" antes de a
+# pessoa criar conta; a objeção que mais trava conversão (pedido do operador, 29/07).
+app.include_router(exemplo.router, prefix="/api")
 app.include_router(salvas.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(analises.router, prefix="/api")

@@ -36,15 +36,26 @@ export function BotoesCta({ escuro = false }: { escuro?: boolean }) {
       >
         Criar conta grátis
       </Link>
-      <a
-        href={LINK_DEMO}
+      {/* 29/07 — o CTA secundário passa a ser o LAUDO DE EXEMPLO: responde "o que sai daí?",
+          que é a objeção que trava a conversão. A demonstração por e-mail vira o terceiro
+          caminho (link discreto), não o segundo botão. */}
+      <Link
+        href="/laudo-exemplo"
         className={`inline-flex h-12 items-center justify-center rounded-xl border px-7 text-base font-semibold transition ${
           escuro
             ? "border-[#4a3f7a] text-[#fdeae4] hover:bg-[#241862]"
             : "border-[#e3d5c8] text-[#4a3f7a] hover:bg-[#fff4f4]"
         }`}
       >
-        Agendar demonstração online
+        Ver um laudo de exemplo
+      </Link>
+      <a
+        href={LINK_DEMO}
+        className={`inline-flex h-12 items-center justify-center px-3 text-sm font-medium underline-offset-4 transition hover:underline ${
+          escuro ? "text-[#c3b8e8]" : "text-[#96796a]"
+        }`}
+      >
+        Agendar demonstração
       </a>
     </div>
   );
