@@ -1,0 +1,179 @@
+# Detalhamento de Requisitos — voaz.app
+
+> Par do `docs/requisitos.md`: para cada requisito, **como funciona por dentro**, as decisões
+> que o moldaram, **onde mora no código** e como é testado — em linguagem para o operador,
+> não para a máquina. Mesmos IDs. Atualizado em 30/07/2026.
+>
+> Arquitetura em uma frase: o **frontend** (Next.js, `frontend/`) só mostra JSON; toda conta
+> vive no **backend** (FastAPI, `backend/app/`), onde cada dimensão é um *router* (a porta de
+> entrada HTTP, `routers/`) que chama o *core* (o motor de verdade, `core/`); os contratos de
+> dados são os *schemas* Pydantic (`models/schemas.py`); e os testes-ouro (`tests/`) congelam
+> o comportamento certo para ninguém quebrar sem perceber.
+
+---
+
+## RF-ENT — Entrada e identificação
+
+**Como funciona.** O KMZ é descompactado e o KML lido; a plataforma classifica o conteúdo por
+forma (polígono grande = gleba; linhas/pontos = contexto). Área e perímetro saem do
+`pyproj.Geod` — cálculo sobre o elipsoide, o mesmo princípio do agrimensor, nunca "área em
+graus". O município vem de apontar o centróide na malha do IBGE. Vários KMZ vizinhos são
+unidos numa geometria só antes de tudo. No upload, a análise já nasce salva (auto-save) e o
+salvar manual só atualiza a mesma linha (upsert pelo id de trabalho `_analise_id`).
+
+- Código: `core/ingestao.py`, `core/geometria.py`, `core/jurisdicao.py`, `routers/analises.py`, `routers/salvas.py`, `core/levantamento.py` (DWG do levantamento).
+- Testes: `test_ingestao.py`, `test_geometria.py`, `test_auto_salvar.py`, `test_agrupamento.py`.
+
+## RF-AMB — Ambiental
+
+**Como funciona.** A gleba é cruzada por **interseção espacial** com cada camada oficial
+(baixadas por provedores injetáveis — em teste entram stubs, em produção as fontes reais).
+Cada interseção vira um alerta com tipo, área, severidade (ALERTA/INFORMATIVO), fonte e data.
+A vegetação (raster WorldCover) é recortada e classificada em **dura** (cruza APP/UC — não
+loteável) × **a verificar**. A declividade sai do DEM Copernicus reamostrado: faixas
+informativas + máscara ≥30% (vedação urbana). Desde 30/07, rodar a análise grava um
+**marcador no servidor** (`ambiental_store`) — é ele que faz a trilha reconhecer a execução
+na hora; o resultado completo continua indo no snapshot da salva.
+
+- Decisões: triagem conservadora, nunca veredito; camada indisponível é DECLARADA (ex.: "Indisponíveis: ANEEL"); no rural a vedação de 30% vira atenção (a régua rural é APP ≥45°).
+- Código: `routers/ambiental.py`, `routers/vegetacao.py`, `routers/declividade.py`, `core/alertas_geo.py`, `core/camadas*.py`, `core/ambiental_store.py`, `core/bacia.py`, `core/bioma.py`.
+- Testes: `test_ambiental.py`, `test_camadas_crs.py`, `test_declividade.py`, `test_alertas_geo_rural.py`.
+
+## RF-APR — Aproveitamento
+
+**Como funciona.** Aproveitável = gleba − união(restrições). A união evita contar duas vezes
+onde mata e encosta se sobrepõem. O teto físico de lotes divide o aproveitável pelo lote
+mínimo **legal** aplicável; com perfil municipal confirmado nasce o cenário "com diretriz"
+(desconta a doação e usa o lote da zona).
+
+- Código: `routers/aproveitamento.py`, `core/aproveitamento.py`, `core/regime.py` (urbano×rural).
+- Testes: `test_aproveitamento.py`, `test_areas_canonicas.py`, `test_cenario_diretriz.py`.
+
+## RF-URB — Urbanismo
+
+**Como funciona.** É o coração da plataforma, em duas metades bem separadas. A **IA propõe o
+programa** (lote-alvo, % lazer, caráter — texto, nunca número final); o **motor determinístico**
+(`urbanismo_geom.py`, ~milhares de linhas de geometria pura) desenha tudo: orienta a malha,
+traça o viário conexo (gramática "faixas fluidas" no alto padrão, grelha eficiente no
+econômico), corta quadras, subdivide lotes respeitando a janela legal [piso, teto], reserva
+verde/institucional/lazer, posiciona lago no ponto baixo do DEM e o pórtico na entrada. São
+geradas **5 variantes** e a **função de valor** (INTEL-2: valor posicional − penalidades de
+sobra/viário + aderência à faixa + bônus de amenidade, pesos por público editáveis em
+`{perfil}.json`) escolhe a vencedora — as 5 ficam disponíveis na tela. Uma **2ª passada**
+re-lota sobras grandes (MOTOR-SOBRA: sobra caiu de 31,8% para ~2%). A **medição**
+(`urbanismo_medida.py`) produz o quadro de áreas que fecha em 100% e o GeoJSON do mapa.
+
+- Decisões-chave: PISO É LEI (125 m² federal ou zona confirmada; mercado é só mira); regime rural com FMP; estilo por público versionado em arquivo (muda sem rebuild); memória de avaliações vira few-shot do programa.
+- Código: `routers/urbanismo.py` (orquestra), `core/urbanismo_geom.py` (gera), `core/urbanismo_medida.py` (mede), `core/urbanismo_diretrizes.py` (régua legal), `core/urbanismo_programa.py`, `core/urbanismo_valor.py`, `core/urbanismo_estilo.py`, `core/urbanismo_tracado.py`/`_loops.py`, `core/custo_infra*`.
+- Testes: ~20 arquivos `test_urbanismo_*.py` + `test_alto_padrao.py` + `test_custo_infra.py` (valores-ouro sobre a gleba real de São Roque).
+
+## RF-IMP — Importação DWG
+
+**Como funciona.** O DWG vira DXF no servidor (dwg2dxf compilado na imagem; conversões com
+lixo pontual passam por um saneador). O inventário conta entidades por camada e sugere papéis;
+a sugestão testa as camadas em "Ignorar" **medindo quanto da área declarada nos rótulos cada
+uma recupera** — foi assim que a camada "P2" de Porto Real (10 linhas, nome mudo) foi achada.
+O fechamento une segmentos, costura pontas com overshoot e poligoniza; os rótulos "A.: 429,94m²"
+casam faces a áreas declaradas (auditoria) e os textos de uso classificam faces — com teto de
+credibilidade (uma face 46× maior que o maior rótulo não vira "institucional" por causa de um
+texto; vira pendência). O encaixe ancora na divisa detectada (IoU dos cascos), corrige vista
+deslocada na prancha e tira a escala dos rótulos do próprio CAD.
+
+- Lições que viraram regra: medir COBERTURA além de precisão (115→127 lotes achados de 129 declarados); relato de memória não vence medição do arquivo.
+- Código: `core/importacao_dwg.py` (tudo), `routers/urbanismo.py` (endpoints importar/confirmar), front `components/cards/ImportarProjetoDwg.tsx`.
+- Testes: `test_importacao_dwg.py` (23 casos, incluindo os golden do caso real).
+
+## RF-LUOS — Diretriz municipal
+
+**Como funciona.** O(s) PDF(s) vão numa única chamada à API da Anthropic (documentos nativos +
+saída estruturada forçada por tool_choice). O prompt proíbe inventar: valor sem
+artigo/página/trecho não é proposto; documento de outro município é ignorado com aviso. A
+resposta passa por validação **tolerante** (Pydantic com coerção: "1,5"→1,5, "250 m²"→250,
+página "8-9"→8) — falha de formato gera dump de diagnóstico, nunca perde a extração inteira.
+O perfil nasce `proposto` e só entra no cálculo após o PUT de confirmação humana.
+
+- Código: `core/extrator_luos.py`, `routers/perfil.py`, `core/perfil_municipal.py`, schemas `ParamProv/ZonaPerfil/NormasUrbanisticas` (validação tolerante em `models/schemas.py`).
+- Testes: `test_perfil_luos.py` (stub offline — sem rede nem chave).
+
+## RF-JUR — Jurídico
+
+**Como funciona.** Mesmo padrão da LUOS: IA lê matrícula/certidão e propõe a ficha (ônus com
+ato "R-5", averbações, indisponibilidade, débitos), humano confirma cada ficha, e o **núcleo
+determinístico** consolida: rola o risco (alto/médio/baixo) a partir das classes dos achados +
+alertas geo, cruza a soma das áreas das matrículas com o KMZ, e gera o checklist de diligência
+por proprietário (PF/PJ) e UF, com anexos por item.
+
+- Código: `routers/juridico.py`, `core/extrator_documento.py`, `core/juridico_nucleo.py`, `core/juridico_checklist.py`, `core/juridico_store.py`.
+- Testes: `test_juridico*.py`.
+
+## RF-FIN / RF-LOC — Financeiro, econômico, localização
+
+**Como funciona.** O financeiro monta o fluxo mês a mês: receitas da venda financiada (Price),
+custos de infra (do RF-URB-8) e despesas; sai VGV, exposição máxima, resultado. O econômico
+desconta a TMA declarada → VPL em moeda constante, TIR real, paybacks. Nenhum número é
+"recomendação": as leituras são rotuladas *sob as premissas declaradas*. Localização é
+contexto IBGE puro.
+
+- Código: `routers/financeira.py`, `routers/economica.py`, `core/financeira*.py`, `core/economica*.py`, `routers/localizacao.py`.
+- Testes: `test_financeira*.py`, `test_economica.py`.
+
+## RF-LAUDO — Consolidação
+
+**Como funciona.** O front repassa os JSONs das dimensões executadas (nada recalculado);
+`core/laudo.py` deriva o semáforo (favorável/atenção/restrição/informativa/não analisada) das
+classes que cada dimensão JÁ reporta e monta as seções; `laudo_pdf.py`/`laudo_excel.py`
+renderizam. Um teste varre o texto inteiro proibindo "viável/aprovado" (§1-A). A trilha
+(`routers/trilha.py`) computa os 6 passos do servidor: stores por dimensão + snapshot da salva
++ marcador ambiental.
+
+- Testes: `test_laudo*.py` (inclui a regex anti-veredito), `test_trilha.py`.
+
+## RF-CONTA — Contas e admin
+
+**Como funciona.** JWT com refresh automático no front (sessão não cai no meio da análise);
+Google Identity Services opcional; reset por e-mail (SMTP Gmail). O modal de contato bloqueia
+o app até nome+celular existirem (coluna `celular` com migração automática idempotente no
+start). Admin lista clientes (com nome/telefone), métricas e o custo real de IA por
+cliente/análise (`core/uso_llm.py` registra tokens de cada chamada).
+
+- Código: `core/auth.py`, `routers/auth.py`, `routers/admin.py`, `core/db.py` (migração leve), front `components/auth/*`.
+- Testes: `test_auth*.py`, `test_admin.py`, `test_google_login.py`.
+
+## RF-PUB — Site e laudo de exemplo
+
+**Como funciona.** O site público usa a identidade voaz.app (tokens no Tailwind: marinho
+estrutura, laranja é o único acento, verde SÓ significa estado). O laudo de exemplo tem dois
+modos: **retrato publicado** (admin clica "Publicar como exemplo público" → o corpo do laudo
+PDF vai ao servidor, que remove a seção jurídica inteira, injeta as contagens por severidade
+derivadas das classes dos ônus, roda um removedor recursivo de chaves sensíveis e grava em
+volume) e **fallback vivo** (o motor gera na hora um laudo da gleba-ouro de São Roque embarcada
+na imagem). Performance: cache em memória na api (invalidado por mtime) + ISR de 60 s na página.
+
+- Código: `routers/exemplo.py`, `frontend/app/laudo-exemplo/page.tsx`, `components/marketing/*`, `components/marca/Logo.tsx`, `tailwind.config.ts`.
+- Testes: verificação de 200 sem auth + 401 no publicar sem admin.
+
+## RF-INTEL — Inteligência do motor
+
+**Como funciona.** O placar (`scripts/placar_motor.py`) roda o motor sem IA sobre o corpus e
+compara KPIs com a base fixada — é o juiz de qualquer mudança no gerador. A função de valor
+(INTEL-2) está descrita no RF-URB. A calibração (INTEL-4, `core/urbanismo_calibracao.py` +
+`scripts/calibrar_estilo.py`) extrai métricas dos projetos importados (lote/quadra/frações de
+uso), agrega por padrão declarado (mínimo 3 projetos, mediana, dispersão) e PROPÕE ajustes de
+estilo com proveniência — aplicar é um comando explícito do operador.
+
+- Testes: `test_placar_motor.py`, `test_intel2_valor.py`, `test_intel4_calibracao.py`.
+
+---
+
+## Mapa do repositório (para se localizar)
+
+```
+backend/app/routers/   ← portas HTTP: um arquivo por dimensão (o "índice" do que existe)
+backend/app/core/      ← motores: geometria, urbanismo, jurídico, laudo, stores
+backend/app/models/    ← schemas.py = todos os contratos de dados (o "dicionário")
+backend/tests/         ← valores-ouro por fase (quebrou = regressão)
+frontend/app/          ← páginas (App Router): (site), app, admin, login, laudo-exemplo
+frontend/components/   ← cards por dimensão, mapa Leaflet, marca, marketing
+docs/                  ← este documento, requisitos.md, mapa-mental, specs fase-*.md
+ARCHITECTURE.md        ← decisões transversais profundas · CLAUDE.md ← convenções e lições
+```
