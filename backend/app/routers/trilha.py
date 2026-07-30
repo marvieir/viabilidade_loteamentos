@@ -118,8 +118,11 @@ def trilha_da_analise(
             cobertura=jur.cobertura,
         ))
 
-    # 3) Ambiental — concluído quando o snapshot salvo tem o resultado.
-    if snapshot.get("ambiental"):
+    # 3) Ambiental — concluído quando o snapshot salvo tem o resultado OU quando o marcador
+    # de execução do servidor existe (30/07: antes ficava 'Disponível' com os alertas na tela
+    # até salvar E reabrir — a única dimensão sem rastro no servidor).
+    from app.core import ambiental_store
+    if snapshot.get("ambiental") or ambiental_store.consta(analise_id):
         amb = TrilhaPasso(id="ambiental", titulo="Pré-análise ambiental", estado="concluido",
                           motivo="Alertas levantados com fonte e data de referência ao lado.")
     else:

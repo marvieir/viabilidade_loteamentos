@@ -19,10 +19,10 @@ export const metadata: Metadata = {
     + "áreas, lotes, régua legal aplicada e a fonte de cada número.",
 };
 
-// SEMPRE dinâmica: com revalidate, o Next congelava o FALLBACK de erro por 1 hora — a api
-// voltava e o visitante continuava vendo "indisponível". O custo de gerar mora no cache em
-// memória da api, então a visita dinâmica é um fetch barato.
-export const dynamic = "force-dynamic";
+// ISR de 60 s (30/07): a página sempre-dinâmica re-serializava MBs de GeoJSON a cada
+// visita — o botão levava ~10 s. Com 60 s de cache o caminho feliz é instantâneo e o pior
+// caso (fallback de erro congelado) dura 1 minuto, não 1 hora como na 1ª versão.
+export const revalidate = 60;
 
 // Esta página renderiza no SERVIDOR, então a URL da api é a INTERNA da rede do compose —
 // "localhost" aqui é o próprio container do web, e foi o que fez a página cair no fallback
@@ -85,7 +85,7 @@ const LINHAS: { chave: string; rotulo: string; cor: string }[] = [
 
 async function buscarLaudo(): Promise<Laudo | null> {
   try {
-    const res = await fetch(`${API}/api/exemplo/laudo`, { cache: "no-store" });
+    const res = await fetch(`${API}/api/exemplo/laudo`, { next: { revalidate: 60 } });
     if (!res.ok) return null;
     return (await res.json()) as Laudo;
   } catch {

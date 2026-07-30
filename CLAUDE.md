@@ -76,11 +76,17 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
 
 ## Produção (AWS Lightsail) — dados fixos da operação
 - **IP da instância:** `54.245.119.252` (SSH: `ssh ubuntu@54.245.119.252`)
-- **Domínio:** `https://viabilidade.homeeye.ai` (o `DOMINIO` do compose de produção)
+- **Domínio:** `https://voaz.app` (desde 30/07/2026; `viabilidade.homeeye.ai` redireciona 301
+  via bloco `DOMINIO_ANTIGO` do Caddyfile — o DNS antigo precisa continuar apontando p/ a instância)
 - Código na instância em `~/viabilidade_loteamentos`, branch `main`; deploy:
   `docker compose -f docker-compose.prod.yml up -d --build`
-  (`DOMINIO` e `NEXT_PUBLIC_GOOGLE_CLIENT_ID` vivem no `.env` da RAIZ da instância,
-  gitignored — nada de export manual; no Mac o export vive no `~/.bash_profile`).
+  **São DOIS arquivos de ambiente** (lição da migração de domínio, 30/07 — custou 4 rodadas):
+  `.env` da RAIZ = variáveis do compose (`DOMINIO`, `DOMINIO_ANTIGO`, `POSTGRES_PASSWORD`,
+  `NEXT_PUBLIC_GOOGLE_CLIENT_ID`); `backend/.env` = variáveis internas da api
+  (`ALLOWED_HOSTS`, `CORS_ORIGINS`, `ANTHROPIC_API_KEY`…). Trocar domínio exige tocar nos dois.
+  `ALLOWED_HOSTS` DEVE incluir o host interno: `voaz.app,api` — o SSR do Next chama a api por
+  `http://api:8700`, e sem o `api` na lista o TrustedHost responde 400 em todo o SSR.
+  Google OAuth: o Client ID precisa de `https://voaz.app` nas Authorized JavaScript origins.
 - Fluxo obrigatório: alterações → teste no Mac do operador (podman) → só então AWS.
 - **Ritual de atualização no Mac (lição de 26/07 — o `up -d` NÃO recria container com
   imagem nova, e build sem espaço falha deixando a imagem velha no ar):**

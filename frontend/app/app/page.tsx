@@ -101,9 +101,22 @@ export default function Home() {
   // remove a seção jurídica (ficam só contagens por severidade) e chaves sensíveis.
   async function onPublicarExemplo() {
     if (!analise) return;
+    const dimsDisponiveis: [string, unknown][] = [
+      ["Ambiental", dadosAmb], ["Vegetação", dadosVerde], ["Declividade", dadosDecliv],
+      ["Aproveitamento", dadosAprov], ["Jurídico", dadosJuridico],
+      ["Financeira", dadosFinanceira], ["Econômica", dadosEconomica],
+      ["Localização", dadosLocalizacao], ["Urbanismo", dadosUrb],
+    ];
+    const vazias = dimsDisponiveis.filter(([, v]) => !v).map(([n]) => n);
+    // 30/07 — a pegadinha que custou 2 republicações: o publicar manda o que está NA TELA,
+    // e dimensão não carregada sai como "não analisada" no laudo público, em silêncio.
+    const avisoVazias = vazias.length
+      ? `\n\nATENÇÃO: ${vazias.join(", ")} ainda NÃO carregada(s) nesta sessão — sairão `
+        + "como 'não analisada' no exemplo. Use 'Analisar tudo' antes, se quiser o laudo completo."
+      : "";
     if (!window.confirm(
       "Publicar esta análise como o EXEMPLO PÚBLICO do site? A seção jurídica sai apenas "
-      + "como contagens por severidade, sem nenhum detalhe de documento."
+      + "como contagens por severidade, sem nenhum detalhe de documento." + avisoVazias
     )) return;
     try {
       await publicarExemplo(

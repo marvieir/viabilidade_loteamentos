@@ -165,6 +165,7 @@ def despublicar_exemplo(_adm: Usuario = Depends(requer_admin)) -> dict:
     return {"ok": True}
 
 _CACHE: Optional[dict] = None
+_CACHE_COMPLETO: Optional[tuple] = None
 
 # Fixture da gleba real (a mesma dos testes-ouro do motor).
 _FIXTURE = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / \
@@ -245,7 +246,13 @@ def laudo_exemplo() -> dict:
     arq = _dir_exemplo() / _ARQ_COMPLETO
     if arq.exists():
         try:
-            return json.loads(arq.read_text(encoding="utf-8"))
+            # Cache em memória invalidado por mtime: o retrato tem MBs de GeoJSON e era
+            # relido+parseado a cada visita — parte dos ~10 s que o operador mediu no botão.
+            global _CACHE_COMPLETO
+            mtime = arq.stat().st_mtime
+            if _CACHE_COMPLETO is None or _CACHE_COMPLETO[0] != mtime:
+                _CACHE_COMPLETO = (mtime, json.loads(arq.read_text(encoding="utf-8")))
+            return _CACHE_COMPLETO[1]
         except (OSError, ValueError):
             pass  # arquivo corrompido → cai no laudo simples (nunca quebra a página)
     global _CACHE

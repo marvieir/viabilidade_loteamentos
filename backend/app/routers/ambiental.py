@@ -50,6 +50,11 @@ def analisar_ambiental(
     res = motor.analisar(gleba, camadas)
     overlays = dict(res.geojson_overlays)
 
+    # 30/07 — marcador de execução no servidor: a trilha reconhece na hora, sem depender
+    # de salvar+reabrir (o resultado completo continua indo pelo snapshot da salva).
+    from app.core import ambiental_store
+    ambiental_store.marcar(analise_id, len(res.alertas))
+
     # Tier 2 — bacia hidrográfica (descritivo; junto da hidrografia ambiental).
     bacia_out = None
     if fonte_bacia is not None:
