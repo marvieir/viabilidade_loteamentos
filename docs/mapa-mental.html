@@ -5,21 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Mapa Mental — voaz.app</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 1.25rem; background: #fff4f4; color: #170d48; }
-    header { margin-bottom: .75rem; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 1rem 1.25rem; background: #fff4f4; color: #170d48; }
+    header { margin-bottom: .6rem; display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
     h1 { font-size: 1.15rem; margin: 0; }
     p.sub { margin: .25rem 0 0; color: #4a3f7a; font-size: .85rem; }
-    .wrap { background: #fff; border: 1px solid #e3d5c8; border-radius: 12px; padding: 1rem; overflow: auto; }
-    .mermaid { font-size: 15px; }
+    /* Viewport de navegação: o SVG do Mermaid vira um "mapa" — scroll dá zoom, arrastar dá pan. */
+    .viewport { position: relative; background: #fff; border: 1px solid #e3d5c8; border-radius: 12px;
+                height: calc(100vh - 110px); overflow: hidden; cursor: grab; touch-action: none; }
+    .viewport.arrastando { cursor: grabbing; }
+    .palco { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+    .palco svg { display: block; max-width: none !important; }
+    .controles { position: absolute; right: .75rem; top: .75rem; display: flex; flex-direction: column; gap: .35rem; z-index: 5; }
+    .controles button { width: 2.2rem; height: 2.2rem; border: 1px solid #e3d5c8; border-radius: 10px; background: #fff;
+                        color: #170d48; font-size: 1.05rem; font-weight: 600; cursor: pointer; box-shadow: 0 1px 4px rgba(23,13,72,.12); }
+    .controles button:hover { background: #fff4ec; border-color: #ff914d; }
+    .dica { position: absolute; left: .75rem; bottom: .6rem; z-index: 5; font-size: .75rem; color: #4a3f7a;
+            background: rgba(255,255,255,.85); border-radius: 8px; padding: .25rem .55rem; }
   </style>
 </head>
 <body>
   <header>
-    <h1>Mapa Mental — voaz.app</h1>
-    <p class="sub">Abra este arquivo no navegador. Precisa de internet para carregar a biblioteca de render (Mermaid via CDN). Fonte editável: docs/mapa-mental.md — os rótulos RF-* apontam para docs/requisitos.md.</p>
+    <div>
+      <h1>Mapa Mental — voaz.app</h1>
+      <p class="sub">Fonte editável: <code>docs/mapa-mental.md</code> (rótulos RF-* apontam para <code>docs/requisitos.md</code>). Precisa de internet para a biblioteca de render (Mermaid via CDN).</p>
+    </div>
   </header>
-  <div class="wrap">
-    <pre class="mermaid">
+  <div class="viewport" id="viewport">
+    <div class="controles">
+      <button id="btn-mais" title="Aproximar">+</button>
+      <button id="btn-menos" title="Afastar">−</button>
+      <button id="btn-ajustar" title="Ajustar à tela">⤢</button>
+    </div>
+    <div class="dica">Scroll = zoom · arrastar = mover · ⤢ = ajustar à tela</div>
+    <div class="palco" id="palco">
+      <pre class="mermaid">
 mindmap
   root((voaz.app — Pré-Viabilidade de Loteamento))
     Entrada RF-ENT
@@ -131,11 +150,79 @@ mindmap
       Docker Compose e Caddy TLS
       Mac podman primeiro depois AWS
       AWS Lightsail voaz.app
-    </pre>
+      </pre>
+    </div>
   </div>
   <script type="module">
     import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({ startOnLoad: true, securityLevel: 'loose', maxTextSize: 200000 });
+
+    // Render manual (startOnLoad: false) para só ligar a navegação quando o SVG existir.
+    mermaid.initialize({ startOnLoad: false, securityLevel: 'loose', maxTextSize: 200000,
+                         mindmap: { useMaxWidth: false } });
+    await mermaid.run({ querySelector: '.mermaid' });
+
+    const viewport = document.getElementById('viewport');
+    const palco = document.getElementById('palco');
+    let escala = 1, tx = 0, ty = 0;
+
+    function aplicar() {
+      palco.style.transform = `translate(${tx}px, ${ty}px) scale(${escala})`;
+    }
+
+    // Tamanho natural do desenho (antes de qualquer transform).
+    function tamanhoNatural() {
+      const svg = palco.querySelector('svg');
+      const r = svg.getBoundingClientRect();
+      return { w: r.width / escala, h: r.height / escala };
+    }
+
+    function ajustarATela() {
+      const { w, h } = tamanhoNatural();
+      const vw = viewport.clientWidth, vh = viewport.clientHeight;
+      escala = Math.min(vw / w, vh / h) * 0.95;
+      tx = (vw - w * escala) / 2;
+      ty = (vh - h * escala) / 2;
+      aplicar();
+    }
+
+    // Zoom centrado no ponto indicado (cursor ou centro da tela nos botões).
+    function zoom(fator, cx, cy) {
+      const nova = Math.min(8, Math.max(0.1, escala * fator));
+      const f = nova / escala;
+      tx = cx - (cx - tx) * f;
+      ty = cy - (cy - ty) * f;
+      escala = nova;
+      aplicar();
+    }
+
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const r = viewport.getBoundingClientRect();
+      zoom(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - r.left, e.clientY - r.top);
+    }, { passive: false });
+
+    let arrasto = null;
+    viewport.addEventListener('pointerdown', (e) => {
+      arrasto = { x: e.clientX - tx, y: e.clientY - ty };
+      viewport.classList.add('arrastando');
+      viewport.setPointerCapture(e.pointerId);
+    });
+    viewport.addEventListener('pointermove', (e) => {
+      if (!arrasto) return;
+      tx = e.clientX - arrasto.x;
+      ty = e.clientY - arrasto.y;
+      aplicar();
+    });
+    viewport.addEventListener('pointerup', () => { arrasto = null; viewport.classList.remove('arrastando'); });
+    viewport.addEventListener('pointercancel', () => { arrasto = null; viewport.classList.remove('arrastando'); });
+
+    const centro = () => [viewport.clientWidth / 2, viewport.clientHeight / 2];
+    document.getElementById('btn-mais').addEventListener('click', () => zoom(1.3, ...centro()));
+    document.getElementById('btn-menos').addEventListener('click', () => zoom(1 / 1.3, ...centro()));
+    document.getElementById('btn-ajustar').addEventListener('click', ajustarATela);
+    window.addEventListener('resize', ajustarATela);
+
+    ajustarATela();
   </script>
 </body>
 </html>
