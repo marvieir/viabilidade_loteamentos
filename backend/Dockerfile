@@ -43,6 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # de bala. Enxugar depois é otimização, não urgência.
 
 COPY app ./app
+# Gleba-ouro de São Roque (6,5 KB): o laudo de EXEMPLO público (routers/exemplo.py) roda o
+# motor sobre ela. Sem esta linha o endpoint respondia 503 — a fixture não entrava na imagem.
+COPY tests/fixtures/sao_roque_aproveitavel_decliv.json ./tests/fixtures/sao_roque_aproveitavel_decliv.json
 # scripts/ — comandos manuais do operador (ex.: seed de admin via scripts/criar_admin.py). NÃO são
 # agentes; precisam estar na imagem p/ rodar `podman exec api python -m scripts.<cmd>`.
 COPY scripts ./scripts
