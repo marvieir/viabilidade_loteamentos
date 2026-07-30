@@ -21,7 +21,13 @@ export const metadata: Metadata = {
 // Revalida de hora em hora: o laudo muda só quando o motor muda.
 export const revalidate = 3600;
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8700";
+// Esta página renderiza no SERVIDOR, então a URL da api é a INTERNA da rede do compose —
+// "localhost" aqui é o próprio container do web, e foi o que fez a página cair no fallback
+// "indisponível" no primeiro teste do operador. Fora do container, cai no endereço público.
+const API =
+  process.env.API_BASE_INTERNA ??
+  process.env.NEXT_PUBLIC_API_BASE ??
+  "http://localhost:8700";
 
 type Uso = { m2: number; m2_fmt: string; pct_apo: number; pct_fmt: string };
 type Laudo = {

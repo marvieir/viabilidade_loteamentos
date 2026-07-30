@@ -109,6 +109,10 @@ services:
         # Login com Google (opcional; mesmo Client ID do GOOGLE_CLIENT_ID do backend/.env).
         # É argumento de BUILD: mudou o valor → rebuild do web.
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: "${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}"
+    environment:
+      # SSR: o servidor do Next fala com a api pela rede interna do compose. "localhost"
+      # aqui seria o próprio container do web — foi o que derrubou o laudo de exemplo.
+      API_BASE_INTERNA: "http://api:8700"
     ports:
       - "3700:3700"
     depends_on:

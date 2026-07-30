@@ -43,8 +43,8 @@ export function BotoesCta({ escuro = false }: { escuro?: boolean }) {
         href="/laudo-exemplo"
         className={`inline-flex h-12 items-center justify-center rounded-xl border px-7 text-base font-semibold transition ${
           escuro
-            ? "border-[#4a3f7a] text-[#fdeae4] hover:bg-[#241862]"
-            : "border-[#e3d5c8] text-[#4a3f7a] hover:bg-[#fff4f4]"
+            ? "border-[#ffad78] bg-white/10 text-[#fff4f4] hover:bg-[#ffad78] hover:text-[#170d48]"
+            : "border-[#170d48] bg-white text-[#170d48] hover:bg-[#170d48] hover:text-[#fff4f4]"
         }`}
       >
         Ver um laudo de exemplo

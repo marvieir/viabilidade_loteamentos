@@ -86,6 +86,9 @@ services:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: "${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}"
     expose:
       - "3700"        # só na rede interna
+    environment:
+      # SSR pela rede interna: o domínio público daria a volta pelo Caddy sem necessidade.
+      API_BASE_INTERNA: "http://api:8700"
     depends_on: [api]
     restart: unless-stopped
 
