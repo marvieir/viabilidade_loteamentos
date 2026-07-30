@@ -15,6 +15,9 @@ services:
       - "443:443"    # TLS público (Let's Encrypt automático)
     environment:
       DOMINIO: "${DOMINIO:?defina DOMINIO no ambiente}"
+      # Migração de domínio (30/07): com esta variável no .env da RAIZ, o Caddy emite TLS
+      # para o endereço antigo e responde 301 para o novo. Sem ela, o bloco fica inerte.
+      DOMINIO_ANTIGO: "${DOMINIO_ANTIGO:-}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data        # certificados (persistem entre deploys)
