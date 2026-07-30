@@ -25,3 +25,11 @@
 		reverse_proxy web:3700
 	}
 }
+
+# Migração de domínio (30/07): o endereço antigo redireciona PERMANENTE para o novo.
+# DOMINIO_ANTIGO é opcional — sem ele no .env, o bloco atende um host vazio e fica inerte.
+# O Caddy emite TLS também para o antigo (precisa do DNS dele apontando para esta instância),
+# então quem acessar https://viabilidade.homeeye.ai chega com cadeado e sai em voaz.app.
+{$DOMINIO_ANTIGO:invalido.localhost} {
+	redir https://{$DOMINIO}{uri} permanent
+}
