@@ -16,12 +16,16 @@ const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
 export function MapaExemplo({
   gleba,
   geometria,
+  overlaysCrus,
 }: {
   gleba: GeoJSON.Polygon;
   geometria: Record<string, unknown> | null;
+  /** Camadas prontas (mapa ambiental): já vêm chaveadas por ChaveOverlay do backend. */
+  overlaysCrus?: Record<string, GeoJSON.Geometry> | null;
 }) {
   const g = (geometria ?? {}) as Record<string, GeoJSON.Geometry | undefined>;
-  const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> = {};
+  const overlays: Partial<Record<ChaveOverlay, GeoJSON.Geometry>> =
+    (overlaysCrus as Partial<Record<ChaveOverlay, GeoJSON.Geometry>>) ?? {};
   if (g.areas_verdes) overlays.urb_verde = g.areas_verdes;
   if (g.institucional) overlays.urb_institucional = g.institucional;
   if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;

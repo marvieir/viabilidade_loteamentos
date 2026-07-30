@@ -44,6 +44,7 @@ type Completo = {
             avisos: string[] }[];
   juridico: { criticos: number; moderados: number; sem_impacto: number;
               n_documentos: number; luz: string };
+  ambiental_geo?: Record<string, GeoJSON.Geometry> | null;
   urbanismo: { geometria: Record<string, unknown> | null;
                quadro_areas: Record<string, Uso | number | string | null> | null };
   gleba_geojson: GeoJSON.Polygon | null;
@@ -386,6 +387,20 @@ function LaudoCompleto({ laudo }: { laudo: Completo }) {
           </div>
         ))}
       </section>
+
+      {/* Mapa AMBIENTAL: as camadas de restrição sobre a gleba */}
+      {laudo.gleba_geojson && laudo.ambiental_geo &&
+        Object.keys(laudo.ambiental_geo).length > 0 && (
+        <Secao titulo="Análise ambiental no mapa">
+          <MapaExemplo gleba={laudo.gleba_geojson} geometria={null}
+                       overlaysCrus={laudo.ambiental_geo} />
+          <p className="mt-2 text-[12px] text-papel-tinta3">
+            Mineração (ANM), Reserva Legal (CAR), domínio da Mata Atlântica, verde a
+            verificar e declividade — as mesmas camadas, com as mesmas cores, que o
+            usuário vê dentro da plataforma.
+          </p>
+        </Secao>
+      )}
 
       {/* Mapa da gleba com o urbanismo */}
       {laudo.gleba_geojson && (

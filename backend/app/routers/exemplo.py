@@ -111,6 +111,15 @@ def publicar_exemplo(body: ExemploPublicarIn, _adm: Usuario = Depends(requer_adm
             "quadro_areas": urb.get("quadro_areas"),
             "indicadores": urb.get("indicadores"),
         },
+        # Camadas do MAPA AMBIENTAL (pedido do operador, 30/07): os cards já produzem
+        # geojson_overlays (mineração/CAR/Mata Atlântica/verde/declividade) — só juntamos.
+        "ambiental_geo": {
+            k: v
+            for dim in (body.ambiental, body.vegetacao, body.declividade)
+            if dim
+            for k, v in (dim.get("geojson_overlays") or {}).items()
+            if v
+        },
         "gleba_geojson": body.gleba_geojson,
         "proveniencia": (
             "Análise REAL feita na plataforma e publicada como exemplo pelo operador, com os "
