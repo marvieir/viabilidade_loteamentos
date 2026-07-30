@@ -28,7 +28,7 @@ import { CardFinanceira } from "@/components/cards/CardFinanceira";
 import { CardEconomica } from "@/components/cards/CardEconomica";
 import { CardLocalizacao } from "@/components/cards/CardLocalizacao";
 import { IconMap } from "@/components/Icons";
-import { gerarLaudo, gerarLaudoExcel } from "@/lib/api";
+import { gerarLaudo, gerarLaudoExcel, publicarExemplo } from "@/lib/api";
 import type {
   Ambiental,
   Analise,
@@ -97,6 +97,33 @@ export default function Home() {
   const overlays: Overlays = { ...overlaysAmb, ...overlaysVerde, ...overlaysUmidas, ...overlaysDecliv };
 
   // Fase 7 — laudo PDF: repassa os JSONs que os cards já receberam (front não recalcula).
+  // ADMIN: promove a análise aberta a EXEMPLO PÚBLICO do site (/laudo-exemplo). O backend
+  // remove a seção jurídica (ficam só contagens por severidade) e chaves sensíveis.
+  async function onPublicarExemplo() {
+    if (!analise) return;
+    if (!window.confirm(
+      "Publicar esta análise como o EXEMPLO PÚBLICO do site? A seção jurídica sai apenas "
+      + "como contagens por severidade, sem nenhum detalhe de documento."
+    )) return;
+    try {
+      await publicarExemplo(
+        analise.analise_id,
+        {
+          aproveitamento: dadosAprov, ambiental: dadosAmb, vegetacao: dadosVerde,
+          declividade: dadosDecliv, juridico: dadosJuridico, financeira: dadosFinanceira,
+          economica: dadosEconomica, localizacao: dadosLocalizacao, urbanismo: dadosUrb,
+        },
+        analise.geometria.geojson,
+        window.prompt("Título público do exemplo:",
+          "Gleba real analisada — exemplo da plataforma") ??
+          "Análise real publicada como exemplo"
+      );
+      window.alert("Exemplo publicado — confira em /laudo-exemplo.");
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Falha ao publicar o exemplo.");
+    }
+  }
+
   async function onLaudo() {
     if (!analise) return;
     setGerandoLaudo(true);
@@ -263,6 +290,7 @@ export default function Home() {
         analisando={analisandoTudo}
         onLaudo={onLaudo}
         gerandoLaudo={gerandoLaudo}
+        onPublicarExemplo={onPublicarExemplo}
         onExcel={onExcel}
         gerandoExcel={gerandoExcel}
         onSalvar={onSalvar}

@@ -10,6 +10,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/marca/Logo";
 import { FooterSite } from "@/components/marketing/site";
+import { MapaExemplo } from "@/components/marketing/MapaExemplo";
 
 export const metadata: Metadata = {
   title: "voaz.app — laudo de exemplo (gleba real em São Roque/SP)",
@@ -30,6 +31,24 @@ const API =
   process.env.API_BASE_INTERNA ??
   process.env.NEXT_PUBLIC_API_BASE ??
   "http://localhost:8700";
+
+type Completo = {
+  tipo: "completo";
+  titulo: string;
+  publicado_em: string;
+  identificacao: Record<string, string | number | null>;
+  ressalva: string;
+  semaforo: { dimensao: string; luz: string; justificativa: string }[];
+  secoes: { chave: string; titulo: string; analisada: boolean; luz: string;
+            itens: { rotulo: string; valor: string; proveniencia?: string | null }[];
+            avisos: string[] }[];
+  juridico: { criticos: number; moderados: number; sem_impacto: number;
+              n_documentos: number; luz: string };
+  urbanismo: { geometria: Record<string, unknown> | null;
+               quadro_areas: Record<string, Uso | number | string | null> | null };
+  gleba_geojson: GeoJSON.Polygon | null;
+  proveniencia: string;
+};
 
 type Uso = { m2: number; m2_fmt: string; pct_apo: number; pct_fmt: string };
 type Laudo = {
@@ -112,6 +131,8 @@ export default async function LaudoExemploPage() {
               Criar conta grátis
             </Link>
           </div>
+        ) : (laudo as unknown as Completo).tipo === "completo" ? (
+          <LaudoCompleto laudo={laudo as unknown as Completo} />
         ) : (
           <>
             {/* Capa do parecer */}
@@ -316,6 +337,147 @@ function Linha({
           {estadoRotulo}
         </span>
       </span>
+    </div>
+  );
+}
+
+const LUZ_ROTULO: Record<string, { r: string; cls: string }> = {
+  favoravel: { r: "favorável", cls: "bg-verde/15 text-verde" },
+  atencao: { r: "atenção", cls: "bg-laranja-600/15 text-laranja-700" },
+  restricao: { r: "restrição", cls: "bg-red-100 text-red-700" },
+  informativa: { r: "informativa", cls: "bg-papel-escuro text-papel-tinta2" },
+  nao_analisada: { r: "não analisada", cls: "bg-papel-escuro text-papel-tinta3" },
+};
+
+function Luz({ luz }: { luz: string }) {
+  const m = LUZ_ROTULO[luz] ?? LUZ_ROTULO.nao_analisada;
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${m.cls}`}>
+      {m.r}
+    </span>
+  );
+}
+
+function LaudoCompleto({ laudo }: { laudo: Completo }) {
+  const ident = laudo.identificacao;
+  return (
+    <>
+      <section className="pt-12">
+        <div className="flex flex-wrap justify-between gap-3 border-b border-papel-linha pb-3 font-mono text-[11px] uppercase tracking-[0.14em] text-papel-tinta3">
+          <span>Análise real · publicada em {laudo.publicado_em}</span>
+          <span>{String(ident.municipio ?? "")} / {String(ident.uf ?? "")}</span>
+        </div>
+        <h1 className="mt-6 font-serifa text-[clamp(26px,4.5vw,42px)] leading-[1.05]">
+          {laudo.titulo}
+        </h1>
+        <p className="mt-3 max-w-[62ch] text-sm text-papel-tinta2">{laudo.ressalva}</p>
+      </section>
+
+      {/* Semáforo por dimensão */}
+      <section className="mt-8 grid gap-3 sm:grid-cols-2">
+        {laudo.semaforo.map((l) => (
+          <div key={l.dimensao}
+               className="flex items-start justify-between gap-3 rounded-lg border border-papel-linha bg-white/50 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold">{l.dimensao}</p>
+              <p className="mt-0.5 text-[12px] text-papel-tinta2">{l.justificativa}</p>
+            </div>
+            <Luz luz={l.luz} />
+          </div>
+        ))}
+      </section>
+
+      {/* Mapa da gleba com o urbanismo */}
+      {laudo.gleba_geojson && (
+        <Secao titulo="A gleba e o estudo urbanístico">
+          <MapaExemplo gleba={laudo.gleba_geojson} geometria={laudo.urbanismo.geometria} />
+        </Secao>
+      )}
+
+      {/* Quadro de áreas do urbanismo */}
+      {laudo.urbanismo.quadro_areas && (
+        <Secao titulo="Quadro de áreas">
+          <div className="grid gap-4">
+            {LINHAS.map((l) => {
+              const q = laudo.urbanismo.quadro_areas![l.chave];
+              const u = q && typeof q === "object" && "m2_fmt" in q ? (q as Uso) : null;
+              if (!u || !u.m2) return null;
+              return (
+                <div key={l.chave}>
+                  <div className="h-2.5 w-full overflow-hidden rounded-sm bg-papel-linha">
+                    <div className="h-full"
+                         style={{ width: `${Math.min(100, u.pct_apo * 100)}%`, background: l.cor }} />
+                  </div>
+                  <div className="mt-1.5 flex items-baseline justify-between gap-3 text-sm">
+                    <span className="text-papel-tinta2">{l.rotulo}</span>
+                    <span className="flex gap-4 font-mono tabular-nums">
+                      <b className="font-semibold">{u.m2_fmt} m²</b>
+                      <b className="w-14 text-right font-semibold">{u.pct_fmt}</b>
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Secao>
+      )}
+
+      {/* Jurídico: SÓ contagens por severidade (decisão do operador — nenhum detalhe) */}
+      <Secao titulo="Análise jurídica dos documentos">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <ContagemJuridica n={laudo.juridico.criticos} rotulo="itens que podem ser críticos"
+                            cor="text-red-700" />
+          <ContagemJuridica n={laudo.juridico.moderados} rotulo="itens de impacto moderado"
+                            cor="text-laranja-700" />
+          <ContagemJuridica n={laudo.juridico.sem_impacto} rotulo="itens sem impacto no loteamento"
+                            cor="text-verde" />
+        </div>
+        <p className="mt-4 text-[12.5px] text-papel-tinta3">
+          {laudo.juridico.n_documentos} documento(s) analisados. Os detalhes de cada achado —
+          e a citação do ato que o sustenta — aparecem na análise completa, dentro da
+          plataforma. Aqui, por respeito aos dados do proprietário, só as contagens.
+        </p>
+      </Secao>
+
+      {/* Demais dimensões, como o laudo PDF as monta */}
+      {laudo.secoes.filter((s) => s.analisada && s.chave !== "identificacao").map((s) => (
+        <Secao key={s.chave} titulo={s.titulo}>
+          <div className="mb-3"><Luz luz={s.luz} /></div>
+          {s.itens.map((it) => (
+            <div key={it.rotulo}
+                 className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-papel-linha py-2.5 text-sm">
+              <span>
+                {it.rotulo}
+                {it.proveniencia && (
+                  <span className="mt-0.5 block font-serifa text-[11.5px] italic text-papel-tinta3">
+                    {it.proveniencia}
+                  </span>
+                )}
+              </span>
+              <b className="font-mono text-[14px] font-semibold tabular-nums">{it.valor}</b>
+            </div>
+          ))}
+        </Secao>
+      ))}
+
+      <section className="mt-12 rounded-xl bg-papel-escuro p-6">
+        <p className="font-serifa text-[15px] leading-relaxed text-papel-tinta2">
+          {laudo.proveniencia}
+        </p>
+        <Link href="/registrar"
+              className="mt-5 inline-flex h-12 items-center rounded-lg bg-laranja px-6 text-sm font-bold text-marinho-900 transition hover:bg-laranja-600 hover:text-white">
+          Analisar minha gleba agora
+        </Link>
+      </section>
+    </>
+  );
+}
+
+function ContagemJuridica({ n, rotulo, cor }: { n: number; rotulo: string; cor: string }) {
+  return (
+    <div className="rounded-xl border border-papel-linha bg-white/50 p-5 text-center">
+      <p className={`font-mono text-4xl font-bold tabular-nums ${cor}`}>{n}</p>
+      <p className="mt-1.5 text-[13px] text-papel-tinta2">{rotulo}</p>
     </div>
   );
 }

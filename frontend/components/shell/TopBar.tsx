@@ -22,6 +22,7 @@ export function TopBar({
   onAnalisarTudo,
   analisando,
   onLaudo,
+  onPublicarExemplo,
   gerandoLaudo,
   onExcel,
   gerandoExcel,
@@ -35,6 +36,7 @@ export function TopBar({
   onAnalisarTudo: () => void;
   analisando?: boolean;
   onLaudo?: () => void;
+  onPublicarExemplo?: () => void;
   gerandoLaudo?: boolean;
   onExcel?: () => void;
   gerandoExcel?: boolean;
@@ -164,6 +166,11 @@ export function TopBar({
               <Link href="/admin" className="block">
                 <MenuItem>Painel do administrador</MenuItem>
               </Link>
+            )}
+            {usuario.papel === "admin" && onPublicarExemplo && (
+              <MenuItem onClick={onPublicarExemplo}>
+                Publicar como exemplo público
+              </MenuItem>
             )}
             <MenuItem onClick={() => setTrocandoSenha(true)}>Alterar senha</MenuItem>
             <MenuDivisor />

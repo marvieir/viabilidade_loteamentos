@@ -2101,3 +2101,24 @@ export async function calcularCustoInfra(
   );
   return jsonOrThrow(res);
 }
+
+// Laudo de exemplo público (29/07) — ADMIN promove a análise aberta a exemplo do site.
+// O corpo é o MESMO do laudo PDF (repassa os JSONs das dimensões); o backend sanitiza.
+export async function publicarExemplo(
+  analiseId: string,
+  dims: Record<string, unknown>,
+  glebaGeojson: GeoJSON.Polygon | null,
+  titulo: string
+): Promise<void> {
+  const res = await apiFetch(`/api/exemplo/publicar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...dims,
+      analise_id: analiseId,
+      titulo,
+      gleba_geojson: glebaGeojson,
+    }),
+  });
+  await jsonOrThrow(res);
+}
