@@ -54,6 +54,32 @@ def _remover_sensiveis(obj):
     return obj
 
 
+def _camadas_ambientais(body: "ExemploPublicarIn") -> dict:
+    """Junta as camadas que os cards do app mandam ao mapa, com as MESMAS chaves/cores."""
+    saida: dict = {}
+    amb = body.ambiental or {}
+    for k, v in (amb.get("geojson_overlays") or {}).items():
+        if v:
+            saida[k] = v
+    veg = body.vegetacao or {}
+    sev = veg.get("severidade") or {}
+    dura = (sev.get("restricao_dura") or {}).get("geojson")
+    verif = (sev.get("a_verificar") or {}).get("geojson")
+    if dura:
+        saida["verde_dura"] = dura
+    if verif:
+        saida["verde_verificar"] = verif
+    if not sev and veg.get("geojson_verde"):
+        saida["verde"] = veg["geojson_verde"]
+    dec = body.declividade or {}
+    ved = (dec.get("flag_vedacao") or {}).get("geojson")
+    if ved:
+        saida["declividade_vedada"] = ved
+    if dec.get("geojson_faixas"):
+        saida["declividade_faixas"] = dec["geojson_faixas"]
+    return saida
+
+
 class ExemploPublicarIn(schemas.LaudoIn):
     """Mesmo corpo do laudo PDF (o front repassa os JSONs das dimensões) + a identidade da
     análise e a gleba para o mapa. Nada é recalculado aqui."""
@@ -113,13 +139,10 @@ def publicar_exemplo(body: ExemploPublicarIn, _adm: Usuario = Depends(requer_adm
         },
         # Camadas do MAPA AMBIENTAL (pedido do operador, 30/07): os cards já produzem
         # geojson_overlays (mineração/CAR/Mata Atlântica/verde/declividade) — só juntamos.
-        "ambiental_geo": {
-            k: v
-            for dim in (body.ambiental, body.vegetacao, body.declividade)
-            if dim
-            for k, v in (dim.get("geojson_overlays") or {}).items()
-            if v
-        },
+        # Cada card publica com um nome próprio (mesma lógica dos cards do app):
+        #   ambiental → geojson_overlays; vegetação → severidade dura/a-verificar;
+        #   declividade → vedada + faixas. Reunimos tudo sob as chaves do mapa.
+        "ambiental_geo": _camadas_ambientais(body),
         "gleba_geojson": body.gleba_geojson,
         "proveniencia": (
             "Análise REAL feita na plataforma e publicada como exemplo pelo operador, com os "

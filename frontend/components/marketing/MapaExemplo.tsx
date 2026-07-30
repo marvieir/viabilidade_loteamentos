@@ -3,6 +3,7 @@
 // Mapa do laudo de EXEMPLO público — só EMBALA o GeoJSON que o backend publicou (§regra 2).
 import dynamic from "next/dynamic";
 import type { ChaveOverlay } from "@/lib/api";
+import { CORES_OVERLAY, ROTULO_OVERLAY } from "@/components/mapa/overlays";
 
 const MapaLeaflet = dynamic(() => import("@/components/mapa/MapaLeaflet"), {
   ssr: false,
@@ -32,7 +33,9 @@ export function MapaExemplo({
   if (g.arruamento) overlays.urb_arruamento = g.arruamento;
   const lotes = (geometria as { lotes_features?: GeoJSON.FeatureCollection } | null)
     ?.lotes_features ?? null;
+  const presentes = Object.keys(overlays) as ChaveOverlay[];
   return (
+    <div>
     <div className="h-[420px] w-full overflow-hidden rounded-xl border border-papel-linha">
       <MapaLeaflet
         geojson={gleba}
@@ -41,6 +44,19 @@ export function MapaExemplo({
         quadras={null}
         lazerFeatures={null}
       />
+    </div>
+    {presentes.length > 0 && (
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 rounded-lg border border-papel-linha bg-white/60 px-3 py-2 text-[12px] text-papel-tinta2">
+        <b className="text-papel-tinta">Camadas:</b>
+        {presentes.map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-2.5 w-3 rounded-sm"
+                  style={{ background: CORES_OVERLAY[k] ?? "#999" }} />
+            {ROTULO_OVERLAY[k] ?? k}
+          </span>
+        ))}
+      </div>
+    )}
     </div>
   );
 }
