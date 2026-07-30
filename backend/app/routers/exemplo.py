@@ -18,9 +18,119 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
-router = APIRouter()  # SEM dependência de auth — a página é pública, é isso que ela serve
+from app.core.auth import requer_admin
+from app.models import schemas
+from app.models.db_models import Usuario
+
+router = APIRouter()  # GET é PÚBLICO (é isso que ele serve); publicar/despublicar exigem admin
+
+
+def _dir_exemplo() -> Path:
+    import os
+    d = os.getenv("EXEMPLO_DIR", "").strip()
+    if d:
+        return Path(d)
+    return Path("/data/perfis/exemplo") if Path("/data/perfis").is_dir() \
+        else Path("app/perfis/_dados/exemplo")
+
+
+_ARQ_COMPLETO = "laudo_completo.json"
+
+# Chaves que NUNCA saem numa página pública, onde quer que apareçam (defesa em profundidade —
+# a seção jurídica já é removida INTEIRA; isto cobre regressões futuras em outras seções).
+_CHAVES_PROIBIDAS = {"proprietario", "proprietarios", "cpf", "cnpj", "matricula",
+                     "validado_por", "documentos", "checklist", "fonte_documento"}
+
+
+def _remover_sensiveis(obj):
+    """Remove recursivamente chaves sensíveis do snapshot público."""
+    if isinstance(obj, dict):
+        return {k: _remover_sensiveis(v) for k, v in obj.items()
+                if k.lower() not in _CHAVES_PROIBIDAS}
+    if isinstance(obj, list):
+        return [_remover_sensiveis(x) for x in obj]
+    return obj
+
+
+class ExemploPublicarIn(schemas.LaudoIn):
+    """Mesmo corpo do laudo PDF (o front repassa os JSONs das dimensões) + a identidade da
+    análise e a gleba para o mapa. Nada é recalculado aqui."""
+
+    analise_id: str
+    titulo: Optional[str] = None
+    gleba_geojson: Optional[dict] = None
+
+
+@router.post("/exemplo/publicar")
+def publicar_exemplo(body: ExemploPublicarIn, _adm: Usuario = Depends(requer_admin)) -> dict:
+    """ADMIN: promove uma análise real a EXEMPLO PÚBLICO da plataforma (decisão do operador,
+    29/07). A seção jurídica é substituída por CONTAGENS por severidade — a classificação
+    vem dos status que o produto já atribui (conforme/atencao/vedado), nunca de juízo novo —
+    e nenhum detalhe de achado, nome, matrícula ou CPF entra no retrato."""
+    from datetime import date
+
+    from app.core import laudo as laudo_core
+    from app.core.store import STORE
+    from app.routers.laudo import _identificacao
+
+    registro = STORE.get(body.analise_id)
+    if registro is None:
+        raise HTTPException(404, "Análise não encontrada no servidor — reabra-a e tente de novo.")
+
+    ident = _identificacao(body.analise_id, registro)
+    dims = {c: getattr(body, c) for c in schemas.LaudoIn.model_fields}
+    laudo = laudo_core.montar_laudo_data(ident, dims, date.today().isoformat())
+
+    # Jurídico público = só contagens, pelas classes que o produto JÁ usa nos ônus.
+    jur = body.juridico or {}
+    onus = jur.get("onus") or []
+    contagens = {
+        "criticos": sum(1 for o in onus if o.get("status") == "vedado"),
+        "moderados": sum(1 for o in onus if o.get("status") == "atencao"),
+        "sem_impacto": sum(1 for o in onus if o.get("status") == "conforme"),
+        "n_documentos": len(jur.get("documentos") or []),
+        "luz": next((l.luz for l in laudo.semaforo if "jur" in l.dimensao.lower()), "nao_analisada"),
+    }
+
+    ident_pub = {k: v for k, v in ident.items() if k != "analise_id"}
+    urb = body.urbanismo or {}
+    snapshot = _remover_sensiveis({
+        "tipo": "completo",
+        "titulo": (body.titulo or "").strip() or "Análise real publicada como exemplo",
+        "publicado_em": date.today().isoformat(),
+        "identificacao": ident_pub,
+        "ressalva": laudo.ressalva_capa,
+        "semaforo": [l.model_dump() for l in laudo.semaforo],
+        # A seção jurídica sai INTEIRA; as demais vão como o laudo PDF as monta.
+        "secoes": [s.model_dump() for s in laudo.secoes if s.chave != "juridico"],
+        "juridico": contagens,
+        "urbanismo": {
+            "geometria": urb.get("geometria"),
+            "quadro_areas": urb.get("quadro_areas"),
+            "indicadores": urb.get("indicadores"),
+        },
+        "gleba_geojson": body.gleba_geojson,
+        "proveniencia": (
+            "Análise REAL feita na plataforma e publicada como exemplo pelo operador, com os "
+            "detalhes dos documentos jurídicos suprimidos (apenas contagens por severidade)."
+        ),
+    })
+    d = _dir_exemplo(); d.mkdir(parents=True, exist_ok=True)
+    (d / _ARQ_COMPLETO).write_text(
+        json.dumps(snapshot, ensure_ascii=False), encoding="utf-8"
+    )
+    return {"ok": True, "publicado_em": snapshot["publicado_em"]}
+
+
+@router.delete("/exemplo/publicar")
+def despublicar_exemplo(_adm: Usuario = Depends(requer_admin)) -> dict:
+    """ADMIN: remove o exemplo completo — a página volta ao laudo simples gerado pelo motor."""
+    arq = _dir_exemplo() / _ARQ_COMPLETO
+    if arq.exists():
+        arq.unlink()
+    return {"ok": True}
 
 _CACHE: Optional[dict] = None
 
@@ -98,7 +208,14 @@ def _gerar() -> dict:
 
 @router.get("/exemplo/laudo")
 def laudo_exemplo() -> dict:
-    """Laudo de exemplo (público). Gera na primeira chamada e serve do cache depois."""
+    """Laudo de exemplo (público). Se o operador publicou uma análise REAL como exemplo,
+    serve o retrato completo (sanitizado); senão, o laudo simples gerado pelo motor."""
+    arq = _dir_exemplo() / _ARQ_COMPLETO
+    if arq.exists():
+        try:
+            return json.loads(arq.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass  # arquivo corrompido → cai no laudo simples (nunca quebra a página)
     global _CACHE
     if _CACHE is None:
         if not _FIXTURE.exists():
