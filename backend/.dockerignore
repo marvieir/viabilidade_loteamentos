@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 tests/
+# EXCEÇÃO: a gleba-ouro de São Roque entra na imagem — o laudo de EXEMPLO público
+# (routers/exemplo.py) roda o motor sobre ela. Sem isto o COPY do Dockerfile falha
+# ("filtered out using .dockerignore") — achado do operador, 29/07.
+!tests/fixtures/sao_roque_aproveitavel_decliv.json
