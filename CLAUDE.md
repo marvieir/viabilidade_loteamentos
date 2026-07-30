@@ -70,6 +70,11 @@ Next.js. Detalhes e parâmetros legais em `ARCHITECTURE.md`.
 - Pense na solução completa mais simples antes de codar. Nada de solução parcial que gere retrabalho.
 - Não tire conclusão sem ter a informação. Em dúvida de **design/contrato**, pare e
   pergunte (a dúvida volta para a sessão de especificação, não se resolve chutando).
+- **Documentação viva (30/07):** toda fase nova atualiza, NO MESMO COMMIT da fase, os três
+  artefatos: `docs/requisitos.md` (o QUÊ — RF/RNF com IDs estáveis),
+  `docs/requisitos-detalhados.md` (o COMO, em linguagem do operador) e
+  `docs/mapa-mental.md` + `docs/mapa-mental.html` (visão de árvore, Mermaid — os dois
+  arquivos carregam o MESMO bloco mindmap). Fase sem documentação atualizada não está pronta.
 
 ## Deploy
 - Docker Compose com dois serviços: `api` (FastAPI) e `web` (Next.js). Alvo: Lightsail.

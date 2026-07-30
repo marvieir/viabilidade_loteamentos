@@ -1,78 +1,123 @@
-# Mapa Mental — Pré-Viabilidade de Loteamento
+# Mapa Mental — voaz.app
 
-> Diagrama Mermaid (`mindmap`). Renderiza no GitHub, no VS Code (extensão Mermaid), no Obsidian,
-> ou cole em **https://mermaid.live**. Para abrir no navegador com 2 cliques, use
-> `docs/mapa-mental.html` (mesmo conteúdo, renderizado).
+> Diagrama Mermaid (`mindmap`). Renderiza direto no GitHub, no VS Code (extensão Mermaid),
+> no Obsidian, ou cole em **https://mermaid.live**. Para abrir no navegador com 2 cliques,
+> use `docs/mapa-mental.html` (mesmo conteúdo, renderizado).
+>
+> Os rótulos `RF-*` são os IDs do `docs/requisitos.md`; o detalhamento de cada ramo está
+> no `docs/requisitos-detalhados.md`. **Manutenção: fase nova = atualizar os três no mesmo
+> commit da fase.** Atualizado em 30/07/2026.
 
 ```mermaid
 mindmap
-  root((Pré-Viabilidade de Loteamento))
-    Entrada
+  root((voaz.app — Pré-Viabilidade de Loteamento))
+    Entrada RF-ENT
       KMZ ou KML da gleba
-      Multi-matrícula
-      Detecção de município
-    Núcleo determinístico
-      Parse e geometria
-      Cálculo geodésico área e perímetro
-      Jurisdição município UF IBGE
-      STORE em memória por análise
-      Fontes injetáveis get_fonte
+      União de glebas vizinhas
+      Município e UF pelo IBGE
+      Área geodésica pyproj Geod
+      Auto-save e Minhas Análises
+      DWG de levantamento
     Regras inegociáveis
       Cálculo só no backend
       Front só renderiza JSON
       Proveniência em todo número
       Determinismo
-      Degradação honesta
+      Degradação honesta de cobertura
+      Piso de lote é lei - 125 m2 federal ou zona confirmada
+      Triagem - nunca diz viável ou aprovado
     Dimensões de análise
-      Ambiental
-        Área verde
-        Declividade
-        Bacia hidrográfica ANA
-        Malha fundiária SIGEF SNCI
-        Bioma
-        APP e UC e mineração
-        Reserva legal CAR
-      Aproveitamento
-      Urbanismo IA
-        Lotes e viário e quadras
-        Pórtico de entrada
-        Heatmap de score
-      Custo de infraestrutura
-        Paramétrico por disciplina
-        Padrão econômico médio alto
-        BDI
-      Conformidade LUOS
-      Jurídico
-        Cadeia dominial
-        Proprietários PF PJ
-        Checklist e anexos
-      Financeira
-      Econômica VPL TIR payback
-      Localização IBGE
-      Diretriz LUOS
+      Ambiental RF-AMB
+        Camadas oficiais por interseção
+        Vegetação dura x a verificar
+        Declividade - faixas e vedação 30 urbana
+        Regime rural - APP acima de 45 graus
+        Bacia bioma malha fundiária CAR
+        Marcador de execução para a trilha
+      Aproveitamento RF-APR
+        Gleba menos união das restrições
+        Teto físico de lotes
+        Cenário com diretriz
+      Urbanismo RF-URB
+        IA propõe o programa
+        Motor determinístico desenha
+        Viário conexo quadras lotes
+        Verde institucional lazer lago pórtico
+        5 variantes e função de valor
+        Segunda passada MOTOR-SOBRA
+        Quadro de áreas fecha 100 por cento
+        Custo de infraestrutura paramétrico
+      Importação DWG RF-IMP
+        dwg2dxf e saneador
+        Inventário de camadas e papéis
+        Sugestão por recuperação medida
+        Fechamento e poligonização de quadras
+        Auditoria por rótulos de área
+        Cobertura além de precisão
+        Teto de credibilidade dos textos
+        Encaixe por divisa e escala do CAD
+        Público-alvo declarado no wizard
+      Diretriz LUOS RF-LUOS
+        Múltiplos PDFs numa chamada
+        Valor sem artigo e página não entra
+        Validação tolerante de formato
+        Confirmação humana obrigatória
+        Índice ausente cai no piso federal
+      Jurídico RF-JUR
+        IA propõe ficha da matrícula
+        Humano confirma cada ficha
+        Núcleo determinístico consolida risco
+        Checklist de diligência com anexos
+      Financeira e Econômica RF-FIN
+        Fluxo mensal Price VGV exposição
+        VPL TIR payback sob premissas declaradas
+      Localização RF-LOC
+    Laudo RF-LAUDO
+      Semáforo derivado - nunca juízo novo
+      PDF e Excel
+      Trilha de 6 passos no servidor
+      Regex proíbe viável e aprovado
+    Contas e Admin RF-CONTA
+      JWT com refresh e Google
+      Reset de senha por e-mail
+      Contato obrigatório nome e celular
+      Admin - clientes métricas custo de IA
+    Site público RF-PUB
+      Marca voaz.app - marinho creme laranja
+      Verde só significa estado
+      Domínio voaz.app com redirect do antigo
+      Laudo de exemplo publicado pelo admin
+      Sanitização e jurídico só por contagens
+      Fallback vivo São Roque
+    Inteligência RF-INTEL
+      Placar do motor - juiz de regressão
+      Função de valor por público
+      Calibração pelos projetos importados
+      Aplicar é decisão do operador
     Uso de LLM
-      Extração LUOS Opus
-      Urbanismo IA Fable e Opus
-      Extração jurídica Opus
-      Fallback Gemini
+      Extração LUOS
+      Programa de urbanismo
+      Extração jurídica
+      Nunca calcula número final
+      Custo por cliente registrado
     Fontes de dados
       OSM Overpass
       CAR SICAR
-      IBGE biomas
+      IBGE biomas e malha
       ANA bacias
-      INCRA SIGEF
+      INCRA SIGEF SNCI
       Copernicus DEM
-      MapBiomas WorldCover
+      WorldCover vegetação
       SINAPI SICRO metodologia
-    Cobertura
+    Cobertura declarada
       BASE_FEDERAL
       PARCIAL_UF
       COMPLETA
     Plataforma
       Backend FastAPI Python
       Frontend Next.js React Leaflet
-      Auth multi-tenant
-      Docker Compose
-      AWS Lightsail
-      Fluxo dev main AWS
+      Postgres com migração leve
+      Docker Compose e Caddy TLS
+      Mac podman primeiro depois AWS
+      AWS Lightsail voaz.app
 ```
