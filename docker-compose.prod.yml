@@ -92,6 +92,8 @@ services:
     environment:
       # SSR pela rede interna: o domínio público daria a volta pelo Caddy sem necessidade.
       API_BASE_INTERNA: "http://api:8700"
+      # Blog (BLOG-2): segredo do webhook /webhooks/revalidate. Vazio = endpoint desligado.
+      REVALIDATE_SECRET: "${REVALIDATE_SECRET:-}"
     depends_on: [api]
     restart: unless-stopped
 

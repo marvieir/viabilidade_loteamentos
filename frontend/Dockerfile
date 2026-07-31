@@ -35,6 +35,10 @@ ENV HOSTNAME=0.0.0.0
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+# Blog (BLOG-1): artigos lidos por fs em TEMPO DE EXECUÇÃO — o tracer do standalone não os
+# inclui sozinho, então a cópia é explícita. No BLOG-2 um volume montado aqui em cima
+# recebe os artigos gerados pelo cron sem rebuild.
+COPY --from=builder /app/content ./content
 # Fase 13 (hardening) — roda como usuário NÃO-root (a imagem node já traz o usuário `node`).
 USER node
 EXPOSE 3700

@@ -106,6 +106,12 @@ de produto e perfis municipais).
 - **RF-PUB-3** Publicar avisa quais dimensões estão vazias na sessão antes de confirmar.
 - **RF-PUB-4** SEO e descobribilidade por IA: metadados completos com domínio canônico e imagem de compartilhamento, `sitemap.xml` e `robots.txt` gerados (área logada fora do índice; crawlers de IA bem-vindos nas páginas públicas), dados estruturados JSON-LD na home (Organization, WebSite, SoftwareApplication, FAQPage) e `llms.txt` descrevendo a plataforma para assistentes de IA; `www` redireciona para o apex.
 
+### RF-BLOG — Blog
+- **RF-BLOG-1** Blog público em `/blog` e `/blog/{slug}`: artigos em JSON versionado (blocos p/h2/ul/aviso + fontes), superfície editorial da marca, JSON-LD Article, canônicas e presença no sitemap; artigo com afirmação legal SEMPRE cita lei/artigo na seção de fontes; aviso de triagem em todo artigo.
+- **RF-BLOG-2** Publicação sem rebuild: páginas com ISR e webhook `POST /webhooks/revalidate` protegido por segredo (sem segredo configurado, endpoint desligado); artigo novo no diretório de conteúdo vira página após revalidação.
+- **RF-BLOG-3** *(planejado)* Gerador automático (port do MMA/voya): fila de tópicos YAML → geração via API Anthropic com grounding no acervo legal verificado → verificador de citações → aprovação do operador via Telegram → publica e revalida; cadência 2-3/semana; sem persona fictícia nem experiência inventada.
+- **RF-BLOG-4** *(planejado)* Minerador de pauta: transcrições de canais do setor (YouTube Data API) viram TEMAS sugeridos na fila (nunca reescrita de conteúdo alheio; artigo original cita e linka a fonte).
+
 ### RF-INTEL — Inteligência do motor
 - **RF-INTEL-1** Corpus de glebas-ouro + placar de KPIs por caso×público; comparação com base fixada (regressão marcada).
 - **RF-INTEL-2** Função de valor por público (pesos auditáveis, editáveis por perfil sem rebuild) escolhe entre as K variantes.

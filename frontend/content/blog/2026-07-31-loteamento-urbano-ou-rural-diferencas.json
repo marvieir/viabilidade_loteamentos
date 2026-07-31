@@ -1,0 +1,31 @@
+{
+  "slug": "loteamento-urbano-ou-rural-diferencas",
+  "titulo": "Loteamento urbano ou parcelamento rural: as regras mudam mais do que parece",
+  "descricao": "Dentro ou fora do perímetro urbano, a gleba responde a leis diferentes: piso do lote, doações, declividade e registro. Aplicar a régua errada derruba estudos nos dois sentidos.",
+  "data": "2026-07-31",
+  "autor": "Equipe voaz.app",
+  "categoria": "Régua legal",
+  "tempoLeituraMin": 6,
+  "blocos": [
+    { "tipo": "p", "texto": "Boa parte das glebas oferecidas a quem quer lotear está fora do perímetro urbano. E é aí que mora um dos erros mais caros da pré-viabilidade: analisar terra rural com régua de cidade, ou o contrário. As duas réguas existem, são diferentes em pontos que mudam a conta inteira, e a escolha entre elas não é opinião: é a localização da gleba diante da lei municipal." },
+    { "tipo": "h2", "texto": "A primeira pergunta da triagem: dentro ou fora do perímetro urbano" },
+    { "tipo": "p", "texto": "O perímetro urbano é definido por lei do próprio município. Dentro dele, o parcelamento segue a Lei federal 6.766/79 e as diretrizes municipais. Fora dele, a terra está no regime agrário: cadastro rural e regras do INCRA, na sistemática da Lei 5.868/72 e do Estatuto da Terra (Lei 4.504/64). Existe caminho para urbanizar terra rural, e ele passa pela prefeitura (alteração de perímetro ou urbanização específica); a triagem séria analisa o cenário como ele está hoje e deixa o caminho de conversão declarado como hipótese, nunca como fato." },
+    { "tipo": "h2", "texto": "Quatro diferenças que mudam a conta" },
+    { "tipo": "ul", "itens": [
+      "Piso do lote: no urbano, 125 m² federal (Lei 6.766/79, art. 4º, II) ou o mínimo da zona quando a lei municipal confirma; no rural, a Fração Mínima de Parcelamento do INCRA, em hectares.",
+      "Áreas públicas: no loteamento urbano, a prefeitura define nas diretrizes as áreas destinadas a viário, verde e institucional; no parcelamento rural essa doação urbanística não existe.",
+      "Declividade: a vedação de lotear terreno com 30% ou mais de declividade é regra do parcelamento urbano (Lei 6.766/79, art. 3º); no rural, a régua ambiental relevante é a APP de encosta com declividade superior a 45 graus (Lei 12.651/2012, art. 4º).",
+      "Aprovação e registro: o urbano nasce nas diretrizes municipais e termina registrado na matrícula com projeto aprovado; o rural corre pelo cadastro rural e pelas exigências do INCRA."
+    ] },
+    { "tipo": "h2", "texto": "Por que régua trocada derruba estudos" },
+    { "tipo": "p", "texto": "Aplicar a régua urbana numa gleba rural cria obrigações que não existem: o estudo desconta doações de verde e institucional que o regime rural não pede, veda encostas que a lei ambiental permite aproveitar, e a conta sai pessimista a ponto de descartar área boa. No sentido contrário, desenhar chácaras de 1.000 m² fora do perímetro urbano promete um produto que o registro de imóveis não aceita: abaixo da fração mínima, o parcelamento rural não registra." },
+    { "tipo": "p", "texto": "Na prática, a triagem correta começa apontando a gleba no mapa oficial do município, declara o regime encontrado e aplica a régua daquele regime do primeiro ao último número. Quando o dado municipal não está disponível, o honesto é rotular a análise como base federal e listar o que falta confirmar." },
+    { "tipo": "aviso", "texto": "Este artigo é orientação de triagem, com a fonte legal citada em cada regra. Enquadramento definitivo de regime e aprovação de projeto são atos da prefeitura e dos órgãos competentes." }
+  ],
+  "fontes": [
+    { "rotulo": "Lei 6.766/1979 (parcelamento do solo urbano)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l6766.htm" },
+    { "rotulo": "Lei 5.868/1972 (Sistema Nacional de Cadastro Rural)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l5868.htm" },
+    { "rotulo": "Lei 4.504/1964 (Estatuto da Terra)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l4504.htm" },
+    { "rotulo": "Lei 12.651/2012, art. 4º (Código Florestal; APP de encosta)", "url": "https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2012/lei/l12651.htm" }
+  ]
+}

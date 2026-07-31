@@ -1,0 +1,25 @@
+{
+  "slug": "declividade-30-por-cento-loteamento",
+  "titulo": "Declividade de 30%: o que a lei veda no loteamento e o que ainda dá para aproveitar",
+  "descricao": "A Lei 6.766/79 veda o parcelamento urbano em terreno com 30% ou mais de declividade, salvo exigências específicas atendidas. A mancha íngreme limita o desenho, e quase nunca mata a gleba.",
+  "data": "2026-07-31",
+  "autor": "Equipe voaz.app",
+  "categoria": "Régua legal",
+  "tempoLeituraMin": 5,
+  "blocos": [
+    { "tipo": "p", "texto": "Gleba com vista costuma vir com morro. E morro costuma vir acompanhado de opiniões desencontradas: tem quem descarte a área inteira por causa da encosta, e tem quem prometa lotear tudo como se relevo não existisse. A lei diz outra coisa, mais precisa e mais útil que os dois extremos." },
+    { "tipo": "h2", "texto": "O que a Lei 6.766 diz de verdade" },
+    { "tipo": "p", "texto": "O art. 3º, parágrafo único, da Lei 6.766/79 lista onde o parcelamento urbano não é permitido. Entre os casos está o terreno com declividade igual ou superior a 30%, salvo se atendidas exigências específicas das autoridades competentes. Em português de obra: naquela mancha, lote não, a menos que um projeto especial aprovado diga como." },
+    { "tipo": "h2", "texto": "O que a mancha íngreme não mata" },
+    { "tipo": "p", "texto": "A vedação incide sobre o trecho com 30% ou mais, e não sobre a gleba inteira. O resto da área continua aproveitável, e a própria mancha tem destinos legítimos: virar área verde, compor o paisagismo, ou receber via mediante as tais exigências específicas (contenções, projeto geotécnico, aprovação do órgão competente). O desenho inteligente contorna a encosta em vez de fingir que ela não está lá." },
+    { "tipo": "h2", "texto": "No rural, a régua é outra" },
+    { "tipo": "p", "texto": "A vedação dos 30% é regra do parcelamento urbano. Fora do perímetro urbano, a restrição de relevo relevante é ambiental: encostas com declividade superior a 45 graus são Área de Preservação Permanente (Lei 12.651/2012, art. 4º, V). São réguas diferentes, com consequências diferentes, e usar uma no lugar da outra distorce o estudo." },
+    { "tipo": "h2", "texto": "Medir antes de opinar" },
+    { "tipo": "p", "texto": "A discussão sobre encosta só sai do achismo com número: o percentual da gleba em cada faixa de declividade, calculado sobre um modelo de elevação do terreno, com a mancha vedada desenhada no mapa. Com isso na mesa, a conversa muda de qualidade: em vez de aceitar ou descartar a gleba por impressão, discute-se quantos metros quadrados vendáveis sobram e o que a encosta custa ou agrega ao produto." },
+    { "tipo": "aviso", "texto": "Este artigo é orientação de triagem, com a fonte legal citada em cada regra. Projeto em área de exigências específicas depende de aprovação dos órgãos competentes e de responsável técnico habilitado." }
+  ],
+  "fontes": [
+    { "rotulo": "Lei 6.766/1979, art. 3º, parágrafo único (parcelamento do solo urbano)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l6766.htm" },
+    { "rotulo": "Lei 12.651/2012, art. 4º, V (Código Florestal; APP de encosta acima de 45°)", "url": "https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2012/lei/l12651.htm" }
+  ]
+}

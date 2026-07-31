@@ -1,0 +1,26 @@
+{
+  "slug": "lote-minimo-loteamento-125-m2-lei",
+  "titulo": "Lote mínimo de loteamento: o que a lei federal exige e quando vale o mínimo da zona",
+  "descricao": "O piso federal é 125 m² com 5 m de frente (Lei 6.766/79, art. 4º, II). Acima dele, só vale o mínimo da zona quando a lei municipal confirma. Entenda a régua e os erros que derrubam estudos.",
+  "data": "2026-07-31",
+  "autor": "Equipe voaz.app",
+  "categoria": "Régua legal",
+  "tempoLeituraMin": 5,
+  "blocos": [
+    { "tipo": "p", "texto": "O lote mínimo é o número que mais trava negociação de gleba. O corretor fala 250 m², o vizinho jura que é 360 m², um conhecido menciona 125 m², e a conta do loteamento muda por completo a cada palpite. A resposta correta existe, está em lei, e cabe em poucos parágrafos." },
+    { "tipo": "h2", "texto": "O piso federal: 125 m² de área e 5 m de frente" },
+    { "tipo": "p", "texto": "A Lei federal 6.766/79, que rege o parcelamento do solo urbano, fixa no art. 4º, inciso II, o padrão mínimo do lote: área de 125 m² e frente de 5 metros. Essa é a régua que vale em qualquer um dos 5.570 municípios do país quando não existe exigência local maior. A própria lei prevê as exceções: urbanização específica de interesse social aprovada pelo poder público, e os casos em que a legislação estadual ou municipal determinar padrões maiores." },
+    { "tipo": "h2", "texto": "Quando vale o mínimo da zona" },
+    { "tipo": "p", "texto": "Municípios com lei de uso e ocupação do solo (LUOS) ou plano diretor costumam fixar lotes mínimos maiores por zona: 200, 250, 360, 450 m². Esse número vale, e passa por cima do piso federal, quando está escrito na lei municipal e a gleba está naquela zona. A ordem prática da triagem é direta: confirmou a lei municipal e a zona, use o mínimo da zona; não confirmou, use 125 m² e registre que a análise está na base federal." },
+    { "tipo": "p", "texto": "Um cuidado que evita estudo errado: índice que não aparece no documento municipal não vira restrição. Se a LUOS da cidade não traz lote mínimo para a zona, a régua volta ao piso federal. Assumir um número de memória, ou por comparação com a cidade vizinha, é a receita clássica para descartar gleba boa ou aprovar conta que não fecha." },
+    { "tipo": "h2", "texto": "Mira de mercado não é lei" },
+    { "tipo": "p", "texto": "Loteamento de alto padrão costuma trabalhar com lotes de 450 m² ou mais. Isso é decisão comercial, uma mira de produto, e faz todo sentido. O erro é tratar a mira como se fosse trava legal: o estudo que rejeita qualquer lote abaixo do alvo comercial joga fora área vendável sem nenhuma lei mandando. Na triagem bem feita os dois números andam juntos e rotulados: o piso legal (125 m² ou o da zona confirmada) e o alvo comercial do público do empreendimento." },
+    { "tipo": "h2", "texto": "No rural, a régua é outra" },
+    { "tipo": "p", "texto": "Fora do perímetro urbano, o parcelamento não segue o art. 4º da Lei 6.766. O piso vira a Fração Mínima de Parcelamento (FMP) definida pelo INCRA para cada município, na sistemática da Lei 5.868/72, tipicamente na casa dos hectares. Chácara de 1.000 m² em zona rural, sem urbanização aprovada, simplesmente não registra." },
+    { "tipo": "aviso", "texto": "Este artigo é orientação de triagem, com a fonte legal citada em cada regra. A palavra final sobre um projeto de loteamento é da prefeitura, nas diretrizes do art. 6º da Lei 6.766/79." }
+  ],
+  "fontes": [
+    { "rotulo": "Lei 6.766/1979, art. 3º, 4º e 6º (parcelamento do solo urbano)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l6766.htm" },
+    { "rotulo": "Lei 5.868/1972 (Sistema Nacional de Cadastro Rural; fração mínima de parcelamento)", "url": "https://www.planalto.gov.br/ccivil_03/leis/l5868.htm" }
+  ]
+}

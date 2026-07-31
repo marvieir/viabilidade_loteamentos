@@ -78,6 +78,9 @@ export function HeaderSite() {
           <Link href="/loteadores" className="transition hover:text-white">
             Para loteadores
           </Link>
+          <Link href="/blog" className="transition hover:text-white">
+            Blog
+          </Link>
         </nav>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {/* No mobile o "Entrar" mora dentro do menu (o header espremia — MKT-5 item 1) */}
@@ -130,6 +133,12 @@ export function HeaderSite() {
               >
                 Para loteadores
               </Link>
+              <Link
+                href="/blog"
+                className="block rounded-lg px-3 py-2.5 text-sm text-[#c3b8e8] transition hover:bg-[#241862] hover:text-white"
+              >
+                Blog
+              </Link>
               <div className="my-1 h-px bg-[#2e1f7a]" />
               <Link
                 href="/login"
@@ -166,6 +175,10 @@ export function FooterSite() {
           cobertura de cada análise.
         </p>
         <p className="text-xs text-[#96796a]">
+          <Link href="/blog" className="transition hover:text-[#5b4a3e]">
+            Blog
+          </Link>{" "}
+          ·{" "}
           <a href={LINK_DEMO} className="transition hover:text-[#5b4a3e]">
             Contato
           </a>{" "}

@@ -162,6 +162,22 @@ JSON-LD (Organization, WebSite, SoftwareApplication com plano grátis, e FAQPage
 array do FAQ da página — uma fonte só). `public/llms.txt` resume a plataforma na convenção que
 os assistentes de IA leem. No Caddy, `www.voaz.app` redireciona 301 para o apex.
 
+## RF-BLOG — Blog
+
+**Como funciona (BLOG-1, 31/07).** Cada artigo é um JSON em `frontend/content/blog/` (blocos
+tipados p/h2/ul/aviso + seção de fontes com lei/artigo e link do Planalto). As páginas `/blog`
+e `/blog/[slug]` LEEM o diretório em tempo de execução (não importam no build) e rodam com ISR:
+é o desenho do sistema MMA do projeto voya, portado — no BLOG-2, o gerador grava o arquivo num
+volume e chama `POST /webhooks/revalidate?path=...&secret=...` para publicar sem rebuild (o
+Dockerfile copia `content/` explicitamente porque o tracer do standalone não segue leitura por
+fs). Sem `REVALIDATE_SECRET` no ambiente, o webhook responde 401 sempre. Artigos de estreia
+escritos das lições legais já verificadas do projeto. Decisões de marca: sem persona fictícia
+(a voz é "Equipe voaz.app"), afirmação legal sempre com fonte, aviso de triagem em todo artigo,
+cadência futura 2-3/semana com aprovação do operador via Telegram (decisão de 31/07).
+
+- Código: `frontend/lib/blog.ts`, `frontend/app/blog/`, `frontend/app/webhooks/revalidate/route.ts`, `frontend/content/blog/*.json`.
+- Referência do sistema original: `docs/marketing/blog-inventario-mma.md`.
+
 ## RF-INTEL — Inteligência do motor
 
 **Como funciona.** O placar (`scripts/placar_motor.py`) roda o motor sem IA sobre o corpus e

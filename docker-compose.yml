@@ -113,6 +113,8 @@ services:
       # SSR: o servidor do Next fala com a api pela rede interna do compose. "localhost"
       # aqui seria o próprio container do web — foi o que derrubou o laudo de exemplo.
       API_BASE_INTERNA: "http://api:8700"
+      # Blog (BLOG-2): segredo do webhook /webhooks/revalidate. Vazio = endpoint desligado.
+      REVALIDATE_SECRET: "${REVALIDATE_SECRET:-}"
     ports:
       - "3700:3700"
     depends_on:
