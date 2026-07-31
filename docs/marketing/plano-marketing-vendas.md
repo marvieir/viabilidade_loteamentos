@@ -1,6 +1,7 @@
 # Plano Estratégico de Marketing, Vendas e Monetização — voaz.app
 
-**Data:** 31/07/2026 · **Versão:** v1 (proposta para decisão do operador)
+**Data:** 31/07/2026 · **Versão:** v1.2 (estrutura de monetização decidida em brainstorm com o
+operador em 31/07; preços seguem como hipótese de teste)
 **Base:** `modelo-negocios.md` (custo marginal MEDIDO ~R$ 2/análise), `concepcao-marketing.md`
 (promessa e 5 públicos aprovados), `estudo-urbia.md` (concorrente de referência) e pesquisa de
 ecossistema e de práticas de monetização feita em 31/07 (fontes no fim).
@@ -14,9 +15,11 @@ forma de faturamento (MEI/PJ, nota fiscal), em qual rede pessoal ele tem mais fo
 1. **Fase de 90 dias com objetivo de VALIDAÇÃO, não de escala**: provar que alguém paga, quanto
    paga e por qual canal chega. Meta proposta: 10 entrevistas de validação, 30 contas criadas,
    5 clientes pagantes, 1 canal com conversão comprovada.
-2. **Monetização híbrida**: plano gratuito com gate por FUNCIONALIDADE (dimensões determinísticas
-   liberadas, IA fechada), plano Pro com TODAS as funcionalidades e cota de glebas/mês, análise
-   avulsa para quem tem uma gleba só. Nenhum plano intermediário por enquanto (2 planos + avulso).
+2. **Monetização híbrida (v1.2, decidida com o operador em 31/07)**: gratuito generoso na tela
+   (1 gleba/mês, 1 rodada de cada dimensão incluindo urbanismo IA, LUOS liberada), SEM plano
+   mensal e SEM análise avulsa. Cardápio pago com 3 ofertas: pacote de 5 glebas (sem assinatura),
+   assinaturas semestral e anual parceladas com cota de glebas do PERÍODO, e pacote extra de
+   expansão para assinantes. Unidade de cobrança: a GLEBA (iterações dentro dela são livres).
 3. **Vender primeiro na mão, cobrar primeiro por Pix**: 10 vendas fundador-led com demo ao vivo
    da gleba DO prospect antes de automatizar checkout. Ativação do plano manual pelo admin.
 4. **Segmento de ataque nº 1: o loteador em operação (Balde 2)**, que tem dor recorrente e
@@ -79,13 +82,16 @@ decisão segura antes do gasto caro. E nunca prometemos aprovação: somos a eta
 
 | Prioridade | Público | Por quê | Oferta natural |
 |---|---|---|---|
-| 1 | Loteador em operação (Balde 2) | Dor recorrente (funil de glebas), usa todo mês, paga assinatura, decide rápido | Pro mensal/anual |
-| 2 | Entrante/corretor de áreas (Balde 5) | Muitos, ávidos por instrumento profissional, evangelizam nos grupos e cursos | Pro mensal (ticket menor de entrada) |
-| 3 | Incorporador/investidor (Balde 3) | Ticket alto, ciclo mais longo, compra por comparação de oportunidades | Pro anual ou pacote de créditos |
-| 4 | Terrenista e dono que quer lotear (Baldes 1 e 4) | Uso pontual (1 gleba), não assina: compra UMA análise | Análise avulsa |
+| 1 | Loteador em operação (Balde 2) | Dor recorrente (funil de glebas); acesso difícil com plataforma nova: entrar por 2-3 clientes fundadores da rede do operador | Assinatura semestral/anual |
+| 2 | Entrante/corretor de áreas (Balde 5) | Acesso fácil, evangelizam nos grupos; demanda EPISÓDICA (pagam quando têm área na mão); disposição a pagar é hipótese a testar | Pacote 5 glebas |
+| 3 | Incorporador/investidor (Balde 3) | Ticket alto; avalia em rajadas (3 a 10 áreas por ciclo de compra) e fica quieto durante a obra | Pacote 5 ou assinatura anual |
+| 4 | Terrenista e dono que quer lotear (Baldes 1 e 4) | Uso pontual (1 gleba); quase nunca incorpora, busca parceiro para permutar | Gratuito (vitrine); pacote se for levar o laudo à negociação |
 
 O terrenista continua sendo o maior público em quantidade, mas ele chega por conteúdo e pelo
-laudo de exemplo, compra avulso uma vez e some: serve para caixa e prova social, não para MRR.
+laudo de exemplo e fica na vitrine gratuita: serve para prova social e cobertura de municípios,
+não para MRR. Registro de alavanca FUTURA (não construir agora): o terrenista que analisou a
+gleba e busca parceiro para permutar é lead qualificado para loteadores; originação/apresentação
+de áreas analisadas, com consentimento, pode virar um segundo modelo de receita.
 
 ---
 
@@ -110,18 +116,47 @@ glebas extrai mais valor. Sozinho, porém, força o gratuito a incluir IA (custo
 nunca converte) ou a ser inútil. Veredito: entra como TETO dentro do plano pago, não como único
 eixo.
 
-**Recomendação: híbrido (b) + (c), dois planos + avulso.** A prática de mercado confirma:
-taxa fixa + limite de uso dá previsibilidade ao cliente e upside a nós; conversão típica de
-freemium é de 2 a 5%, então o free precisa custar quase zero para nós (o nosso custa) e o degrau
-para o pago precisa ficar claro (o nosso é: as 3 análises de IA).
+**Recomendação: híbrido (b) + (c).** A prática de mercado confirma: taxa fixa + limite de uso
+dá previsibilidade ao cliente e upside a nós; conversão típica de freemium é de 2 a 5%, então o
+free precisa custar quase zero para nós (o nosso custa) e o degrau para o pago precisa ficar
+claro.
 
-### Estrutura proposta (preços são HIPÓTESE para teste, decisão final é do operador)
+### Estrutura v1.2 (brainstorm com o operador, 31/07 — preços são HIPÓTESE de teste)
 
-| Plano | Preço de teste | O que inclui | Para quem |
+Decisões registradas do brainstorm:
+1. **Unidade de cobrança é a GLEBA, nunca a análise-execução.** Cobrar por análise instalaria um
+   taxímetro sobre a iteração (regenerar, trocar variante, anexar DWG), que é justamente o nosso
+   diferencial contra o estudo encomendado. Dentro de uma gleba, iterações livres (teto interno
+   de sanidade contra abuso, invisível no preço). Uso puro (só créditos, sem assinatura) foi
+   avaliado e descartado: zero piso de receita e ansiedade de medidor.
+2. **SEM plano mensal.** Churn alto e custo de repor assinante todo mês. As assinaturas são
+   semestral e anual, parceláveis em 6 ou 12 vezes ("12× de R$ 179" soa mensal sem ser mensal).
+3. **SEM análise avulsa.** Cliente transacional de R$ 197 tem o mesmo custo operacional de um
+   assinante e LTV mínimo; a avulsa ainda competia com o pacote por baixo. Cardápio pago com 3
+   ofertas. Hipótese a observar nas 10 conversas: gente de 1 gleba disposta a pagar mas travando
+   no pacote de R$ 747 (se aparecer, reavaliar; a "análise única" pode existir não publicada,
+   como ferramenta de negociação do fundador, abatível do pacote em 30 dias).
+4. **Cota da assinatura vale pelo PERÍODO inteiro** (balde do semestre/ano), não por mês: funil
+   de gleba é irregular, cota mensal que expira frustra. Fim do balde é o gatilho de expansão.
+5. **Gratuito com LUOS liberada** (1 município/mês): sem ela a análise urbana fica no piso
+   federal (produto pior na primeira impressão), a extração custa pouco e cada município
+   perfilado enriquece a plataforma. Gratuito mostra TUDO na tela (1 gleba/mês, 1 rodada de cada
+   dimensão, urbanismo IA incluso 1×) mas NÃO LEVA: sem laudo PDF/Excel, sem variantes extras,
+   sem importação DWG, marca d'água. Quem vai negociar, paga.
+6. **Não chamar crédito de "token"** no produto: a língua do cliente é "gleba"/"crédito de gleba".
+
+| Oferta | Preço de teste | Glebas incluídas | R$/gleba efetivo |
 |---|---|---|---|
-| **Gratuito** | R$ 0 | Dimensões determinísticas ilimitadas (ambiental, declividade, vegetação, aproveitamento, financeiro, econômico, localização) em até 2 glebas/mês. SEM urbanismo IA, SEM jurídico, SEM diretriz LUOS. Laudo com marca d'água "pré-análise gratuita" | Porta de entrada de todos os públicos |
-| **Pro** | R$ 297/mês ou R$ 2.970/ano (2 meses grátis) | TUDO: urbanismo IA (com variantes e importação DWG), jurídico, diretriz LUOS, laudo completo PDF/Excel sem marca d'água. Cota: 10 glebas novas/mês (análises ilimitadas dentro delas). Gleba extra: R$ 49 | Loteador, entrante, incorporador |
-| **Análise avulsa** | R$ 197/gleba | Análise completa de UMA gleba (tudo do Pro, 30 dias de acesso àquela gleba) | Terrenista, dono de 1 gleba |
+| **Gratuito** | R$ 0 | 1 gleba/mês, 1 rodada de cada dimensão, LUOS liberada (1 município/mês), só na tela (sem PDF, sem variantes, sem DWG) | — |
+| **Pacote 5** (sem assinatura) | R$ 747, validade 12 meses | 5 | ~149 |
+| **Assinatura semestral** | 6× R$ 199 (R$ 1.194) | 12 no semestre | ~99 |
+| **Assinatura anual** | 12× R$ 179 (R$ 2.148) | 30 no ano | ~72 |
+| **Pacote extra** (só assinante) | R$ 397 | +5 no período | ~79 |
+
+A escada de preço por gleba conta a história sozinha (149 → 99 → 72; extra de assinante a 79):
+quanto mais compromisso, mais barata a gleba. O pacote extra é receita de expansão dentro da
+base. Risco aceito e monitorado: cota de 12/30 pode punir o loteador de volume alto (30+ áreas
+por semestre); se aparecer nas conversas, criar degrau "ilimitado" depois, não agora.
 
 Âncoras de valor para a conversa de venda (todas verificáveis):
 - Um EVU/estudo encomendado no mercado custa alguns milhares de reais e leva semanas; a Urbia
@@ -133,7 +168,8 @@ para o pago precisa ficar claro (o nosso é: as 3 análises de IA).
 
 Regras da fase de teste de preço:
 1. As primeiras 10 vendas são NA MÃO (conversa, demo, Pix): o preço é falado, não publicado, e
-   pode variar de conversa para conversa para medir reação (R$ 197 / 297 / 497 no Pro).
+   pode variar de conversa para conversa para medir reação. Oferecer pacote × semestral × anual
+   e REGISTRAR o que cada perfil escolhe: a escolha é o dado que fecha os preços.
 2. Em cada conversa, duas perguntas de calibragem: "a partir de que preço isso fica caro?" e
    "a que preço fica barato a ponto de desconfiar?" (Van Westendorp simplificado).
 3. Página de preços pública só depois das 10 conversas, com o preço que o mercado sinalizou.
@@ -252,9 +288,11 @@ Roteiro da entrevista de validação (usuários atuais, 30 min):
 
 Em ordem, com o critério "menos código antes da validação":
 
-1. **MKT-4 (já no backlog): enforcement de quotas** no backend: plano por usuário (free/pro/avulso),
-   contadores de glebas/mês, gate das 3 features de IA + importação DWG. Sem isso o gratuito
-   proposto não existe de fato.
+1. **MKT-4 (já no backlog): enforcement de quotas** no backend, conforme a estrutura v1.2:
+   plano por usuário (gratuito/pacote/semestral/anual), SALDO DE GLEBAS por período (balde, não
+   cota mensal), contador de 1 gleba/mês + 1 rodada por dimensão + 1 município LUOS/mês no
+   gratuito, bloqueio de PDF/Excel, variantes extras e importação DWG no gratuito, e soma de
+   pacotes extras ao saldo. Sem isso a estrutura proposta não existe de fato.
 2. **Campo de plano no admin** com ativação/desativação manual (é o "checkout" da fase 1: o
    cliente paga por Pix, o operador ativa; recibo por e-mail).
 3. **Página de preços** (após as 10 conversas) + CTA nos pontos de bloqueio ("essa análise faz
