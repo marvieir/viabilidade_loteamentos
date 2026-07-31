@@ -15,6 +15,7 @@ export const metadata: Metadata = {
   title: "voaz.app para loteadores | Triar 10 glebas no tempo de 1 estudo",
   description:
     "A pré-análise que corta do seu funil a gleba que morre na diligência, antes de você pagar o estudo caro por ela. Grátis: 1 gleba por mês, com até 5 análises.",
+  alternates: { canonical: "/loteadores" },
 };
 
 // Fatos REAIS (estudo de São Roque replayado pelo motor + arquitetura da plataforma).

@@ -2,12 +2,26 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 
+// SEO (31/07): metadataBase resolve todas as URLs relativas de OG/canonical para o domínio
+// público; robots.ts e sitemap.ts (nesta pasta) geram /robots.txt e /sitemap.xml; /llms.txt
+// (em public/) descreve a plataforma para assistentes de IA. Canonical é POR PÁGINA (aqui no
+// root ele valeria para todas as rotas — errado).
 export const metadata: Metadata = {
+  metadataBase: new URL("https://voaz.app"),
   title: "voaz.app — pré-viabilidade de loteamento",
   description:
     "Envie o KMZ da gleba e receba a triagem determinística: geometria, ambiental, "
     + "declividade, urbanismo e financeiro, com a lei citada em cada número.",
   applicationName: "voaz.app",
+  keywords: [
+    "viabilidade de loteamento",
+    "pré-viabilidade",
+    "análise de gleba",
+    "loteamento",
+    "estudo de viabilidade urbanística",
+    "parcelamento do solo",
+  ],
+  robots: { index: true, follow: true },
   openGraph: {
     title: "voaz.app — a gleba fecha a conta?",
     description:
@@ -16,6 +30,22 @@ export const metadata: Metadata = {
     siteName: "voaz.app",
     locale: "pt_BR",
     type: "website",
+    url: "https://voaz.app",
+    images: [
+      {
+        url: "/og.jpg",
+        width: 1200,
+        height: 630,
+        alt: "voaz.app — análise de pré-viabilidade de uma gleba real, com camadas ambientais e quadro de números",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "voaz.app — a gleba fecha a conta?",
+    description:
+      "Pré-viabilidade de loteamento a partir do KMZ, com a fonte legal ao lado de cada número.",
+    images: ["/og.jpg"],
   },
 };
 

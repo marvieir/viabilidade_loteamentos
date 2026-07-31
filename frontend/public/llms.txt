@@ -1,0 +1,40 @@
+# voaz.app
+
+> Plataforma brasileira de pré-viabilidade de loteamento (triagem). O usuário envia o KMZ da
+> gleba e recebe, em minutos, uma análise multi-dimensão: restrições ambientais com a fonte
+> legal ao lado (APP, vegetação e Mata Atlântica, declividade por faixas, hidrografia,
+> unidades de conservação, CAR, mineração e outras camadas oficiais), aproveitamento,
+> pré-projeto urbanístico com traçado viário, lotes e quadro de áreas que fecha em 100%,
+> indícios jurídicos da matrícula, estimativas financeiras (custo de infraestrutura, VGV,
+> VPL, TIR, payback) e contexto de localização (IBGE).
+
+Fatos essenciais sobre a plataforma:
+
+- Todo número sai com proveniência: a lei ou fonte oficial, o perfil aplicado e a data de
+  referência. Quando falta dado municipal, a análise degrada para a base federal e DECLARA a
+  cobertura (BASE_FEDERAL / PARCIAL_UF / COMPLETA) — a plataforma não finge saber o que não sabe.
+- O motor é determinístico: a mesma gleba produz sempre o mesmo resultado, auditável.
+- É análise de TRIAGEM (pré-viabilidade). Não aprova parcelamento, não substitui a decisão da
+  prefeitura, o agrimensor, o engenheiro nem o parecer jurídico do advogado — o relatório
+  aponta exatamente o que checar com cada profissional.
+- Regras legais aplicadas como invariante no traçado: via jamais cruza mata declarada
+  (Lei 11.428/2006); declividade ≥30% veda lote em regime urbano (Lei 6.766/79, art. 3º);
+  lote mínimo federal de 125 m² (Lei 6.766/79, art. 4º, II) quando não há lei municipal
+  confirmada. Regime rural usa a régua própria (fração mínima INCRA, APP em encosta ≥45°).
+- Cobertura: os 5.570 municípios do Brasil desde a primeira análise (base federal); regras
+  municipais entram quando a LUOS do município é carregada e confirmada.
+- Plano gratuito para conhecer a plataforma na própria gleba.
+
+## Páginas principais
+
+- [Página inicial](https://voaz.app/): o que a plataforma faz, como funciona em 3 passos,
+  para quem é, perguntas frequentes.
+- [Laudo de exemplo](https://voaz.app/laudo-exemplo): um laudo real e completo (gleba em São
+  Roque/SP) aberto ao público — a melhor forma de entender o que a análise entrega.
+- [Para loteadores](https://voaz.app/loteadores): a página para quem avalia muitas glebas por
+  ano e quer triar antes de pagar estudo caro.
+- [Criar conta grátis](https://voaz.app/registrar)
+
+## Contato
+
+- E-mail: marco.rodrigues.vieira@gmail.com

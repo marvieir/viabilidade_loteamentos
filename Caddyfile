@@ -26,6 +26,12 @@
 	}
 }
 
+# SEO (31/07): www redireciona para o apex — um domínio canônico só, sem conteúdo duplicado.
+# O DNS já tem o CNAME www → voaz.app; o Caddy emite o certificado do www automaticamente.
+www.{$DOMINIO} {
+	redir https://{$DOMINIO}{uri} permanent
+}
+
 # Migração de domínio (30/07): o endereço antigo redireciona PERMANENTE para o novo.
 # DOMINIO_ANTIGO é opcional — sem ele no .env, o bloco atende um host vazio e fica inerte.
 # O Caddy emite TLS também para o antigo (precisa do DNS dele apontando para esta instância),

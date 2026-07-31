@@ -152,6 +152,16 @@ na imagem). Performance: cache em memória na api (invalidado por mtime) + ISR d
 - Código: `routers/exemplo.py`, `frontend/app/laudo-exemplo/page.tsx`, `components/marketing/*`, `components/marca/Logo.tsx`, `tailwind.config.ts`.
 - Testes: verificação de 200 sem auth + 401 no publicar sem admin.
 
+**SEO e descobribilidade por IA (RF-PUB-4, 31/07).** O Next gera `robots.txt` e `sitemap.xml`
+(`app/robots.ts` e `app/sitemap.ts`): páginas públicas liberadas para todos os robôs, inclusive
+os de IA (GPTBot, ClaudeBot etc., que herdam a regra `*`); `/app`, `/admin` e os fluxos de senha
+ficam fora do índice. O `layout.tsx` define o domínio canônico (`metadataBase`) e a imagem de
+compartilhamento `/og.jpg` (1200×630: print real da plataforma + faixa da marca, JPEG leve para
+o WhatsApp mostrar o preview). Cada página pública declara sua URL canônica. A home injeta
+JSON-LD (Organization, WebSite, SoftwareApplication com plano grátis, e FAQPage gerado do MESMO
+array do FAQ da página — uma fonte só). `public/llms.txt` resume a plataforma na convenção que
+os assistentes de IA leem. No Caddy, `www.voaz.app` redireciona 301 para o apex.
+
 ## RF-INTEL — Inteligência do motor
 
 **Como funciona.** O placar (`scripts/placar_motor.py`) roda o motor sem IA sobre o corpus e

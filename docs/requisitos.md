@@ -104,6 +104,7 @@ de produto e perfis municipais).
 - **RF-PUB-1** Site de marketing (home, loteadores, para quem é, como funciona) na identidade voaz.app.
 - **RF-PUB-2** **Laudo de exemplo público** (`/laudo-exemplo`, sem login): análise REAL publicada pelo admin com um clique; jurídico sai APENAS como contagens por severidade (críticos/moderados/sem impacto); nomes, matrículas e CPF/CNPJ nunca saem (sanitização em duas camadas). Sem exemplo publicado, a página degrada para um laudo gerado pelo motor na hora.
 - **RF-PUB-3** Publicar avisa quais dimensões estão vazias na sessão antes de confirmar.
+- **RF-PUB-4** SEO e descobribilidade por IA: metadados completos com domínio canônico e imagem de compartilhamento, `sitemap.xml` e `robots.txt` gerados (área logada fora do índice; crawlers de IA bem-vindos nas páginas públicas), dados estruturados JSON-LD na home (Organization, WebSite, SoftwareApplication, FAQPage) e `llms.txt` descrevendo a plataforma para assistentes de IA; `www` redireciona para o apex.
 
 ### RF-INTEL — Inteligência do motor
 - **RF-INTEL-1** Corpus de glebas-ouro + placar de KPIs por caso×público; comparação com base fixada (regressão marcada).

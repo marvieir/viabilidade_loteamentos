@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   title: "voaz.app — a gleba fecha a conta? Decida antes de gastar com projeto",
   description:
     "Pré-análise ambiental, jurídica, urbanística e financeira da sua gleba a partir do KMZ, com a fonte legal ao lado de cada número. Grátis: 1 gleba por mês, com até 5 análises.",
+  alternates: { canonical: "/" },
 };
 
 const DORES = [
@@ -121,9 +122,65 @@ const FAQ: { pergunta: string; resposta: string }[] = [
   },
 ];
 
+// Dados estruturados (JSON-LD) para buscadores e assistentes de IA. O FAQPage reutiliza o
+// MESMO array FAQ renderizado acima — uma fonte só, sem risco de descolar da página.
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://voaz.app/#org",
+      name: "voaz.app",
+      url: "https://voaz.app",
+      description:
+        "Plataforma de pré-viabilidade de loteamento: análise ambiental, jurídica, "
+        + "urbanística e financeira de glebas a partir do KMZ, com fonte legal em cada número.",
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://voaz.app/#site",
+      name: "voaz.app",
+      url: "https://voaz.app",
+      inLanguage: "pt-BR",
+      publisher: { "@id": "https://voaz.app/#org" },
+    },
+    {
+      "@type": "SoftwareApplication",
+      name: "voaz.app",
+      url: "https://voaz.app",
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description:
+        "Envie o KMZ da gleba e receba em minutos a triagem de pré-viabilidade do loteamento: "
+        + "restrições ambientais com a lei ao lado, declividade, pré-projeto urbanístico com "
+        + "quadro de áreas, indícios jurídicos da matrícula e estimativas financeiras. "
+        + "É análise de triagem: não substitui a decisão da prefeitura nem profissionais habilitados.",
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "BRL",
+        description: "Plano gratuito: 1 gleba por mês para conhecer a plataforma.",
+      },
+      publisher: { "@id": "https://voaz.app/#org" },
+    },
+    {
+      "@type": "FAQPage",
+      mainEntity: FAQ.map((f) => ({
+        "@type": "Question",
+        name: f.pergunta,
+        acceptedAnswer: { "@type": "Answer", text: f.resposta },
+      })),
+    },
+  ],
+};
+
 export default function PaginaPrincipal() {
   return (
     <div className="bg-white text-slate-900">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       <HeaderSite />
 
       {/* 1. Hero */}

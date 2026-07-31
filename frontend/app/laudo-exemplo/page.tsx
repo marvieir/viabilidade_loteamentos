@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   description:
     "Veja um laudo de pré-viabilidade completo antes de enviar a sua gleba: quadro de "
     + "áreas, lotes, régua legal aplicada e a fonte de cada número.",
+  alternates: { canonical: "/laudo-exemplo" },
 };
 
 // ISR de 60 s (30/07): a página sempre-dinâmica re-serializava MBs de GeoJSON a cada
