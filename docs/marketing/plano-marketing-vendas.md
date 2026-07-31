@@ -1,7 +1,7 @@
 # Plano Estratégico de Marketing, Vendas e Monetização — voaz.app
 
-**Data:** 31/07/2026 · **Versão:** v1.2 (estrutura de monetização decidida em brainstorm com o
-operador em 31/07; preços seguem como hipótese de teste)
+**Data:** 31/07/2026 · **Versão:** v1.2 (estrutura de monetização refinada no brainstorm de
+31/07 — EM ANÁLISE PELO OPERADOR, nada aprovado ainda; preços são hipótese de teste)
 **Base:** `modelo-negocios.md` (custo marginal MEDIDO ~R$ 2/análise), `concepcao-marketing.md`
 (promessa e 5 públicos aprovados), `estudo-urbia.md` (concorrente de referência) e pesquisa de
 ecossistema e de práticas de monetização feita em 31/07 (fontes no fim).
@@ -15,7 +15,7 @@ forma de faturamento (MEI/PJ, nota fiscal), em qual rede pessoal ele tem mais fo
 1. **Fase de 90 dias com objetivo de VALIDAÇÃO, não de escala**: provar que alguém paga, quanto
    paga e por qual canal chega. Meta proposta: 10 entrevistas de validação, 30 contas criadas,
    5 clientes pagantes, 1 canal com conversão comprovada.
-2. **Monetização híbrida (v1.2, decidida com o operador em 31/07)**: gratuito generoso na tela
+2. **Monetização híbrida (v1.2, proposta refinada no brainstorm de 31/07, em análise)**: gratuito generoso na tela
    (1 gleba/mês, 1 rodada de cada dimensão incluindo urbanismo IA, LUOS liberada), SEM plano
    mensal e SEM análise avulsa. Cardápio pago com 3 ofertas: pacote de 5 glebas (sem assinatura),
    assinaturas semestral e anual parceladas com cota de glebas do PERÍODO, e pacote extra de
@@ -121,9 +121,9 @@ dá previsibilidade ao cliente e upside a nós; conversão típica de freemium �
 free precisa custar quase zero para nós (o nosso custa) e o degrau para o pago precisa ficar
 claro.
 
-### Estrutura v1.2 (brainstorm com o operador, 31/07 — preços são HIPÓTESE de teste)
+### Estrutura v1.2 (brainstorm com o operador, 31/07 — EM ANÁLISE, preços são HIPÓTESE de teste)
 
-Decisões registradas do brainstorm:
+Pontos levantados no brainstorm (aguardando aprovação do operador):
 1. **Unidade de cobrança é a GLEBA, nunca a análise-execução.** Cobrar por análise instalaria um
    taxímetro sobre a iteração (regenerar, trocar variante, anexar DWG), que é justamente o nosso
    diferencial contra o estudo encomendado. Dentro de uma gleba, iterações livres (teto interno
