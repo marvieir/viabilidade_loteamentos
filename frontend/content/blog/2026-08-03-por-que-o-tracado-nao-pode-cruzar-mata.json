@@ -1,0 +1,69 @@
+{
+  "slug": "por-que-o-tracado-nao-pode-cruzar-mata",
+  "titulo": "Mata na gleba: por que o traçado sério desvia em vez de prometer supressão",
+  "descricao": "Vegetação de Mata Atlântica tem regime próprio. Entenda por que o traçado deve contornar a mancha, não prometer supressão.",
+  "data": "2026-08-03",
+  "autor": "Equipe voaz.app",
+  "categoria": "Régua legal",
+  "tempoLeituraMin": 5,
+  "blocos": [
+    {
+      "tipo": "p",
+      "texto": "A cena se repete em estudos apressados. Uma mancha verde aparece na imagem de satélite, no meio da gleba, e o traçado simplesmente ignora, desenhando rua e quadra por cima como se aquela vegetação não existisse. O quadro de áreas sai bonito, o VGV sai inflado, e o comprador só descobre o problema quando o laudo ambiental chega na diligência."
+    },
+    {
+      "tipo": "h2",
+      "texto": "O que a Lei 11.428 protege"
+    },
+    {
+      "tipo": "p",
+      "texto": "A Lei 11.428/2006 estabelece regime de proteção próprio para a vegetação nativa do bioma Mata Atlântica. Corte e supressão dependem de autorização do órgão competente e são restritos conforme o estágio de regeneração da vegetação encontrada. Isso significa que a autorização é ato de terceiro, concedido ou negado fora do controle de quem elabora o projeto. Um estudo de pré-viabilidade que trata a supressão como premissa está, na prática, vendendo um risco jurídico como se fosse lote pronto."
+    },
+    {
+      "tipo": "h2",
+      "texto": "Restrição dura e vegetação a verificar em campo"
+    },
+    {
+      "tipo": "p",
+      "texto": "Existe diferença prática entre dois tipos de mancha vegetada. A primeira é a restrição dura: vegetação já declarada em mapeamento oficial, laudo técnico ou cadastro ambiental do imóvel, com enquadramento confirmado no bioma. Essa mancha é tratada como perímetro fechado, e o traçado não desenha via, quadra ou lote sobre ela. A segunda é a vegetação a verificar em campo: aparece em imagem de satélite ou em levantamento preliminar, mas sem confirmação de estágio de regeneração ou de enquadramento legal. Nesse caso a análise sinaliza a área como alerta, não como restrição consolidada, porque só um profissional habilitado em campo, engenheiro florestal ou biólogo, com laudo técnico, confirma o estágio da vegetação."
+    },
+    {
+      "tipo": "ul",
+      "itens": [
+        "Restrição dura: mancha já documentada em laudo, cadastro ou mapeamento oficial do bioma",
+        "A verificar: vegetação identificada por imagem, sem confirmação de estágio em campo",
+        "Em ambos os casos, a hipótese de corte ou supressão nunca entra como premissa de cálculo do estudo"
+      ]
+    },
+    {
+      "tipo": "h2",
+      "texto": "O desenho que contorna a mancha e absorve o verde no quadro de áreas"
+    },
+    {
+      "tipo": "p",
+      "texto": "O traçado correto desenha o sistema viário e as quadras ao redor do perímetro vegetado, preservando o acesso e a topografia natural do terreno. A área da mancha entra no quadro de áreas como área não edificável ou área verde, contabilizada fora da área vendável desde o primeiro cálculo. Essa lógica também aparece na Lei 6.766/1979, art. 3º, parágrafo único, que veda o parcelamento em áreas de preservação ecológica sem que sejam atendidas as exigências das autoridades competentes. O efeito prático para quem está avaliando a gleba é o mesmo: a mancha reduz área útil, mas mantém o projeto coerente com a matrícula e com a realidade fundiária, sem depender de autorização que ainda não existe."
+    },
+    {
+      "tipo": "h2",
+      "texto": "O erro que encolhe a área vendável na diligência"
+    },
+    {
+      "tipo": "p",
+      "texto": "O erro clássico segue um roteiro conhecido. O estudo inicial ignora a mancha, desenha lotes sobre ela e apresenta um VGV cheio, sem desconto de área verde. Semanas depois, na diligência de compra, um laudo ambiental confirma remanescente de Mata Atlântica em estágio médio de regeneração sobre parte do traçado. O projeto precisa ser redesenhado, quadras inteiras somem, e a área vendável encolhe de forma abrupta em relação ao número que havia sido apresentado ao comprador ou ao investidor. Esse tipo de surpresa nasce de uma decisão de desenho tomada antes de confirmar a vegetação, não de um imprevisto de mercado. Um estudo que trata a mancha como alerta desde o início evita esse tipo de reformulação tardia e entrega um número de área vendável mais próximo do que a diligência vai confirmar."
+    },
+    {
+      "tipo": "aviso",
+      "texto": "Este artigo tem caráter de triagem preliminar. A voaz.app não aprova parcelamento, não substitui prefeitura, agrimensor, engenheiro florestal, biólogo ou advogado, e a confirmação de restrições ambientais depende de laudo técnico em campo e de autorização do órgão competente."
+    }
+  ],
+  "fontes": [
+    {
+      "rotulo": "Lei 11.428/2006 (regime de proteção da Mata Atlântica)",
+      "url": "https://www.planalto.gov.br/ccivil_03/_ato2004-2006/2006/lei/l11428.htm"
+    },
+    {
+      "rotulo": "Lei 6.766/1979, art. 3º, parágrafo único (vedações ao parcelamento)",
+      "url": "https://www.planalto.gov.br/ccivil_03/leis/l6766.htm"
+    }
+  ]
+}
