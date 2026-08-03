@@ -110,3 +110,13 @@ def test_fila_real_do_repositorio_e_valida():
     assert len(slugs) == len(set(slugs))
     for s in slugs:
         assert nucleo.re.fullmatch(r"[a-z0-9-]{8,80}", s), s
+
+
+def test_fila_pula_artigo_ja_publicado_no_disco():
+    """Artigo semente (arquivo publicado) bloqueia o tópico mesmo com estado vazio."""
+    fila = [{"slug": "topico-ja-no-disco"}, {"slug": "topico-livre-x"}]
+    artigo = {**_artigo_ok(), "slug": "topico-ja-no-disco"}
+    nucleo.gravar_rascunho(artigo)
+    nucleo.publicar_rascunho("topico-ja-no-disco")
+    topico = nucleo.proximo_topico(fila, {"publicados": []})
+    assert topico is not None and topico["slug"] == "topico-livre-x"

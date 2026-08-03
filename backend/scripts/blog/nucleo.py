@@ -84,12 +84,30 @@ def slugs_em_rascunho() -> set[str]:
     return {p.stem for p in d.glob("*.json")}
 
 
+def slugs_publicados_no_disco() -> set[str]:
+    """Slugs dos artigos JÁ publicados (arquivos AAAA-MM-DD-slug.json no diretório do web).
+
+    Fonte da verdade além do _estado.json: o estado vive no volume de CADA ambiente, então
+    um artigo aprovado no Mac e levado à produção como semente não constaria no estado da
+    AWS — sem esta checagem, o cron regeraria o mesmo tópico (visto em 03/08)."""
+    d = blog_dir()
+    if not d.exists():
+        return set()
+    slugs: set[str] = set()
+    for p in d.glob("*.json"):
+        m = re.match(r"\d{4}-\d{2}-\d{2}-(.+)", p.stem)
+        if m:
+            slugs.add(m.group(1))
+    return slugs
+
+
 def proximo_topico(
     fila: list[dict], estado: dict, slug_filtro: str | None = None
 ) -> dict | None:
     """Primeiro tópico que não foi publicado, rejeitado nem está aguardando aprovação."""
     fora = set(estado.get("publicados", [])) | set(estado.get("rejeitados", []))
     fora |= slugs_em_rascunho()
+    fora |= slugs_publicados_no_disco()
     for t in fila:
         if slug_filtro and t.get("slug") != slug_filtro:
             continue
