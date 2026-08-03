@@ -87,6 +87,17 @@ def processar() -> int:
             logger.info("Publicado: %s", destino)
             nucleo.tg_avisar(f"✅ Publicado: https://voaz.app/blog/{slug}")
         else:
+            # Blindagem (teste de 03/08: operador tocou Aprovar E Rejeitar): rejeitar algo
+            # que JÁ foi publicado não despublica em silêncio — vira aviso explícito.
+            if slug in estado.get("publicados", []):
+                nucleo.tg_avisar(
+                    f"⚠️ '{slug}' já foi PUBLICADO pelo botão Aprovar — rejeitar não "
+                    f"despublica. Para tirar do ar, remova o arquivo do diretório do blog."
+                )
+                continue
+            if nucleo.ler_rascunho(slug) is None:
+                nucleo.tg_avisar(f"O rascunho '{slug}' não existe mais (já tratado?).")
+                continue
             nucleo.descartar_rascunho(slug)
             estado.setdefault("rejeitados", []).append(slug)
             nucleo.salvar_estado(estado)
