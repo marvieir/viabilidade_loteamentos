@@ -60,3 +60,8 @@ backend/*.db
 # Dados de custo/uso + perfis do operador (dev bind mount)
 backend/app/perfis/_dados/
 backend/scripts/corpus/placar.json
+
+# BLOG-2 — estado/rascunhos do gerador (no dev o bind aponta p/ dentro do repo; artigo
+# PUBLICADO é versionável, estado e rascunhos não)
+frontend/content/blog/_estado.json
+frontend/content/blog/_rascunhos/
