@@ -305,10 +305,11 @@ def gerar_via_llm(topico: dict, erros_anteriores: list[str] | None = None) -> di
     from app.core.extrator_luos import _opcoes_tls
 
     client = anthropic.Anthropic(api_key=api_key, max_retries=4, **_opcoes_tls())
+    # Sem `temperature`: os modelos atuais (claude-sonnet-5) rejeitam o parâmetro (400
+    # "temperature is deprecated for this model" — visto no teste de 03/08).
     resposta = client.messages.create(
         model=modelo,
         max_tokens=8000,
-        temperature=0.3,
         messages=[{"role": "user", "content": prompt}],
     )
     # Custo por artigo entra no MESMO medidor do admin (dimensão "blog").
