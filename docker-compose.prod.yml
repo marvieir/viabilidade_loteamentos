@@ -96,11 +96,13 @@ services:
       API_BASE_INTERNA: "http://api:8700"
       # Blog (BLOG-2): segredo do webhook /webhooks/revalidate. Vazio = endpoint desligado.
       REVALIDATE_SECRET: "${REVALIDATE_SECRET:-}"
+      # BLOG-2 (lição de 03/08) — o web lê DUAS origens: os artigos semente da própria
+      # imagem (content/blog, atualizam a cada deploy) + os aprovados pelo gerador neste
+      # volume, que SÓ a api escreve (montado somente-leitura aqui; evita o choque de
+      # UID/permissão entre containers e o volume inicializado vazio escondendo as sementes).
+      BLOG_CONTENT_DIR_EXTRA: "/data/blog-extra"
     volumes:
-      # BLOG-2 — volume compartilhado com a api. Na PRIMEIRA montagem o Docker semeia o
-      # volume com os artigos que vieram na imagem (content/blog); depois disso a fonte da
-      # verdade é o volume: artigo semente novo só entra via gerador ou cópia manual.
-      - blog_conteudo:/app/content/blog
+      - blog_conteudo:/data/blog-extra:ro
     depends_on: [api]
     restart: unless-stopped
 

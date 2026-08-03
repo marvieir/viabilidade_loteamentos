@@ -25,27 +25,45 @@ export interface PostBlog {
   fontes: { rotulo: string; url?: string }[];
 }
 
+// DUAS origens (lição do deploy de 03/08 — volume compartilhado entre containers de UIDs
+// diferentes dava blog vazio e erro de permissão em produção):
+//   1. BLOG_CONTENT_DIR (default: content/blog da IMAGEM) — artigos SEMENTE versionados no
+//      git; atualizam a cada deploy.
+//   2. BLOG_CONTENT_DIR_EXTRA (produção: volume que SÓ a api escreve, montado ro aqui) —
+//      artigos aprovados pelo gerador, sem rebuild.
+// Mesmo slug nas duas → vale o do EXTRA (versão mais recente publicada pelo gerador).
 const BLOG_DIR =
   process.env.BLOG_CONTENT_DIR ?? path.join(process.cwd(), "content", "blog");
+const BLOG_DIR_EXTRA = process.env.BLOG_CONTENT_DIR_EXTRA ?? "";
 
-export async function listarPosts(): Promise<PostBlog[]> {
+async function lerDiretorio(dir: string): Promise<PostBlog[]> {
   let arquivos: string[];
   try {
-    arquivos = await fs.readdir(BLOG_DIR);
+    arquivos = await fs.readdir(dir);
   } catch {
-    return []; // diretório ausente = blog vazio, nunca erro
+    return []; // diretório ausente = origem vazia, nunca erro
   }
   const posts: PostBlog[] = [];
   for (const nome of arquivos) {
     if (!nome.endsWith(".json")) continue;
     try {
-      const bruto = await fs.readFile(path.join(BLOG_DIR, nome), "utf-8");
+      const bruto = await fs.readFile(path.join(dir, nome), "utf-8");
       const post = JSON.parse(bruto) as PostBlog;
       if (post.slug && post.titulo && Array.isArray(post.blocos)) posts.push(post);
     } catch {
       // arquivo malformado não derruba o índice inteiro
     }
   }
+  return posts;
+}
+
+export async function listarPosts(): Promise<PostBlog[]> {
+  const porSlug = new Map<string, PostBlog>();
+  for (const post of await lerDiretorio(BLOG_DIR)) porSlug.set(post.slug, post);
+  if (BLOG_DIR_EXTRA) {
+    for (const post of await lerDiretorio(BLOG_DIR_EXTRA)) porSlug.set(post.slug, post);
+  }
+  const posts = [...porSlug.values()];
   posts.sort((a, b) => (a.data < b.data ? 1 : -1));
   return posts;
 }
