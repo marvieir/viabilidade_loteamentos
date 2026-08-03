@@ -109,7 +109,7 @@ de produto e perfis municipais).
 ### RF-BLOG — Blog
 - **RF-BLOG-1** Blog público em `/blog` e `/blog/{slug}`: artigos em JSON versionado (blocos p/h2/ul/aviso + fontes), superfície editorial da marca, JSON-LD Article, canônicas e presença no sitemap; artigo com afirmação legal SEMPRE cita lei/artigo na seção de fontes; aviso de triagem em todo artigo.
 - **RF-BLOG-2** Publicação sem rebuild: páginas com ISR e webhook `POST /webhooks/revalidate` protegido por segredo (sem segredo configurado, endpoint desligado); artigo novo no diretório de conteúdo vira página após revalidação.
-- **RF-BLOG-3** *(planejado)* Gerador automático (port do MMA/voya): fila de tópicos YAML → geração via API Anthropic com grounding no acervo legal verificado → verificador de citações → aprovação do operador via Telegram → publica e revalida; cadência 2-3/semana; sem persona fictícia nem experiência inventada.
+- **RF-BLOG-3** Gerador automático com gate humano: fila de tópicos YAML versionada → geração via API Anthropic com grounding EXCLUSIVO no acervo legal verificado → verificador determinístico (toda lei citada tem fonte oficial correspondente; estilo Light Copy; bloco de aviso obrigatório) → proposta no Telegram com botões → SÓ publica com aprovação do operador (revalida via webhook); cadência 2-3/semana via cron; sem persona fictícia nem experiência inventada; custo por artigo no medidor do admin.
 - **RF-BLOG-4** *(planejado)* Minerador de pauta: transcrições de canais do setor (YouTube Data API) viram TEMAS sugeridos na fila (nunca reescrita de conteúdo alheio; artigo original cita e linka a fonte).
 
 ### RF-INTEL — Inteligência do motor

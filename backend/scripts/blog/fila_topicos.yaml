@@ -1,0 +1,58 @@
+# Fila de tópicos do blog (BLOG-2). VERSIONADA no git — editar aqui é editar a pauta.
+# O gerador pega o PRIMEIRO tópico ainda não publicado/rejeitado/pendente de aprovação.
+# O estado (o que já saiu) vive no volume (_estado.json), não aqui — sobrevive a deploys.
+#
+# Campos: slug (obrigatório, minúsculas-e-hífens), titulo (sugestão; a IA pode melhorar),
+# categoria, angulo (a tese do artigo em 1-2 frases) e pontos (o roteiro; a IA só pode
+# citar lei que esteja no acervo_legal.md — ponto fora do acervo vira texto sem citação).
+
+topicos:
+  - slug: por-que-o-tracado-nao-pode-cruzar-mata
+    titulo: "Mata na gleba: por que o traçado sério desvia em vez de prometer supressão"
+    categoria: "Régua legal"
+    angulo: >
+      Vegetação de Mata Atlântica tem regime de proteção próprio (Lei 11.428/2006) e
+      autorização de corte é exceção, não premissa. Estudo que desenha via sobre mata está
+      vendendo um risco como se fosse lote.
+    pontos:
+      - O que a Lei 11.428 protege e por que supressão é exceção
+      - A diferença entre vegetação com restrição dura e vegetação a verificar em campo
+      - O desenho correto contorna a mancha e o quadro de áreas absorve o verde
+      - O erro clássico do estudo que ignora a mata e encolhe 40 por cento na diligência
+
+  - slug: diretrizes-municipais-o-que-pedir-a-prefeitura
+    titulo: "Diretrizes municipais: o que pedir à prefeitura antes de desenhar o projeto"
+    categoria: "Processo"
+    angulo: >
+      O art. 6º da Lei 6.766/79 manda o interessado pedir diretrizes ANTES do projeto.
+      Quem chega à prefeitura com pedido bem instruído corta rodadas de exigência.
+    pontos:
+      - O que são as diretrizes do art. 6º e o que o município define nelas
+      - O que levar no pedido e o que perguntar (zona, lote mínimo, doações, viário)
+      - Por que a pré-viabilidade vem ANTES do pedido e o que ela evita
+      - Municípios sem LUOS estruturada e a base federal como piso declarado
+
+  - slug: o-que-e-pre-viabilidade-de-loteamento
+    titulo: "Pré-viabilidade de loteamento: a triagem barata antes do estudo caro"
+    categoria: "Conceito"
+    angulo: >
+      Entre o achismo e o projeto contratado existe uma etapa que custa pouco e evita os
+      erros mais caros: a triagem multi-dimensão da gleba, com fonte em cada número.
+    pontos:
+      - O funil da decisão sobre gleba e onde a triagem entra (antes do EVU e do projeto)
+      - O que uma triagem séria cobre (ambiental, aproveitamento, urbanístico, jurídico, financeiro)
+      - O que a triagem NÃO é (não aprova, não substitui prefeitura nem profissionais)
+      - Como avaliar a qualidade de uma triagem (proveniência, cobertura declarada, reprodutibilidade)
+
+  - slug: doacao-de-areas-publicas-loteamento
+    titulo: "Doação de áreas públicas no loteamento: de onde vêm os percentuais"
+    categoria: "Régua legal"
+    angulo: >
+      Desde a Lei 9.785/99 não existe percentual federal fixo de doação: a proporção vem
+      do plano diretor e da lei municipal, definida nas diretrizes. Estudo que chuta
+      35 por cento de doação para qualquer cidade erra a conta nos dois sentidos.
+    pontos:
+      - O que a redação atual do art. 4º, I da Lei 6.766/79 diz sobre áreas públicas
+      - Onde o percentual real é definido (plano diretor, LUOS, diretrizes do art. 6º)
+      - Por que no parcelamento rural essa doação urbanística não existe
+      - Como a triagem trata o tema quando a lei municipal ainda não foi confirmada

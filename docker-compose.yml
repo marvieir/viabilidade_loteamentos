@@ -82,6 +82,9 @@ services:
       # CA corporativa (ex.: Cisco Secure Access) para religar o TLS sob inspeção: coloque o
       # PEM em backend/certs/corp-ca.pem e defina LUOS_CA_BUNDLE=/certs/corp-ca.pem no .env.
       - ./backend/certs:/certs:ro
+      # BLOG-2 — no DEV o conteúdo do blog é bind no PRÓPRIO repo: artigo aprovado vira
+      # arquivo em frontend/content/blog (dá para commitar). Em produção é volume nomeado.
+      - ./frontend/content/blog:/data/blog
     restart: unless-stopped
 
   # Fase 12 — Postgres (fonte de verdade dos usuários/análises). Volume `pgdata`
@@ -115,6 +118,10 @@ services:
       API_BASE_INTERNA: "http://api:8700"
       # Blog (BLOG-2): segredo do webhook /webhooks/revalidate. Vazio = endpoint desligado.
       REVALIDATE_SECRET: "${REVALIDATE_SECRET:-}"
+    volumes:
+      # BLOG-2 — o web LÊ o mesmo diretório que a api escreve (artigo aprovado aparece
+      # sem rebuild; o webhook de revalidação atualiza a página na hora).
+      - ./frontend/content/blog:/app/content/blog
     ports:
       - "3700:3700"
     depends_on:

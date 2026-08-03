@@ -178,6 +178,19 @@ cadência futura 2-3/semana com aprovação do operador via Telegram (decisão d
 - Código: `frontend/lib/blog.ts`, `frontend/app/blog/`, `frontend/app/webhooks/revalidate/route.ts`, `frontend/content/blog/*.json`.
 - Referência do sistema original: `docs/marketing/blog-inventario-mma.md`.
 
+**Gerador com gate (RF-BLOG-3, 31/07).** Roda DENTRO do container da api (que já tem a chave
+Anthropic e o medidor de custo): `scripts/blog/gerar.py` pega o próximo tópico da fila
+versionada (`fila_topicos.yaml`), escreve via API usando como única base legal permitida o
+`acervo_legal.md` (item novo no acervo exige verificação na fonte + commit), passa no
+verificador determinístico (`nucleo.verificar`: toda lei citada no texto precisa de fonte com
+domínio oficial; Light Copy; aviso de triagem obrigatório; 1 retry com os erros no prompt) e
+manda a proposta ao Telegram com botões. `scripts/blog/aprovacoes.py` (cron a cada 10 min,
+polling getUpdates com offset persistido — sem daemon) processa a resposta: aprovar publica o
+JSON no volume compartilhado com o web e revalida; rejeitar arquiva. Estado e artigos no
+volume `blog_conteudo` (dev: bind em `frontend/content/blog`, o aprovado vira arquivo
+commitável). Ativação e cron: `docs/blog-operacao.md`. Testes: `test_blog_gerador.py`
+(verificador, fila, publicação — tudo offline).
+
 ## RF-INTEL — Inteligência do motor
 
 **Como funciona.** O placar (`scripts/placar_motor.py`) roda o motor sem IA sobre o corpus e

@@ -10,6 +10,7 @@ rasterio==1.4.3  # Fase 2.2 — amostragem do raster de vegetação (área verde
 pyogrio==0.13.0  # Fase 13 — leitura vetorial por JANELA (bbox) das camadas ambientais (escala estado/BR)
 python-dotenv==1.0.1  # carrega backend/.env via `uvicorn --env-file .env`
 anthropic==0.69.0  # Fase 1.8 — extrator real da LUOS (import TARDIO, gated por ANTHROPIC_API_KEY; testes não usam)
+pyyaml==6.0.2  # BLOG-2 — fila de tópicos do blog em YAML (scripts/blog)
 google-genai==1.21.0  # Fase 11.14 — fallback do gerador de programa (Gemini; import TARDIO, gated por GOOGLE_API_KEY; testes não usam)
 fpdf2==2.8.7  # Fase 7 — laudo de triagem em PDF (Python puro, offline, sem fonte externa nem rede)
 openpyxl==3.1.5  # export Excel do modelo financeiro/dimensões (offline, sem rede)

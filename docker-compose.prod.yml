@@ -74,6 +74,8 @@ services:
       # aponte DADOS_AMBIENTAIS) e os AMBIENTAL_*_PATH no backend/.env.
       - ${DADOS_AMBIENTAIS:-./dados-ambientais}:/data/ambiental:ro
       - ./backend/app/perfis/malha_ibge.geojson:/data/malha_ibge.geojson:ro
+      # BLOG-2 — a api ESCREVE os artigos aprovados no mesmo volume que o web LÊ.
+      - blog_conteudo:/data/blog
     depends_on:
       db:
         condition: service_healthy
@@ -94,6 +96,11 @@ services:
       API_BASE_INTERNA: "http://api:8700"
       # Blog (BLOG-2): segredo do webhook /webhooks/revalidate. Vazio = endpoint desligado.
       REVALIDATE_SECRET: "${REVALIDATE_SECRET:-}"
+    volumes:
+      # BLOG-2 — volume compartilhado com a api. Na PRIMEIRA montagem o Docker semeia o
+      # volume com os artigos que vieram na imagem (content/blog); depois disso a fonte da
+      # verdade é o volume: artigo semente novo só entra via gerador ou cópia manual.
+      - blog_conteudo:/app/content/blog
     depends_on: [api]
     restart: unless-stopped
 
@@ -121,3 +128,4 @@ volumes:
   perfis_municipais:
   juridico:
   perfis_dados:
+  blog_conteudo:
