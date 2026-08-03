@@ -20,6 +20,9 @@ import sys
 from . import nucleo
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+# httpx loga a URL COMPLETA de cada request em INFO — e a URL do Telegram contém o token
+# do bot. Sobe para WARNING para o token jamais aparecer em log/terminal.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger("blog.gerar")
 
 
