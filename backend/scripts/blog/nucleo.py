@@ -299,7 +299,12 @@ def gerar_via_llm(topico: dict, erros_anteriores: list[str] | None = None) -> di
         acervo=acervo, topico=topico_txt, erros_anteriores=correcao
     )
 
-    client = anthropic.Anthropic(api_key=api_key, max_retries=4)
+    # Mesmo mecanismo TLS do extrator da LUOS (lição de 03/08: o Mac do operador fica atrás
+    # de inspeção TLS corporativa — sem o CA bundle do LUOS_CA_BUNDLE a chamada falha com
+    # CERTIFICATE_VERIFY_FAILED, exatamente como acontecia na Fase 1.8).
+    from app.core.extrator_luos import _opcoes_tls
+
+    client = anthropic.Anthropic(api_key=api_key, max_retries=4, **_opcoes_tls())
     resposta = client.messages.create(
         model=modelo,
         max_tokens=8000,
