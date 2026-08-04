@@ -416,7 +416,10 @@ class GeradorProgramaClaude:
             try:
                 resp = client.messages.create(
                     model=modelo,
-                    max_tokens=4000,
+                    # 16000 (era 4000): no Opus 5 o thinking vem LIGADO por padrão e consome
+                    # DESTE orçamento — com 4000 a proposta truncava e a cadeia caía no Gemini
+                    # em silêncio. Teto, não alvo: no 4.8 (sem thinking) nada muda de custo.
+                    max_tokens=16000,
                     # NÃO passar `temperature`: alguns modelos novos (Opus 4.8/Fable 5) a depreciaram
                     # e devolvem 400. A CONSISTÊNCIA (§4) vem do CAP de lazer/largura + da regra 5.
                     system=_INSTRUCAO,
