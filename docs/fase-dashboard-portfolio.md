@@ -158,14 +158,15 @@ PDF/Excel do comparativo, KPIs de mercado (C2).
 3. Colunas da tabela v1 (proposta apresentada em mockup, aguardando ajuste fino do
    operador): Área · ha bruto · Lotes · VGV · VGV/ha · Margem · TIR · Exposição máx. ·
    Meses negativo · Ambiental · Jurídico. Demais KPIs no detalhe da linha.
-4. Valor residual da terra (C1): conceito explicado ao operador; decisão de prioridade
-   pendente.
+4. **Valor residual da terra (C1): FASE 2** (decisão do operador, 05/08). Não entra na v1. ✔
 5. **Gate comercial: 30 dias de prévia para o plano gratuito**, com CONTADOR visível dos
    dias restantes; depois bloqueia (tela de bloqueio mantém as análises e oferece os
    planos). Planos pagos: acesso pleno. Detalhe a fechar na implementação: o prazo conta
    a partir do primeiro ACESSO ao painel (persistido no backend), não da criação da conta.
-6. Score de risco (radar/B10): mockup apresenta com "fórmula aberta"; decisão final
-   pendente.
+6. **Score de risco (radar/B10): entra na v1 com fórmula aberta na tela** (decisão do
+   operador, 05/08). ✔
+
+**Spec FECHADA em 05/08/2026 — implementação da v1 autorizada pelo operador.**
 
 **Mockups aprovação:** imagens em `docs/mockups/` — `mockup-1-painel.png` (painel free com contador) e
 `mockup-2-bloqueio.png` (bloqueio pós-30 dias), APROVADAS pelo operador em 05/08; fontes HTML no mesmo diretório para iterar
