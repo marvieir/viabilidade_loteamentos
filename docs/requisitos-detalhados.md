@@ -117,6 +117,29 @@ contexto IBGE puro.
 - Código: `routers/financeira.py`, `routers/economica.py`, `core/financeira*.py`, `core/economica*.py`, `routers/localizacao.py`.
 - Testes: `test_financeira*.py`, `test_economica.py`.
 
+## RF-PORT — AI Portfolio Insights
+
+**Como funciona.** O cliente que analisou várias glebas compara todas numa tela só
+(`/app/insights`): o backend varre as análises SALVAS do usuário (tabela `analises`),
+extrai KPIs de cada dimensão presente no snapshot (financeira, econômica, jurídico,
+ambiental, aproveitamento) e busca o urbanismo no store de propostas via `_analise_id`
+(último snapshot). Tudo que é conta — normalizar percentuais (as fontes misturam fração
+0-1 e escala 0-100), derivar VGV/ha, lotes/ha, múltiplo de capital, eleger destaques,
+montar o radar — acontece no router `portfolio.py`; o front só ordena colunas e desenha.
+Dimensão que o usuário não rodou aparece como "não calculado" (nunca zero), e premissas
+divergentes (TMA) viram aviso de comparabilidade em vez de comparação silenciosa. O radar
+publica a própria fórmula na tela ("como calculamos").
+
+**Gate.** Gratuito tem prévia de 30 dias contada do primeiro ACESSO ao painel (gravada
+por usuário em `PORTFOLIO_DIR`); a tela mostra o contador. No dia 31 o servidor para de
+enviar as linhas (o bloqueio não é cosmético) e a tela oferece os planos, deixando claro
+que as análises continuam guardadas. Admin não tem gate e pode liberar um cliente pago
+manualmente (`PUT /api/portfolio/liberacao/{usuario_id}`) enquanto não existe billing.
+
+- Código: `routers/portfolio.py`, `core/portfolio_store.py`; front `app/app/insights/`, `lib/portfolio.ts`.
+- Testes: `test_portfolio.py` (agregação/escalas, gate 30 dias, liberação, multi-tenant).
+- Spec e mockups aprovados: `docs/fase-dashboard-portfolio.md`, `docs/mockups/`.
+
 ## RF-LAUDO — Consolidação
 
 **Como funciona.** O front repassa os JSONs das dimensões executadas (nada recalculado);

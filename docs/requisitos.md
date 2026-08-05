@@ -89,6 +89,12 @@ de produto e perfis municipais).
 ### RF-LOC — Localização
 - **RF-LOC-1** Contexto socioeconômico IBGE (população, PIB per capita, domicílios, faixa etária) — informativo.
 
+### RF-PORT — AI Portfolio Insights (portfólio do usuário)
+- **RF-PORT-1** Painel `/app/insights` agrega POR USUÁRIO as análises salvas em KPIs comparáveis (risco, aproveitamento, retorno); TODA agregação no backend (`/api/portfolio`); percentuais normalizados para 0-100 num único lugar; dimensão não calculada = "não calculado", nunca zero.
+- **RF-PORT-2** Destaques (maior VGV, VGV/ha, mais lotes, menor exposição, positivo mais cedo, menor risco ambiental, melhor TIR, maior múltiplo) e avisos de comparabilidade (TMA divergente) computados no backend, cada um com origem declarada.
+- **RF-PORT-3** Radar de risco por área (ambiental/jurídico/urbanístico/financeiro, 0-100) com fórmula ABERTA no payload e na tela — régua de triagem, não veredito.
+- **RF-PORT-4** Gate comercial: prévia de 30 dias para o gratuito contada do PRIMEIRO acesso (persistida por usuário em `PORTFOLIO_DIR`); contador visível; após o prazo o servidor deixa de enviar as linhas (bloqueio real); bypass para admin e liberação manual `PUT /api/portfolio/liberacao/{usuario_id}` (admin) enquanto não há billing.
+
 ### RF-LAUDO — Consolidação e exportação
 - **RF-LAUDO-1** Laudo PDF e Excel compondo as dimensões executadas; dimensão ausente sai como "não analisada".
 - **RF-LAUDO-2** Semáforo por dimensão DERIVADO do que cada uma reporta (nunca juízo novo); texto auditável sem "viável/aprovado".

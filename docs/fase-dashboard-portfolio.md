@@ -168,6 +168,9 @@ PDF/Excel do comparativo, KPIs de mercado (C2).
 
 **Spec FECHADA em 05/08/2026 — implementação da v1 autorizada pelo operador.**
 
+**v1 IMPLEMENTADA em 05/08/2026** — backend `/api/portfolio` (agregação + gate) e tela
+`/app/insights`; testes em `backend/tests/test_portfolio.py`; requisitos RF-PORT-1..4.
+
 **Mockups aprovação:** imagens em `docs/mockups/` — `mockup-1-painel.png` (painel free com contador) e
 `mockup-2-bloqueio.png` (bloqueio pós-30 dias), APROVADAS pelo operador em 05/08; fontes HTML no mesmo diretório para iterar
 (dados fictícios, sem código). Iteração de layout acontece sobre elas antes de qualquer
