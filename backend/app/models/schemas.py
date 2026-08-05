@@ -2286,3 +2286,115 @@ class EntrevistaResumoOut(BaseModel):
     sentiu_falta: list[TextoEntrevistaOut] = []
     dificuldades: list[TextoEntrevistaOut] = []
     capacidades: list[TextoEntrevistaOut] = []
+
+
+# ----- AI Portfolio Insights (fase Dashboard-Portfólio) — agregação POR USUÁRIO -----
+# Regra da fase: todo KPI é Optional — dimensão não calculada = None ("não calculado"),
+# NUNCA zero. Percentuais SEMPRE em escala 0-100 (o router normaliza as frações internas).
+
+
+class PortfolioGateOut(BaseModel):
+    """Gate comercial do painel: prévia de 30 dias para o gratuito (conta do 1º acesso),
+    liberação manual pelo admin, bypass para papel admin."""
+
+    status: Literal["liberado", "previa", "bloqueado"]
+    previa_dias: int = 30
+    dias_restantes: Optional[int] = None  # só em status "previa"
+    primeiro_acesso: Optional[str] = None  # ISO UTC
+    motivo: str = ""
+
+
+class PortfolioKpisOut(BaseModel):
+    # Urbanístico (último snapshot do store de urbanismo, via resultados._analise_id)
+    n_lotes: Optional[int] = None
+    area_media_m2: Optional[float] = None
+    pct_vendavel: Optional[float] = None  # sobre a área LÍQUIDA do layout
+    pct_viario: Optional[float] = None
+    pct_sobra: Optional[float] = None
+    pct_verde_bruta: Optional[float] = None  # verde consolidado sobre a gleba BRUTA
+    lotes_por_ha: Optional[float] = None
+    urbanismo_versao: Optional[int] = None
+    urbanismo_origem: Optional[str] = None  # llm | variante | importado
+    # Risco
+    pct_restrito: Optional[float] = None  # união mata/APP/decliv. sobre a gleba bruta
+    alertas_criticos: Optional[int] = None
+    alertas_informativos: Optional[int] = None
+    juridico_nivel: Optional[str] = None  # baixo | medio | alto
+    divergencia_area_pct: Optional[float] = None
+    # Retorno (Financeira/Econômica)
+    vgv: Optional[float] = None
+    vgv_fmt: Optional[str] = None
+    vgv_por_ha: Optional[float] = None
+    vgv_por_ha_fmt: Optional[str] = None
+    vgv_proprio: Optional[float] = None
+    permuta_modo: Optional[str] = None
+    permuta_pct: Optional[float] = None
+    margem_pct: Optional[float] = None
+    lucro: Optional[float] = None
+    lucro_fmt: Optional[str] = None
+    exposicao_maxima: Optional[float] = None
+    exposicao_maxima_fmt: Optional[str] = None
+    exposicao_mes: Optional[int] = None
+    multiplo_capital: Optional[float] = None
+    receita_por_lote: Optional[float] = None
+    receita_por_lote_fmt: Optional[str] = None
+    meses_negativo: Optional[int] = None  # 1º mês com acumulado >= 0 (payback simples)
+    payback_descontado_mes: Optional[int] = None
+    vpl: Optional[float] = None
+    vpl_fmt: Optional[str] = None
+    tir_aa_pct: Optional[float] = None
+    tir_status: Optional[str] = None
+    tma_aa_pct: Optional[float] = None  # premissa — comparabilidade
+
+
+class PortfolioRadarOut(BaseModel):
+    """Score 0-100 por dimensão (100 = menor risco). Fórmulas DECLARADAS no payload
+    (radar_formula) — régua nossa de triagem, nunca veredito."""
+
+    ambiental: Optional[float] = None
+    juridico: Optional[float] = None
+    urbanistico: Optional[float] = None
+    financeiro: Optional[float] = None
+
+
+class PortfolioLinhaOut(BaseModel):
+    id: str  # id da análise SALVA (tabela analises)
+    titulo: str
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    atualizada_em: str
+    area_ha: Optional[float] = None
+    dimensoes: list[str] = []  # quais dimensões têm dado nesta linha
+    kpis: PortfolioKpisOut
+    radar: PortfolioRadarOut
+    proveniencia: dict = {}  # dimensão -> origem resumida do dado
+
+
+class PortfolioDestaqueOut(BaseModel):
+    chave: str  # maior_vgv | maior_vgv_ha | mais_lotes | menor_exposicao | ...
+    rotulo: str
+    valor_fmt: str
+    analise_id: str
+    titulo: str
+    cidade: Optional[str] = None
+    uf: Optional[str] = None
+    fonte: str  # proveniência curta do número
+
+
+class PortfolioOut(BaseModel):
+    gate: PortfolioGateOut
+    total_analises: int = 0
+    com_dados: int = 0  # linhas com >= 1 dimensão calculada
+    linhas: list[PortfolioLinhaOut] = []  # VAZIA quando gate.status == "bloqueado"
+    destaques: list[PortfolioDestaqueOut] = []
+    radar_formula: dict = {}  # eixo -> fórmula declarada (transparência)
+    avisos: list[str] = []  # comparabilidade (TMA divergente etc.)
+
+
+class PortfolioLiberacaoIn(BaseModel):
+    liberado: bool
+
+
+class PortfolioLiberacaoOut(BaseModel):
+    usuario_id: str
+    liberado: bool
