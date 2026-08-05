@@ -151,13 +151,23 @@ foram rodadas). Router novo isolado (`portfolio.py`), auth de cliente comum.
 comparação lado a lado (2-3 áreas em detalhe), valor residual da terra (C1), exportação
 PDF/Excel do comparativo, KPIs de mercado (C2).
 
-## 6. Perguntas abertas para o operador (fecham a spec)
+## 6. Decisões do operador (05/08/2026)
 
-1. O menu entra no app do cliente ("Portfólio") — confirma nome e posição?
-2. O MVP acima (cards + tabela + radar) é o recorte certo, ou você tira/põe algo?
-3. Dos KPIs A+B, quais são as ~10 colunas da tabela na v1? (todas de uma vez vira Excel.)
-4. Valor residual da terra (C1): prioridade para a fase 2 ou já na v1?
-5. Gate comercial: portfólio é feature de quais planos? (candidata natural a exclusiva de
-   assinatura — é o argumento de recorrência.)
-6. Score de risco B10: publicar já na v1 (com fórmula aberta na tela) ou segurar até
-   validar as fórmulas com uso real?
+1. **Nome: "AI Portfolio Insights"** — menu no app logado. ✔
+2. **Recorte do MVP aprovado** (cards de destaque + tabela comparativa + radar). ✔
+3. Colunas da tabela v1 (proposta apresentada em mockup, aguardando ajuste fino do
+   operador): Área · ha bruto · Lotes · VGV · VGV/ha · Margem · TIR · Exposição máx. ·
+   Meses negativo · Ambiental · Jurídico. Demais KPIs no detalhe da linha.
+4. Valor residual da terra (C1): conceito explicado ao operador; decisão de prioridade
+   pendente.
+5. **Gate comercial: 30 dias de prévia para o plano gratuito**, com CONTADOR visível dos
+   dias restantes; depois bloqueia (tela de bloqueio mantém as análises e oferece os
+   planos). Planos pagos: acesso pleno. Detalhe a fechar na implementação: o prazo conta
+   a partir do primeiro ACESSO ao painel (persistido no backend), não da criação da conta.
+6. Score de risco (radar/B10): mockup apresenta com "fórmula aberta"; decisão final
+   pendente.
+
+**Mockups aprovação:** imagens `mockup-1-painel.png` (painel free com contador) e
+`mockup-2-bloqueio.png` (estado bloqueado pós-30 dias) entregues ao operador em 05/08
+(dados fictícios, sem código). Iteração de layout acontece sobre elas antes de qualquer
+implementação.
