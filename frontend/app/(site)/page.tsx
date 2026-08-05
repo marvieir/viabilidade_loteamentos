@@ -15,7 +15,7 @@ import {
 export const metadata: Metadata = {
   title: "voaz.app — a gleba fecha a conta? Decida antes de gastar com projeto",
   description:
-    "Pré-análise ambiental, jurídica, urbanística e financeira da sua gleba a partir do KMZ, com a fonte legal ao lado de cada número. Grátis: 1 gleba por mês, com até 5 análises.",
+    "Pré-análise ambiental, jurídica, urbanística e financeira da sua gleba a partir do KMZ, com a fonte legal ao lado de cada número. Grátis: 1 gleba por mês, com todas as dimensões.",
   alternates: { canonical: "/" },
 };
 
@@ -118,7 +118,7 @@ const FAQ: { pergunta: string; resposta: string }[] = [
   {
     pergunta: "Vou usar pouco. Vale o preço?",
     resposta:
-      "Usar pouco custa R$ 0,00: o plano gratuito dá 1 gleba por mês com até 5 análises entre as dimensões (ambiental, jurídica, urbanística, financeira). A assinatura só faz sentido quando o seu volume pedir mais áreas e mais análises. Comece de graça e deixe o uso decidir.",
+      "Usar pouco custa R$ 0,00: o plano gratuito dá 1 gleba por mês com todas as dimensões (ambiental, jurídica, urbanística, financeira). Pagar só faz sentido quando o seu volume pedir mais glebas. Comece de graça e deixe o uso decidir.",
   },
 ];
 
@@ -199,7 +199,7 @@ export default function PaginaPrincipal() {
               <BotoesCta escuro />
             </div>
             <p className="mt-3 text-sm text-slate-400">
-              Grátis: 1 gleba por mês, com até 5 análises.
+              Grátis: 1 gleba por mês, com todas as dimensões.
             </p>
           </div>
           <div className="mx-auto mt-12 max-w-4xl">
@@ -351,8 +351,8 @@ export default function PaginaPrincipal() {
         <div className="mx-auto max-w-3xl px-5 text-center">
           <h2 className="text-3xl font-bold tracking-tight">A primeira análise sai hoje</h2>
           <p className="mt-4 leading-relaxed text-slate-300">
-            Crie a conta gratuita, suba o KMZ e veja a sua gleba em números: 1 gleba por mês, com
-            até 5 análises, grátis. Se preferir ver antes com um especialista, agende a
+            Crie a conta gratuita, suba o KMZ e veja a sua gleba em números: 1 gleba por mês,
+            com todas as dimensões, grátis. Se preferir ver antes com um especialista, agende a
             demonstração online.
           </p>
           <div className="mt-8">

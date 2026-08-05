@@ -14,7 +14,7 @@ import { BotoesCta, FooterSite, HeaderSite, LINK_DEMO } from "@/components/marke
 export const metadata: Metadata = {
   title: "voaz.app para loteadores | Triar 10 glebas no tempo de 1 estudo",
   description:
-    "A pré-análise que corta do seu funil a gleba que morre na diligência, antes de você pagar o estudo caro por ela. Grátis: 1 gleba por mês, com até 5 análises.",
+    "A pré-análise que corta do seu funil a gleba que morre na diligência, antes de você pagar o estudo caro por ela. Grátis: 1 gleba por mês, com todas as dimensões.",
   alternates: { canonical: "/loteadores" },
 };
 
@@ -32,7 +32,7 @@ const MUDANCAS = [
   "Concentrar o orçamento de diligência nas 2 ou 3 áreas que passaram",
   "Descobrir o passivo ambiental antes do sinal, quando ainda vira desconto",
   "Comparar todas as glebas do funil com a mesma régua, sempre",
-  "Rodar até 600 análises por ano sem fila de fornecedor",
+  "Triar o funil inteiro sem fila de fornecedor",
   "Testar a mesma gleba em dois objetivos: Rendimento (mais lotes) ou Paisagem (desenho premium)",
   "Chegar ao investidor com quadro de áreas, VGV e fontes em vez de conversa",
 ];
@@ -61,15 +61,15 @@ const OBJECOES = [
   {
     objecao: "Está caro para o quanto eu usaria.",
     quebra:
-      "O custo que importa é o custo por decisão, e cada decisão de gleba movimenta milhões. Usar pouco custa R$ 0,00: o plano gratuito dá 1 gleba por mês com até 5 análises. Com 200 áreas e 600 análises por ano, a assinatura tria um funil inteiro: contando as 4 dimensões por gleba, dá para fechar mais de 12 áreas completas por mês.",
+      "O custo que importa é o custo por decisão, e cada decisão de gleba movimenta milhões. Usar pouco custa R$ 0,00: o plano gratuito dá 1 gleba por mês com todas as dimensões. Quando o funil pedir volume, o preço por gleba cai conforme o compromisso, do pacote avulso à assinatura anual. Comece de graça e deixe o uso decidir.",
   },
 ];
 
 const FAQ_OPERACIONAL = [
   {
-    pergunta: "O que conta como 1 análise?",
+    pergunta: "Como conta o uso no plano gratuito?",
     resposta:
-      "Cada rodada de uma dimensão: uma análise ambiental, uma jurídica, uma financeira ou uma geração de urbanismo. No plano gratuito são até 5 por mês, todas na mesma gleba; a gleba escolhida fica fixa até o mês virar.",
+      "A unidade é a gleba: 1 gleba nova por mês, com 1 rodada de cada dimensão e 1 geração de urbanismo. O resultado completo aparece na tela.",
   },
   {
     pergunta: "O que eu preciso ter?",
@@ -93,7 +93,7 @@ const FAQ_OPERACIONAL = [
   {
     pergunta: "Posso regenerar o urbanismo?",
     resposta:
-      "Sim, inclusive trocando o objetivo (Rendimento ou Paisagem) para comparar teses na mesma gleba. Cada regeneração consome 1 análise.",
+      "Nos planos pagos, sim, quantas vezes quiser, inclusive trocando o objetivo (Rendimento ou Paisagem) para comparar teses na mesma gleba. No gratuito é 1 geração por gleba.",
   },
 ];
 
@@ -313,7 +313,7 @@ export default function PaginaLoteadores() {
               </a>
             </div>
             <p className="mt-4 text-sm text-[#9287c4]">
-              Grátis: 1 gleba por mês, com até 5 análises.
+              Grátis: 1 gleba por mês, com todas as dimensões.
             </p>
           </div>
           <Reveal>
@@ -549,59 +549,9 @@ export default function PaginaLoteadores() {
         </Reveal>
       </section>
 
-      {/* 8. Planos */}
-      <section id="planos" className="bg-[#170d48] py-20">
-        <div className="mx-auto max-w-4xl px-5">
-          <Reveal>
-            <h2 className="font-display text-center text-3xl text-[#fffafa]">Planos</h2>
-            <p className="mt-3 text-center text-sm text-[#9287c4]">
-              Cada rodada de dimensão conta como 1 análise. Regenerar o urbanismo da mesma gleba
-              consome 1 análise.
-            </p>
-          </Reveal>
-          <div className="mt-10 grid gap-6 md:grid-cols-2">
-            <Reveal>
-              <div className="flex h-full flex-col rounded-2xl border border-[#33503f] bg-[#1d3229] p-7">
-                <h3 className="font-display text-xl text-[#fffafa]">Gratuito</h3>
-                <p className="font-display mt-4 text-4xl text-[#fffafa]">R$ 0,00</p>
-                <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#c3b8e8]">
-                  <li>1 gleba por mês (fixa no mês)</li>
-                  <li>Até 5 análises, somando as dimensões</li>
-                  <li>Todas as dimensões: ambiental, jurídica, urbanística, financeira</li>
-                  <li>Proveniência em todo número</li>
-                </ul>
-                <Link
-                  href="/registrar"
-                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl border border-[#4a3f7a] text-sm font-semibold text-[#fdeae4] transition hover:bg-[#241862]"
-                >
-                  Começar de graça
-                </Link>
-              </div>
-            </Reveal>
-            <Reveal atraso={120}>
-              <div className="relative flex h-full flex-col rounded-2xl border-2 border-[#ff914d] bg-[#fbf6f1] p-7 shadow-2xl shadow-black/30">
-                <span className="absolute -top-3 left-6 rounded-full bg-[#ff914d] px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-white">
-                  Para a operação
-                </span>
-                <h3 className="font-display text-xl text-[#1d1252]">Assinatura anual</h3>
-                <p className="font-display mt-4 text-4xl text-[#241862]">Fale com a gente</p>
-                <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#4a3f7a]">
-                  <li>200 áreas por ano</li>
-                  <li>600 análises por ano (cerca de 12 glebas completas por mês)</li>
-                  <li>Todas as dimensões, com proveniência</li>
-                  <li>Feita para o funil de originação girar sem fila</li>
-                </ul>
-                <a
-                  href={LINK_DEMO}
-                  className="mt-7 inline-flex h-11 items-center justify-center rounded-xl bg-[#241862] text-sm font-semibold text-[#fff4f4] transition hover:bg-[#1d1252]"
-                >
-                  Agendar demonstração online
-                </a>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
+      {/* 8. Planos: seção REMOVIDA (05/08, decisão do operador) — na fase de teste de preço
+          a tabela v1.3 não é pública; ela mora em /planos-mvp (não listada) para os
+          participantes do MVP. O preço é falado na conversa, não publicado aqui. */}
 
       {/* 9. Objeções */}
       <section className="py-20">
@@ -633,7 +583,7 @@ export default function PaginaLoteadores() {
           <div className="mx-auto max-w-2xl px-5 text-center">
             <h2 className="font-display text-2xl">Risco reverso</h2>
             <p className="mt-4 leading-relaxed text-[#4a3f7a]">
-              O plano gratuito é permanente: 1 gleba por mês, até 5 análises, todas as
+              O plano gratuito é permanente: 1 gleba por mês, todas as
               dimensões, com proveniência. Você valida o método na sua área real, no seu ritmo,
               e assina quando o funil pedir mais. A decisão de pagar chega depois da prova.
             </p>

@@ -98,22 +98,16 @@ mostra a fonte de cada número, você audita.
 
 ## 8. Planos
 
-| | **Gratuito** | **Assinatura anual** |
-|---|---|---|
-| Áreas (glebas) | 1 por mês (fixa no mês) | 200 por ano |
-| Análises | Até 5 por mês, somando as dimensões | 600 por ano |
-| Dimensões (ambiental, jurídica, urbanística, financeira) | Todas | Todas |
-| Proveniência em todo número | Sim | Sim |
-| Para quem | Testar na sua gleba real | Operação de originação |
-| Investimento | R$ 0,00 | [VALOR A DEFINIR] |
+**Seção REMOVIDA da página em 05/08/2026 (decisão do operador).** Na fase de teste de preço
+(10 conversas fundador-led) a tabela não é pública: o preço é falado na conversa, nunca
+publicado. A tabela vigente é o **Quadro v1.3** do `plano-marketing-vendas.md` e está
+renderizada em **`/planos-mvp`** (página não listada: sem link em menu, fora do sitemap,
+noindex), mostrada só aos participantes do MVP para validação dos valores.
 
-*Nota sob a tabela: cada rodada de dimensão conta como 1 análise. Regenerar o urbanismo da mesma
-gleba, por exemplo, consome 1 análise.*
-
-*Ancoragem (entra quando o valor fechar): o ano inteiro da assinatura contra o custo de um único
-estudo tradicional encomendado.*
-
-`Criar conta grátis` · `Agendar demonstração online`
+O modelo antigo desta seção (gratuito com "até 5 análises/mês" + anual "200 áreas / 600
+análises") foi descontinuado pela v1.3: a unidade passou a ser a GLEBA, com iteração livre
+dentro dela. As menções ao gratuito nas páginas públicas dizem apenas "1 gleba por mês, com
+todas as dimensões".
 
 ## 9. As objeções, de frente
 
