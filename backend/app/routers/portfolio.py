@@ -25,7 +25,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+import re
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.auth import requer_admin, usuario_atual
@@ -276,8 +278,9 @@ def _kpis_retorno(res: dict, kpis: dict, prov: dict, dims: list[str], area_ha) -
                     kpis["meses_negativo"] = mes
                     break
 
-    if isinstance(res.get("localizacao"), dict):
-        dims.append("localizacao")
+    # (A dimensão de contexto socioeconômico fica FORA do portfólio de propósito: o
+    # critério-coração da fase 6 proíbe qualquer outro router de depender dela — é
+    # enriquecimento informativo, nunca insumo de comparação.)
 
 
 def _radar(kpis: dict) -> schemas.PortfolioRadarOut:
@@ -439,6 +442,9 @@ def liberar(
 ):
     """Destrava (ou re-trava) o painel para um cliente — a alavanca manual do admin
     enquanto não existe billing (cliente pagou → admin libera)."""
+    # O id vira nome de arquivo no store: só aceita o formato de id da casa (uuid hex/hífen).
+    if not re.fullmatch(r"[A-Za-z0-9-]{1,64}", usuario_id):
+        raise HTTPException(status_code=422, detail="usuario_id inválido.")
     reg = fonte_gate.carregar(usuario_id) or {}
     reg["liberado"] = body.liberado
     fonte_gate.salvar(usuario_id, reg)

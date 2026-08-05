@@ -176,3 +176,10 @@ def test_portfolio_multi_tenant_e_guardas(client_anon, dirs):
     _criar_admin("adm-portfolio2@exemplo.com")
     adm = _login(client_anon, "adm-portfolio2@exemplo.com", "senha-admin-1")
     assert client_anon.get("/api/portfolio", headers=_auth(adm)).json()["gate"]["status"] == "liberado"
+    # usuario_id vira nome de arquivo no store — formato fora do padrão é rejeitado.
+    assert (
+        client_anon.put(
+            "/api/portfolio/liberacao/abc..def", json={"liberado": True}, headers=_auth(adm)
+        ).status_code
+        == 422
+    )
