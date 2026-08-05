@@ -21,9 +21,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-# Preço por 1M de tokens (US$): (input, output). Fonte: tabela oficial Anthropic 2026-06.
+# Preço por 1M de tokens (US$): (input, output). Fonte: tabela oficial Anthropic 2026-06
+# (Opus 5 conferido em 2026-08: mesmo preço do 4.8, US$ 5/25).
 # Fable 5 incluído por completude, mas hoje NÃO é usado (indisponível → cai p/ Opus 4.8).
 PRECOS: dict[str, tuple[float, float]] = {
+    "claude-opus-5": (5.0, 25.0),
     "claude-opus-4-8": (5.0, 25.0),
     "claude-opus-4-7": (5.0, 25.0),
     "claude-opus-4-6": (5.0, 25.0),
