@@ -57,6 +57,8 @@ services:
       MEMORIA_URBANISMO_DIR: "/data/perfis/memoria-urbanismo"
       # Cache de vias OSM por gleba (pórtico) — persiste: 1 consulta por gleba, para sempre.
       VIAS_CACHE_DIR: "/data/perfis/vias"
+      # Entrevistas de validação do MVP (teste de preço) — respostas persistem no volume.
+      ENTREVISTAS_DIR: "/data/perfis/entrevistas"
       FINANCEIRA_DIR: "/data/perfis/financeira"
       ECONOMICA_DIR: "/data/perfis/economica"
     volumes:

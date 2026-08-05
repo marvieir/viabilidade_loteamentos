@@ -284,7 +284,9 @@ Cadência proposta (meio período por semana dedicado a vendas):
 - **3 demos/semana** de 20 a 30 min, sempre com a gleba DO prospect (pedir o KMZ antes; se não
   tiver, usar o laudo de exemplo e criar o KMZ juntos na conversa).
 - **Follow-up em 48 h** com o PDF do laudo da gleba dele e a oferta.
-- **Registro simples** (planilha: nome, público, canal de origem, preço falado, reação, status).
+- **Registro na plataforma** (05/08): formulário em `/entrevista-mvp` (roteiro completo, blocos
+  A a F) e consolidação em `/entrevista-mvp/resumo` (escolha por perfil, reação por plano,
+  calibragem de preço, rankings de funcionalidade). Páginas não listadas, exclusivas do admin.
 
 Script de abordagem (rede própria, Balde 2):
 > Oi, {nome}. Coloquei no ar a plataforma que analisa pré-viabilidade de gleba em minutos:

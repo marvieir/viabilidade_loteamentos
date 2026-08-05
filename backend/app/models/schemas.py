@@ -2208,3 +2208,81 @@ class AdminCustosOut(BaseModel):
     por_analise: list[CustoLinhaOut] = []  # urbanismo + jurídico, por análise
     luos_por_municipio: list[CustoLinhaOut] = []
     avisos: list[str] = []
+
+
+# ----- Entrevistas de validação do MVP (fase de teste de preço — plano de marketing §8) -----
+
+
+class EntrevistaIn(BaseModel):
+    """Uma entrevista de validação, preenchida pelo entrevistador DURANTE a conversa.
+    Todos os campos são opcionais de propósito: a conversa manda, o formulário registra
+    o que houver. Os valores de escolha/reação chegam como rótulo humano (sem de-para)."""
+
+    # Bloco A — identificação
+    nome: str = ""
+    perfil: str = ""
+    canal: str = ""
+    entrevistador: str = ""
+    # Bloco B — contexto e dor
+    ultima_gleba: str = ""
+    glebas_ano: str = ""
+    confianca: str = ""  # o que não sabia / em qual análise mais e menos confiou
+    sumisse_amanha: str = ""
+    # Bloco C — produto
+    mais_gostou: list[str] = []
+    capacidade_nova: str = ""  # o que passou a conseguir que não conseguia antes
+    dificuldades: str = ""
+    sentiu_falta: str = ""
+    # Bloco D — valor
+    pagaria_manter: list[str] = []
+    # Bloco E — preço (Van Westendorp + reação às 3 ofertas + a escolha, que é o dado)
+    preco_caro: str = ""
+    preco_barato: str = ""
+    reacao_pacote5: str = ""
+    reacao_semestral: str = ""
+    reacao_anual: str = ""
+    escolha: str = ""
+    travou_motivo: str = ""
+    cota_cobre: str = ""
+    # Bloco F — fechamento
+    desconto_fundador: str = ""
+    indicacoes: str = ""
+    observacoes: str = ""
+
+
+class EntrevistaOut(EntrevistaIn):
+    id: str
+    ts: str
+
+
+class TextoEntrevistaOut(BaseModel):
+    """Resposta aberta com a atribuição de quem falou (para o resumo citar a fonte)."""
+
+    nome: str = ""
+    perfil: str = ""
+    texto: str = ""
+
+
+class PrecoEntrevistaOut(BaseModel):
+    nome: str = ""
+    perfil: str = ""
+    caro: str = ""
+    barato: str = ""
+
+
+class EntrevistaResumoOut(BaseModel):
+    total: int = 0
+    por_perfil: list[ContagemOut] = []
+    por_glebas_ano: list[ContagemOut] = []
+    escolhas: list[ContagemOut] = []
+    escolha_por_perfil: dict = {}  # {perfil: {escolha: n}}
+    reacoes: dict = {}  # {"Pacote 5": {"Justo": n, ...}, "Semestral": ..., "Anual": ...}
+    mais_gostou: list[ContagemOut] = []
+    pagaria_manter: list[ContagemOut] = []
+    cota_cobre: list[ContagemOut] = []
+    desconto_fundador: list[ContagemOut] = []
+    precos: list[PrecoEntrevistaOut] = []
+    travas: list[TextoEntrevistaOut] = []
+    sentiu_falta: list[TextoEntrevistaOut] = []
+    dificuldades: list[TextoEntrevistaOut] = []
+    capacidades: list[TextoEntrevistaOut] = []

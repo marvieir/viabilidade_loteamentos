@@ -37,6 +37,7 @@ from app.routers import (
     custo_infra,
     declividade,
     economica,
+    entrevistas,
     financeira,
     juridico,
     laudo,
@@ -146,6 +147,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(exemplo.router, prefix="/api")
 app.include_router(salvas.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(entrevistas.router, prefix="/api")  # validação do MVP (admin-only)
 app.include_router(analises.router, prefix="/api")
 app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")
