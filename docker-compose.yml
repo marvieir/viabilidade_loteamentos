@@ -59,6 +59,8 @@ services:
       VIAS_CACHE_DIR: "/data/perfis/vias"
       # Entrevistas de validação do MVP (teste de preço) — respostas persistem no volume.
       ENTREVISTAS_DIR: "/data/perfis/entrevistas"
+      # AI Portfolio Insights — gate da prévia de 30 dias por usuário (persiste no volume).
+      PORTFOLIO_DIR: "/data/perfis/portfolio"
       FINANCEIRA_DIR: "/data/perfis/financeira"
       ECONOMICA_DIR: "/data/perfis/economica"
     volumes:

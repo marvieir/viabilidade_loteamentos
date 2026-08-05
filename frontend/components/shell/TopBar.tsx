@@ -143,6 +143,14 @@ export function TopBar({
             )}
           </>
         )}
+        {/* AI Portfolio Insights — painel POR USUÁRIO (rota própria, fora do fluxo da gleba) */}
+        <Link
+          href="/app/insights"
+          title="Comparar todas as suas áreas analisadas"
+          className="hidden h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:inline-flex"
+        >
+          <span className="text-laranja">✦</span> Portfolio Insights
+        </Link>
         <Button onClick={onNova}>
           <IconPlus width={14} height={14} />
           <span className="hidden sm:inline">Nova análise</span>
@@ -162,6 +170,10 @@ export function TopBar({
             }
           >
             <MenuLabel>{usuario.email}</MenuLabel>
+            {/* No mobile o link do painel mora aqui (a barra esconde o atalho em md-) */}
+            <Link href="/app/insights" className="block md:hidden">
+              <MenuItem>AI Portfolio Insights</MenuItem>
+            </Link>
             {usuario.papel === "admin" && (
               <Link href="/admin" className="block">
                 <MenuItem>Painel do administrador</MenuItem>

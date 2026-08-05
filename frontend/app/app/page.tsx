@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { UploadKmz } from "@/components/UploadKmz";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { MinhasAnalises } from "@/components/cliente/MinhasAnalises";
@@ -539,6 +540,23 @@ function UploadHero({
       <section className="w-full">
         <MinhasAnalises onCarregar={onCarregar} recarregar={recarregar} />
       </section>
+
+      {/* AI Portfolio Insights — comparador das áreas do usuário (rota própria) */}
+      <Link
+        href="/app/insights"
+        className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white px-6 py-4 shadow-sm transition-colors hover:border-laranja"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-bold tracking-tight">
+            <span className="text-laranja">✦</span> AI Portfolio Insights
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Compare todas as suas áreas pela mesma régua: risco, aproveitamento e retorno —
+            com destaques e radar por gleba.
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-semibold text-laranja">Abrir painel →</span>
+      </Link>
 
       <p className="text-center text-[11px] text-slate-400">
         Ferramenta de pré-viabilidade/triagem — não decide aprovação municipal.
