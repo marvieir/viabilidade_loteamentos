@@ -167,7 +167,7 @@ PDF/Excel do comparativo, KPIs de mercado (C2).
 6. Score de risco (radar/B10): mockup apresenta com "fórmula aberta"; decisão final
    pendente.
 
-**Mockups aprovação:** imagens `mockup-1-painel.png` (painel free com contador) e
-`mockup-2-bloqueio.png` (estado bloqueado pós-30 dias) entregues ao operador em 05/08
+**Mockups aprovação:** imagens em `docs/mockups/` — `mockup-1-painel.png` (painel free com contador) e
+`mockup-2-bloqueio.png` (bloqueio pós-30 dias), APROVADAS pelo operador em 05/08; fontes HTML no mesmo diretório para iterar
 (dados fictícios, sem código). Iteração de layout acontece sobre elas antes de qualquer
 implementação.

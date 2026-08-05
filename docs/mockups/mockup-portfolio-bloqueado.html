@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  body { background:#f1f5f9; color:#0f172a; width:1440px; height:860px; overflow:hidden; }
+  .topo { background:#170d48; color:#fff; padding:0 40px; height:60px; display:flex; align-items:center; gap:28px; }
+  .logo { font-weight:800; font-size:19px; } .logo span { color:#ff914d; }
+  .menu { display:flex; gap:26px; font-size:14px; color:#c3b8e8; height:60px; align-items:center; }
+  .menu .ativo { color:#fff; font-weight:700; box-shadow:inset 0 -3px 0 #ff914d; height:60px; display:flex; align-items:center; }
+  .mock { position:fixed; top:14px; right:16px; background:#dc2626; color:#fff; font-size:11px; font-weight:800; letter-spacing:1px; padding:5px 12px; border-radius:99px; z-index:9; text-transform:uppercase; }
+  .fundo { filter:blur(7px); opacity:.55; padding:26px 40px; }
+  .h1 { font-size:26px; font-weight:800; color:#1d1252; }
+  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:18px; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:18px 20px; height:110px; }
+  .card .rot { font-size:12px; color:#64748b; } .card .val { font-size:24px; font-weight:800; color:#1d1252; margin-top:6px; }
+  .tabela { background:#fff; border-radius:16px; height:300px; margin-top:16px; border:1px solid #e2e8f0; }
+  .tabela .cab { background:#1d1252; height:40px; border-radius:16px 16px 0 0; }
+  .trava { position:fixed; inset:0; display:grid; place-items:center; }
+  .caixa { background:#fff; border:1px solid #e2e8f0; border-radius:20px; padding:40px 44px; width:520px; text-align:center; box-shadow:0 24px 60px rgba(23,13,72,.28); }
+  .cadeado { width:56px; height:56px; border-radius:99px; background:#fff7ed; display:grid; place-items:center; margin:0 auto; font-size:26px; }
+  .caixa h1 { font-size:22px; font-weight:800; color:#1d1252; margin-top:14px; }
+  .caixa p { font-size:14.5px; color:#475569; margin-top:10px; line-height:1.6; }
+  .cta { display:inline-block; margin-top:22px; background:#ff914d; color:#170d48; font-weight:800; font-size:15px; padding:13px 30px; border-radius:12px; }
+  .sec { display:block; margin-top:12px; font-size:13px; color:#64748b; text-decoration:underline; }
+</style>
+</head>
+<body>
+<div class="mock">Mockup · dados fictícios</div>
+<div class="topo">
+  <div class="logo">voaz<span>.app</span></div>
+  <div class="menu">
+    <span>Minhas análises</span><span>Nova análise</span>
+    <span class="ativo">AI Portfolio Insights</span><span>Conta</span>
+  </div>
+</div>
+<div class="fundo">
+  <div class="h1">AI Portfolio Insights</div>
+  <div class="cards">
+    <div class="card"><div class="rot">Maior VGV</div><div class="val">R$ ●●,● mi</div></div>
+    <div class="card"><div class="rot">Maior VGV/ha</div><div class="val">R$ ●,●● mi</div></div>
+    <div class="card"><div class="rot">Vira positivo mais cedo</div><div class="val">●● meses</div></div>
+    <div class="card"><div class="rot">Menor exposição</div><div class="val">R$ ●,● mi</div></div>
+  </div>
+  <div class="tabela"><div class="cab"></div></div>
+</div>
+<div class="trava">
+  <div class="caixa">
+    <div class="cadeado">🔒</div>
+    <h1>Sua prévia gratuita de 30 dias terminou</h1>
+    <p>O AI Portfolio Insights continua guardando e comparando as suas <b>4 áreas analisadas</b> —
+    elas não foram apagadas. Para voltar a ver o comparativo, os destaques e o radar de risco,
+    escolha um plano pago.</p>
+    <span class="cta">Conhecer os planos</span>
+    <span class="sec">Continuar só com as análises individuais (grátis)</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  body { background:#f1f5f9; color:#0f172a; width:1440px; }
+  .topo { background:#170d48; color:#fff; padding:0 40px; height:60px; display:flex; align-items:center; gap:28px; }
+  .logo { font-weight:800; font-size:19px; letter-spacing:-0.5px; }
+  .logo span { color:#ff914d; }
+  .menu { display:flex; gap:26px; font-size:14px; color:#c3b8e8; height:60px; align-items:center; }
+  .menu .ativo { color:#fff; font-weight:700; box-shadow:inset 0 -3px 0 #ff914d; height:60px; display:flex; align-items:center; }
+  .mock { position:fixed; top:14px; right:16px; background:#dc2626; color:#fff; font-size:11px; font-weight:800; letter-spacing:1px; padding:5px 12px; border-radius:99px; z-index:9; text-transform:uppercase; }
+  .wrap { max-width:1360px; margin:0 auto; padding:26px 40px 48px; }
+  .h1 { font-size:26px; font-weight:800; color:#1d1252; }
+  .sub { color:#64748b; font-size:14px; margin-top:4px; }
+  .banner { margin-top:18px; background:#fff7ed; border:1.5px solid #fdba74; border-radius:14px; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; }
+  .banner b { color:#c2410c; }
+  .banner .dias { background:#ff914d; color:#fff; border-radius:12px; padding:10px 18px; font-weight:800; font-size:15px; text-align:center; }
+  .banner .dias small { display:block; font-weight:600; font-size:10px; opacity:.9; }
+  .filtros { margin-top:20px; display:flex; gap:10px; font-size:13px; }
+  .chip { background:#fff; border:1px solid #cbd5e1; border-radius:99px; padding:8px 16px; color:#334155; }
+  .chip.on { background:#1d1252; color:#fff; border-color:#1d1252; font-weight:700; }
+  .secao { margin-top:26px; font-size:12px; font-weight:800; letter-spacing:1.5px; color:#94a3b8; text-transform:uppercase; }
+  .cards { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-top:12px; }
+  .card { background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:18px 20px; box-shadow:0 1px 3px rgba(29,18,82,.06); }
+  .card .rot { font-size:12px; color:#64748b; font-weight:600; }
+  .card .val { font-size:24px; font-weight:800; color:#1d1252; margin-top:6px; }
+  .card .area { font-size:13px; color:#0f172a; margin-top:4px; font-weight:600; }
+  .card .fonte { font-size:10.5px; color:#94a3b8; margin-top:8px; border-top:1px dashed #e2e8f0; padding-top:7px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:16px; overflow:hidden; margin-top:12px; font-size:13px; box-shadow:0 1px 3px rgba(29,18,82,.06); }
+  th { background:#1d1252; color:#fff; text-align:left; padding:11px 12px; font-size:11.5px; white-space:nowrap; }
+  th .ord { color:#ff914d; }
+  td { padding:11px 12px; border-bottom:1px solid #f1f5f9; white-space:nowrap; }
+  tr:nth-child(even) td { background:#f8fafc; }
+  .nome { font-weight:700; color:#1d1252; }
+  .cid { font-size:11px; color:#94a3b8; display:block; }
+  .semaf { display:inline-block; padding:3px 10px; border-radius:99px; font-size:11px; font-weight:700; }
+  .verde { background:#dcfce7; color:#166534; } .ambar { background:#fef3c7; color:#92400e; } .verm { background:#fee2e2; color:#991b1b; }
+  .vazio { color:#cbd5e1; font-style:italic; }
+  .melhor { color:#166534; font-weight:800; }
+  .aviso { margin-top:10px; background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 16px; font-size:12.5px; color:#92400e; }
+  .duas { display:grid; grid-template-columns:1.15fr .85fr; gap:14px; margin-top:12px; }
+  .radares { display:flex; gap:26px; justify-content:space-around; margin-top:8px; }
+  .radar { text-align:center; }
+  .radar p { font-size:13px; font-weight:700; color:#1d1252; margin-top:2px; }
+  .radar small { color:#94a3b8; font-size:11px; }
+  .det dt { font-size:10.5px; color:#94a3b8; font-weight:700; text-transform:uppercase; letter-spacing:.5px; margin-top:11px; }
+  .det dd { font-size:14px; font-weight:700; color:#0f172a; }
+  .det .prov { font-size:10px; color:#94a3b8; font-weight:400; }
+  .gradeDet { display:grid; grid-template-columns:repeat(3,1fr); column-gap:18px; }
+</style>
+</head>
+<body>
+<div class="mock">Mockup · dados fictícios</div>
+
+<div class="topo">
+  <div class="logo">voaz<span>.app</span></div>
+  <div class="menu">
+    <span>Minhas análises</span>
+    <span>Nova análise</span>
+    <span class="ativo">AI Portfolio Insights</span>
+    <span>Conta</span>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="h1">AI Portfolio Insights</div>
+  <div class="sub">Suas 4 áreas analisadas, comparadas pela mesma régua — risco, aproveitamento e retorno.</div>
+
+  <div class="banner">
+    <div style="max-width:900px">
+      <b>Prévia do plano gratuito.</b> Você tem acesso completo ao AI Portfolio Insights por 30 dias.
+      Depois disso, o painel é exclusivo dos planos pagos — suas análises continuam salvas.
+    </div>
+    <div class="dias">Restam 21 dias<small>de prévia gratuita</small></div>
+  </div>
+
+  <div class="filtros">
+    <span class="chip on">Todas (4)</span>
+    <span class="chip">SP (3)</span>
+    <span class="chip">RS (1)</span>
+    <span class="chip">Urbano (3)</span>
+    <span class="chip">Chacreamento (1)</span>
+    <span class="chip">Últimos 90 dias</span>
+  </div>
+
+  <div class="secao">Destaques do portfólio</div>
+  <div class="cards">
+    <div class="card"><div class="rot">Maior VGV</div><div class="val">R$ 42,5 mi</div><div class="area">Gleba do Vale · São Roque SP</div><div class="fonte">Financeira · análise de 28/07/2026</div></div>
+    <div class="card"><div class="rot">Maior VGV por hectare</div><div class="val">R$ 2,56 mi/ha</div><div class="area">Sítio Boa Vista · Sorocaba SP</div><div class="fonte">Financeira ÷ área bruta · 01/08/2026</div></div>
+    <div class="card"><div class="rot">Vira positivo mais cedo</div><div class="val">16 meses</div><div class="area">Sítio Boa Vista · Sorocaba SP</div><div class="fonte">Fluxo acumulado da Financeira</div></div>
+    <div class="card"><div class="rot">Menor exposição de caixa</div><div class="val">R$ 2,1 mi</div><div class="area">Fazenda Santa Rita · Alegrete RS</div><div class="fonte">Exposição máxima · mês 14</div></div>
+    <div class="card"><div class="rot">Mais lotes</div><div class="val">210 lotes</div><div class="area">Sítio Boa Vista · Sorocaba SP</div><div class="fonte">Urbanismo · média 182 m²</div></div>
+    <div class="card"><div class="rot">Menor risco ambiental</div><div class="val">8% restrito</div><div class="area">Sítio Boa Vista · Sorocaba SP</div><div class="fonte">Ambiental + declividade</div></div>
+    <div class="card"><div class="rot">Melhor TIR</div><div class="val">28,6% a.a.</div><div class="area">Sítio Boa Vista · Sorocaba SP</div><div class="fonte">Econômica · TMA 12%</div></div>
+    <div class="card"><div class="rot">Maior múltiplo de capital</div><div class="val">3,1×</div><div class="area">Fazenda Santa Rita · Alegrete RS</div><div class="fonte">Lucro ÷ exposição máxima</div></div>
+  </div>
+
+  <div class="secao">Comparativo das áreas — clique no título da coluna para ordenar</div>
+  <table>
+    <tr>
+      <th>Área</th><th>ha bruto</th><th>Lotes</th><th>VGV</th><th>VGV/ha <span class="ord">▼</span></th>
+      <th>Margem</th><th>TIR</th><th>Exposição máx.</th><th>Meses negativo</th><th>Ambiental</th><th>Jurídico</th>
+    </tr>
+    <tr>
+      <td><span class="nome">Sítio Boa Vista</span><span class="cid">Sorocaba · SP · 01/08/2026</span></td>
+      <td>12,1</td><td class="melhor">210</td><td>R$ 31,0 mi</td><td class="melhor">R$ 2,56 mi</td>
+      <td class="melhor">34%</td><td class="melhor">28,6%</td><td>R$ 3,4 mi</td><td class="melhor">16</td>
+      <td><span class="semaf verde">8% restrito</span></td><td><span class="semaf verde">sem ônus</span></td>
+    </tr>
+    <tr>
+      <td><span class="nome">Fazenda Santa Rita</span><span class="cid">Alegrete · RS · 05/08/2026</span></td>
+      <td>7,4</td><td>150</td><td>R$ 18,2 mi</td><td>R$ 2,46 mi</td>
+      <td>31%</td><td>24,1%</td><td class="melhor">R$ 2,1 mi</td><td>19</td>
+      <td><span class="semaf ambar">24,8% restrito</span></td><td><span class="semaf verde">sem ônus</span></td>
+    </tr>
+    <tr>
+      <td><span class="nome">Gleba do Vale</span><span class="cid">São Roque · SP · 28/07/2026</span></td>
+      <td>18,7</td><td>154</td><td class="melhor">R$ 42,5 mi</td><td>R$ 2,27 mi</td>
+      <td>27%</td><td>19,8%</td><td>R$ 6,8 mi</td><td>26</td>
+      <td><span class="semaf verm">27,9% restrito</span></td><td><span class="semaf ambar">divergência 39,5%</span></td>
+    </tr>
+    <tr>
+      <td><span class="nome">Chácara Ipê</span><span class="cid">Itu · SP · 03/08/2026</span></td>
+      <td>9,3</td><td class="vazio">não calculado</td><td class="vazio">não calculado</td><td class="vazio">—</td>
+      <td class="vazio">—</td><td class="vazio">—</td><td class="vazio">—</td><td class="vazio">—</td>
+      <td><span class="semaf ambar">18,2% restrito</span></td><td class="vazio">não calculado</td>
+    </tr>
+  </table>
+  <div class="aviso">⚠ Comparabilidade: a TIR da Gleba do Vale usa TMA de 14% a.a.; as demais usam 12% a.a. Premissas diferentes — compare com cautela. Passe o mouse em qualquer número para ver a origem (análise, dimensão e data).</div>
+
+  <div class="duas">
+    <div class="card">
+      <div class="rot" style="font-weight:800;color:#1d1252;font-size:14px">Radar de risco por área <span style="color:#94a3b8;font-weight:400;font-size:11px">(100 = menor risco · fórmula aberta em "como calculamos")</span></div>
+      <div class="radares">
+        <div class="radar">
+          <svg width="300" height="230" viewBox="-70 -5 340 230">
+            <polygon points="110,20 200,110 110,200 20,110" fill="none" stroke="#e2e8f0"/>
+            <polygon points="110,50 170,110 110,170 50,110" fill="none" stroke="#e2e8f0"/>
+            <polygon points="110,80 140,110 110,140 80,110" fill="none" stroke="#e2e8f0"/>
+            <line x1="110" y1="20" x2="110" y2="200" stroke="#e2e8f0"/><line x1="20" y1="110" x2="200" y2="110" stroke="#e2e8f0"/>
+            <polygon points="110,60.5 182,110 110,191 42.5,110" fill="rgba(255,145,77,.25)" stroke="#ff914d" stroke-width="2"/>
+            <text x="110" y="14" text-anchor="middle" font-size="10" fill="#64748b">Ambiental 55</text>
+            <text x="208" y="113" font-size="10" fill="#64748b">Urbanístico 80</text>
+            <text x="110" y="214" text-anchor="middle" font-size="10" fill="#64748b">Jurídico 90</text>
+            <text x="12" y="113" text-anchor="end" font-size="10" fill="#64748b">Financeiro 75</text>
+          </svg>
+          <p>Fazenda Santa Rita</p><small>Alegrete · RS</small>
+        </div>
+        <div class="radar">
+          <svg width="300" height="230" viewBox="-70 -5 340 230">
+            <polygon points="110,20 200,110 110,200 20,110" fill="none" stroke="#e2e8f0"/>
+            <polygon points="110,50 170,110 110,170 50,110" fill="none" stroke="#e2e8f0"/>
+            <polygon points="110,80 140,110 110,140 80,110" fill="none" stroke="#e2e8f0"/>
+            <line x1="110" y1="20" x2="110" y2="200" stroke="#e2e8f0"/><line x1="20" y1="110" x2="200" y2="110" stroke="#e2e8f0"/>
+            <polygon points="110,29 189,110 110,186 27,110" fill="rgba(29,18,82,.18)" stroke="#241862" stroke-width="2"/>
+            <text x="110" y="14" text-anchor="middle" font-size="10" fill="#64748b">Ambiental 90</text>
+            <text x="208" y="113" font-size="10" fill="#64748b">Urbanístico 88</text>
+            <text x="110" y="214" text-anchor="middle" font-size="10" fill="#64748b">Jurídico 85</text>
+            <text x="12" y="113" text-anchor="end" font-size="10" fill="#64748b">Financeiro 92</text>
+          </svg>
+          <p>Sítio Boa Vista</p><small>Sorocaba · SP</small>
+        </div>
+      </div>
+    </div>
+    <div class="card det">
+      <div class="rot" style="font-weight:800;color:#1d1252;font-size:14px">Detalhe · Fazenda Santa Rita <span style="color:#94a3b8;font-weight:400;font-size:11px">(clicou na linha, abre tudo)</span></div>
+      <div class="gradeDet">
+        <div><dt>VGV próprio × terrenista</dt><dd>R$ 12,7 mi × R$ 5,5 mi <span class="prov">permuta 30% VGV</span></dd></div>
+        <div><dt>Lucro nominal</dt><dd>R$ 3,9 mi</dd></div>
+        <div><dt>VPL (TMA 12%)</dt><dd>R$ 2,1 mi</dd></div>
+        <div><dt>Payback descontado</dt><dd>31 meses</dd></div>
+        <div><dt>Receita média/lote</dt><dd>R$ 121 mil</dd></div>
+        <div><dt>Infra por lote</dt><dd>R$ 38,4 mil</dd></div>
+        <div><dt>% vendável (área líq.)</dt><dd>59,1%</dd></div>
+        <div><dt>% viário</dt><dd>29,0% <span class="prov">107 m² de via/lote</span></dd></div>
+        <div><dt>Sobra geométrica</dt><dd>2,8%</dd></div>
+        <div><dt>Verde total</dt><dd>26,9% <span class="prov">APAC ok</span></dd></div>
+        <div><dt>Alertas ambientais</dt><dd>1 crítico · 2 atenção</dd></div>
+        <div><dt>Lotes/ha bruto</dt><dd>20,3</dd></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
