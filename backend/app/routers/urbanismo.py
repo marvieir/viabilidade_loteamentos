@@ -21,7 +21,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
-from shapely.ops import transform, unary_union
+from shapely.ops import transform
 
 from app.core.uploads import ler_upload_limitado
 
@@ -176,7 +176,9 @@ def _travessia_conexao(aprov_m, registro, to_wgs, fonte_dem, prog, restr_m=None)
             tv = conexao_mod.travessia_otima(a, b, flat)
     else:
         # 10.3 — domínio da via = a gleba inteira (aproveitável + restrição); a via pode pisar no ≥30%.
-        dominio = aprov_m if restr_m is None else unary_union([aprov_m, restr_m])
+        # União SEGURA (caso real 03/08, análise 19803379): camada de restrição inválida fazia o
+        # GEOS estourar aqui ("side location conflict") e derrubava o /propor inteiro.
+        dominio = aprov_m if restr_m is None else (geom._uniao_segura([aprov_m, restr_m]) or aprov_m)
         tv = conexao_mod.travessia_diagonal(a, b, cota, dominio, restr_m)
     cruza = bool(getattr(tv, "cruza_restricao", False))
     diag = {
@@ -309,19 +311,41 @@ def _aproveitavel_wgs(registro, fonte_veg, fonte_camadas, fonte_dem):
         if overlays.get(chave) is not None:
             partes_via.append(overlays[chave])
             origem.append(chave)
-    decliv_lote = decliv_geom.intersection(gleba) if decliv_geom is not None else None
+    # Recortes e uniões SEGUROS (caso real 03/08): camada ambiental do mundo real vem com
+    # geometria inválida — cada parte é validada e, se o recorte ainda falhar, a parte entra
+    # SEM recorte (superestima a restrição = conservador na triagem, nunca derruba o request).
+    gleba_v = geom._valido(gleba) or gleba
+    decliv_lote = None
+    if decliv_geom is not None:
+        dv = geom._valido(decliv_geom)
+        if dv is not None and not dv.is_empty:
+            try:
+                decliv_lote = dv.intersection(gleba_v)
+            except Exception:  # noqa: BLE001
+                decliv_lote = dv
     if decliv_lote is not None and not decliv_lote.is_empty:
         origem.append("declividade_30")
     else:
         decliv_lote = None
-    restr_via = (unary_union([g.intersection(gleba) for g in partes_via if g is not None])
-                 if partes_via else None)
-    aprov = gleba.difference(restr_via) if (restr_via is not None and not restr_via.is_empty) else gleba
+    recortes = []
+    for g in partes_via:
+        gv = geom._valido(g)
+        if gv is None or gv.is_empty:
+            continue
+        try:
+            recortes.append(gv.intersection(gleba_v))
+        except Exception:  # noqa: BLE001
+            recortes.append(gv)
+    restr_via = geom._uniao_segura(recortes) if recortes else None
+    aprov = (geom._diferenca_segura(gleba_v, restr_via) or gleba
+             if (restr_via is not None and not restr_via.is_empty) else gleba)
     if aprov.is_empty:
-        return gleba, None, [], None
+        # BUG latente corrigido junto: este return tinha 4 valores numa função que devolve 5
+        # (estourava ValueError em gleba 100% restrita, mascarando o diagnóstico honesto).
+        return gleba, None, [], None, None
     # restrição COMPLETA (mata/APP ∪ ≥30%) p/ o mapa rotular a faixa não-edificável (Fase 9.8).
     full = [g for g in (restr_via, decliv_lote) if g is not None and not g.is_empty]
-    restr_full = unary_union(full) if full else None
+    restr_full = geom._uniao_segura(full) if full else None
     # ``restr_via`` SEPARADO (achado do operador — dump 027): é o conjunto que BLOQUEIA VIA
     # (vegetação/APP/faixas — Fase 10.8). A união restr_full APAGA a distinção mata∩encosta
     # (que bloqueia via) × encosta limpa (via ok c/ laudo) — o motor precisa das duas camadas.
