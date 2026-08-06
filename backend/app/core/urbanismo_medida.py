@@ -341,18 +341,19 @@ def _orientacao_ns(poly: BaseGeometry) -> float:
     return round(abs(dy) / n, 4) if n > 0 else 0.5
 
 
-def _privacidade(lote: BaseGeometry, verde, arruamento) -> Optional[float]:
+def _privacidade(lote: BaseGeometry, verde, arruamento_buf) -> Optional[float]:
     """Fundo protegido = 1,0 (encosta em verde/mata); frente única = 0,6; esquina/dupla
     frente = 0,2 (exposição). CATEGÓRICO e invariante à escala — a frente exposta é medida
     contra a PRÓPRIA testada do lote (razão frente/perímetro premiaria lote fundo = maior e
     acoplaria tamanho ao score, quebrando a Fase 9.3 §3). ``None`` quando não há via nem
-    verde para avaliar (fator ausente, não zero)."""
+    verde para avaliar (fator ausente, não zero). ``arruamento_buf`` chega PRÉ-bufferizado
+    (0,5 m) pelo chamador — MOTOR-1: bufferizar aqui dentro custava um buffer por lote."""
     if verde is not None and not verde.is_empty and lote.distance(verde) <= _PROX_VERDE_M:
         return 1.0
-    if arruamento is None or arruamento.is_empty:
+    if arruamento_buf is None or arruamento_buf.is_empty:
         return None
     try:
-        frente = lote.boundary.intersection(arruamento.buffer(0.5)).length
+        frente = lote.boundary.intersection(arruamento_buf).length
     except Exception:  # noqa: BLE001 — interseção degenerada → neutro
         return 0.6
     if frente <= 0.1:
@@ -436,6 +437,14 @@ def pontuar(
     raio_max = max(g.centroid.distance(entrada) for g in lotes) or 1.0
     fins = _fins_de_via(eixos, borda_externa, portico)
     priv_avaliavel = _tem(arruamento) or _tem(verde)
+    # MOTOR-1 (06/08): o buffer da malha viária INTEIRA sai do loop — era recalculado uma
+    # vez POR LOTE dentro de _privacidade e, em arruamento complexo (ex.: fronteira de
+    # 2 KMZ), custava horas (O(n_lotes × buffer)). Mesma conta, feita UMA vez: o score
+    # continua idêntico (determinismo preservado).
+    try:
+        arruamento_buf = arruamento.buffer(0.5) if _tem(arruamento) else None
+    except Exception:  # noqa: BLE001 — buffer degenerado → fator privacidade ausente
+        arruamento_buf = None
 
     por_lote = []
     for i, g in enumerate(lotes, start=1):
@@ -460,7 +469,7 @@ def pontuar(
         if fins:
             fatores["culdesac"] = 1.0 if min(g.distance(p) for p in fins) <= RAIO_CULDESAC_M else 0.0
         if priv_avaliavel:
-            priv = _privacidade(g, verde, arruamento)
+            priv = _privacidade(g, verde, arruamento_buf)
             if priv is not None:
                 fatores["privacidade"] = priv
         fatores["orientacao"] = _orientacao_ns(g)
