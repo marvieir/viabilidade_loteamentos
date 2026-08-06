@@ -143,14 +143,8 @@ export function TopBar({
             )}
           </>
         )}
-        {/* AI Portfolio Insights — painel POR USUÁRIO (rota própria, fora do fluxo da gleba) */}
-        <Link
-          href="/app/insights"
-          title="Comparar todas as suas áreas analisadas"
-          className="hidden h-9 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 md:inline-flex"
-        >
-          <span className="text-laranja">✦</span> Comparar áreas
-        </Link>
+        {/* "Comparar áreas" mora na SIDEBAR (destaque) e no menu do avatar (mobile) —
+            decisão do operador 06/08: saiu da barra superior. */}
         <Button onClick={onNova}>
           <IconPlus width={14} height={14} />
           <span className="hidden sm:inline">Nova análise</span>

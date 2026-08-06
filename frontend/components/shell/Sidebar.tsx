@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { SECOES, type Secao } from "@/components/shell/secoes";
 
 export function Sidebar({
@@ -18,6 +19,17 @@ export function Sidebar({
 }) {
   return (
     <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-56 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+      {/* Comparar áreas — DESTAQUE (decisão do operador 06/08): navegação por usuário,
+          fora do fluxo da gleba; fundo marinho para destoar dos itens de seção. */}
+      <div className="px-2.5 pt-3">
+        <Link
+          href="/app/insights"
+          title="Comparar todas as suas áreas analisadas pela mesma régua"
+          className="flex items-center gap-2 rounded-lg bg-[#241862] px-3 py-2.5 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-[#170d48]"
+        >
+          <span className="text-laranja">✦</span> Comparar áreas
+        </Link>
+      </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3 text-sm">
         <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
           Análise
