@@ -348,7 +348,7 @@ function Insights() {
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5">
           <div>
             <h1 className="text-xl font-extrabold tracking-tight text-[#1d1252]">
-              AI Portfolio Insights
+              Comparar áreas
             </h1>
             <p className="text-xs text-slate-500">
               {dados
@@ -374,7 +374,7 @@ function Insights() {
               Sua prévia gratuita de {dados.gate.previa_dias} dias terminou
             </h2>
             <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-slate-600">
-              O AI Portfolio Insights continua guardando e comparando as suas{" "}
+              O comparador de áreas continua guardando as suas{" "}
               <b>{dados.total_analises} área(s) analisada(s)</b> — nada foi apagado. Para voltar
               a ver o comparativo, os destaques e o radar de risco, fale com a gente sobre os
               planos pagos.
@@ -396,7 +396,7 @@ function Insights() {
               <div className="flex flex-col items-start justify-between gap-3 rounded-[14px] border-[1.5px] border-orange-300 bg-orange-50 px-5 py-3.5 sm:flex-row sm:items-center">
                 <p className="max-w-3xl text-sm text-slate-700">
                   <b className="text-orange-700">Prévia do plano gratuito.</b> Você tem acesso
-                  completo ao AI Portfolio Insights por {dados.gate.previa_dias} dias. Depois
+                  completo ao comparador de áreas por {dados.gate.previa_dias} dias. Depois
                   disso, o painel é exclusivo dos planos pagos — suas análises continuam salvas.
                 </p>
                 <div className="shrink-0 rounded-xl bg-laranja px-4 py-2 text-center text-white">

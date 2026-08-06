@@ -548,7 +548,7 @@ function UploadHero({
       >
         <div className="min-w-0">
           <p className="text-sm font-bold tracking-tight">
-            <span className="text-laranja">✦</span> AI Portfolio Insights
+            <span className="text-laranja">✦</span> Comparar áreas
           </p>
           <p className="mt-0.5 text-xs text-slate-500">
             Compare todas as suas áreas pela mesma régua: risco, aproveitamento e retorno —

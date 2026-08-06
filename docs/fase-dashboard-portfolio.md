@@ -153,7 +153,9 @@ PDF/Excel do comparativo, KPIs de mercado (C2).
 
 ## 6. Decisões do operador (05/08/2026)
 
-1. **Nome: "AI Portfolio Insights"** — menu no app logado. ✔
+1. **Nome: "AI Portfolio Insights"** — menu no app logado. ✔ *(Revisto em 06/08: o rótulo
+   COMERCIAL no produto virou **"Comparar áreas"** — verbo claro de benefício; "AI Portfolio
+   Insights" segue como codinome interno da fase/rota `/app/insights`.)*
 2. **Recorte do MVP aprovado** (cards de destaque + tabela comparativa + radar). ✔
 3. Colunas da tabela v1 (proposta apresentada em mockup, aguardando ajuste fino do
    operador): Área · ha bruto · Lotes · VGV · VGV/ha · Margem · TIR · Exposição máx. ·
