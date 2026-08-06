@@ -300,12 +300,14 @@ def _radar(kpis: dict) -> schemas.PortfolioRadarOut:
 def _formatar_dinheiro(kpis: dict) -> None:
     if kpis.get("vgv") is not None:
         kpis["vgv_fmt"] = _dinheiro_curto(kpis["vgv"])
+    if kpis.get("vgv_proprio") is not None:
+        kpis["vgv_proprio_fmt"] = _dinheiro_curto(kpis["vgv_proprio"])
     if kpis.get("vgv_por_ha") is not None:
         kpis["vgv_por_ha_fmt"] = _dinheiro_curto(kpis["vgv_por_ha"]) + "/ha"
     if kpis.get("lucro") is not None:
         kpis["lucro_fmt"] = _dinheiro_curto(kpis["lucro"])
     if kpis.get("exposicao_maxima") is not None:
-        kpis["exposicao_maxima_fmt"] = _dinheiro_curto(kpis["exposicao_maxima"])
+        kpis["exposicao_maxima_fmt"] = _dinheiro_curto(abs(kpis["exposicao_maxima"]))
     if kpis.get("receita_por_lote") is not None:
         kpis["receita_por_lote_fmt"] = _dinheiro_curto(kpis["receita_por_lote"])
     if kpis.get("vpl") is not None:
@@ -351,7 +353,7 @@ _DESTAQUES = [
     ("mais_lotes", "Mais lotes", "n_lotes", True,
      lambda v: f"{int(v)} lotes", "Estudo urbanístico"),
     ("menor_exposicao", "Menor exposição de caixa", "exposicao_maxima", False,
-     _dinheiro_curto, "Financeira (exposição máxima)"),
+     lambda v: _dinheiro_curto(abs(v)), "Financeira (exposição máxima)"),
     ("positivo_mais_cedo", "Vira positivo mais cedo", "meses_negativo", False,
      lambda v: f"{int(v)} meses", "Fluxo nominal (payback simples)"),
     ("menor_risco_ambiental", "Menor risco ambiental", "pct_restrito", False,

@@ -31,6 +31,7 @@ export interface PortfolioKpis {
   vgv_por_ha: number | null;
   vgv_por_ha_fmt: string | null;
   vgv_proprio: number | null;
+  vgv_proprio_fmt: string | null;
   permuta_modo: string | null;
   permuta_pct: number | null;
   margem_pct: number | null;

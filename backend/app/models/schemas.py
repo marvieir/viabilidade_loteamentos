@@ -2327,6 +2327,7 @@ class PortfolioKpisOut(BaseModel):
     vgv_por_ha: Optional[float] = None
     vgv_por_ha_fmt: Optional[str] = None
     vgv_proprio: Optional[float] = None
+    vgv_proprio_fmt: Optional[str] = None
     permuta_modo: Optional[str] = None
     permuta_pct: Optional[float] = None
     margem_pct: Optional[float] = None
