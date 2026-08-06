@@ -158,10 +158,6 @@ function Radar({ linha }: { linha: PortfolioLinha }) {
           Financeiro {linha.radar.financeiro ?? "—"}
         </text>
       </svg>
-      <p className="text-sm font-bold text-[#1d1252]">{linha.titulo}</p>
-      <p className="text-xs text-slate-400">
-        {[linha.cidade, linha.uf].filter(Boolean).join(" · ")}
-      </p>
     </div>
   );
 }
@@ -180,15 +176,11 @@ function ItemDet({ rotulo, valor, nota }: { rotulo: string; valor: string | null
   );
 }
 
-function Detalhe({ l }: { l: PortfolioLinha }) {
+function DetalheGrade({ l }: { l: PortfolioLinha }) {
   const k = l.kpis;
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-bold text-[#1d1252]">
-        Detalhe · {l.titulo}{" "}
-        <span className="text-[11px] font-normal text-slate-400">(clique numa linha da tabela para trocar)</span>
-      </p>
-      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+    <div className="min-w-0 flex-1">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5 sm:grid-cols-3">
         <ItemDet
           rotulo="VGV próprio × terrenista"
           valor={k.vgv_proprio_fmt}
@@ -224,12 +216,20 @@ function Detalhe({ l }: { l: PortfolioLinha }) {
       </dl>
       {l.dimensoes.length === 0 && (
         <p className="mt-3 text-xs italic text-slate-400">
-          Nenhuma dimensão calculada nesta análise ainda.
+          Nenhuma dimensão calculada nesta análise ainda — rode as análises e salve para
+          preencher este painel.
         </p>
       )}
     </div>
   );
 }
+
+const ROTULO_EIXO: Record<string, string> = {
+  ambiental: "Ambiental",
+  urbanistico: "Urbanístico",
+  juridico: "Jurídico",
+  financeiro: "Financeiro",
+};
 
 // ----- página -----
 
@@ -307,7 +307,6 @@ function Insights() {
 
   const linhaSelecionada =
     linhasFiltradas.find((l) => l.id === selecionada) ?? linhasFiltradas[0] ?? null;
-  const radares = linhasFiltradas.filter((l) => EIXOS.some((e) => l.radar[e] !== null));
 
   if (carregando) {
     return (
@@ -558,41 +557,45 @@ function Insights() {
               </section>
             )}
 
-            {/* Radar + Detalhe lado a lado (mockup) */}
+            {/* Raio-X da área selecionada: UM card — radar à esquerda, detalhe à direita.
+                Sem pilha de gráficos e sem vazio: a tabela é o seletor, este card é a lupa. */}
             {linhaSelecionada && (
-              <div className="grid gap-3.5 lg:grid-cols-[1.15fr_0.85fr]">
-                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-sm font-bold text-[#1d1252]">
-                    Radar de risco por área{" "}
+                    Raio-X da área · {linhaSelecionada.titulo}{" "}
                     <span className="text-[11px] font-normal text-slate-400">
-                      (100 = menor risco · fórmula aberta em &quot;como calculamos&quot;)
+                      (clique numa linha da tabela para trocar de área)
                     </span>
                   </p>
-                  {radares.length === 0 ? (
-                    <p className="mt-4 text-sm text-slate-400">
-                      Nenhuma área com dimensão de risco calculada ainda.
-                    </p>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap justify-around gap-4">
-                      {radares.slice(0, 4).map((l) => (
-                        <Radar key={l.id} linha={l} />
-                      ))}
-                    </div>
-                  )}
-                  {radares.length > 4 && (
-                    <p className="mt-2 text-center text-xs text-slate-400">
-                      Mostrando 4 de {radares.length} — filtre por UF para ver as demais.
-                    </p>
-                  )}
-                  {linhasFiltradas.some((l) => EIXOS.some((e) => l.radar[e] === null)) && (
-                    <p className="mt-3 text-xs text-slate-400">
-                      Eixo &quot;—&quot; = dimensão não calculada; rode e salve as análises que
-                      faltam para completar o radar.
-                    </p>
-                  )}
+                  <p className="text-[11px] text-slate-400">
+                    Radar: 100 = menor risco · fórmula aberta em &quot;como calculamos&quot;
+                  </p>
                 </div>
-                <Detalhe l={linhaSelecionada} />
-              </div>
+                <div className="mt-4 flex flex-col items-center gap-6 md:flex-row md:items-start">
+                  <div className="shrink-0">
+                    {EIXOS.every((e) => linhaSelecionada.radar[e] !== null) ? (
+                      <Radar linha={linhaSelecionada} />
+                    ) : (
+                      <div className="grid h-[230px] w-[310px] place-items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 text-center">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-600">
+                            Radar incompleto
+                          </p>
+                          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                            Faltam:{" "}
+                            {EIXOS.filter((e) => linhaSelecionada.radar[e] === null)
+                              .map((e) => ROTULO_EIXO[e])
+                              .join(", ")}
+                            . Rode e salve essas análises para desenhar o radar.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <DetalheGrade l={linhaSelecionada} />
+                </div>
+              </section>
             )}
 
             {dados.linhas.length > 0 && (
