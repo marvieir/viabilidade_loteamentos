@@ -87,6 +87,7 @@ mindmap
       Reset de senha por e-mail
       Contato obrigatório nome e celular
       Admin - clientes métricas custo de IA
+      Desativar reativar e excluir clientes
     Site público RF-PUB
       Marca voaz.app - marinho creme laranja
       Verde só significa estado

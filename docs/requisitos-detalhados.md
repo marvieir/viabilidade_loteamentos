@@ -157,10 +157,16 @@ renderizam. Um teste varre o texto inteiro proibindo "viável/aprovado" (§1-A).
 Google Identity Services opcional; reset por e-mail (SMTP Gmail). O modal de contato bloqueia
 o app até nome+celular existirem (coluna `celular` com migração automática idempotente no
 start). Admin lista clientes (com nome/telefone), métricas e o custo real de IA por
-cliente/análise (`core/uso_llm.py` registra tokens de cada chamada).
+cliente/análise (`core/uso_llm.py` registra tokens de cada chamada). Gestão de contas
+(ADMIN-1, 06/08): na lista de clientes o admin DESATIVA/reativa (a conta perde o acesso
+na hora — `usuario_atual` e o login já recusavam `ativo=False`; as análises ficam
+guardadas) e EXCLUI definitivamente (digitar o e-mail confirma; o backend exige o mesmo
+e-mail de novo, apaga análises em cascata, tokens de reset e os arquivos por-usuário dos
+stores — é o mecanismo do pedido LGPD de remoção). Conta admin não é gerenciável pelo
+painel: nasce e morre só pelo seed `criar_admin`.
 
 - Código: `core/auth.py`, `routers/auth.py`, `routers/admin.py`, `core/db.py` (migração leve), front `components/auth/*`.
-- Testes: `test_auth*.py`, `test_admin.py`, `test_google_login.py`.
+- Testes: `test_auth*.py`, `test_admin.py`, `test_admin_gestao.py`, `test_google_login.py`.
 
 ## RF-PUB — Site e laudo de exemplo
 

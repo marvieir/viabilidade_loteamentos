@@ -2,7 +2,8 @@
 
 Dois endpoints alimentam os cards do painel: ``/metricas`` (números agregados) e
 ``/clientes`` (uma linha por cliente, com nº de análises e cidades/UFs analisadas).
-Só leitura — o admin observa o uso da plataforma, não mexe em análise de cliente.
+Leitura + gestão de CONTAS (ADMIN-1, 06/08): desativar/reativar e excluir cliente.
+O admin nunca mexe em análise de cliente.
 """
 
 from __future__ import annotations
@@ -11,14 +12,14 @@ import os
 from collections import Counter
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.auth import requer_admin
 from app.core.db import get_db
 from app.core import uso_llm
 from app.models import schemas
-from app.models.db_models import Analise, Usuario
+from app.models.db_models import Analise, ResetSenhaToken, Usuario
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -216,3 +217,73 @@ def clientes(
             )
         )
     return saida
+
+
+# ----------------- ADMIN-1 — gestão de contas (06/08/2026) -----------------
+
+
+def _alvo_gerenciavel(usuario_id: str, admin: Usuario, db: Session) -> Usuario:
+    """Guardas comuns: alvo existe, não é o próprio admin e não é outra conta admin
+    (conta admin nasce e se gerencia SÓ pelo seed scripts/criar_admin.py)."""
+    alvo = db.get(Usuario, usuario_id)
+    if alvo is None:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado.")
+    if alvo.id == admin.id:
+        raise HTTPException(status_code=400, detail="Você não pode alterar a própria conta por aqui.")
+    if alvo.papel == "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Conta administradora não é gerenciada pelo painel — use o seed criar_admin.",
+        )
+    return alvo
+
+
+def _limpar_arquivos_do_usuario(usuario_id: str) -> None:
+    """Best-effort LGPD: remove os arquivos POR USUÁRIO dos stores (gate do Comparar
+    áreas, perfil de custos). Silencioso — o banco é a fonte de verdade da exclusão."""
+    try:
+        from pathlib import Path
+
+        from app.core.perfil_custos import get_fonte_perfil_custos
+        from app.core.portfolio_store import get_fonte_portfolio
+
+        for fonte in (get_fonte_portfolio(), get_fonte_perfil_custos()):
+            diretorio = getattr(fonte, "diretorio", None)
+            if diretorio:
+                (Path(diretorio) / f"{usuario_id}.json").unlink(missing_ok=True)
+    except Exception:  # noqa: BLE001 — limpeza auxiliar nunca derruba a exclusão
+        pass
+
+
+@router.put("/clientes/{usuario_id}/ativo", response_model=schemas.AdminClienteAtivoOut)
+def alterar_ativo(
+    usuario_id: str,
+    body: schemas.AdminClienteAtivoIn,
+    admin: Usuario = Depends(requer_admin),
+    db: Session = Depends(get_db),
+):
+    """Desativa/reativa a conta (REVERSÍVEL — análises ficam guardadas). O corte é
+    imediato: ``usuario_atual`` e o login já recusam conta inativa."""
+    alvo = _alvo_gerenciavel(usuario_id, admin, db)
+    alvo.ativo = body.ativo
+    db.commit()
+    return schemas.AdminClienteAtivoOut(usuario_id=alvo.id, ativo=alvo.ativo)
+
+
+@router.delete("/clientes/{usuario_id}", status_code=204)
+def excluir_cliente(
+    usuario_id: str,
+    email: str,
+    admin: Usuario = Depends(requer_admin),
+    db: Session = Depends(get_db),
+):
+    """EXCLUSÃO DEFINITIVA (atende pedido LGPD): apaga usuário, análises salvas
+    (cascata do relacionamento), tokens de reset e arquivos por-usuário dos stores.
+    Exige ``?email=`` idêntico ao da conta — dupla confirmação contra clique errado."""
+    alvo = _alvo_gerenciavel(usuario_id, admin, db)
+    if (email or "").strip().lower() != alvo.email:
+        raise HTTPException(status_code=422, detail="Confirmação de e-mail não confere.")
+    db.query(ResetSenhaToken).filter(ResetSenhaToken.usuario_id == alvo.id).delete()
+    db.delete(alvo)  # cascade "all, delete-orphan" leva as análises salvas junto
+    db.commit()
+    _limpar_arquivos_do_usuario(usuario_id)

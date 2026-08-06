@@ -92,3 +92,31 @@ export interface AdminCustos {
 export async function obterCustos(): Promise<AdminCustos> {
   return apiFetch("/api/admin/custos").then(jsonOrThrow);
 }
+
+// ----- ADMIN-1 — gestão de contas -----
+
+export async function alterarAtivoCliente(id: string, ativo: boolean): Promise<void> {
+  await apiFetch(`/api/admin/clientes/${id}/ativo`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ativo }),
+  }).then(jsonOrThrow);
+}
+
+// Exclusão DEFINITIVA — o backend exige o e-mail idêntico (dupla confirmação).
+export async function excluirCliente(id: string, email: string): Promise<void> {
+  const r = await apiFetch(
+    `/api/admin/clientes/${id}?email=${encodeURIComponent(email)}`,
+    { method: "DELETE" },
+  );
+  if (!r.ok) {
+    let detalhe = `${r.status} ${r.statusText}`;
+    try {
+      const body = await r.json();
+      if (body?.detail) detalhe = body.detail;
+    } catch {
+      /* corpo não-JSON */
+    }
+    throw new Error(detalhe);
+  }
+}

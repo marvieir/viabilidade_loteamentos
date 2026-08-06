@@ -2399,3 +2399,15 @@ class PortfolioLiberacaoIn(BaseModel):
 class PortfolioLiberacaoOut(BaseModel):
     usuario_id: str
     liberado: bool
+
+
+# ----- ADMIN-1 — gestão de contas pelo painel admin -----
+
+
+class AdminClienteAtivoIn(BaseModel):
+    ativo: bool
+
+
+class AdminClienteAtivoOut(BaseModel):
+    usuario_id: str
+    ativo: bool

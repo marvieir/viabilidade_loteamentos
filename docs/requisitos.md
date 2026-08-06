@@ -105,6 +105,7 @@ de produto e perfis municipais).
 - **RF-CONTA-2** Modal obrigatório de nome + celular no primeiro login (não sai da tela sem preencher).
 - **RF-CONTA-3** Minhas análises: salvar, reabrir (reidratação sob o mesmo id), renomear.
 - **RF-CONTA-4** Admin: métricas, lista de clientes com **nome e telefone**, custos de IA por cliente/análise.
+- **RF-CONTA-5** Gestão de contas pelo admin: **desativar/reativar** (reversível; corte de acesso imediato — login e token recusam conta inativa) e **excluir definitivamente** (apaga conta + análises salvas + tokens + arquivos por-usuário; dupla confirmação por e-mail; atende pedido LGPD). Guardas: admin não altera a própria conta nem outra conta admin pelo painel.
 
 ### RF-PUB — Site público e exemplo
 - **RF-PUB-1** Site de marketing (home, loteadores, para quem é, como funciona) na identidade voaz.app.

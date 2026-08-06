@@ -8,6 +8,8 @@ import Link from "next/link";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
+  alterarAtivoCliente,
+  excluirCliente,
   listarClientes,
   obterCustos,
   obterMetricas,
@@ -56,6 +58,36 @@ function PainelAdmin() {
       }
     })();
   }, [ehAdmin]);
+
+  // ADMIN-1 — gestão de contas: as REGRAS moram no backend (auto-alteração, conta
+  // admin, e-mail de confirmação); aqui só a confirmação humana e o refresh da lista.
+  async function onToggleAtivo(c: AdminCliente) {
+    const msg = c.ativo
+      ? `Desativar ${c.email}?\n\nA conta perde o acesso IMEDIATAMENTE. As análises ficam guardadas — é reversível.`
+      : `Reativar ${c.email}? A conta volta a acessar normalmente.`;
+    if (!window.confirm(msg)) return;
+    try {
+      await alterarAtivoCliente(c.id, !c.ativo);
+      setClientes(await listarClientes());
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Falha ao alterar a conta.");
+    }
+  }
+
+  async function onExcluir(c: AdminCliente) {
+    const digitado = window.prompt(
+      `EXCLUSÃO DEFINITIVA de ${c.email}\n\nApaga a conta E as ${c.n_analises} análise(s) ` +
+        "salva(s) — SEM VOLTA (é o mecanismo do pedido LGPD de remoção).\n\n" +
+        "Digite o E-MAIL da conta para confirmar:",
+    );
+    if (digitado === null) return;
+    try {
+      await excluirCliente(c.id, digitado.trim());
+      setClientes(await listarClientes());
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : "Falha ao excluir a conta.");
+    }
+  }
 
   if (!ehAdmin) {
     return (
@@ -145,16 +177,25 @@ function PainelAdmin() {
                       <th className="px-4 py-2 font-medium">Análises</th>
                       <th className="px-4 py-2 font-medium">Cidades</th>
                       <th className="px-4 py-2 font-medium">UFs</th>
+                      <th className="px-4 py-2 font-medium">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {clientes.map((c) => (
-                      <tr key={c.id} className="border-t border-slate-100">
+                      <tr
+                        key={c.id}
+                        className={`border-t border-slate-100 ${c.ativo ? "" : "opacity-50"}`}
+                      >
                         <td className="px-4 py-2">
                           {c.email}
                           {c.papel === "admin" && (
                             <span className="ml-2 rounded-full bg-laranja-100 px-2 py-0.5 text-[10px] font-medium text-laranja-700">
                               admin
+                            </span>
+                          )}
+                          {!c.ativo && (
+                            <span className="ml-2 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                              desativado
                             </span>
                           )}
                         </td>
@@ -173,6 +214,28 @@ function PainelAdmin() {
                         </td>
                         <td className="px-4 py-2 text-slate-600">
                           {c.ufs.join(", ") || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2">
+                          {c.papel === "admin" ? (
+                            <span className="text-xs text-slate-300">—</span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => onToggleAtivo(c)}
+                                className="rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-400"
+                              >
+                                {c.ativo ? "Desativar" : "Reativar"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => onExcluir(c)}
+                                className="ml-2 rounded-md border border-rose-200 px-2 py-1 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
+                              >
+                                Excluir
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))}
