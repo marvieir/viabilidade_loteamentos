@@ -214,13 +214,35 @@ function DetalheGrade({ l }: { l: PortfolioLinha }) {
           nota={k.urbanismo_origem}
         />
       </dl>
-      {l.dimensoes.length === 0 && (
-        <p className="mt-3 text-xs italic text-slate-400">
-          Nenhuma dimensão calculada nesta análise ainda — rode as análises e salve para
-          preencher este painel.
-        </p>
-      )}
+      <FaltamDimensoes l={l} />
     </div>
+  );
+}
+
+const ROTULO_DIM: Record<string, string> = {
+  urbanismo: "urbanismo",
+  ambiental: "ambiental",
+  aproveitamento: "aproveitamento",
+  vegetacao: "área verde",
+  declividade: "declividade",
+  juridico: "jurídico",
+  financeira: "financeira",
+  economica: "econômica",
+};
+
+function FaltamDimensoes({ l }: { l: PortfolioLinha }) {
+  const faltam = Object.keys(ROTULO_DIM).filter((d) => !l.dimensoes.includes(d));
+  if (faltam.length === 0) return null;
+  return (
+    <p className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">
+      {l.dimensoes.length === 0
+        ? "Nenhuma dimensão calculada nesta análise ainda. "
+        : "Ainda sem dados de: "}
+      {l.dimensoes.length > 0 && (
+        <b>{faltam.map((d) => ROTULO_DIM[d]).join(", ")}</b>
+      )}
+      {" — abra a análise, rode essas dimensões e clique em Salvar para completar o Raio-X."}
+    </p>
   );
 }
 
@@ -249,8 +271,12 @@ function Insights() {
       try {
         const p = await obterPortfolio();
         setDados(p);
-        const primeira = p.linhas.find((l) => l.dimensoes.length > 0) ?? p.linhas[0];
-        if (primeira) setSelecionada(primeira.id);
+        // Abre na área MAIS COMPLETA (mais dimensões calculadas; empate = mais recente):
+        // o Raio-X nasce rico em vez de abrir numa análise ainda vazia.
+        const maisCompleta = [...p.linhas].sort(
+          (a, b) => b.dimensoes.length - a.dimensoes.length,
+        )[0];
+        if (maisCompleta) setSelecionada(maisCompleta.id);
       } catch (e) {
         setErro(e instanceof Error ? e.message : "Falha ao carregar o portfólio.");
       } finally {
