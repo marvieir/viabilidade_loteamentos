@@ -63,6 +63,16 @@ sobra/viário + aderência à faixa + bônus de amenidade, pesos por público ed
 re-lota sobras grandes (MOTOR-SOBRA: sobra caiu de 31,8% para ~2%). A **medição**
 (`urbanismo_medida.py`) produz o quadro de áreas que fecha em 100% e o GeoJSON do mapa.
 
+**Gleba estreita/fragmentada (RF-URB-10, caso Caverá).** Quando a mata rasterizada pica uma
+faixa estreita em dezenas de bolsões, o motor antigo afinava o quarteirão ao mínimo e desenhava
+labirinto: viário 50%, vendável 21%. Hoje valem três réguas determinísticas: o quarteirão nunca
+afina além do ponto em que a grade teórica passa de ~30% de via (freio de via); ilha-FAIXA
+(menos de ~2 fileiras de quarteirão na largura útil) fica no teto do perfil — afinar ali só
+multiplica travessas; e a coletora de 21 m só entra em gleba com porte (≥ 3 ha úteis). Bolsão
+menor que 1 lote legal vira verde/remanescente e o quadro sai com o aviso **GLEBA FRAGMENTADA**
+dizendo quantos bolsões existem e quanto não é loteável — o rendimento baixo aparece ROTULADO,
+não disfarçado em traçado denso. No caso real: 18 → 36 lotes, vendável 21,7% → 42,5%.
+
 - Decisões-chave: PISO É LEI (125 m² federal ou zona confirmada; mercado é só mira); regime rural com FMP; estilo por público versionado em arquivo (muda sem rebuild); memória de avaliações vira few-shot do programa.
 - Código: `routers/urbanismo.py` (orquestra), `core/urbanismo_geom.py` (gera), `core/urbanismo_medida.py` (mede), `core/urbanismo_diretrizes.py` (régua legal), `core/urbanismo_programa.py`, `core/urbanismo_valor.py`, `core/urbanismo_estilo.py`, `core/urbanismo_tracado.py`/`_loops.py`, `core/custo_infra*`.
 - Testes: ~20 arquivos `test_urbanismo_*.py` + `test_alto_padrao.py` + `test_custo_infra.py` (valores-ouro sobre a gleba real de São Roque).

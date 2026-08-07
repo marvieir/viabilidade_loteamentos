@@ -45,6 +45,7 @@ mindmap
         Verde institucional lazer lago pórtico
         5 variantes e função de valor
         Segunda passada MOTOR-SOBRA
+        Gleba estreita sem labirinto rotulada
         Quadro de áreas fecha 100 por cento
         Custo de infraestrutura paramétrico
       Importação DWG RF-IMP

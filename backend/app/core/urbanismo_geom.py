@@ -84,6 +84,25 @@ L_MIN_EIXO_M = 25.0
 # limpa NÃO regride (escala = 1,0). Decisão GEOMÉTRICA determinística do Python (§2), não do LLM.
 AREA_ILHA_REF_M2 = 55_000.0   # ilha ≥ esta área usa o quarteirão CHEIO (teto do perfil)
 ESCALA_QUADRA_MIN = 0.45      # afina no máximo até 45% do lado do teto (piso legal ainda manda)
+# MOTOR-3 (caso Caverá, 07/08/2026) — FREIO DE VIA na adaptação: afinar o quarteirão multiplica
+# fronteira interna = viário. Na gleba estreita/fragmentada (ilhas de 5-15 mil m²) a escala caía
+# ao piso 0,45 e a grade TEÓRICA passava de 45% de via → tela com viário 50%/vendável 21%. O
+# quarteirão nunca afina além do ponto em que a grade teórica (passo = lado+via) consome mais que
+# este teto de via. São Roque (âncora 9.11, escalas 0,67-0,83 na alta) fica AQUÉM do freio — os
+# valores-ouro da grade adaptativa não mudam.
+TETO_VIA_GRADE = 0.30
+# MOTOR-3 — ILHA-FAIXA: nº de FILEIRAS de quarteirão que cabem na largura útil (MRR curto /
+# (teto_h + via)). Abaixo deste limiar a ilha é uma FAIXA: o nº de fileiras está travado pela
+# largura, afinar o quarteirão só multiplica transversais (viário explode) → usa o TETO do perfil.
+# Calibração com as glebas reais: Caverá ilha-faixa = 1,88 fileiras (dispara); São Roque ilha 2
+# = 2,03 (segue na adaptação 9.11, âncora intocada). Zona cinzenta ~1,9-2,1: qualquer lado é
+# defensável; o limiar fica ABAIXO da âncora para nunca regredir um valor-ouro.
+FAIXA_FILEIRAS_MAX = 1.95
+# MOTOR-3 — HIERARQUIA PROPORCIONAL AO PORTE: coletora de 21 m (VIA_TRONCO_M) só em gleba com
+# porte para justificá-la; abaixo deste aproveitável o tronco é via local +2 m (a coletora de
+# 21 m numa gleba de 2 ha consumia sozinha ~10% do aproveitável). Largura de via é hierarquia
+# municipal de projeto (não exigência da 6.766) — régua de triagem rotulada, determinística.
+COLETORA_MIN_APROV_M2 = 30_000.0
 # Ilha só adapta se comporta ao menos ~este nº de quarteirões no teto; abaixo disso é site único
 # pequeno (não a gleba estilhaçada) e afinar só geraria slivers — mantém o teto (sem churn).
 AREA_MIN_ADAPTA_QUADRAS = 3.0
@@ -462,14 +481,39 @@ def podar_stubs(reg: BaseGeometry, faces: list[Polygon], eixos, troncos_ia,
     return ruas, uteis, n_stub
 
 
+def _mrr_lado_curto(ilha: BaseGeometry) -> float:
+    """Lado CURTO do retângulo mínimo rotacionado — a 'largura útil' de uma ilha alongada."""
+    try:
+        mrr = _valido(ilha).minimum_rotated_rectangle
+        pts = list(mrr.exterior.coords)[:-1]
+    except Exception:  # noqa: BLE001 — geometria degenerada
+        return 0.0
+    if len(pts) < 4:
+        return 0.0
+    e1 = math.hypot(pts[0][0] - pts[1][0], pts[0][1] - pts[1][1])
+    e2 = math.hypot(pts[1][0] - pts[2][0], pts[1][1] - pts[2][1])
+    return min(e1, e2)
+
+
 def lado_quadra_adaptativo(area_ilha: float, teto_w: float, teto_h: float,
-                           piso_w: float, piso_h: float) -> tuple[float, float]:
+                           piso_w: float, piso_h: float,
+                           via_m: Optional[float] = None) -> tuple[float, float]:
     """Fase 9.11 — lado do quarteirão ``(largura, altura)`` ADAPTADO ao tamanho da ilha, com
     clamp legal. Ilha grande (≥ ``AREA_ILHA_REF_M2``) → teto do perfil (caixa limpa intacta);
     ilha pequena/torta → AFINA o quarteirão (escala = √(área/ref)) para gerar faces adjacentes —
     fronteira interna = viário —, mas NUNCA abaixo do piso (lote ≥ mínimo, clamp 9.4 preservado).
-    Pura geometria determinística (§2): não vem do LLM, só do tamanho da ilha + piso legal."""
+    Pura geometria determinística (§2): não vem do LLM, só do tamanho da ilha + piso legal.
+
+    MOTOR-3 — ``via_m`` liga o FREIO DE VIA: a fração teórica de via de uma grade de passo
+    ``(lado + via)`` é ``1 − (w·h)/((w+via)(h+via))``; a escala nunca desce do ponto em que essa
+    fração ultrapassa ``TETO_VIA_GRADE`` (raiz da quadrática em fechado — determinístico)."""
     escala = min(1.0, max(ESCALA_QUADRA_MIN, math.sqrt(max(area_ilha, 0.0) / AREA_ILHA_REF_M2)))
+    if via_m and via_m > 0 and teto_w > 0 and teto_h > 0:
+        # share(e) ≤ s  ⟺  s·wh·e² − (1−s)·v·(w+h)·e − (1−s)·v² ≥ 0  → menor e admissível.
+        s, v, wh, soma = TETO_VIA_GRADE, float(via_m), teto_w * teto_h, teto_w + teto_h
+        disc = ((1 - s) * v * soma) ** 2 + 4.0 * s * wh * (1 - s) * v * v
+        e_min_via = ((1 - s) * v * soma + math.sqrt(disc)) / (2.0 * s * wh)
+        escala = max(escala, min(1.0, e_min_via))
     return max(piso_w, teto_w * escala), max(piso_h, teto_h * escala)
 
 
@@ -1631,6 +1675,11 @@ def gerar_layout(
     # subdivisão urbana de quadras dá lugar ao particionador de fatias (4.c) e a sanitização
     # "lote não pisa em restrição" não remove chácara — o % edificável sai rotulado no meta.
     regime_rural = str(diretrizes.get("regime") or "") == "rural"
+    # MOTOR-3 — HONESTIDADE em gleba fragmentada: bolsões menores que 1 lote legal não são
+    # urbanizáveis (viram verde/remanescente — critério 4 da 9.11); quando eles são muitos, o
+    # rendimento é ESTRUTURALMENTE baixo e o operador precisa ler a causa, não só o número.
+    _bolsoes_sub_lote = [c for c in comps if c.area < piso_lote]
+    _area_sub_lote = sum(c.area for c in _bolsoes_sub_lote)
 
     # Reserva de verde/institucional: o município é PISO — reserva o MAIOR entre o que a IA
     # propôs e o mínimo da LUOS (doacao_split). Pode propor mais, nunca menos (§0).
@@ -1762,7 +1811,13 @@ def gerar_layout(
     via_local = via_local_diretriz if via_local_diretriz else min(via, VIA_LOCAL_M)  # rua de quadra
     # Tronco: na GRELHA, a coletora central é larga (≥21 m, hierarquia 9.8). No traçado SINUOSO usa a
     # largura da via principal (já capada p/ ~11 m em condomínio privado na fronteira do programa).
-    via_tronco = max(via, via_local + 2.0) if quer_curva else max(via, VIA_TRONCO_M)
+    # MOTOR-3: coletora de 21 m só em gleba com PORTE (aprov ≥ COLETORA_MIN_APROV_M2); numa gleba
+    # de ~2 ha ela consumia sozinha ~10% do aproveitável (caso Caverá) — abaixo do porte, o tronco
+    # é a via local +2 m (hierarquia mantida, largura proporcional).
+    if quer_curva or aprov_area < COLETORA_MIN_APROV_M2:
+        via_tronco = max(via, via_local + 2.0)
+    else:
+        via_tronco = max(via, VIA_TRONCO_M)
     block_w = N_LOTES_QUADRA * testada_alvo    # TETO: testada da quadra ~ N lotes (perfil)
     block_h = 2.0 * prof                        # TETO: quadra de duas fileiras (costas-com-costas)
     # Fase 9.11 — PISO LEGAL do quarteirão adaptativo: a grade pode afinar p/ gerar faces, mas o
@@ -1796,9 +1851,17 @@ def gerar_layout(
         # comporta vários quarteirões → afina p/ gerar faces. Ilha pequena DEMAIS (site único
         # minúsculo, não a patologia da gleba estilhaçada) NÃO adapta — afinar ali só churna slivers
         # sem recuperar loteamento. Não toca poda/sinuosidade/recorte — só o passo da grade.
-        if ilha.area >= AREA_MIN_ADAPTA_QUADRAS * block_w * block_h:
+        # MOTOR-3 — ILHA-FAIXA (caso Caverá): menos de ~2 fileiras de quarteirão na largura
+        # útil. Afinar quadra numa faixa só multiplica transversais — o nº de fileiras está
+        # travado pela LARGURA, não pela área — e o viário explode (50% medido na tela). Faixa
+        # usa o TETO do perfil; ilhas com porte 2D (São Roque, 2,0-2,7 fileiras) seguem na 9.11.
+        faixa_estreita = (
+            _mrr_lado_curto(ilha) < FAIXA_FILEIRAS_MAX * (block_h + via_local)
+        )
+        if (not faixa_estreita) and ilha.area >= AREA_MIN_ADAPTA_QUADRAS * block_w * block_h:
             bw_i, bh_i = lado_quadra_adaptativo(
-                ilha.area, block_w, block_h, piso_quadra_w, piso_quadra_h
+                ilha.area, block_w, block_h, piso_quadra_w, piso_quadra_h,
+                via_m=via_local,  # MOTOR-3: freio de via — não afinar até a grade virar 45% rua
             )
         else:
             bw_i, bh_i = block_w, block_h
@@ -2795,6 +2858,15 @@ def gerar_layout(
     avisos: list[str] = []
     if regime_rural and aviso_rural:
         avisos.append(aviso_rural)
+    # MOTOR-3 — a gleba fragmentada é rotulada: quem lê "vendável baixo" precisa ver a causa.
+    if len(_bolsoes_sub_lote) >= 3:
+        avisos.append(
+            f"GLEBA FRAGMENTADA: a área aproveitável está partida em {len(comps)} bolsões pela "
+            f"restrição (mata/APP/declividade); {len(_bolsoes_sub_lote)} deles são menores que um "
+            f"lote legal ({piso_lote:.0f} m²) e viram verde/remanescente "
+            f"(~{_area_sub_lote:,.0f} m² não loteáveis). O rendimento desta gleba é "
+            "estruturalmente baixo — o traçado serve só os bolsões com porte de quadra."
+        )
     if not lotes:
         avisos.append(
             "A subdivisão não acomodou lotes na área aproveitável "
