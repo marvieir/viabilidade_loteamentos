@@ -40,6 +40,8 @@ class Ingestao:
     descricao: str = ""
     poligonos: list[Polygon] = field(default_factory=list)
     avisos: list[str] = field(default_factory=list)
+    # Alfinetes do KMZ (lon, lat) — desempate na escolha da gleba (router).
+    pontos: list[tuple[float, float]] = field(default_factory=list)
     # apenas em recusa:
     erro: str | None = None
     diagnostico: dict | None = None
@@ -220,6 +222,7 @@ def ingerir(
                 ),
                 poligonos=poligonos,
                 avisos=avisos,
+                pontos=list(conteudo_kml.pontos or []),
             )
         # TODO "polígono" do arquivo era DEGENERADO (área zero) e foi descartado → não há gleba.
         # Recusa honesta (antes o degenerado seguia inválido e o motor recusava em geometria.medir;

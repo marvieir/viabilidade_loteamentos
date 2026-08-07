@@ -29,6 +29,9 @@ class ConteudoKml:
     poligonos: list[Polygon]
     linhas: list[list[tuple[float, float]]]  # cada linha = lista de (lon, lat)
     n_pontos: int
+    # Alfinetes (<Point>) do arquivo — sinal de intenção do usuário no Google Earth
+    # (caso Caverá 07/08: o alfinete marcava a gleba certa entre 2 polígonos).
+    pontos: list[tuple[float, float]] = None  # type: ignore[assignment]
 
 
 def _ler_kml(conteudo: bytes) -> bytes:
@@ -112,13 +115,27 @@ def _linhas(root: etree._Element) -> list[list[tuple[float, float]]]:
     return linhas
 
 
+def _pontos(root: etree._Element) -> list[tuple[float, float]]:
+    pontos: list[tuple[float, float]] = []
+    for pt_el in root.xpath(".//*[local-name()='Point']"):
+        coords_el = pt_el.xpath(".//*[local-name()='coordinates']")
+        if not coords_el:
+            continue
+        pts = _parse_coords(coords_el[0].text)
+        if pts:
+            pontos.append(pts[0])
+    return pontos
+
+
 def ler_conteudo(conteudo: bytes) -> ConteudoKml:
-    """Lê o arquivo uma única vez e devolve polígonos, linhas e contagem de pontos."""
+    """Lê o arquivo uma única vez e devolve polígonos, linhas e os pontos (alfinetes)."""
     root = _root(conteudo)
+    pontos = _pontos(root)
     return ConteudoKml(
         poligonos=_poligonos(root),
         linhas=_linhas(root),
-        n_pontos=len(root.xpath(".//*[local-name()='Point']")),
+        n_pontos=len(pontos),
+        pontos=pontos,
     )
 
 

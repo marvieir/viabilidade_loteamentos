@@ -221,7 +221,7 @@ _COMPAC_LINEAR = 0.08
 _COMPAC_BLOCO = 0.30
 
 
-def _gleba_de_poligonos(poligonos, rotulo: str = ""):
+def _gleba_de_poligonos(poligonos, rotulo: str = "", pontos=None):
     """Monta a gleba a partir dos N polígonos de UM arquivo (decisão do operador, Fase 1.x):
 
     - 1 polígono → ele mesmo.
@@ -266,10 +266,36 @@ def _gleba_de_poligonos(poligonos, rotulo: str = ""):
             "(a gleba é o conjunto completo das áreas)."
         )
         return uni, avisos
+    # Caso Caverá (07/08): entre polígonos SEPARADOS, o ALFINETE do arquivo decide —
+    # quem trabalha no Google Earth marca a gleba com um Point; se exatamente UM dos
+    # polígonos contém alfinete, ele é a gleba (mesmo sendo o menor). Sem alfinete
+    # decisivo, mantém a regra antiga (maior área) com aviso enriquecido.
+    def _ha(g):
+        area_m2, _ = geometria.medir(g)
+        return area_m2 / 10_000.0
+
+    if pontos:
+        from shapely.geometry import Point as _Pt
+
+        com_pin = [g for g in uni.geoms if any(g.contains(_Pt(lon, lat)) for lon, lat in pontos)]
+        if len(com_pin) == 1:
+            escolhido = com_pin[0]
+            descartadas = ", ".join(
+                f"{_ha(g):.2f} ha" for g in uni.geoms if g is not escolhido
+            )
+            avisos.append(
+                f"{pref}KMZ continha {len(polys)} polígonos SEPARADOS; o ALFINETE do "
+                f"arquivo está dentro de um deles — usado como a gleba "
+                f"({_ha(escolhido):.2f} ha). Descartado(s): {descartadas}. Se a gleba "
+                "for outro polígono, reenvie o KMZ só com ela."
+            )
+            return escolhido, avisos
     maior = max(uni.geoms, key=lambda g: g.area)
+    descartadas = ", ".join(f"{_ha(g):.2f} ha" for g in uni.geoms if g is not maior)
     avisos.append(
         f"{pref}KMZ continha {len(polys)} polígonos SEPARADOS (não conexos); usado o de "
-        "maior área."
+        f"maior área ({_ha(maior):.2f} ha). Descartado(s): {descartadas}. Se a gleba for "
+        "outro polígono, reenvie o KMZ só com ela (ou marque-a com um alfinete)."
     )
     return maior, avisos
 
@@ -360,7 +386,7 @@ async def _criar_analise_unica(upload: UploadFile, fonte_malha, usuario: Usuario
             raise HTTPException(422, str(exc))
 
     # Vários polígonos → conexos viram a gleba unida (projeto único); disjuntos → o de maior área.
-    poly, avisos_gleba = _gleba_de_poligonos(res.poligonos)
+    poly, avisos_gleba = _gleba_de_poligonos(res.poligonos, pontos=res.pontos)
     avisos.extend(avisos_gleba)
     area, perimetro = geometria.medir(poly)
     jur = resolver_jurisdicao(poly, fonte_malha)
@@ -423,7 +449,9 @@ async def _ler_gleba(upload: UploadFile):
             raise HTTPException(422, f"{upload.filename}: {exc}")
 
     avisos = [f"{upload.filename}: {a}" for a in res.avisos]
-    gleba, avisos_gleba = _gleba_de_poligonos(res.poligonos, rotulo=upload.filename)
+    gleba, avisos_gleba = _gleba_de_poligonos(
+        res.poligonos, rotulo=upload.filename, pontos=res.pontos
+    )
     avisos.extend(avisos_gleba)
     return gleba, conteudo, avisos
 
