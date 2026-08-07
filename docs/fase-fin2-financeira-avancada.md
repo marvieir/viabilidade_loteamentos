@@ -3,7 +3,14 @@
 > Status: rascunho para discussão com o operador (06/08/2026). Origem: análise minuciosa da
 > planilha **TIV 5.0 — Técnica Inteligente de Viabilidade** (modelo profissional do setor,
 > 103 abas, capítulos CP 01-11) fornecida pelo operador, comparada com nossa Financeira
-> (fase 4) + Econômica (fase 5). Nada aqui está aprovado para implementação.
+> (fase 4) + Econômica (fase 5).
+>
+> Mockups das 4 telas no assistente real em `docs/mockups/mockup-fin2-*.png` (fontes .html).
+> **07/08 — MOCKUPS APROVADOS pelo operador; ONDA A AUTORIZADA para implementação**
+> (FIN2-1 curvas+cenários Conservador/Base/Otimista; FIN2-2 cronograma da obra com defaults
+> ROTULADOS como sugestão; FIN2-3 indicadores adicionais + viabilidade estática). O passo
+> novo "Financiamento" só entra com a Onda B — que segue aguardando gatilhos reais de
+> mercado (FIN2-4) e a pesquisa legal tributária (FIN2-5).
 
 ## 1. Posicionamento (o que copiar e o que NÃO copiar)
 
