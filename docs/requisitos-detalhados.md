@@ -114,8 +114,20 @@ desconta a TMA declarada → VPL em moeda constante, TIR real, paybacks. Nenhum 
 "recomendação": as leituras são rotuladas *sob as premissas declaradas*. Localização é
 contexto IBGE puro.
 
+**FIN-2 Onda A (07/08).** O ritmo de venda ganhou curva declarada — "rampa de lançamento"
+usa pesos linearmente decrescentes (1º mês pesa N, o último pesa 1; fórmula na
+proveniência) — e cenários nomeados (Conservador/Base/Otimista): o motor roda o fluxo
+inteiro para CADA cenário, o ativo vira o resultado principal e os demais aparecem lado a
+lado; a Econômica avalia VPL/TIR/paybacks de todos (fluxos persistidos no store). A obra
+ganhou cronograma por disciplina (cada uma com início/duração/curva; a soma prevalece
+sobre o R$/lote único) e o PICO de desembolso sai declarado. Novos indicadores na
+Econômica: MTIR (captação e reinvestimento à TMA), ROE nominal e anualizado, exposição
+média e tempo no vermelho; e a Financeira entrega o quadro ESTÁTICO (a conta de guardanapo
+estruturada). Tudo aditivo — sem cenários/disciplinas o comportamento é idêntico ao
+anterior (ouros preservados).
+
 - Código: `routers/financeira.py`, `routers/economica.py`, `core/financeira*.py`, `core/economica*.py`, `routers/localizacao.py`.
-- Testes: `test_financeira*.py`, `test_economica.py`.
+- Testes: `test_financeira*.py`, `test_economica.py`, `test_fin2_onda_a.py`.
 
 ## RF-PORT — AI Portfolio Insights
 

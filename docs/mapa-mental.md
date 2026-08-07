@@ -71,6 +71,9 @@ mindmap
       Financeira e Econômica RF-FIN
         Fluxo mensal Price VGV exposição
         VPL TIR payback sob premissas declaradas
+        Cenários de venda e curva rampa
+        Obra por disciplina com pico
+        MTIR ROE exposição média e estático
       Localização RF-LOC
       AI Portfolio Insights RF-PORT
         Compara as áreas do usuário

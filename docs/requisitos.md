@@ -85,6 +85,9 @@ de produto e perfis municipais).
 - **RF-FIN-1** Fluxo de caixa do empreendimento com venda financiada (tabela Price), VGV nominal e geral, exposição máxima de caixa.
 - **RF-FIN-2** VPL em moeda constante, TIR real, paybacks; leituras favorável/atenção/desfavorável **sob as premissas declaradas**.
 - **RF-FIN-3** Avaliação econômica com TMA declarada; premissas sempre visíveis.
+- **RF-FIN-4** *(FIN-2)* Ritmo de vendas com curva declarada (linear/rampa de lançamento/custom) e até 3 CENÁRIOS nomeados de venda — mesmo VGV, indicadores lado a lado (exposição/payback no fluxo; VPL/TIR por cenário na Econômica).
+- **RF-FIN-5** *(FIN-2)* Cronograma físico-financeiro da obra por disciplina (início/duração/curva por disciplina; prevalece sobre o valor único) com pico de desembolso exposto.
+- **RF-FIN-6** *(FIN-2)* Indicadores adicionais: MTIR (à TMA), ROE nominal/anualizado, exposição média + tempo no negativo, e quadro de viabilidade ESTÁTICA (custos÷VGV com composição obra/terreno/demais, custo por lote).
 
 ### RF-LOC — Localização
 - **RF-LOC-1** Contexto socioeconômico IBGE (população, PIB per capita, domicílios, faixa etária) — informativo.

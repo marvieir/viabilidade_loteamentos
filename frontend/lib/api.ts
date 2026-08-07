@@ -1284,6 +1284,31 @@ export interface Leitura {
   valor_fmt: string | null;
 }
 
+export interface CenarioFin {
+  nome: string;
+  ativo: boolean;
+  duracao_meses: number;
+  resultado_nominal: number;
+  resultado_nominal_fmt: string;
+  exposicao_maxima: { valor: number; valor_fmt: string; mes: number };
+  meses_negativo: number | null;
+  horizonte_meses: number;
+}
+
+export interface EstaticoFin {
+  vgv: number;
+  vgv_fmt: string;
+  custos_total: number;
+  custos_total_fmt: string;
+  custos_pct_vgv: number | null;
+  resultado: number;
+  resultado_fmt: string;
+  margem: number | null;
+  custo_por_lote: number | null;
+  custo_por_lote_fmt: string | null;
+  composicao: Record<string, number>;
+}
+
 export interface Financeira {
   caso_base: {
     lotes: number;
@@ -1303,6 +1328,10 @@ export interface Financeira {
     permuta: { modo: string; pct: number | null; valor: number; valor_fmt: string };
   };
   blocos: BlocoFin[];
+  // FIN-2 Onda A (aditivos; ausentes em snapshots antigos)
+  cenarios?: CenarioFin[];
+  obra_pico?: { mes: number; valor: number; valor_fmt: string } | null;
+  estatico?: EstaticoFin | null;
   fluxo_vendas: FluxoVenda[];
   fluxo: LinhaFluxo[];
   fluxo_resumo_anual: ResumoAnual[];
@@ -1379,6 +1408,25 @@ export interface Economica {
   leituras: Leitura[]; // chaves vpl/tir/payback — o dashboard da Financeira compõe
   proveniencia: string;
   avisos: string[];
+  // FIN-2 Onda A (aditivos)
+  mtir_aa?: number | null;
+  mtir_aa_fmt?: string | null;
+  roe_nominal?: number | null;
+  roe_aa?: number | null;
+  exposicao_media?: { valor: number; valor_fmt: string; meses: number } | null;
+  cenarios?: CenarioEco[];
+}
+
+export interface CenarioEco {
+  nome: string;
+  ativo: boolean;
+  vpl: number;
+  vpl_fmt: string;
+  tir_aa: number | null;
+  tir_aa_fmt: string | null;
+  tir_status: string;
+  payback_simples_mes: number | null;
+  payback_descontado_mes: number | null;
 }
 
 // Avalia e persiste. 409 = Financeira ainda não executada; 422 = TMA ausente/curva inválida.

@@ -27,6 +27,9 @@ determinístico testado (a TIV depende de fórmula não travada e disciplina do 
 
 ## 2. Escopo proposto (6 itens, em 2 ondas)
 
+> **ONDA A IMPLEMENTADA em 07/08/2026** (FIN2-1/2/3 — RF-FIN-4/5/6; testes em
+> `test_fin2_onda_a.py`). Onda B aguarda insumos do operador.
+
 ### Onda A — realismo do fluxo (maior impacto de credibilidade)
 
 **FIN2-1 · Curva de vendas + 3 cenários.**

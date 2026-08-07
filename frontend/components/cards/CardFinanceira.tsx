@@ -23,6 +23,17 @@ import { comporLeituras } from "@/lib/compor";
    backend (POST a cada avanço) — nada é calculado aqui (§2). Microcopy em todo campo. */
 
 type LinhaMesa = { participacao: number; prazo_meses: number; taxa_am: number };
+type LinhaCenario = { nome: string; duracao_meses: number; curva: "linear" | "rampa" };
+type LinhaDisc = {
+  nome: string; valor: number; inicio_mes: number; duracao_meses: number;
+  curva: "linear" | "frente_carregada";
+};
+
+// FIN2-2 — disciplinas SUGERIDAS (rateio uniforme do total; edite conforme a obra real).
+const DISCIPLINAS_SUGERIDAS = [
+  "Terraplenagem", "Rede de água", "Esgoto sanitário", "Drenagem pluvial",
+  "Energia / iluminação", "Pavimentação / meio-fio", "Paisagismo e portaria",
+];
 
 type Form = {
   precoModo: "m2" | "lote";
@@ -39,6 +50,9 @@ type Form = {
   // venda
   inicio_mes: number;
   duracao_meses: number;
+  curva: "linear" | "rampa"; // FIN2-1 — ritmo (custom só via API por ora)
+  usarCenarios: boolean;
+  cenAtivo: string;
   modo: "financiado" | "avista" | "parcelado";
   entrada_pct: number; // %
   n_parcelas: number;
@@ -46,6 +60,7 @@ type Form = {
   urb_valor: number;
   urb_inicio: number;
   urb_duracao: number;
+  usarDisciplinas: boolean; // FIN2-2 — cronograma por disciplina prevalece
   projetos: number;
   topografia: number;
   admin_mensal: number;
@@ -62,7 +77,8 @@ const PADRAO: Form = {
   precoModo: "lote", preco_m2: 350, area_lote_m2: 263.21, preco_lote: 100000,
   override_lotes: false, lotes_n: 0,
   aq_modo: "permuta_vgv", terrenista_pct: 20, permuta_n: 0, compra_valor: 0,
-  inicio_mes: 1, duracao_meses: 10, modo: "financiado", entrada_pct: 15, n_parcelas: 36,
+  inicio_mes: 1, duracao_meses: 10, curva: "rampa", usarCenarios: false, cenAtivo: "Base",
+  modo: "financiado", entrada_pct: 15, n_parcelas: 36, usarDisciplinas: false,
   urb_valor: 30000, urb_inicio: 1, urb_duracao: 6, projetos: 280000, topografia: 100000,
   admin_mensal: 10000, marketing_pct: 2, comissao_pct: 5,
   aliquota_pct: 5.93, inadimplencia_pct: 0, margem_referencia_pct: 20, capital_disponivel: 0,
@@ -89,6 +105,14 @@ export function CardFinanceira({
 }) {
   const [f, setF] = useState<Form>(PADRAO);
   const [mesa, setMesa] = useState<LinhaMesa[]>(MESA_PADRAO);
+  // FIN2-1 — três cenários de venda (nomes fixos da spec; durações editáveis)
+  const [cen, setCen] = useState<LinhaCenario[]>([
+    { nome: "Conservador", duracao_meses: 15, curva: "linear" },
+    { nome: "Base", duracao_meses: 10, curva: "rampa" },
+    { nome: "Otimista", duracao_meses: 7, curva: "rampa" },
+  ]);
+  // FIN2-2 — cronograma por disciplina (vazio = modo simples de sempre)
+  const [disc, setDisc] = useState<LinhaDisc[]>([]);
   const [confirmarInad, setConfirmarInad] = useState(false);
   const [passo, setPasso] = useState(1);
   const [prev, setPrev] = useState<Financeira | null>(null);
@@ -107,7 +131,7 @@ export function CardFinanceira({
 
   function premissas() {
     const vendas: Record<string, unknown> = {
-      inicio_mes: f.inicio_mes, duracao_meses: f.duracao_meses, curva: "linear", modo: f.modo,
+      inicio_mes: f.inicio_mes, duracao_meses: f.duracao_meses, curva: f.curva, modo: f.modo,
     };
     if (f.modo === "parcelado") { vendas.entrada_pct = f.entrada_pct / 100; vendas.n_parcelas = f.n_parcelas; }
     if (f.modo === "financiado") {
@@ -132,8 +156,24 @@ export function CardFinanceira({
         f.aq_modo === "permuta_vgv" ? { modo: "permuta_vgv", pct: f.terrenista_pct / 100 }
         : f.aq_modo === "permuta_lotes" ? { modo: "permuta_lotes", n: f.permuta_n }
         : { modo: "compra", valor: f.compra_valor, condicao: "avista", inicio_mes: 0 },
+      ...(f.usarCenarios
+        ? {
+            cenarios: cen.map((c) => ({
+              nome: c.nome, duracao_meses: c.duracao_meses, curva: c.curva,
+            })),
+            cenario_ativo: f.cenAtivo,
+          }
+        : {}),
       custos: {
-        urbanizacao: { base: "por_lote", valor: f.urb_valor, inicio_mes: f.urb_inicio, duracao_meses: f.urb_duracao },
+        urbanizacao: {
+          base: "por_lote", valor: f.urb_valor, inicio_mes: f.urb_inicio, duracao_meses: f.urb_duracao,
+          ...(f.usarDisciplinas && disc.length
+            ? { disciplinas: disc.map((d) => ({
+                nome: d.nome, valor: d.valor, inicio_mes: d.inicio_mes,
+                duracao_meses: d.duracao_meses, curva: d.curva,
+              })) }
+            : {}),
+        },
         projetos_aprovacao: { valor: f.projetos, mes: 0 },
         topografia: { valor: f.topografia, mes: 0 },
         administracao_mensal: f.admin_mensal,
@@ -346,6 +386,55 @@ export function CardFinanceira({
                 </div>
               </div>
             )}
+            {/* FIN2-1 — ritmo de vendas */}
+            <div className="rounded-lg border border-laranja-200 bg-laranja-50/40 p-3">
+              <p className="text-sm font-medium text-slate-700">Ritmo de vendas <Badge tom="amber">novo</Badge></p>
+              <div className="mt-2 flex gap-2">
+                {([["rampa", "Rampa de lançamento"], ["linear", "Linear"]] as const).map(([v, r]) => (
+                  <button key={v} type="button" onClick={() => set("curva", v)}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${f.curva === v ? "border-marinho-900 bg-marinho-900 font-semibold text-white" : "border-slate-300 bg-white text-slate-600"}`}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Rampa: venda forte no lançamento e cauda longa (pesos decrescentes mês a mês —
+                fórmula declarada na proveniência). Linear: mesmo volume todo mês.
+              </p>
+            </div>
+            {/* FIN2-1 — cenários de venda */}
+            <div className="rounded-lg border border-laranja-200 bg-laranja-50/40 p-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input type="checkbox" checked={f.usarCenarios} onChange={(e) => set("usarCenarios", e.target.checked)} className="accent-laranja-600" />
+                Comparar 3 cenários de venda <Badge tom="amber">novo</Badge>
+              </label>
+              {f.usarCenarios && (
+                <div className="mt-2 space-y-1.5">
+                  {cen.map((c, i) => (
+                    <div key={c.nome} className="flex flex-wrap items-center gap-2 text-xs">
+                      <label className="flex w-28 items-center gap-1.5 font-medium text-slate-700">
+                        <input type="radio" name="cenAtivo" checked={f.cenAtivo === c.nome} onChange={() => set("cenAtivo", c.nome)} className="accent-laranja-600" />
+                        {c.nome}
+                      </label>
+                      <input type="number" value={c.duracao_meses}
+                        onChange={(e) => setCen((m) => m.map((l, k) => k === i ? { ...l, duracao_meses: parseInt(e.target.value) || 1 } : l))}
+                        className="w-16 rounded border border-slate-200 px-2 py-1" />
+                      <span className="text-slate-500">meses ·</span>
+                      <select value={c.curva}
+                        onChange={(e) => setCen((m) => m.map((l, k) => k === i ? { ...l, curva: e.target.value as LinhaCenario["curva"] } : l))}
+                        className="rounded border border-slate-200 px-1.5 py-1">
+                        <option value="rampa">rampa</option>
+                        <option value="linear">linear</option>
+                      </select>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-slate-500">
+                    Mesmo VGV nos três — muda o TEMPO do dinheiro. O selecionado é o cenário
+                    principal; os três aparecem lado a lado no Resultado (com VPL/TIR na Econômica).
+                  </p>
+                </div>
+              )}
+            </div>
             <Parcial rotulo="VGV geral (nominal + financeira)" valor={prev?.vgv.geral_fmt}
               extra={prev && prev.vgv.receita_financeira > 0 ? `juros ${prev.vgv.receita_financeira_fmt}` : undefined} />
           </Passo>
@@ -363,6 +452,66 @@ export function CardFinanceira({
               <Campo rotulo="Administração (R$/mês)" ajuda="Custo fixo mensal do empreendimento (equipe, escritório)." valor={f.admin_mensal} on={(v) => set("admin_mensal", v)} />
               <Campo rotulo="Marketing (% do VGV próprio)" ajuda="Verba de divulgação como % do faturamento do incorporador." valor={f.marketing_pct} on={(v) => set("marketing_pct", v)} />
               <Campo rotulo="Comissão (%)" ajuda="Comissão de venda. No financiado, incide sobre o recebimento (carteira)." valor={f.comissao_pct} on={(v) => set("comissao_pct", v)} />
+            </div>
+            {/* FIN2-2 — cronograma da obra por disciplina */}
+            <div className="rounded-lg border border-laranja-200 bg-laranja-50/40 p-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                <input type="checkbox" checked={f.usarDisciplinas}
+                  onChange={(e) => {
+                    const ligar = e.target.checked;
+                    set("usarDisciplinas", ligar);
+                    if (ligar && disc.length === 0) {
+                      const lotesRef = prev?.caso_base.lotes_vendaveis ?? nDiretriz ?? nTeto ?? 0;
+                      const total = f.urb_valor * lotesRef;
+                      const porDisc = Math.round((total / DISCIPLINAS_SUGERIDAS.length) * 100) / 100;
+                      setDisc(DISCIPLINAS_SUGERIDAS.map((nome, i) => ({
+                        nome, valor: porDisc,
+                        inicio_mes: f.urb_inicio + Math.floor(i * (f.urb_duracao / DISCIPLINAS_SUGERIDAS.length)),
+                        duracao_meses: Math.max(1, Math.round(f.urb_duracao / 2)),
+                        curva: i === 0 ? "frente_carregada" : "linear",
+                      })));
+                    }
+                  }}
+                  className="accent-laranja-600" />
+                Detalhar cronograma por disciplina <Badge tom="amber">novo</Badge>
+              </label>
+              {f.usarDisciplinas && (
+                <div className="mt-2 space-y-1.5">
+                  <p className="text-[11px] text-amber-700">
+                    Valores SUGERIDOS por rateio uniforme do total (R$/lote × lotes) e datas
+                    escalonadas — edite conforme a obra real. Este cronograma PREVALECE sobre o
+                    R$/lote acima.
+                  </p>
+                  {disc.map((d, i) => (
+                    <div key={i} className="flex flex-wrap items-center gap-1.5 text-xs">
+                      <input value={d.nome} onChange={(e) => setDisc((m) => m.map((l, k) => k === i ? { ...l, nome: e.target.value } : l))} className="w-40 rounded border border-slate-200 px-2 py-1" />
+                      <span className="text-slate-500">R$</span>
+                      <input type="number" value={d.valor} onChange={(e) => setDisc((m) => m.map((l, k) => k === i ? { ...l, valor: parseFloat(e.target.value) || 0 } : l))} className="w-24 rounded border border-slate-200 px-2 py-1" />
+                      <span className="text-slate-500">mês</span>
+                      <input type="number" value={d.inicio_mes} onChange={(e) => setDisc((m) => m.map((l, k) => k === i ? { ...l, inicio_mes: parseInt(e.target.value) || 0 } : l))} className="w-14 rounded border border-slate-200 px-2 py-1" />
+                      <span className="text-slate-500">por</span>
+                      <input type="number" value={d.duracao_meses} onChange={(e) => setDisc((m) => m.map((l, k) => k === i ? { ...l, duracao_meses: parseInt(e.target.value) || 1 } : l))} className="w-14 rounded border border-slate-200 px-2 py-1" />
+                      <span className="text-slate-500">meses ·</span>
+                      <select value={d.curva} onChange={(e) => setDisc((m) => m.map((l, k) => k === i ? { ...l, curva: e.target.value as LinhaDisc["curva"] } : l))} className="rounded border border-slate-200 px-1.5 py-1">
+                        <option value="linear">linear</option>
+                        <option value="frente_carregada">frente carregada</option>
+                      </select>
+                      <button onClick={() => setDisc((m) => m.filter((_, k) => k !== i))} className="text-slate-400 hover:text-rose-600">✕</button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-3 text-xs">
+                    <button onClick={() => setDisc((m) => [...m, { nome: "Nova disciplina", valor: 0, inicio_mes: f.urb_inicio, duracao_meses: 3, curva: "linear" }])} className="font-medium text-laranja-700">+ disciplina</button>
+                    <span className="text-slate-500">
+                      total: {disc.reduce((sm, d) => sm + d.valor, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </div>
+                  {prev?.obra_pico && (
+                    <p className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800">
+                      ⚠ Pico de desembolso da obra: <b>{prev.obra_pico.valor_fmt} no mês {prev.obra_pico.mes}</b> — é ele que pressiona a exposição máxima.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
             <Parcial rotulo="Total de custos" valor={prev ? prev.blocos.filter((b) => !["tributos"].includes(b.bloco)).reduce((s, b) => s + b.total, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }) : undefined}
               extra={prev && prev.caso_base.lotes_vendaveis ? `${prev.caso_base.lotes_vendaveis} lotes vendáveis` : undefined} />
@@ -483,6 +632,61 @@ function Dashboard({ d, econ }: { d: Financeira; econ?: Economica | null }) {
         <Kpi rotulo="Exposição máx. de caixa" valor={ind.exposicao_maxima.valor_fmt} tom="rose" sub={`no mês ${ind.exposicao_maxima.mes}`} />
         <Kpi rotulo="Horizonte" valor={`${ind.horizonte_meses} meses`} sub={`${d.caso_base.lotes_vendaveis} lotes · ${d.caso_base.origem_lotes}`} />
       </div>
+
+      {/* FIN2-1 — comparativo de cenários (VPL/TIR da Econômica quando disponível) */}
+      {d.cenarios && d.cenarios.length > 0 && (
+        <div className="rounded-xl border border-slate-200 p-4">
+          <p className="mb-2 text-sm font-semibold text-slate-800">Cenários de venda — mesmo VGV, muda o tempo do dinheiro</p>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {d.cenarios.map((c) => {
+              const ce = econ?.cenarios?.find((x) => x.nome === c.nome);
+              return (
+                <div key={c.nome} className={`rounded-lg border p-3 ${c.ativo ? "border-laranja-400 ring-2 ring-laranja-100" : "border-slate-200"}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{c.duracao_meses} meses de venda{c.ativo ? " · ativo" : ""}</p>
+                  <p className="text-sm font-bold text-slate-800">{c.nome}</p>
+                  <ul className="mt-1.5 space-y-1 text-xs text-slate-600">
+                    {ce && <li className="flex justify-between"><span>VPL</span><b className={ce.vpl >= 0 ? "text-emerald-700" : "text-rose-700"}>{ce.vpl_fmt}</b></li>}
+                    {ce && <li className="flex justify-between"><span>TIR a.a.</span><b>{ce.tir_aa_fmt ?? "—"}</b></li>}
+                    <li className="flex justify-between"><span>Resultado</span><b>{c.resultado_nominal_fmt}</b></li>
+                    <li className="flex justify-between"><span>Exposição máx.</span><b className="text-rose-700">{c.exposicao_maxima.valor_fmt}</b></li>
+                    <li className="flex justify-between"><span>Mês da exposição</span><b>{c.exposicao_maxima.mes}</b></li>
+                    <li className="flex justify-between"><span>Meses no negativo</span><b>{c.meses_negativo ?? "não recupera"}</b></li>
+                    {ce?.payback_descontado_mes != null && <li className="flex justify-between"><span>Payback descontado</span><b>{ce.payback_descontado_mes} meses</b></li>}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+          {!econ?.cenarios?.length && (
+            <p className="mt-2 text-[11px] text-slate-400">Rode a Econômica para ver VPL/TIR de cada cenário.</p>
+          )}
+        </div>
+      )}
+
+      {/* FIN2-3 — indicadores adicionais (Econômica) */}
+      {econ && (econ.mtir_aa != null || econ.roe_nominal != null || econ.exposicao_media) && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {econ.mtir_aa_fmt && <Kpi rotulo="MTIR a.a." valor={econ.mtir_aa_fmt} sub="reinvestimento à TMA" />}
+          {econ.roe_nominal != null && <Kpi rotulo="ROE nominal" valor={`${econ.roe_nominal.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}×`} sub="resultado ÷ exposição máx." />}
+          {econ.roe_aa != null && <Kpi rotulo="ROE anualizado" valor={`${(econ.roe_aa * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`} sub="no horizonte do fluxo" />}
+          {econ.exposicao_media && <Kpi rotulo="Exposição média" valor={econ.exposicao_media.valor_fmt} tom="rose" sub={`por ${econ.exposicao_media.meses} meses no negativo`} />}
+        </div>
+      )}
+
+      {/* FIN2-3 — viabilidade estática (a conta de guardanapo, estruturada) */}
+      {d.estatico && (
+        <div className="rounded-xl border border-slate-200 p-4">
+          <p className="mb-2 text-sm font-semibold text-slate-800">Viabilidade estática (sem o tempo)</p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Kpi rotulo="VGV" valor={d.estatico.vgv_fmt} />
+            <Kpi rotulo="Custos ÷ VGV" valor={d.estatico.custos_pct_vgv != null ? `${(d.estatico.custos_pct_vgv * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%` : "—"}
+              sub={Object.entries(d.estatico.composicao).map(([k, v]) => `${k} ${(v * 100).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}%`).join(" · ")} />
+            <Kpi rotulo="Resultado" valor={d.estatico.resultado_fmt} tom={d.estatico.resultado >= 0 ? "emerald" : "rose"}
+              sub={d.estatico.margem != null ? `margem ${(d.estatico.margem * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : undefined} />
+            <Kpi rotulo="Custo por lote" valor={d.estatico.custo_por_lote_fmt ?? "—"} sub="todos os custos ÷ lotes" />
+          </div>
+        </div>
+      )}
 
       {/* Semáforo */}
       <div className="rounded-xl border border-slate-200 p-4">
