@@ -192,6 +192,29 @@ def avaliar(
         )
     payback = schemas.PaybackOut(simples_mes=simples, descontado_mes=descontado, avisos=pb_avisos)
 
+    # --- FIN2-3: MTIR (MIRR com captação e reinvestimento à TMA), ROE e exposição média ---
+    horizonte_n = max(m for m, _ in fluxo)
+    fv_pos = sum(v * (1.0 + i_m) ** (horizonte_n - m) for m, v in fluxo if v > 0)
+    pv_neg = sum(-v / (1.0 + i_m) ** m for m, v in fluxo if v < 0)
+    mtir_aa = None
+    if fv_pos > 0 and pv_neg > 0 and horizonte_n > 0:
+        mtir_m = (fv_pos / pv_neg) ** (1.0 / horizonte_n) - 1.0
+        mtir_aa = round((1.0 + mtir_m) ** 12 - 1.0, 5)
+    acum_ord = sorted(acumulado_nominal)
+    resultado_nom = acum_ord[-1][1] if acum_ord else 0.0
+    exp_nom_min = min((ac for _, ac in acum_ord), default=0.0)
+    roe_nominal = round(resultado_nom / abs(exp_nom_min), 4) if exp_nom_min < -0.005 else None
+    roe_aa = None
+    if roe_nominal is not None and roe_nominal > -1 and horizonte_n > 0:
+        roe_aa = round((1.0 + roe_nominal) ** (12.0 / horizonte_n) - 1.0, 5)
+    negativos = [ac for _, ac in acum_ord if ac < 0]
+    exposicao_media = None
+    if negativos:
+        media_neg = round(sum(negativos) / len(negativos), 2)
+        exposicao_media = schemas.ExposicaoMediaOut(
+            valor=media_neg, valor_fmt=brl(media_neg), meses=len(negativos)
+        )
+
     # --- Exposição máxima descontada + IL ---
     exp_valor = round(acd_min, 2)
     exposicao = schemas.ExposicaoOut(valor=exp_valor, valor_fmt=brl(exp_valor), mes=acd_min_mes)
@@ -281,4 +304,45 @@ def avaliar(
         leituras=leituras,
         proveniencia=proveniencia,
         avisos=[AVISO_INCC, AVISO_JUROS_REAL, AVISO_1A],
+        mtir_aa=mtir_aa,
+        mtir_aa_fmt=pct_br(mtir_aa) + " a.a." if mtir_aa is not None else None,
+        roe_nominal=roe_nominal,
+        roe_aa=roe_aa,
+        exposicao_media=exposicao_media,
     )
+
+
+def avaliar_cenarios(
+    cenarios_fluxos: dict, p: schemas.PremissasEconomicaIn
+) -> list[schemas.CenarioEconomicoOut]:
+    """FIN2-1 — VPL/TIR/paybacks de CADA cenário de venda persistido pela Financeira.
+    Entrada: {nome: {"ativo": bool, "fluxo": [(m, liq)], "acumulado": [(m, ac)]}}."""
+    i_m = tma_mensal(p.tma_aa_real)
+    saida: list[schemas.CenarioEconomicoOut] = []
+    for nome, dados in (cenarios_fluxos or {}).items():
+        fl = sorted((int(m), float(v)) for m, v in dados.get("fluxo", []))
+        ac = sorted((int(m), float(v)) for m, v in dados.get("acumulado", []))
+        if not fl:
+            continue
+        vpl_v = round(vpl(fl, i_m), 2)
+        tir_m, tir_status = tir_bissecao(fl)
+        tir_aa = round((1.0 + tir_m) ** 12 - 1.0, 5) if tir_m is not None else None
+        pb_simples = next((m for m, a in ac if a >= 0), None)
+        pb_desc, acd = None, 0.0
+        for m, v in fl:
+            acd += v / (1.0 + i_m) ** m
+            if pb_desc is None and acd >= 0:
+                pb_desc = m
+        saida.append(
+            schemas.CenarioEconomicoOut(
+                nome=nome,
+                ativo=bool(dados.get("ativo")),
+                vpl=vpl_v, vpl_fmt=brl(vpl_v),
+                tir_aa=tir_aa,
+                tir_aa_fmt=pct_br(tir_aa) + " a.a." if tir_aa is not None else None,
+                tir_status=tir_status if tir_m is not None else "indefinida",
+                payback_simples_mes=pb_simples,
+                payback_descontado_mes=pb_desc,
+            )
+        )
+    return saida

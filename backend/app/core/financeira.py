@@ -116,6 +116,12 @@ def _fracoes(inicio: int, dur: int, curva: str, custom: Optional[list[float]]) -
                 f"curva custom deve somar 1,0 (soma atual: {sum(custom):.4f})."
             )
         fr = custom
+    elif curva in ("rampa", "frente_carregada"):
+        # FIN2-1/2 — rampa de lançamento / frente carregada: pesos LINEARMENTE
+        # decrescentes (peso_i ∝ dur − i, normalizado). Determinístico e declarado:
+        # 1º mês pesa dur, o último pesa 1 → começo forte, cauda longa.
+        soma = dur * (dur + 1) / 2.0
+        fr = [(dur - i) / soma for i in range(dur)]
     else:
         fr = [1.0 / dur] * dur
     return {inicio + i: fr[i] for i in range(dur)}
@@ -293,9 +299,31 @@ def montar_fluxo(
         )
 
     c = p.custos
+    obra_por_mes: dict[int, float] = {}  # FIN2-2 — desembolso mensal da obra (p/ o pico)
 
-    # Urbanização
-    if c.urbanizacao.valor > 0:
+    # Urbanização — FIN2-2: com ``disciplinas`` presentes, o cronograma físico-financeiro
+    # por disciplina PREVALECE (cada uma com início/duração/curva; total = soma).
+    if c.urbanizacao.disciplinas:
+        por_mes: dict[int, float] = defaultdict(float)
+        nomes = []
+        for d in c.urbanizacao.disciplinas:
+            if d.valor <= 0:
+                continue
+            fr = _fracoes(d.inicio_mes, d.duracao_meses, d.curva, d.curva_custom)
+            for m, f in fr.items():
+                por_mes[m] += d.valor * f
+            nomes.append(d.nome)
+        if por_mes:
+            obra_por_mes = dict(por_mes)
+            total_disc = round(sum(v.valor for v in c.urbanizacao.disciplinas if v.valor > 0), 2)
+            _add_bloco(
+                "urbanizacao",
+                dict(por_mes),
+                f"cronograma por disciplina ({len(nomes)}: {', '.join(nomes[:4])}"
+                + ("…" if len(nomes) > 4 else "")
+                + f") — total R$ {brl(total_disc)[3:]} — declarado",
+            )
+    elif c.urbanizacao.valor > 0:
         if c.urbanizacao.base == "por_lote":
             urb_total = c.urbanizacao.valor * lotes_fisicos
             prov_urb = (
@@ -310,7 +338,8 @@ def montar_fluxo(
             urb_total = c.urbanizacao.valor * area
             prov_urb = f"R$ {brl(c.urbanizacao.valor)[3:]}/m² × {area:.0f} m² — declarado"
         urb = _fracoes(c.urbanizacao.inicio_mes, c.urbanizacao.duracao_meses, "linear", None)
-        _add_bloco("urbanizacao", {m: urb_total * f for m, f in urb.items()}, prov_urb)
+        obra_por_mes = {m: urb_total * f for m, f in urb.items()}
+        _add_bloco("urbanizacao", dict(obra_por_mes), prov_urb)
 
     # Projetos + aprovação (default rotulado)
     if c.projetos_aprovacao.valor > 0:
@@ -615,6 +644,37 @@ def montar_fluxo(
             "explicitamente pelo usuário."
         )
 
+    # --- FIN2-2: pico de desembolso da obra (quando há obra no fluxo) ---
+    obra_pico = None
+    if obra_por_mes:
+        pico_mes = max(obra_por_mes, key=lambda m: obra_por_mes[m])
+        pico_val = round(obra_por_mes[pico_mes], 2)
+        obra_pico = schemas.ObraPicoOut(mes=pico_mes, valor=pico_val, valor_fmt=brl(pico_val))
+
+    # --- FIN2-3: viabilidade ESTÁTICA (sem tempo) — a conta de guardanapo, estruturada ---
+    _obra_tot = sum(b.total for b in blocos if b.bloco == "urbanizacao")
+    _terreno_tot = sum(b.total for b in blocos if b.bloco in ("aquisicao", "itbi"))
+    _demais_tot = round(custos_total - _obra_tot - _terreno_tot, 2)
+    composicao = (
+        {
+            "obra": round(_obra_tot / vgv_bruto, 4),
+            "terreno": round(_terreno_tot / vgv_bruto, 4),
+            "demais": round(_demais_tot / vgv_bruto, 4),
+        }
+        if vgv_bruto
+        else {}
+    )
+    estatico = schemas.EstaticoOut(
+        vgv=vgv_bruto, vgv_fmt=brl(vgv_bruto),
+        custos_total=custos_total, custos_total_fmt=brl(custos_total),
+        custos_pct_vgv=round(custos_total / vgv_bruto, 4) if vgv_bruto else None,
+        resultado=resultado, resultado_fmt=brl(resultado),
+        margem=margem if vgv_proprio else None,
+        custo_por_lote=round(custos_total / lotes_fisicos, 2) if lotes_fisicos else None,
+        custo_por_lote_fmt=brl(round(custos_total / lotes_fisicos, 2)) if lotes_fisicos else None,
+        composicao=composicao,
+    )
+
     return schemas.FinanceiraOut(
         caso_base=schemas.CasoBaseOut(
             lotes=ctx.lotes_base,
@@ -648,9 +708,70 @@ def montar_fluxo(
         participantes=participantes,
         leituras=leituras,
         alerta_critico=alerta_critico,
+        obra_pico=obra_pico,
+        estatico=estatico,
         proveniencia=(
             "Premissas declaradas/defaults rotulados desta análise · lotes do "
             + (ctx.rotulo_origem or ctx.origem_lotes)
         ),
         avisos=avisos,
     )
+
+
+def montar_com_cenarios(
+    premissas: PremissasFinanceiraIn, ctx: ContextoFinanceira
+) -> tuple[schemas.FinanceiraOut, dict]:
+    """FIN2-1 — roda o fluxo para CADA cenário de venda e devolve:
+    (FinanceiraOut do cenário ATIVO com ``cenarios`` resumidos, fluxos_por_cenario) —
+    o segundo item vai ao store para a Econômica avaliar VPL/TIR de todos.
+    Sem ``cenarios`` nas premissas: comporta-se exatamente como montar_fluxo (compat)."""
+    p = premissas
+    if not p.cenarios:
+        return montar_fluxo(p, ctx), {}
+
+    nomes = [c.nome for c in p.cenarios]
+    if len(set(nomes)) != len(nomes):
+        raise CurvaInvalida("cenários com nomes repetidos.")
+    ativo_nome = p.cenario_ativo or nomes[0]
+    if ativo_nome not in nomes:
+        raise CurvaInvalida(f"cenario_ativo '{ativo_nome}' não está na lista de cenários.")
+
+    resultados: dict[str, schemas.FinanceiraOut] = {}
+    fluxos: dict[str, dict] = {}
+    for cen in p.cenarios:
+        vendas_cen = p.vendas.model_copy(
+            update={
+                "inicio_mes": cen.inicio_mes if cen.inicio_mes is not None else p.vendas.inicio_mes,
+                "duracao_meses": cen.duracao_meses,
+                "curva": cen.curva,
+                "curva_custom": cen.curva_custom,
+            }
+        )
+        p_cen = p.model_copy(update={"vendas": vendas_cen, "cenarios": None, "cenario_ativo": None})
+        out_cen = montar_fluxo(p_cen, ctx)
+        resultados[cen.nome] = out_cen
+        fluxos[cen.nome] = {
+            "ativo": cen.nome == ativo_nome,
+            "fluxo": [(l.mes, l.liquido) for l in out_cen.fluxo],
+            "acumulado": [(l.mes, l.acumulado) for l in out_cen.fluxo],
+        }
+
+    out = resultados[ativo_nome]
+    resumos = []
+    for cen in p.cenarios:
+        r = resultados[cen.nome]
+        meses_neg = next((l.mes for l in r.fluxo if l.acumulado >= 0), None)
+        resumos.append(
+            schemas.CenarioResumoOut(
+                nome=cen.nome,
+                ativo=cen.nome == ativo_nome,
+                duracao_meses=cen.duracao_meses,
+                resultado_nominal=r.indicadores.resultado_nominal,
+                resultado_nominal_fmt=r.indicadores.resultado_nominal_fmt,
+                exposicao_maxima=r.indicadores.exposicao_maxima,
+                meses_negativo=meses_neg,
+                horizonte_meses=r.indicadores.horizonte_meses,
+            )
+        )
+    out = out.model_copy(update={"cenarios": resumos})
+    return out, fluxos

@@ -63,7 +63,7 @@ def calcular_financeira(
         }.get(origem, origem),
     )
     try:
-        resultado = motor.montar_fluxo(body, ctx)
+        resultado, fluxos_cenarios = motor.montar_com_cenarios(body, ctx)
     except motor.PremissaFaltando as exc:
         raise HTTPException(422, f"Premissa essencial ausente: {exc}")
     except motor.InadimplenciaNaoConfirmada as exc:
@@ -74,7 +74,12 @@ def calcular_financeira(
 
     fonte.salvar(
         analise_id,
-        {"premissas": body.model_dump(), "resultado": resultado.model_dump()},
+        {
+            "premissas": body.model_dump(),
+            "resultado": resultado.model_dump(),
+            # FIN2-1 — fluxos por cenário (a Econômica avalia VPL/TIR de todos)
+            "cenarios_fluxos": fluxos_cenarios,
+        },
     )
     return resultado
 

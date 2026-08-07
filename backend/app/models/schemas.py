@@ -1006,13 +1006,25 @@ class PerfilMesaIn(BaseModel):
 class VendasIn(BaseModel):
     inicio_mes: int = 1
     duracao_meses: int = 1
-    curva: Literal["linear", "custom"] = "linear"
+    # FIN2-1: "rampa" = rampa de lançamento (pesos linearmente decrescentes — venda forte
+    # nos primeiros meses, cauda longa; fórmula declarada na proveniência do motor).
+    curva: Literal["linear", "rampa", "custom"] = "linear"
     curva_custom: Optional[list[float]] = None  # % por mês; soma=1 (validado)
     modo: Literal["avista", "parcelado", "financiado"] = "avista"
     entrada_pct: float = 1.0  # parcelado/financiado: % no mês da venda
     n_parcelas: int = 0  # parcelado: nº de parcelas mensais após a entrada
     entrada_parcelas: int = 1  # financiado: entrada pode ser parcelada (default à vista)
     mesa: Optional[list[PerfilMesaIn]] = None  # financiado; None = mesa default ROTULADA
+
+
+class CenarioVendaIn(BaseModel):
+    """FIN2-1 — um cenário de VENDA (mesmo VGV; muda o tempo do dinheiro)."""
+
+    nome: str
+    inicio_mes: Optional[int] = None  # None = herda vendas.inicio_mes
+    duracao_meses: int = 1
+    curva: Literal["linear", "rampa", "custom"] = "linear"
+    curva_custom: Optional[list[float]] = None
 
 
 class AquisicaoIn(BaseModel):
@@ -1026,11 +1038,25 @@ class AquisicaoIn(BaseModel):
     itbi_pct: Optional[float] = None  # compra
 
 
+class DisciplinaObraIn(BaseModel):
+    """FIN2-2 — uma disciplina do cronograma físico-financeiro da obra."""
+
+    nome: str
+    valor: float = 0.0  # R$ absoluto da disciplina (o front pré-preenche do custo de infra)
+    inicio_mes: int = 1
+    duracao_meses: int = 1
+    curva: Literal["linear", "frente_carregada", "custom"] = "linear"
+    curva_custom: Optional[list[float]] = None
+
+
 class CustoUrbanizacaoIn(BaseModel):
     base: Literal["por_lote", "por_m2"] = "por_lote"
     valor: float = 0.0
     inicio_mes: int = 1
     duracao_meses: int = 1
+    # FIN2-2: quando presente, o cronograma por disciplina PREVALECE sobre valor/base
+    # únicos (o total passa a ser a soma das disciplinas, cada uma com sua curva).
+    disciplinas: Optional[list[DisciplinaObraIn]] = None
 
 
 class CustoPontualIn(BaseModel):
@@ -1078,6 +1104,9 @@ class PremissasFinanceiraIn(BaseModel):
     # 4.1: inadimplência > 30% exige confirmação explícita (senão 422) — nunca silenciosa.
     confirmar_inadimplencia_alta: bool = False
     aquisicao: AquisicaoIn = Field(default_factory=AquisicaoIn)
+    # FIN2-1 — cenários de venda (Conservador/Base/Otimista…); None = sem cenários.
+    cenarios: Optional[list[CenarioVendaIn]] = None
+    cenario_ativo: Optional[str] = None  # None = o primeiro da lista
     custos: CustosIn = Field(default_factory=CustosIn)
     tributos: TributosIn = Field(default_factory=TributosIn)
     # 4.2: parâmetros do semáforo (dashboard). Referência editável + capital opcional.
@@ -1211,6 +1240,43 @@ class LeituraOut(BaseModel):
     valor_fmt: Optional[str] = None
 
 
+class CenarioResumoOut(BaseModel):
+    """FIN2-1 — resumo de UM cenário de venda no nível do FLUXO (VPL/TIR na Econômica)."""
+
+    nome: str
+    ativo: bool = False
+    duracao_meses: int
+    resultado_nominal: float
+    resultado_nominal_fmt: str
+    exposicao_maxima: ExposicaoOut
+    meses_negativo: Optional[int] = None  # 1º mês com acumulado ≥ 0 (None = não recupera)
+    horizonte_meses: int
+
+
+class ObraPicoOut(BaseModel):
+    """FIN2-2 — pico de desembolso da obra (a leitura que define a exposição)."""
+
+    mes: int
+    valor: float
+    valor_fmt: str
+
+
+class EstaticoOut(BaseModel):
+    """FIN2-3 — viabilidade ESTÁTICA (sem tempo): a conta de guardanapo, estruturada."""
+
+    vgv: float
+    vgv_fmt: str
+    custos_total: float
+    custos_total_fmt: str
+    custos_pct_vgv: Optional[float] = None  # fração 0-1
+    resultado: float
+    resultado_fmt: str
+    margem: Optional[float] = None  # fração 0-1 sobre o VGV próprio
+    custo_por_lote: Optional[float] = None
+    custo_por_lote_fmt: Optional[str] = None
+    composicao: dict = {}  # bloco -> fração do VGV (obra/terreno/demais…)
+
+
 class FinanceiraOut(BaseModel):
     caso_base: CasoBaseOut
     vgv: VgvOut
@@ -1225,6 +1291,10 @@ class FinanceiraOut(BaseModel):
     alerta_critico: Optional[str] = None
     proveniencia: str
     avisos: list[str] = []
+    # FIN-2 (Onda A) — aditivos; ausentes em snapshots antigos:
+    cenarios: list[CenarioResumoOut] = []
+    obra_pico: Optional[ObraPicoOut] = None
+    estatico: Optional[EstaticoOut] = None
 
 # ----- Fase 5 — Econômica (avalia o fluxo da Financeira: VPL/TIR/paybacks/curva) -----
 
@@ -1279,6 +1349,28 @@ class PontoCurvaOut(BaseModel):
     vpl_fmt: str
 
 
+class ExposicaoMediaOut(BaseModel):
+    """FIN2-3 — exposição nominal média enquanto o caixa está negativo + duração."""
+
+    valor: float
+    valor_fmt: str
+    meses: int  # nº de meses com acumulado nominal < 0
+
+
+class CenarioEconomicoOut(BaseModel):
+    """FIN2-1 — avaliação econômica de UM cenário de venda (VPL/TIR/paybacks)."""
+
+    nome: str
+    ativo: bool = False
+    vpl: float
+    vpl_fmt: str
+    tir_aa: Optional[float] = None
+    tir_aa_fmt: Optional[str] = None
+    tir_status: str = "indefinida"
+    payback_simples_mes: Optional[int] = None
+    payback_descontado_mes: Optional[int] = None
+
+
 class EconomicaOut(BaseModel):
     convencao: str  # moeda constante (Fisher) — explícita, nunca implícita (handoff §0.1)
     tma: TmaOut
@@ -1291,6 +1383,13 @@ class EconomicaOut(BaseModel):
     leituras: list[LeituraOut]  # chaves vpl/tir/payback — o dashboard 4.2 compõe os slots
     proveniencia: str
     avisos: list[str] = []
+    # FIN-2 (Onda A) — aditivos:
+    mtir_aa: Optional[float] = None  # MIRR anualizada (reinvestimento e captação à TMA)
+    mtir_aa_fmt: Optional[str] = None
+    roe_nominal: Optional[float] = None  # resultado ÷ |exposição máxima nominal|
+    roe_aa: Optional[float] = None  # ROE anualizado no horizonte do fluxo
+    exposicao_media: Optional[ExposicaoMediaOut] = None
+    cenarios: list[CenarioEconomicoOut] = []
 
 
 # ----- Fase 6 — Localização (enriquecimento socioeconômico IBGE; INFORMATIVO, §1-A) -----

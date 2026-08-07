@@ -57,6 +57,12 @@ def calcular_economica(
         )
     except motor.CurvaEconomicaInvalida as exc:
         raise HTTPException(422, str(exc))
+    # FIN2-1 — avalia também os cenários de venda persistidos pela Financeira.
+    dados_fin = fonte_fin.carregar(analise_id) or {}
+    if dados_fin.get("cenarios_fluxos"):
+        resultado = resultado.model_copy(
+            update={"cenarios": motor.avaliar_cenarios(dados_fin["cenarios_fluxos"], body)}
+        )
     fonte_eco.salvar(
         analise_id,
         {"premissas": body.model_dump(), "resultado": resultado.model_dump()},
