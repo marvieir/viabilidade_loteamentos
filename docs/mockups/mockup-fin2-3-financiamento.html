@@ -1,0 +1,91 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+body { background:#f8fafc; color:#0f172a; width:1240px; padding:22px 26px; }
+.mock { position:fixed; top:10px; right:12px; background:#dc2626; color:#fff; font-size:10px; font-weight:800; letter-spacing:1px; padding:4px 10px; border-radius:99px; text-transform:uppercase; z-index:9; }
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.05); padding:20px 24px; }
+h1 { font-size:17px; font-weight:800; }
+.sub { font-size:12px; color:#64748b; margin-top:3px; }
+.stepper { display:flex; align-items:center; margin:18px 0 22px; }
+.st { display:flex; align-items:center; flex:1; }
+.st:last-child { flex:0; }
+.dot { width:26px; height:26px; border-radius:99px; display:grid; place-items:center; font-size:12px; font-weight:800; border:2px solid #cbd5e1; color:#94a3b8; background:#fff; flex-shrink:0; }
+.dot.done { background:#ff914d; border-color:#ff914d; color:#fff; }
+.dot.atual { border-color:#ff914d; color:#ff914d; }
+.stn { font-size:10.5px; margin-left:6px; color:#94a3b8; white-space:nowrap; }
+.stn.done, .stn.atual { color:#0f172a; font-weight:700; }
+.conn { flex:1; height:2px; background:#e2e8f0; margin:0 8px; }
+.conn.done { background:#ff914d; }
+.pergunta { font-size:15px; font-weight:800; margin-bottom:4px; }
+.ajuda { font-size:12px; color:#64748b; margin-bottom:14px; }
+.grade { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.campo { }
+.campo label { display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px; }
+.campo input, .campo select { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13px; font-family:ui-monospace,Menlo,monospace; }
+.novo { border:1.5px dashed #ff914d; border-radius:12px; padding:16px 18px; margin-top:16px; position:relative; background:#fffdfa; }
+.novo .selo { position:absolute; top:-9px; left:14px; background:#ff914d; color:#fff; font-size:9.5px; font-weight:800; letter-spacing:.5px; padding:2px 9px; border-radius:99px; text-transform:uppercase; }
+.bl { font-size:12.5px; font-weight:800; color:#1d1252; margin-bottom:8px; }
+.chips { display:flex; gap:8px; }
+.chip { border:1px solid #cbd5e1; border-radius:99px; padding:6px 14px; font-size:12px; color:#334155; background:#fff; }
+.chip.on { background:#1d1252; border-color:#1d1252; color:#fff; font-weight:700; }
+.mini { display:flex; align-items:flex-end; gap:2px; height:44px; margin-top:10px; }
+.mini b { width:14px; background:#ffd7bb; border-radius:2px 2px 0 0; }
+.mini b.on { background:#ff914d; }
+.tabs { display:flex; gap:6px; margin-bottom:10px; }
+.tab { border:1px solid #e2e8f0; border-bottom:none; border-radius:8px 8px 0 0; padding:6px 14px; font-size:12px; color:#64748b; background:#f8fafc; }
+.tab.on { background:#fff; color:#1d1252; font-weight:800; border-color:#cbd5e1; }
+.nota { font-size:11px; color:#94a3b8; margin-top:10px; }
+.botoes { display:flex; justify-content:space-between; margin-top:18px; }
+.btn { border-radius:8px; padding:9px 18px; font-size:13px; font-weight:700; }
+.btn.sec { border:1px solid #cbd5e1; color:#475569; background:#fff; }
+.btn.pri { background:#ff914d; color:#fff; }
+.gantt { margin-top:6px; }
+.gl { display:grid; grid-template-columns:170px 1fr 120px; align-items:center; gap:10px; padding:5px 0; border-bottom:1px dashed #f1f5f9; font-size:12px; }
+.gl .nome { color:#334155; font-weight:600; }
+.trilha { position:relative; height:14px; background:#f1f5f9; border-radius:99px; }
+.barra { position:absolute; height:14px; border-radius:99px; background:#ff914d; opacity:.85; }
+.meses { display:grid; grid-template-columns:170px 1fr 120px; gap:10px; font-size:9.5px; color:#94a3b8; }
+.meses .esc { display:flex; justify-content:space-between; padding:0 2px; }
+.leit { background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:8px 12px; font-size:12px; color:#92400e; margin-top:12px; }
+.cen3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.cenc { border:1px solid #e2e8f0; border-radius:10px; padding:14px 16px; }
+.cenc.on { border-color:#ff914d; box-shadow:0 0 0 2px #ffedd5; }
+.cenc h4 { font-size:12px; font-weight:800; color:#1d1252; }
+.cenc .tag { font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; }
+.kv { display:flex; justify-content:space-between; font-size:12px; padding:3.5px 0; border-bottom:1px dashed #f1f5f9; }
+.kv b { font-family:ui-monospace,Menlo,monospace; }
+.kv .bom { color:#047857; } .kv .ruim { color:#be123c; }
+.indg { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px; }
+.ind { background:#f8fafc; border:1px solid #f1f5f9; border-radius:10px; padding:10px 12px; }
+.ind .r { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; }
+.ind .v { font-size:17px; font-weight:800; font-family:ui-monospace,Menlo,monospace; color:#1d1252; margin-top:3px; }
+.ind .p { font-size:9.5px; color:#94a3b8; margin-top:3px; }
+.tog { display:inline-flex; border:1px solid #cbd5e1; border-radius:99px; overflow:hidden; font-size:12px; }
+.tog span { padding:6px 16px; color:#64748b; }
+.tog .on { background:#1d1252; color:#fff; font-weight:700; }
+
+body { height:800px; }</style></head><body>
+<div class="mock">Mockup FIN-2 · dados fictícios</div>
+<div class="card">
+<h1>Análise financeira</h1>
+<p class="sub">Sete passos, uma pergunta de negócio por vez. Cada campo tem ajuda; os defaults vêm do estudo urbanístico com proveniência.</p>
+<div class="stepper"><div class="st"><div class="dot done">✓</div><span class="stn done">Lotes & Preço</span><div class="conn done"></div></div><div class="st"><div class="dot done">✓</div><span class="stn done">Parceria</span><div class="conn done"></div></div><div class="st"><div class="dot done">✓</div><span class="stn done">Venda</span><div class="conn done"></div></div><div class="st"><div class="dot done">✓</div><span class="stn done">Custos</span><div class="conn done"></div></div><div class="st"><div class="dot atual">5</div><span class="stn atual">Financiamento</span><div class="conn "></div></div><div class="st"><div class="dot ">6</div><span class="stn ">Tributos</span><div class="conn "></div></div><div class="st"><div class="dot ">7</div><span class="stn ">Resultado</span></div></div>
+<p class="pergunta">Vai usar dinheiro de banco na obra?</p>
+<p class="ajuda">Passo NOVO (Onda B da FIN-2). Sem financiamento, o fluxo segue 100% capital próprio — como é hoje.</p>
+<div class="novo"><span class="selo">Novo · FIN-2</span>
+  <p class="bl">Financiamento à produção</p>
+  <div style="margin-bottom:12px"><span class="tog"><span class="on">Sim</span><span>Não</span></span></div>
+  <div class="grade">
+    <div class="campo"><label>% do custo de obra financiado</label><input value="80%"></div>
+    <div class="campo"><label>Juros (a.a.)</label><input value="11%"></div>
+    <div class="campo"><label>Gatilho: % mínimo de OBRA executada</label><input value="15%"></div>
+    <div class="campo"><label>Gatilho: % mínimo de VENDAS</label><input value="30%"></div>
+  </div>
+  <div class="leit">Com as curvas dos passos Venda e Custos, os gatilhos são atingidos no <b>mês 8</b> — a liberação entra no fluxo a partir daí.</div>
+</div>
+<div class="novo"><span class="selo">Novo · FIN-2</span>
+  <p class="bl">Financiamento da exposição de caixa</p>
+  <div style="margin-bottom:12px"><span class="tog"><span>Sim</span><span class="on">Não</span></span></div>
+  <p class="nota">Cobre o vale do caixa com capital de terceiros (taxa própria). Desligado, a exposição fica com o empreendedor.</p>
+</div>
+<div class="botoes"><span class="btn sec">← Voltar</span><span class="btn pri">Avançar →</span></div>
+</div></body></html>
