@@ -65,13 +65,17 @@ re-lota sobras grandes (MOTOR-SOBRA: sobra caiu de 31,8% para ~2%). A **mediçã
 
 **Gleba estreita/fragmentada (RF-URB-10, caso Caverá).** Quando a mata rasterizada pica uma
 faixa estreita em dezenas de bolsões, o motor antigo afinava o quarteirão ao mínimo e desenhava
-labirinto: viário 50%, vendável 21%. Hoje valem três réguas determinísticas: o quarteirão nunca
+labirinto: viário 50%, vendável 21%. Hoje valem cinco réguas determinísticas: o quarteirão nunca
 afina além do ponto em que a grade teórica passa de ~30% de via (freio de via); ilha-FAIXA
 (menos de ~2 fileiras de quarteirão na largura útil) fica no teto do perfil — afinar ali só
-multiplica travessas; e a coletora de 21 m só entra em gleba com porte (≥ 3 ha úteis). Bolsão
-menor que 1 lote legal vira verde/remanescente e o quadro sai com o aviso **GLEBA FRAGMENTADA**
-dizendo quantos bolsões existem e quanto não é loteável — o rendimento baixo aparece ROTULADO,
-não disfarçado em traçado denso. No caso real: 18 → 36 lotes, vendável 21,7% → 42,5%.
+multiplica travessas; a coletora de 21 m só entra em gleba com porte (≥ 3 ha úteis); no regime
+FRAGMENTADO (muitos bolsões sub-lote) o canvas ganha borda limpa e o lote é recortado contra a
+mata FECHADA (superset da crua — mais conservador que a lei exige), saindo com borda reta em vez
+de escadinha de pixel; e porção com largura média menor que rua + 1 fileira de lote NÃO é
+urbanizável por construção — vira verde remanescente rotulado, nunca teia de via. Bolsão menor
+que 1 lote legal vira verde/remanescente e o quadro sai com os avisos **GLEBA FRAGMENTADA** e de
+porção estreita descartada — o rendimento baixo aparece ROTULADO, não disfarçado em traçado
+denso. No caso real: 18 lotes-teia/viário 51% → 21 lotes de verdade/viário 27%, norte honesto.
 
 - Decisões-chave: PISO É LEI (125 m² federal ou zona confirmada; mercado é só mira); regime rural com FMP; estilo por público versionado em arquivo (muda sem rebuild); memória de avaliações vira few-shot do programa.
 - Código: `routers/urbanismo.py` (orquestra), `core/urbanismo_geom.py` (gera), `core/urbanismo_medida.py` (mede), `core/urbanismo_diretrizes.py` (régua legal), `core/urbanismo_programa.py`, `core/urbanismo_valor.py`, `core/urbanismo_estilo.py`, `core/urbanismo_tracado.py`/`_loops.py`, `core/custo_infra*`.

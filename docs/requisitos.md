@@ -60,11 +60,15 @@ de produto e perfis municipais).
 - **RF-URB-7** Conformidade legal do layout (frente mínima, institucional qualificado, normas de condomínio da LUOS) com citação por item.
 - **RF-URB-8** Custo de infraestrutura paramétrico por disciplina, com BDI e padrão (econômico/médio/alto).
 - **RF-URB-9** Avaliação (rating) de propostas alimenta a memória do gerador (few-shot).
-- **RF-URB-10** Gleba **estreita/fragmentada** não degenera (caso Caverá, 07/08/2026): a grade
-  adaptativa tem **freio de via** (não afina o quarteirão além de ~30% de via teórica),
+- **RF-URB-10** Gleba **estreita/fragmentada** não degenera (caso Caverá, 07-08/08/2026): a
+  grade adaptativa tem **freio de via** (não afina o quarteirão além de ~30% de via teórica),
   **ilha-faixa** (< ~2 fileiras de quarteirão na largura útil) fica no teto do perfil, coletora
   de 21 m só em gleba com porte (≥ 3 ha de aproveitável) e o quadro sai **rotulado** com o aviso
-  `GLEBA FRAGMENTADA` (nº de bolsões e área sub-lote que virou remanescente).
+  `GLEBA FRAGMENTADA`. No **regime fragmentado** (muitos bolsões sub-lote de máscara raster):
+  borda limpa no canvas mesmo sem `tracado` no estilo e grampo do **lote** contra a restrição
+  FECHADA (closing = superset da crua, mais conservador) — lote sai com borda reta, não em
+  escadinha de pixel. **Ilha estreita demais** (largura média < rua + 1 fileira de lote) não é
+  urbanizável por construção: vira verde remanescente rotulado, nunca teia de via.
 
 ### RF-IMP — Importação de projeto pronto (DWG/DXF)
 - **RF-IMP-1** Wizard de 3 passos: arquivo → papel das camadas (de-para) → conferência. Conversão DWG→DXF no servidor, com saneamento de arquivos corrompidos.

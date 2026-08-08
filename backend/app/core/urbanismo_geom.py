@@ -98,6 +98,16 @@ TETO_VIA_GRADE = 0.30
 # = 2,03 (segue na adaptação 9.11, âncora intocada). Zona cinzenta ~1,9-2,1: qualquer lado é
 # defensável; o limiar fica ABAIXO da âncora para nunca regredir um valor-ouro.
 FAIXA_FILEIRAS_MAX = 1.95
+# MOTOR-3b (2ª rodada do operador, 08/08) — REGIME "GLEBA RASTERIZADA-FRAGMENTADA": quando a
+# máscara raster (mata/APP) pica o aproveitável em MUITOS caquinhos sub-lote, o traçado herda a
+# escadinha de pixel (lotes com 20-34 vértices, compacidade 0,31-0,68 — "recortes, não lotes",
+# feedback do operador). Neste regime o motor aplica: (a) borda limpa no canvas mesmo fora do
+# traçado 'limpo' do estilo; (b) grampo do LOTE contra a restrição FECHADA (closing morfológico
+# = SUPERSET da crua → mais conservador que a lei exige; os dentes viram verde). Limiar calibrado
+# nas glebas reais: Caverá = 15 bolsões sub-lote (dispara); Alegrete = 4 e São Roque = 2 (ficam
+# como validados pelos clientes/testes-ouro — mudar o desenho deles é decisão de produto, não fix).
+GLEBA_FRAG_MIN_BOLSOES = 5
+FECHO_RESTRICAO_LOTE_M = 6.0  # raio do closing (pixel da máscara ~9 m; 6 m fecha os entalhes)
 # MOTOR-3 — HIERARQUIA PROPORCIONAL AO PORTE: coletora de 21 m (VIA_TRONCO_M) só em gleba com
 # porte para justificá-la; abaixo deste aproveitável o tronco é via local +2 m (a coletora de
 # 21 m numa gleba de 2 ha consumia sozinha ~10% do aproveitável). Largura de via é hierarquia
@@ -1630,6 +1640,20 @@ def gerar_layout(
         _c2 = _diferenca_segura(canvas, restricao_via_bloqueio)
         if _c2 is not None and not _c2.is_empty:
             canvas = _c2
+    # MOTOR-3b — REGIME GLEBA RASTERIZADA-FRAGMENTADA: muitos caquinhos sub-lote na entrada →
+    # borda limpa TAMBÉM fora do traçado 'limpo' do estilo (o econômico/médio não tem `tracado`
+    # e entrava com a escadinha crua). Decisão pelo canvas CRU (antes de suavizar); calibração
+    # e consequências na nota da constante GLEBA_FRAG_MIN_BOLSOES.
+    _piso_frag = float(diretrizes["piso_lote_efetivo_m2"])
+    _sub_cru = [c for c in _componentes(canvas) if c.area < _piso_frag]
+    gleba_fragmentada = len(_sub_cru) >= GLEBA_FRAG_MIN_BOLSOES
+    if gleba_fragmentada and not limpar:
+        canvas = _suavizar_raster(canvas)
+        # a suavização pode PONTEAR vãos da mata que veda via (dump 030) — subtrai de novo.
+        if restricao_via_bloqueio is not None and not restricao_via_bloqueio.is_empty:
+            _c3 = _diferenca_segura(canvas, restricao_via_bloqueio)
+            if _c3 is not None and not _c3.is_empty:
+                canvas = _c3
     # Fase U6a P1 — CINTURÃO verde perimetral (frame original): nenhum lote encosta na
     # divisa; a moldura entra na doação como verde reservado (todas as referências).
     cinturao_orig = None
@@ -1845,7 +1869,28 @@ def gerar_layout(
     modos_paisagem: list[str] = []  # U6a — modo do traçado paisagístico por ilha
     corredores_reg: list[BaseGeometry] = []  # U6a P4 — corredores verdes entre pods
     ilhas = _componentes(reg)
+    ilhas_estreitas_reg: list[BaseGeometry] = []  # MOTOR-3b — ilhas não-urbanizáveis → sobra/verde
     for idx, ilha in enumerate(ilhas):
+        # MOTOR-3b — ILHA ESTREITA DEMAIS (feedback do operador: "recortes, não lotes"): largura
+        # MÉDIA (2·área/perímetro, buracos contam) menor que UMA rua + UMA fileira de lote →
+        # não é urbanizável por construção; qualquer malha ali vira teia de via com caquinho
+        # (o norte da Caverá: 25 m de largura média vs 29 m necessários). Vai INTEIRA para
+        # sobra→verde, rotulada no diagnóstico — régua honesta, não malha forçada. Só ilhas com
+        # porte de lote entram aqui (as menores seguem no caminho 'sub-lote' de sempre).
+        _per = ilha.boundary.length
+        _w_med = (2.0 * ilha.area / _per) if _per > 0 else 0.0
+        _w_min_urb = via_local + prof
+        if ilha.area >= piso_lote and _w_med < _w_min_urb:
+            _mnx, _mny, _mxx, _mxy = ilha.bounds
+            ilhas_detalhe.append({
+                "ilha": idx, "area_m2": round(ilha.area, 2),
+                "bbox_m": [round(_mxx - _mnx, 1), round(_mxy - _mny, 1)],
+                "lado_quadra_m": None, "faces": 0,
+                "motivo": (f"estreita demais (largura média {_w_med:.0f} m < "
+                           f"{_w_min_urb:.0f} m de rua+fileira): vira verde/não-aproveitável"),
+            })
+            ilhas_estreitas_reg.append(ilha)
+            continue
         # Fase 9.11 — GRADE ADAPTATIVA: o lado do quarteirão é função do tamanho DESTA ilha (com
         # piso legal). Ilha grande → teto (caixa limpa intacta); ilha pequena/torta MAS que ainda
         # comporta vários quarteirões → afina p/ gerar faces. Ilha pequena DEMAIS (site único
@@ -2543,6 +2588,10 @@ def gerar_layout(
                 verde_reservado_reg = _uniao_segura([verde_reservado_reg, *promovidas])
                 sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura(promovidas))
 
+    # MOTOR-3b — as ilhas estreitas demais (não-urbanizáveis) entram na sobra: o quadro fecha
+    # 100% e o mapa mostra verde remanescente rotulado, não teia de via.
+    if ilhas_estreitas_reg:
+        sobra_reg = _uniao_segura([sobra_reg, *ilhas_estreitas_reg])
     verde_total_reg = _uniao_segura([verde_reservado_reg, sobra_reg])
     verde_reserva_m2 = verde_reservado_reg.area if verde_reservado_reg is not None else 0.0
     verde_sobra_m2 = sobra_reg.area if sobra_reg is not None else 0.0
@@ -2858,6 +2907,14 @@ def gerar_layout(
     avisos: list[str] = []
     if regime_rural and aviso_rural:
         avisos.append(aviso_rural)
+    # MOTOR-3b — porção estreita descartada é rotulada (o operador vê a causa no quadro).
+    if ilhas_estreitas_reg:
+        _a_estreitas = sum(_g.area for _g in ilhas_estreitas_reg)
+        avisos.append(
+            f"{len(ilhas_estreitas_reg)} porção(ões) da gleba estreita(s) DEMAIS para lotear "
+            f"(largura média menor que uma rua + uma fileira de lote) viraram verde "
+            f"remanescente (~{_a_estreitas:,.0f} m²) — lotear ali geraria só viário e retalho."
+        )
     # MOTOR-3 — a gleba fragmentada é rotulada: quem lê "vendável baixo" precisa ver a causa.
     if len(_bolsoes_sub_lote) >= 3:
         avisos.append(
@@ -2992,6 +3049,18 @@ def gerar_layout(
                         "REMOVIDOS (mata/APP bloqueia via; só a declividade ≥30% pode, com laudo)."
                     )
         _tem_lq = bool(lote_quadra) and len(lote_quadra) == len(lotes)
+        # MOTOR-3b — no regime fragmentado, o LOTE é recortado contra a restrição FECHADA
+        # (closing = superset da crua → nunca menos conservador): a escadinha de pixel vira
+        # borda reta e os dentes viram verde. A VIA continua no recorte contra a crua/bloqueio
+        # (fechar a máscara da via poderia desconectar o acesso que passa entre os pixels).
+        _restr_grampo_lote = restricao_raw
+        if gleba_fragmentada:
+            _fech = _valido(
+                restricao_raw.buffer(FECHO_RESTRICAO_LOTE_M, join_style=2)
+                .buffer(-FECHO_RESTRICAO_LOTE_M, join_style=2)
+            )
+            if _fech is not None and not _fech.is_empty:
+                _restr_grampo_lote = _uniao_segura([restricao_raw, _fech]) or restricao_raw
         # RURAL-2 — parcela-cheia: a restrição interna COMPÕE a chácara (rotulada no meta);
         # a régua "lote não pisa em restrição" é urbana e não remove parcela rural.
         if regime_rural:
@@ -2999,12 +3068,12 @@ def gerar_layout(
         else:
             _novos, _lq, _perdidos_m2, _slivers = [], [], 0.0, []
         for _i, _l in enumerate([] if regime_rural else lotes):
-            if not _intersecta_segura(_l, restricao_raw):
+            if not _intersecta_segura(_l, _restr_grampo_lote):
                 _novos.append(_l)
                 if _tem_lq:
                     _lq.append(lote_quadra[_i])
                 continue
-            _l2 = _diferenca_segura(_l, restricao_raw)
+            _l2 = _diferenca_segura(_l, _restr_grampo_lote)
             _partes = [p for p in _componentes(_l2)] if (_l2 is not None and not _l2.is_empty) else []
             _maior = max(_partes, key=lambda p: p.area) if _partes else None
             if _maior is not None and _maior.area >= piso_lote - 0.5:
