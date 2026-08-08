@@ -607,6 +607,7 @@ export type ChaveOverlay =
   | "urb_verde"
   | "urb_verde_reservada"
   | "urb_verde_sobra"
+  | "urb_verde_remanescente"
   | "urb_lazer"
   | "urb_institucional"
   | "urb_portico"
@@ -1585,6 +1586,8 @@ export interface QuadroAreas {
   // Fase 10 (Parte 2) — verde desmembrado: reserva (legítimo) × sobra geométrica (a reduzir).
   area_verde_reserva?: UsoArea | null;
   sobra_geometrica?: UsoArea | null;
+  // MOTOR-3c — remanescente declarado (não loteável por restrição/forma; sem alerta).
+  verde_remanescente?: UsoArea | null;
   sistema_lazer: UsoArea;
   institucional: UsoArea;
   arruamento: UsoArea;
@@ -1688,6 +1691,8 @@ export interface GeometriaUrb {
   // Fase 9.6 — verde separado p/ o mapa: bloco reservado (destaque) × sobra de ponta (discreto).
   areas_verdes_reservada: GeoJSON.Geometry | null;
   areas_verdes_sobra: GeoJSON.Geometry | null;
+  // MOTOR-3c — remanescente declarado (não loteável por restrição/forma).
+  verde_remanescente?: GeoJSON.Geometry | null;
   // Fase 9.7 — clube como figura formada (forma=quadra); institucional como quadra (qualifica_legal).
   sistema_lazer: (GeoJSON.Geometry & { forma?: string; frente_via_m?: number | null }) | null;
   // Fase U2 — lazer DISTRIBUÍDO e rotulado: sub-parcelas do hub + praças de bolso

@@ -1697,6 +1697,9 @@ class QuadroAreasOut(BaseModel):
     # Fase 10 (Parte 2) — verde desmembrado: reserva (verde legítimo) × sobra geométrica (a reduzir).
     area_verde_reserva: Optional[UsoAreaOut] = None
     sobra_geometrica: Optional[UsoAreaOut] = None
+    # MOTOR-3c — verde REMANESCENTE declarado (não loteável por restrição/forma: ilha estreita,
+    # caquinho sub-lote, dente de mata). Sem alerta — o motor decidiu, o traçado não falhou.
+    verde_remanescente: Optional[UsoAreaOut] = None
     sistema_lazer: UsoAreaOut
     institucional: UsoAreaOut
     arruamento: UsoAreaOut

@@ -1880,7 +1880,8 @@ def gerar_layout(
     modos_paisagem: list[str] = []  # U6a — modo do traçado paisagístico por ilha
     corredores_reg: list[BaseGeometry] = []  # U6a P4 — corredores verdes entre pods
     ilhas = _componentes(reg)
-    ilhas_estreitas_reg: list[BaseGeometry] = []  # MOTOR-3b — ilhas não-urbanizáveis → sobra/verde
+    ilhas_estreitas_reg: list[BaseGeometry] = []  # MOTOR-3b — ilhas não-urbanizáveis → remanescente
+    ilhas_sublote_reg: list[BaseGeometry] = []    # MOTOR-3c — caquinhos sub-lote (diagnóstico)
     for idx, ilha in enumerate(ilhas):
         # MOTOR-3b — ILHA ESTREITA DEMAIS (feedback do operador: "recortes, não lotes"): largura
         # MÉDIA (2·área/perímetro, buracos contam) menor que UMA rua + UMA fileira de lote →
@@ -2015,6 +2016,7 @@ def gerar_layout(
         grade_adaptou = grade_adaptou or afinou
         if n_loteavel == 0:
             motivo, lado_out = "sub-lote: vira verde/não-aproveitável", None
+            ilhas_sublote_reg.append(ilha)  # MOTOR-3c — candidata a remanescente declarado
         elif afinou:
             motivo, lado_out = "adaptado: ilha pequena", round(bw_i, 1)
         else:
@@ -2600,11 +2602,22 @@ def gerar_layout(
                 verde_reservado_reg = _uniao_segura([verde_reservado_reg, *promovidas])
                 sobra_reg = _diferenca_segura(sobra_reg, _uniao_segura(promovidas))
 
-    # MOTOR-3b — as ilhas estreitas demais (não-urbanizáveis) entram na sobra: o quadro fecha
-    # 100% e o mapa mostra verde remanescente rotulado, não teia de via.
-    if ilhas_estreitas_reg:
-        sobra_reg = _uniao_segura([sobra_reg, *ilhas_estreitas_reg])
-    verde_total_reg = _uniao_segura([verde_reservado_reg, sobra_reg])
+    # MOTOR-3c — VERDE REMANESCENTE DECLARADO ≠ sobra geométrica: as ilhas estreitas (sempre)
+    # e, no regime fragmentado, os caquinhos sub-lote saem da "sobra a minimizar" (⚠ do quadro)
+    # e viram camada própria — o motor DECIDIU não lotear, o traçado não falhou. O verde TOTAL
+    # continua somando tudo (quadro fecha 100%; conformidade inalterada).
+    remanescente_reg = None
+    _partes_reman: list[BaseGeometry] = list(ilhas_estreitas_reg)
+    if gleba_fragmentada and ilhas_sublote_reg:
+        _partes_reman.extend(ilhas_sublote_reg)
+        _uni_sub = _uniao_segura(ilhas_sublote_reg)
+        if _uni_sub is not None and sobra_reg is not None:
+            sobra_reg = _diferenca_segura(sobra_reg, _uni_sub)
+    if _partes_reman:
+        remanescente_reg = _uniao_segura(_partes_reman)
+    verde_total_reg = _uniao_segura(
+        [g for g in (verde_reservado_reg, sobra_reg, remanescente_reg) if g is not None]
+    )
     verde_reserva_m2 = verde_reservado_reg.area if verde_reservado_reg is not None else 0.0
     verde_sobra_m2 = sobra_reg.area if sobra_reg is not None else 0.0
 
@@ -2677,6 +2690,7 @@ def gerar_layout(
         verde_reservado = _uniao_segura([verde_reservado, cinturao_orig])
         verde = _uniao_segura([verde, cinturao_orig])
     sobra_ponta = _back(sobra_reg)
+    verde_reman = _back(remanescente_reg)  # MOTOR-3c — remanescente declarado (linha própria)
     eixos_malha = [r for r in (_back(e) for e in eixos_reg) if r is not None]
     # 9.9 — curvas (IA/fallback) efetivamente usadas, no frame original (p/ desenho + sinuosidade).
     curvas_ia = [r for r in (_back(e) for e in curvas_ia_reg) if r is not None]
@@ -3033,6 +3047,8 @@ def gerar_layout(
                            if verde_reservado is not None else None)
         sobra_ponta = (_diferenca_segura(sobra_ponta, arruamento)
                        if sobra_ponta is not None else None)
+        verde_reman = (_diferenca_segura(verde_reman, arruamento)
+                       if verde_reman is not None else None)  # MOTOR-3c — via de conexão passa
         lazer_total = (_diferenca_segura(lazer_total, arruamento)
                        if lazer_total is not None else None)
         inst = _diferenca_segura(inst, arruamento) if inst is not None else None
@@ -3105,7 +3121,12 @@ def gerar_layout(
         if _tem_lq:
             lote_quadra = _lq
         if _slivers:
-            sobra_ponta = _uniao_segura([sobra_ponta, *_slivers])
+            # MOTOR-3c — no regime fragmentado, o resto do lote removido pelo grampo fechado
+            # (dentes da mata) é REMANESCENTE DECLARADO (restrição), não sobra de traçado.
+            if gleba_fragmentada:
+                verde_reman = _uniao_segura([verde_reman, *_slivers])
+            else:
+                sobra_ponta = _uniao_segura([sobra_ponta, *_slivers])
             verde = _uniao_segura([verde, *_slivers])
 
     # ===== GARANTIA DE CONEXÃO (pós-grampo — dump 030) =====
@@ -3356,6 +3377,7 @@ def gerar_layout(
         areas_verdes=verde,  # TOTAL (reservado ∪ sobra) — quadro/conformidade usam este
         areas_verdes_reservada=verde_reservado,  # 9.6/9.7 — quadras verdes formadas (mapa)
         sobra_ponta=sobra_ponta,
+        verde_remanescente=verde_reman,  # MOTOR-3c — declarado não-loteável (linha própria)
         sistema_lazer=lazer_total,  # U2 — hub ∪ praças de bolso (união medida no quadro)
         institucional=inst,
         centerlines=curvas_ia,  # 9.9 — curvas (IA ou fallback) usadas; [] na grelha

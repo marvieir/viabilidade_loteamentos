@@ -68,7 +68,9 @@ de produto e perfis municipais).
   borda limpa no canvas mesmo sem `tracado` no estilo e grampo do **lote** contra a restrição
   FECHADA (closing = superset da crua, mais conservador) — lote sai com borda reta, não em
   escadinha de pixel. **Ilha estreita demais** (largura média < rua + 1 fileira de lote) não é
-  urbanizável por construção: vira verde remanescente rotulado, nunca teia de via.
+  urbanizável por construção: vira verde remanescente rotulado, nunca teia de via. O quadro
+  separa **"Verde remanescente (não loteável — restrição/forma)"** (linha própria, sem alerta;
+  protegido da 2ª passada) da **"Sobra geométrica ⚠"** (retalho operacional a minimizar).
 
 ### RF-IMP — Importação de projeto pronto (DWG/DXF)
 - **RF-IMP-1** Wizard de 3 passos: arquivo → papel das camadas (de-para) → conferência. Conversão DWG→DXF no servidor, com saneamento de arquivos corrompidos.

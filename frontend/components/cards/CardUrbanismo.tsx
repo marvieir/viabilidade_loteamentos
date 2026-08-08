@@ -328,6 +328,7 @@ export function CardUrbanismo({
     // Fase 9.6 — verde SEPARADO: bloco reservado (destaque) × sobra de ponta (discreto).
     if (g.areas_verdes_reservada) overlays.urb_verde_reservada = g.areas_verdes_reservada;
     if (g.areas_verdes_sobra) overlays.urb_verde_sobra = g.areas_verdes_sobra;
+    if (g.verde_remanescente) overlays.urb_verde_remanescente = g.verde_remanescente;
     if (!g.areas_verdes_reservada && !g.areas_verdes_sobra && g.areas_verdes)
       overlays.urb_verde = g.areas_verdes; // fallback (backend antigo)
     if (g.sistema_lazer) overlays.urb_lazer = g.sistema_lazer;
@@ -1004,6 +1005,13 @@ export function CardUrbanismo({
                       />
                     ) : (
                       <LinhaArea rotulo="Áreas verdes" m2={q.areas_verdes.m2_fmt} pct={q.areas_verdes.pct_fmt} />
+                    )}
+                    {q.verde_remanescente && q.verde_remanescente.m2 > 0 && (
+                      <LinhaArea
+                        rotulo="Verde remanescente (não loteável — restrição/forma)"
+                        m2={q.verde_remanescente.m2_fmt}
+                        pct={q.verde_remanescente.pct_fmt}
+                      />
                     )}
                     {q.sobra_geometrica && q.sobra_geometrica.m2 > 0 && (
                       <LinhaArea

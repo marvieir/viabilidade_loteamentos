@@ -68,6 +68,11 @@ class Layout:
     # ``areas_verdes`` (acima) continua sendo o TOTAL (reservada ∪ sobra) p/ o quadro/conformidade.
     areas_verdes_reservada: Optional[BaseGeometry] = None
     sobra_ponta: Optional[BaseGeometry] = None
+    # MOTOR-3c — VERDE REMANESCENTE DECLARADO: porções que o motor decidiu NÃO lotear por
+    # restrição/forma (ilha estreita demais, bolsões sub-lote, dentes do grampo fechado).
+    # NÃO é "sobra a minimizar" (o traçado não falhou — a gleba não comporta); linha própria
+    # no quadro, sem alerta. ``areas_verdes`` (total) CONTINUA incluindo esta camada.
+    verde_remanescente: Optional[BaseGeometry] = None
     centerlines: list[BaseGeometry] = field(default_factory=list)
     via_largura_m: float = 12.0
     ignorados: list[str] = field(default_factory=list)
@@ -161,6 +166,9 @@ def medir(layout: Layout, publico_alvo: Optional[str] = None) -> Medicao:
     # "área verde". O cálculo já existia (areas_verdes_reservada × sobra_ponta); aqui expõe separado.
     verde_reserva = round(_area(layout.areas_verdes_reservada), 2)
     sobra_geom = round(_area(layout.sobra_ponta), 2)
+    # MOTOR-3c — remanescente DECLARADO (ilha estreita/caquinho/dente de mata): o motor decidiu
+    # não lotear; linha própria SEM o alerta de "meta: reduzir" (não é falha de traçado).
+    verde_reman = round(_area(layout.verde_remanescente), 2)
     lazer = round(_area(layout.sistema_lazer), 2)
     inst = round(_area(layout.institucional), 2)
     arru = round(_area(layout.arruamento), 2)
@@ -187,6 +195,8 @@ def medir(layout: Layout, publico_alvo: Optional[str] = None) -> Medicao:
         # Fase 10 (Parte 2) — linhas SEPARADAS: verde de verdade × sobra geométrica.
         "area_verde_reserva": _uso(verde_reserva),  # doação/programa (verde legítimo)
         "sobra_geometrica": _uso(sobra_geom),        # ⚠️ NÃO é área verde — sobra a minimizar
+        # MOTOR-3c — remanescente declarado (não loteável por restrição/forma; sem alerta)
+        "verde_remanescente": _uso(verde_reman) if verde_reman > 0 else None,
         "sistema_lazer": _uso(lazer),
         "institucional": _uso(inst),
         "arruamento": _uso(arru),
@@ -687,6 +697,8 @@ def geojson_do_layout(layout: Layout, to_wgs, por_lote=None, declividade_por_lot
         "areas_verdes": _gj(layout.areas_verdes),
         "areas_verdes_reservada": _gj(layout.areas_verdes_reservada),
         "areas_verdes_sobra": _gj(layout.sobra_ponta),
+        # MOTOR-3c — remanescente declarado (mesma família visual do verde remanescente)
+        "verde_remanescente": _gj(layout.verde_remanescente),
         "sistema_lazer": lazer_gj,  # 9.7 — figura formada (forma=quadra), não círculo
         # Fase U2 — detalhe do lazer: sub-parcelas do hub + praças de bolso (rotuladas) e o
         # diagnóstico completo (programa do hub, cobertura 400 m, não-materializadas).

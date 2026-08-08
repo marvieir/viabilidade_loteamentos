@@ -75,7 +75,11 @@ de escadinha de pixel; e porção com largura média menor que rua + 1 fileira d
 urbanizável por construção — vira verde remanescente rotulado, nunca teia de via. Bolsão menor
 que 1 lote legal vira verde/remanescente e o quadro sai com os avisos **GLEBA FRAGMENTADA** e de
 porção estreita descartada — o rendimento baixo aparece ROTULADO, não disfarçado em traçado
-denso. No caso real: 18 lotes-teia/viário 51% → 21 lotes de verdade/viário 27%, norte honesto.
+denso. No quadro de áreas, esse não-loteável declarado tem linha própria — **"Verde remanescente
+(não loteável — restrição/forma)"**, sem o alerta de "meta: reduzir" — separado da sobra
+geométrica operacional (que volta a ser pequena, só retalho de subdivisão); a 2ª passada de
+recuperação não re-loteia o remanescente. No caso real: 18 lotes-teia/viário 51%/"sobra" 36% →
+~21-26 lotes de verdade/viário 24-27%/sobra ⚠ 8-10% + remanescente 27-28% rotulado.
 
 - Decisões-chave: PISO É LEI (125 m² federal ou zona confirmada; mercado é só mira); regime rural com FMP; estilo por público versionado em arquivo (muda sem rebuild); memória de avaliações vira few-shot do programa.
 - Código: `routers/urbanismo.py` (orquestra), `core/urbanismo_geom.py` (gera), `core/urbanismo_medida.py` (mede), `core/urbanismo_diretrizes.py` (régua legal), `core/urbanismo_programa.py`, `core/urbanismo_valor.py`, `core/urbanismo_estilo.py`, `core/urbanismo_tracado.py`/`_loops.py`, `core/custo_infra*`.

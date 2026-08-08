@@ -34,6 +34,7 @@ export const CORES_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde: "#16a34a",
   urb_verde_reservada: "#22c55e", // park manicurado — verde médio (Fase 11.6 cores distintas)
   urb_verde_sobra: "#a3e635", // verde remanescente — LIMA claro (amarelado), distinto do park
+  urb_verde_remanescente: "#a3e635", // MOTOR-3c — mesma família visual do remanescente
   urb_lazer: "#06b6d4", // cor de equipamento
   urb_institucional: "#f59e0b",
   urb_portico: "#db2777", // Fase 11.3 — pórtico/entrada: rosa/magenta (cor ÚNICA, não clasha c/ lote)
@@ -58,6 +59,7 @@ export const ESTILO_OVERLAY: Partial<Record<ChaveOverlay, EstiloOverlay>> = {
   // remanescente = lima claro amarelado pontilhado; bosque = floresta bem escuro texturizado.
   urb_verde_reservada: { color: "#15803d", weight: 2, fillColor: "#22c55e", fillOpacity: 0.55 },
   urb_verde_sobra: { color: "#65a30d", weight: 1.5, fillColor: "#bef264", fillOpacity: 0.5, dashArray: "4 3" },
+  urb_verde_remanescente: { color: "#65a30d", weight: 1.5, fillColor: "#bef264", fillOpacity: 0.5, dashArray: "4 3" },
   urb_lazer: { color: "#0e7490", weight: 2, fillColor: "#22d3ee", fillOpacity: 0.5 },
   urb_institucional: { color: "#b45309", weight: 2, fillColor: "#f59e0b", fillOpacity: 0.5 },
   // Área úmida/alagável: teal com hachura "ondulada" (dash) — lê como água/charco, distinto do
@@ -111,6 +113,7 @@ export const ROTULO_OVERLAY: Record<ChaveOverlay, string> = {
   urb_verde: "Áreas verdes",
   urb_verde_reservada: "Área verde (reservada)",
   urb_verde_sobra: "Verde remanescente",
+  urb_verde_remanescente: "Verde remanescente (restrição/forma)",
   urb_lazer: "Sistema de lazer / clube",
   urb_institucional: "Institucional",
   urb_portico: "Pórtico / entrada",

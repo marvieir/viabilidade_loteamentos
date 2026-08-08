@@ -80,8 +80,14 @@ def test_cavera_nao_degenera():
     viario = (lay.arruamento.area if lay.arruamento is not None else 0.0) / aprov.area
 
     assert n >= 18, f"degenerou: {n} lotes (v2: 21 reais; bug: 18 em teia)"
-    assert vendavel >= 0.22, f"vendável {vendavel:.1%} (v2: 25,7%)"
-    assert viario <= 0.33, f"viário {viario:.1%} explodiu (v2: 26,7%; bug: 51,5%)"
+    assert vendavel >= 0.22, f"vendável {vendavel:.1%} (v2: 25,4%)"
+    assert viario <= 0.33, f"viário {viario:.1%} explodiu (v2: 26,4%; bug: 51,5%)"
+    # MOTOR-3c — o remanescente DECLARADO não é "sobra a minimizar": a linha ⚠ do quadro fica
+    # pequena e o não-loteável aparece rotulado (feedback do operador: "muita sobra geométrica").
+    q = med.quadro
+    assert q["sobra_geometrica"]["pct_apo"] <= 0.15, "sobra ⚠ deveria ser só retalho operacional"
+    assert q["verde_remanescente"] is not None
+    assert q["verde_remanescente"]["pct_apo"] >= 0.20  # ilha norte + caquinhos + dentes
     # Invariante duro: nenhum lote ilhado, nenhum lote abaixo do piso legal.
     assert lay.viario_diagnostico["todos_lotes_com_frente_via"] is True
     piso = float(d["diretrizes"]["piso_lote_efetivo_m2"])
