@@ -103,10 +103,15 @@ FAIXA_FILEIRAS_MAX = 1.95
 # escadinha de pixel (lotes com 20-34 vértices, compacidade 0,31-0,68 — "recortes, não lotes",
 # feedback do operador). Neste regime o motor aplica: (a) borda limpa no canvas mesmo fora do
 # traçado 'limpo' do estilo; (b) grampo do LOTE contra a restrição FECHADA (closing morfológico
-# = SUPERSET da crua → mais conservador que a lei exige; os dentes viram verde). Limiar calibrado
-# nas glebas reais: Caverá = 15 bolsões sub-lote (dispara); Alegrete = 4 e São Roque = 2 (ficam
-# como validados pelos clientes/testes-ouro — mudar o desenho deles é decisão de produto, não fix).
+# = SUPERSET da crua → mais conservador que a lei exige; os dentes viram verde). O regime exige
+# DUAS condições no canvas CRU (contagem sozinha não discrimina — Alegrete/São Roque também têm
+# meia dúzia de caquinhos): nº de bolsões sub-lote ≥ MIN_BOLSOES *e* fração da área nos caquinhos
+# ≥ MIN_FRAC. Calibração nas glebas reais: Caverá = 15 bolsões / 3,0% (dispara); Alegrete = 5 /
+# 0,5% e São Roque = 5 / 0,2% (ficam como validados pelos clientes/testes-ouro — mudar o desenho
+# deles é decisão de produto, não fix). RURAL fica FORA do regime (particionador próprio; closing
+# de lote e borda limpa são réguas urbanas).
 GLEBA_FRAG_MIN_BOLSOES = 5
+GLEBA_FRAG_MIN_FRAC = 0.01    # ≥1% da área aproveitável picada em caquinhos sub-lote
 FECHO_RESTRICAO_LOTE_M = 6.0  # raio do closing (pixel da máscara ~9 m; 6 m fecha os entalhes)
 # MOTOR-3 — HIERARQUIA PROPORCIONAL AO PORTE: coletora de 21 m (VIA_TRONCO_M) só em gleba com
 # porte para justificá-la; abaixo deste aproveitável o tronco é via local +2 m (a coletora de
@@ -1645,8 +1650,14 @@ def gerar_layout(
     # e entrava com a escadinha crua). Decisão pelo canvas CRU (antes de suavizar); calibração
     # e consequências na nota da constante GLEBA_FRAG_MIN_BOLSOES.
     _piso_frag = float(diretrizes["piso_lote_efetivo_m2"])
+    _rural_frag = str(diretrizes.get("regime") or "") == "rural"
     _sub_cru = [c for c in _componentes(canvas) if c.area < _piso_frag]
-    gleba_fragmentada = len(_sub_cru) >= GLEBA_FRAG_MIN_BOLSOES
+    _frac_sub = (sum(c.area for c in _sub_cru) / canvas.area) if canvas.area > 0 else 0.0
+    gleba_fragmentada = (
+        not _rural_frag
+        and len(_sub_cru) >= GLEBA_FRAG_MIN_BOLSOES
+        and _frac_sub >= GLEBA_FRAG_MIN_FRAC
+    )
     if gleba_fragmentada and not limpar:
         canvas = _suavizar_raster(canvas)
         # a suavização pode PONTEAR vãos da mata que veda via (dump 030) — subtrai de novo.
@@ -1877,10 +1888,11 @@ def gerar_layout(
         # (o norte da Caverá: 25 m de largura média vs 29 m necessários). Vai INTEIRA para
         # sobra→verde, rotulada no diagnóstico — régua honesta, não malha forçada. Só ilhas com
         # porte de lote entram aqui (as menores seguem no caminho 'sub-lote' de sempre).
+        # (Régua URBANA — o rural tem particionador próprio de fatias e FMP; fica fora.)
         _per = ilha.boundary.length
         _w_med = (2.0 * ilha.area / _per) if _per > 0 else 0.0
         _w_min_urb = via_local + prof
-        if ilha.area >= piso_lote and _w_med < _w_min_urb:
+        if (not regime_rural) and ilha.area >= piso_lote and _w_med < _w_min_urb:
             _mnx, _mny, _mxx, _mxy = ilha.bounds
             ilhas_detalhe.append({
                 "ilha": idx, "area_m2": round(ilha.area, 2),
