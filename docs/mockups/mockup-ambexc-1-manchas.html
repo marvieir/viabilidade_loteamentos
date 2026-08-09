@@ -1,0 +1,101 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+body { background:#f8fafc; color:#0f172a; width:1240px; padding:22px 26px; }
+.mock { position:fixed; top:10px; right:12px; background:#dc2626; color:#fff; font-size:10px; font-weight:800; letter-spacing:1px; padding:4px 10px; border-radius:99px; text-transform:uppercase; z-index:9; }
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.05); padding:20px 24px; }
+h1 { font-size:17px; font-weight:800; }
+.sub { font-size:12px; color:#64748b; margin-top:3px; }
+.selo-pro { display:inline-block; background:#1d1252; color:#fff; font-size:9.5px; font-weight:800; letter-spacing:.5px; padding:3px 10px; border-radius:99px; text-transform:uppercase; vertical-align:2px; margin-left:8px; }
+.regime { display:flex; gap:10px; margin:14px 0; }
+.reg { flex:1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
+.reg .r { font-size:9.5px; font-weight:800; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+.reg .v { font-size:13px; font-weight:800; color:#1d1252; margin-top:3px; }
+.reg .f { font-size:10.5px; color:#94a3b8; margin-top:2px; }
+.duas { display:grid; grid-template-columns:460px 1fr; gap:18px; margin-top:6px; }
+.mapa { position:relative; background:#e8f1e4; border:1px solid #cbd5e1; border-radius:10px; height:430px; overflow:hidden; }
+.gleba { position:absolute; left:110px; top:18px; width:220px; height:396px; background:#f2efe6; border:2px solid #f59e0b; transform:skewX(-4deg); }
+.mata { position:absolute; background:#3f7d4e; opacity:.85; }
+.mancha { position:absolute; border:2px dashed #b45309; background:rgba(250,204,21,.45); display:grid; place-items:center; font-size:12px; font-weight:800; color:#78350f; }
+.mancha.prio { border-color:#dc2626; background:rgba(248,113,113,.35); color:#7f1d1d; }
+.leg { position:absolute; left:8px; bottom:8px; background:rgba(255,255,255,.94); border-radius:8px; padding:7px 10px; font-size:10px; color:#334155; line-height:1.6; }
+.leg i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { text-align:left; font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; padding:7px 8px; border-bottom:1.5px solid #e2e8f0; }
+td { padding:8px; border-bottom:1px dashed #f1f5f9; vertical-align:top; }
+.mono { font-family:ui-monospace,Menlo,monospace; }
+.pill { display:inline-block; border-radius:99px; padding:2px 9px; font-size:10px; font-weight:800; }
+.pill.mata { background:#dcfce7; color:#166534; }
+.pill.div { background:#fee2e2; color:#991b1b; }
+.pill.nmata { background:#fef9c3; color:#854d0e; }
+.fonte { font-size:10px; color:#64748b; line-height:1.5; }
+.fonte b { color:#334155; }
+.rodape { display:flex; justify-content:space-between; align-items:center; margin-top:16px; }
+.nota { font-size:11px; color:#94a3b8; max-width:640px; }
+.btn { border-radius:8px; padding:10px 18px; font-size:13px; font-weight:700; }
+.btn.pri { background:#ff914d; color:#fff; }
+.aviso { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:9px 12px; font-size:11.5px; color:#1e40af; margin-top:12px; }
+</style></head><body>
+<div class="mock">Mockup — não é o produto</div>
+<div class="card">
+  <h1>Ambiental — vegetação a verificar <span class="selo-pro">Planos pagos</span></h1>
+  <div class="sub">Segunda opinião automática por mancha (satélite × múltiplas fontes). Nenhuma mancha é liberada aqui:
+  a liberação exige laudo de vistoria de campo (aba "Registrar laudo") e autorização do órgão competente.</div>
+
+  <div class="regime">
+    <div class="reg"><div class="r">Regime da gleba</div><div class="v">Bioma Pampa</div><div class="f">IBGE · fora da área da Lei 11.428 (mapa oficial)</div></div>
+    <div class="reg"><div class="r">Rito de supressão</div><div class="v">IN Conjunta SEMA-FEPAM 01/2021 (RS)</div><div class="f">Lei 12.651 art. 26 · campo nativo também protegido</div></div>
+    <div class="reg"><div class="r">Cobertura da régua</div><div class="v">FEDERAL + BIOMA + UF (RS)</div><div class="f">perfil estadual carregado ✓</div></div>
+  </div>
+
+  <div class="duas">
+    <div class="mapa">
+      <div class="gleba"></div>
+      <div class="mata" style="left:130px; top:30px; width:170px; height:90px; border-radius:8px;"></div>
+      <div class="mata" style="left:150px; top:200px; width:140px; height:70px; border-radius:8px;"></div>
+      <div class="mata" style="left:120px; top:330px; width:110px; height:60px; border-radius:8px;"></div>
+      <div class="mancha prio" style="left:160px; top:64px; width:110px; height:52px;">M1</div>
+      <div class="mancha" style="left:180px; top:150px; width:70px; height:38px;">M2</div>
+      <div class="mancha prio" style="left:175px; top:225px; width:80px; height:36px;">M3</div>
+      <div class="mancha" style="left:140px; top:345px; width:60px; height:34px;">M4</div>
+      <div class="leg">
+        <div><i style="background:#3f7d4e"></i>Vegetação (satélite)</div>
+        <div><i style="background:rgba(248,113,113,.6); border:1px dashed #dc2626"></i>Mancha DIVERGENTE — prioridade de vistoria</div>
+        <div><i style="background:rgba(250,204,21,.6); border:1px dashed #b45309"></i>Mancha convergente (fontes concordam)</div>
+      </div>
+    </div>
+    <div>
+      <table>
+        <tr><th>Mancha</th><th>Área</th><th>O que as fontes dizem</th><th>Concordância</th></tr>
+        <tr>
+          <td class="mono"><b>M1</b></td><td class="mono">4.980 m²</td>
+          <td class="fonte"><b>WorldCover:</b> árvore · <b>MapBiomas:</b> formação campestre (2015-2024) · <b>Dossel:</b> 2,1 m (baixo) · <b>CAR:</b> sem remanescente declarado</td>
+          <td><span class="pill div">DIVERGEM — vistoriar</span></td>
+        </tr>
+        <tr>
+          <td class="mono"><b>M2</b></td><td class="mono">2.140 m²</td>
+          <td class="fonte"><b>WorldCover:</b> árvore · <b>MapBiomas:</b> formação florestal (desde 1998) · <b>Dossel:</b> 11,4 m · <b>CAR:</b> remanescente declarado</td>
+          <td><span class="pill mata">MATA — alta confiança</span></td>
+        </tr>
+        <tr>
+          <td class="mono"><b>M3</b></td><td class="mono">3.320 m²</td>
+          <td class="fonte"><b>WorldCover:</b> árvore · <b>MapBiomas:</b> silvicultura (eucalipto, 2011-2024) · <b>Dossel:</b> 14,8 m · <b>CAR:</b> sem remanescente</td>
+          <td><span class="pill div">DIVERGEM — vistoriar</span></td>
+        </tr>
+        <tr>
+          <td class="mono"><b>M4</b></td><td class="mono">1.180 m²</td>
+          <td class="fonte"><b>WorldCover:</b> gramado · <b>MapBiomas:</b> campestre · <b>Dossel:</b> 0,6 m · <b>CAR:</b> sem remanescente</td>
+          <td><span class="pill nmata">NÃO-MATA provável — segue restrita até laudo</span></td>
+        </tr>
+      </table>
+      <div class="aviso">📋 <b>Pacote de vistoria:</b> gera um PDF com o mapa, as manchas numeradas e os campos que o
+      laudo precisa devolver — o engenheiro ambiental leva a campo e volta com o enquadramento de cada mancha.</div>
+    </div>
+  </div>
+
+  <div class="rodape">
+    <div class="nota">Proveniência: WorldCover 10 m (ESA) · MapBiomas Coleção 10 (30 m, série 1985-2024) ·
+    Dossel 1 m (Meta/WRI 2026) · CAR/SICAR. A segunda opinião é triagem — não substitui a vistoria nem a autorização do órgão competente.</div>
+    <button class="btn pri">Gerar pacote de vistoria (PDF)</button>
+  </div>
+</div>
+</body></html>

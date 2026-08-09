@@ -1,5 +1,11 @@
-# Fase AMB-EXC — Reconciliação ambiental pós-vistoria (ESPECIFICAÇÃO, AGUARDA APROVAÇÃO)
+# Fase AMB-EXC — Reconciliação ambiental pós-vistoria (SPEC APROVADA EM ESCOPO; MOCKUPS EM CURSO)
 
+> **08/08 — DECISÕES DO OPERADOR (fecham a spec):** (1) a reconciliação é do PRÓPRIO CLIENTE
+> dono da análise — a plataforma não revisa (a responsabilidade técnica é do RT que assina o
+> laudo do cliente; a plataforma registra proveniência e aplica a régua); (2) feature de PLANOS
+> PAGOS; (3) laudo sem nº de ART/registro é ACEITO sem alarde (campo opcional; a proveniência
+> registra o que foi informado); (4) MOCKUPS antes do código.
+>
 > Status: rascunho para aprovação do operador (08/08/2026). Base: pesquisa legal em
 > `docs/pesquisa-legal-supressao-vegetacao.md` (2 rodadas, fontes primárias), laudo-modelo
 > Geônoma/São Roque destilado em `docs/gap-analise-ambiental.md`, e prática descrita pelo
@@ -89,11 +95,13 @@ campo (doc. X, resp. Y, data Z)" e listam o que mudou (liberado/adicionado, m²,
 Cálculo de compensação florestal (art. 17 da 11.428), volumetria de supressão, PRAD, emissão de
 requerimentos aos órgãos (podem virar fases futuras). O módulo prepara e organiza; não protocola.
 
-## 7. Perguntas para o operador (fecham a spec)
+## 7. Decisões do operador (08/08/2026)
 
-1. Quem faz a reconciliação na tela: só o operador/admin, ou o cliente final também (com o laudo
-   dele)? Sugestão: cliente registra, mas o recálculo exige revisão do operador (2 olhos).
-2. Gate comercial: reconciliação é feature de plano pago (o padrão "gratuito vê, não exporta")?
-3. Laudo sem ART/registro: aceitar com aviso forte, ou recusar?
-4. Mockups das telas (manchas + formulário do laudo + resumo da reconciliação) antes do código,
-   no padrão das fases anteriores?
+1. **Reconciliação é do cliente** dono da análise (a plataforma não revisa análises alheias; o
+   responsável técnico é o do laudo do cliente). A tela deixa claro: triagem + registro; a
+   autorização é sempre do órgão competente.
+2. **Planos pagos apenas** (gate no padrão da casa).
+3. **Laudo sem nº de ART/registro: aceito, sem alarde** — campo opcional; a proveniência grava
+   o que foi informado (sem aviso ruidoso).
+4. **Mockups antes do código** — 3 telas: manchas + segunda opinião; registro do laudo +
+   reconciliação; resumo/recálculo. Fontes em `docs/mockups/mockup-ambexc-*.html`.
