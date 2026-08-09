@@ -29,6 +29,7 @@ from app.core.ratelimit import limiter
 from app.routers import (
     exemplo,
     admin,
+    ambexc,
     ambiental,
     analises,
     areas_umidas,
@@ -153,6 +154,7 @@ app.include_router(portfolio.router, prefix="/api")  # AI Portfolio Insights (po
 app.include_router(analises.router, prefix="/api")
 app.include_router(ambiental.router, prefix="/api")
 app.include_router(vegetacao.router, prefix="/api")
+app.include_router(ambexc.router, prefix="/api")  # AMB-EXC — reconciliação pós-vistoria (pago)
 app.include_router(areas_umidas.router, prefix="/api")
 app.include_router(declividade.router, prefix="/api")
 app.include_router(perfil.router, prefix="/api")

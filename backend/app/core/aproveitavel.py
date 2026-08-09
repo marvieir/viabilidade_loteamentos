@@ -25,6 +25,8 @@ ROTULOS = {
     "faixa_nao_edificavel": "faixa não-edificável",
     "linhas_transmissao": "servidão de linha de transmissão",
     "declividade_vedada": "Declividade ≥30% (Lei 6.766)",
+    # AMB-EXC — achados de campo do laudo de vistoria (banhado/nascente/APP de campo).
+    "reconciliacao_campo": "restrição de vistoria de campo (laudo)",
 }
 
 

@@ -75,6 +75,7 @@ def _rehidratar_de_salva(
             "perimetro_m": perimetro,
             "jurisdicao": jur,
             "usuario_id": usuario.id,
+            "analise_id": analise_id,  # AMB-EXC — o registro sabe o próprio id (reconciliação)
         }
         STORE[analise_id] = registro
         return registro

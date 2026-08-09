@@ -2513,3 +2513,85 @@ class AdminClienteAtivoIn(BaseModel):
 class AdminClienteAtivoOut(BaseModel):
     usuario_id: str
     ativo: bool
+
+
+# ===================== AMB-EXC — reconciliação ambiental pós-vistoria =====================
+
+
+class LeituraFonteOut(BaseModel):
+    fonte: str
+    valor: str
+    detalhe: str = ""
+
+
+class ManchaOut(BaseModel):
+    mancha_id: str
+    assinatura: str
+    area_m2: float
+    geojson: dict
+    leituras: list[LeituraFonteOut]
+    concordancia: str   # mata_alta_confianca | mata_provavel | divergem | campestre_provavel | dados_insuficientes
+    motivo: str
+
+
+class RegimeAmbientalOut(BaseModel):
+    codigo: str         # mata_atlantica | pampa | geral
+    rotulo: str
+    rito: str
+    cobertura: str      # FEDERAL | FEDERAL+BIOMA | FEDERAL+BIOMA+UF
+    avisos: list[str] = []
+
+
+class ManchasAmbientaisOut(BaseModel):
+    gate: PortfolioGateOut
+    regime: Optional[RegimeAmbientalOut] = None
+    manchas: list[ManchaOut] = []
+    reconciliacao_vigente: Optional["ReconciliacaoResumoOut"] = None
+    avisos: list[str] = []
+    proveniencia: str = ""
+
+
+class AjusteLaudoIn(BaseModel):
+    acao: Literal["estagio", "formacao", "nova_restricao"]
+    mancha_id: Optional[str] = None
+    assinatura: Optional[str] = None
+    estagio: Optional[str] = None       # primaria | sec_avancado | sec_medio | sec_inicial | nao_nativa
+    formacao: Optional[str] = None      # florestal | campestre | nao_nativa
+    tipo_restricao: Optional[str] = None  # banhado | nascente | app_curso_dagua | outro
+    geojson: Optional[dict] = None
+    observacao: str = ""
+
+
+class LaudoReconciliacaoIn(BaseModel):
+    responsavel: str
+    registro: str = ""                  # ART/registro — OPCIONAL (decisão do operador, sem alarde)
+    data_vistoria: str                  # ISO (AAAA-MM-DD)
+    perimetro_urbano_pre_lei: Optional[bool] = None  # aprovado até 22/12/2006? (Mata Atlântica)
+    perimetro_urbano_fonte: str = ""    # ex.: "Lei municipal 2.140/98"
+    ajustes: list[AjusteLaudoIn]
+
+
+class ItemReconciliadoOut(BaseModel):
+    item_id: str
+    area_m2: float
+    decisao: str
+    acao: str
+    base_legal: str
+    leitura: str
+    efeito_m2: float
+    preservacao_m2: float = 0.0
+
+
+class ReconciliacaoResumoOut(BaseModel):
+    versao: int
+    itens: list[ItemReconciliadoOut]
+    saldo_m2: float
+    laudo: dict          # responsavel/registro/data_vistoria/arquivo/registrado_em
+    avisos: list[str] = []
+    liberadas_geojson: Optional[dict] = None
+    preservacao_geojson: Optional[dict] = None
+    novas_restricoes_geojson: Optional[dict] = None
+    leitura: str = ""
+
+
+ManchasAmbientaisOut.model_rebuild()  # resolve a forward ref de ReconciliacaoResumoOut

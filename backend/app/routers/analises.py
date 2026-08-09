@@ -28,6 +28,8 @@ from app.models.db_models import Analise as AnaliseSalvaDB
 from app.models.db_models import Usuario
 from app.core import agrupamento as agrupamento_mod
 from app.core import ambiental as ambiental_motor
+from app.core import ambiental_reconciliacao
+from app.core import reconciliacao_store
 from app.core import aproveitamento as motor
 from app.core import areas_canonicas
 from app.core import aproveitavel
@@ -66,12 +68,22 @@ _RESSALVA_OTIMISTA = (
 )
 
 # Faixas não-edificáveis do ambiental que reduzem o aproveitável (Fase 2.2).
-_CHAVES_RESTRITIVAS = ("app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao")
+_CHAVES_RESTRITIVAS = (
+    "app", "app_massa_dagua", "faixa_nao_edificavel", "linhas_transmissao",
+    # AMB-EXC — restrições ACHADAS EM CAMPO pelo laudo de vistoria (banhado/nascente/…):
+    # entram como APP (bloqueiam via e lote), com base legal na proveniência do snapshot.
+    "reconciliacao_campo",
+)
 
 
 def _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem=None):
     """Busca, uma vez, a geometria do verde (WGS84), as camadas ambientais (dict WGS84) e a
-    mancha de declividade vedada (≥30%, WGS84, Fase 2.5). Cada um degrada honesto se ausente."""
+    mancha de declividade vedada (≥30%, WGS84, Fase 2.5). Cada um degrada honesto se ausente.
+
+    AMB-EXC: se a análise tem RECONCILIAÇÃO de vistoria aplicada (laudo de campo), o verde é
+    ajustado AQUI — o choke point único que todas as abas (canônicas, aproveitamento,
+    urbanismo) atravessam, então a análise inteira converge por construção. A fonte é
+    injetável por env (``AMBEXC_DIR``); sem reconciliação → passthrough."""
     gleba = registro["poly"]
     verde_geom = fonte_veg.cobertura_verde(gleba).geometria if fonte_veg is not None else None
     overlays: dict = {}
@@ -79,6 +91,13 @@ def _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem=None):
         camadas = fonte_camadas.coletar(gleba.bounds, registro["jurisdicao"].uf)
         raw = ambiental_motor.analisar(gleba, camadas).geojson_overlays
         overlays = {k: shape(v) for k, v in raw.items() if v}
+    aid = registro.get("analise_id")
+    if aid:
+        snap = reconciliacao_store.vigente(reconciliacao_store.get_fonte_reconciliacao(), aid)
+        if snap:
+            verde_geom, novas = ambiental_reconciliacao.aplicar_no_verde(verde_geom, snap)
+            if novas is not None and not novas.is_empty:
+                overlays["reconciliacao_campo"] = novas
     decliv_geom = None
     if fonte_dem is not None:
         dem = fonte_dem.amostrar(gleba)
@@ -398,6 +417,7 @@ async def _criar_analise_unica(upload: UploadFile, fonte_malha, usuario: Usuario
         "perimetro_m": perimetro,
         "jurisdicao": jur,
         "usuario_id": usuario.id,
+        "analise_id": analise_id,  # AMB-EXC — o registro sabe o próprio id (reconciliação)
     }
     salva_id = _auto_salvar_registro(db, usuario, analise_id, poly, area, jur, upload.filename, avisos)
 
@@ -543,6 +563,7 @@ async def _criar_analise_agrupada(arquivos: list[UploadFile], fonte_malha, usuar
         "jurisdicao": jur,
         "agrupamento": agr_out.model_dump(),
         "usuario_id": usuario.id,
+        "analise_id": analise_id,  # AMB-EXC — o registro sabe o próprio id (reconciliação)
     }
     nome_grupo = f"{nomes[0]} (+{len(nomes) - 1})" if len(nomes) > 1 else (nomes[0] if nomes else None)
     salva_id = _auto_salvar_registro(db, usuario, analise_id, uniao_wgs, area, jur, nome_grupo, avisos)
