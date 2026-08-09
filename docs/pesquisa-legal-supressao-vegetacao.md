@@ -74,14 +74,29 @@
 5. **Quem autoriza** (estado × município) muda por arranjo local — o módulo informa o rito
    provável e rotula como "verificar no órgão local" (não decide).
 
-## 6. Perguntas abertas (próxima rodada, antes da spec)
+## 6. 2ª rodada (08/08/2026) — regime urbano da Mata Atlântica FECHADO
 
-- Ler na íntegra: arts. 30/31 da 11.428 (condicionantes exatas + jurisprudência de perímetro
-  urbano pós-2006); IN SEMA-FEPAM 01/2021 (aplica-se a supressão em área URBANA no Pampa ou só
-  rural/CODRAM 10740?); CONAMA 33/1994 (parâmetros de estágio no RS).
-- RS tem os DOIS regimes (Pampa ao sul, Mata Atlântica ao norte) — o mapa IBGE resolve por gleba?
-- Estágio INICIAL na Mata Atlântica: regra de supressão em urbano (menos restritiva — confirmar).
-- Como os municípios que licenciam (LC 140) tratam o rito na prática (amostra: Alegrete).
+A régua completa dos arts. 25/30/31 (o que o motor aplica quando o laudo declara o estágio),
+em área urbana/região metropolitana:
+
+| Estágio declarado no laudo | Perímetro urbano aprovado ATÉ 22/12/2006 | Perímetro aprovado DEPOIS |
+|---|---|---|
+| **Primária** | Supressão **VEDADA** p/ loteamento/edificação (art. 30) | idem — VEDADA |
+| **Secundária AVANÇADO** | Autorização estadual + preservar **≥ 50%** da área coberta (art. 30, I) | **VEDADA** p/ loteamento/edificação (art. 30, II) |
+| **Secundária MÉDIO** | Autorização estadual, conforme plano diretor + preservar **≥ 30%** (art. 31, § 1º) | preservar **≥ 50%** (art. 31, § 2º) |
+| **Secundária INICIAL** | Autorização do órgão estadual (art. 25) — regra menos restritiva; nos estados com remanescente < 5% do original, aplica-se o regime do estágio médio, RESSALVADAS áreas urbanas (art. 25, § único) | idem |
+
+- Regulamento: **Decreto 6.660/2008**. A data de aprovação do PERÍMETRO URBANO vira dado de
+  entrada do módulo (declarável, com fonte municipal).
+- **Consequência de produto:** o laudo não "libera" — ele **declara o estágio**; a consequência
+  (vedado / % de preservação / autorização) é do MOTOR, determinística e citando o dispositivo.
+
+### Ainda em aberto (não bloqueia a spec; rotular no produto)
+- Pampa em área URBANA: a IN 01/2021 trata do rito rural (CODRAM 10740); o rito urbano segue o
+  licenciamento do parcelamento no órgão competente → rotular "verificar rito no órgão local".
+- Parâmetros botânicos de estágio (CONAMA 33/94-RS, 1/94-SP…): são matéria do LAUDO (engenheiro
+  enquadra), não do motor — o módulo só recebe o estágio declarado + referência da resolução.
+- Prática municipal (LC 140) por cidade → campo informativo, nunca decisão do motor.
 
 ## 7. Fontes (verificadas em 08/08/2026)
 
