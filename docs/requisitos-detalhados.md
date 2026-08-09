@@ -39,6 +39,28 @@ na hora; o resultado completo continua indo no snapshot da salva.
 - Código: `routers/ambiental.py`, `routers/vegetacao.py`, `routers/declividade.py`, `core/alertas_geo.py`, `core/camadas*.py`, `core/ambiental_store.py`, `core/bacia.py`, `core/bioma.py`.
 - Testes: `test_ambiental.py`, `test_camadas_crs.py`, `test_declividade.py`, `test_alertas_geo_rural.py`.
 
+**Vistoria de campo e reconciliação (RF-AMB-7, AMB-EXC).** O satélite é prudente: tudo que
+parece vegetação entra como restrição. O módulo fecha o ciclo com o campo, em 4 passos:
+(1) as manchas de "verde a verificar" são numeradas (M1..Mn) e cada uma recebe uma **segunda
+opinião automática** — WorldCover diz "vegetação", o MapBiomas diz a CLASSE (floresta nativa ×
+silvicultura × campo × pastagem) e o CAR diz se há Reserva Legal declarada; onde as fontes
+divergem, a mancha vira prioridade de vistoria (nada é liberado por satélite); (2) o cliente
+leva o mapa a campo com o engenheiro ambiental; (3) registra o laudo (PDF + responsável +
+data; ART opcional) e enquadra mancha a mancha — na Mata Atlântica declara o ESTÁGIO e o motor
+aplica a tabela legal (primária vedada; avançado 50% ou vedado conforme a data do perímetro
+urbano; médio 30%/50%; inicial autorização — arts. 25/30/31 da Lei 11.428, citados item a
+item); no Pampa/demais declara a formação (campo nativo também exige autorização); achados de
+campo (banhado/nascente) entram como restrição nova com base legal (no RS, banhado é APP —
+Lei 15.434/2020); (4) o aproveitável é recalculado num ponto único do backend — todas as abas
+convergem — e o histórico fica versionado (a leitura de satélite nunca é apagada). Feature de
+planos pagos; a autorização de supressão é SEMPRE do órgão competente (Lei 12.651, art. 26).
+
+- Código: `core/ambiental_regua.py` (tabela legal versionada), `core/ambiental_manchas.py`
+  (manchas + 2ª opinião), `core/ambiental_reconciliacao.py` (efeitos geométricos),
+  `core/reconciliacao_store.py`, `routers/ambexc.py`; front `components/cards/ReconciliacaoAmbiental.tsx`.
+- Testes: `test_ambiental_regua.py` (18), `test_ambiental_manchas.py` (7),
+  `test_ambiental_reconciliacao.py` (8), `test_ambexc_router.py` (5, ponta a ponta).
+
 ## RF-APR — Aproveitamento
 
 **Como funciona.** Aproveitável = gleba − união(restrições). A união evita contar duas vezes

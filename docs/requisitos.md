@@ -44,6 +44,14 @@ de produto e perfis municipais).
 - **RF-AMB-4** Bacia hidrográfica e bioma como contexto descritivo.
 - **RF-AMB-5** Execução registrada no servidor (a trilha reconhece na hora, sem depender de salvar).
 - **RF-AMB-6** Camada indisponível → declarar "não consultada", nunca inferir ausência de problema.
+- **RF-AMB-7** **Reconciliação pós-vistoria (AMB-EXC, planos pagos, Brasil todo):** manchas do
+  "verde a verificar" numeradas com **segunda opinião automática** por mancha (WorldCover ×
+  MapBiomas Col.10 × CAR — nada é liberado por satélite); registro do **laudo de campo** que
+  declara FATOS (estágio/formação/achados) e o motor aplica a consequência legal citando o
+  dispositivo (régua em 3 camadas com degradação honesta: federal Lei 12.651 → bioma — Mata
+  Atlântica arts. 25/30/31, Pampa IN 01/2021 → perfil de UF); efeito **bidirecional** (libera
+  E adiciona banhado/nascente achados em campo); histórico versionado com proveniência
+  (laudo, RT, data, artigo); o aproveitável/urbanismo passam a usar a área reconciliada.
 
 ### RF-APR — Aproveitamento
 - **RF-APR-1** Área aproveitável = gleba − união das restrições físicas/ambientais, com memória do desconto.

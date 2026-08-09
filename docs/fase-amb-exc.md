@@ -1,4 +1,4 @@
-# Fase AMB-EXC — Reconciliação ambiental pós-vistoria (SPEC APROVADA EM ESCOPO; MOCKUPS EM CURSO)
+# Fase AMB-EXC — Reconciliação ambiental pós-vistoria (IMPLEMENTADA em 09/08/2026)
 
 > **08/08 — DECISÕES DO OPERADOR (fecham a spec):** (1) a reconciliação é do PRÓPRIO CLIENTE
 > dono da análise — a plataforma não revisa (a responsabilidade técnica é do RT que assina o

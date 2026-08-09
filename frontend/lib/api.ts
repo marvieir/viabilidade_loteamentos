@@ -2175,3 +2175,110 @@ export async function publicarExemplo(
   });
   await jsonOrThrow(res);
 }
+
+// ===================== AMB-EXC — reconciliação ambiental pós-vistoria =====================
+
+export type LeituraFonteAmb = { fonte: string; valor: string; detalhe: string };
+
+export type ManchaAmb = {
+  mancha_id: string;
+  assinatura: string;
+  area_m2: number;
+  geojson: GeoJSON.Geometry;
+  leituras: LeituraFonteAmb[];
+  concordancia:
+    | "mata_alta_confianca"
+    | "mata_provavel"
+    | "divergem"
+    | "campestre_provavel"
+    | "dados_insuficientes";
+  motivo: string;
+};
+
+export type RegimeAmb = {
+  codigo: "mata_atlantica" | "pampa" | "geral";
+  rotulo: string;
+  rito: string;
+  cobertura: string;
+  avisos: string[];
+};
+
+export type ItemReconciliado = {
+  item_id: string;
+  area_m2: number;
+  decisao: string;
+  acao: string;
+  base_legal: string;
+  leitura: string;
+  efeito_m2: number;
+  preservacao_m2: number;
+};
+
+export type ReconciliacaoResumo = {
+  versao: number;
+  itens: ItemReconciliado[];
+  saldo_m2: number;
+  laudo: Record<string, unknown>;
+  avisos: string[];
+  leitura: string;
+};
+
+export type ManchasAmbientais = {
+  gate: import("./portfolio").PortfolioGate;
+  regime?: RegimeAmb | null;
+  manchas: ManchaAmb[];
+  reconciliacao_vigente?: ReconciliacaoResumo | null;
+  avisos: string[];
+  proveniencia: string;
+};
+
+export type AjusteLaudo = {
+  acao: "estagio" | "formacao" | "nova_restricao";
+  mancha_id?: string;
+  assinatura?: string;
+  estagio?: string;
+  formacao?: string;
+  tipo_restricao?: string;
+  geojson?: GeoJSON.Geometry | Record<string, unknown>;
+  observacao?: string;
+};
+
+export type LaudoReconciliacao = {
+  responsavel: string;
+  registro?: string;
+  data_vistoria: string;
+  perimetro_urbano_pre_lei?: boolean | null;
+  perimetro_urbano_fonte?: string;
+  ajustes: AjusteLaudo[];
+};
+
+async function _erroAmbexc(res: Response, padrao: string): Promise<string> {
+  try {
+    const b = (await res.json()) as { detail?: string };
+    return b.detail ?? padrao;
+  } catch {
+    return `${padrao} (${res.status})`;
+  }
+}
+
+export async function buscarManchasAmbientais(analiseId: string): Promise<ManchasAmbientais> {
+  const res = await apiFetch(`/api/analises/${analiseId}/ambiental/manchas`);
+  if (!res.ok) throw new Error(await _erroAmbexc(res, "Falha ao listar as manchas."));
+  return res.json();
+}
+
+export async function registrarLaudoAmbiental(
+  analiseId: string,
+  dados: LaudoReconciliacao,
+  arquivo?: File | null
+): Promise<ReconciliacaoResumo> {
+  const form = new FormData();
+  form.append("dados", JSON.stringify(dados));
+  if (arquivo) form.append("arquivo", arquivo);
+  const res = await apiFetch(`/api/analises/${analiseId}/ambiental/laudo`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) throw new Error(await _erroAmbexc(res, "Falha ao registrar o laudo."));
+  return res.json();
+}

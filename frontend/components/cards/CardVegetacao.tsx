@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { EstadoVazio } from "@/components/cards/EstadoVazio";
+import { ReconciliacaoAmbiental } from "@/components/cards/ReconciliacaoAmbiental";
 import {
   buscarVegetacao,
   type ChaveOverlay,
@@ -241,6 +242,12 @@ export function CardVegetacao({
               </p>
             )}
           </>
+        )}
+
+        {/* AMB-EXC — vistoria de campo e reconciliação (planos pagos); aparece após a
+            análise, junto do balde 'a verificar' que ela destrava. */}
+        {data?.severidade && (data.severidade.a_verificar.area_m2 ?? 0) > 0 && (
+          <ReconciliacaoAmbiental analiseId={analiseId} />
         )}
       </CardContent>
     </Card>
