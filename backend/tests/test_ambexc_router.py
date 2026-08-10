@@ -162,3 +162,36 @@ def test_gate_bloqueado_sem_dados_e_post_402(client, fonte_vegetacao, fonte, tmp
                           "geojson": {"type": "Polygon", "coordinates": [[[0, 0], [0, 1], [1, 1], [0, 0]]]}}]}
     r2 = client.post(f"/api/analises/{aid}/ambiental/laudo", data={"dados": json.dumps(dados)})
     assert r2.status_code == 402
+
+
+def test_reconciliacao_sobrevive_ao_abrir_analise_salva(client, fonte_vegetacao, fonte):
+    """O fluxo REAL do operador (bug de campo, 09/08): laudo aplicado → fecha o app →
+    'Abrir análise' (/salvas/{id}/carregar reconstrói o registro) → o aproveitável TEM que
+    continuar refletindo a reconciliação. O registro reconstruído sem ``analise_id`` fazia o
+    gancho não aplicar EM SILÊNCIO (28 lotes de sempre na tela do operador)."""
+    from app.core.store import STORE
+
+    _com_verde(fonte_vegetacao, fonte)
+    aid = _criar_analise(client)
+    m1 = client.get(f"/api/analises/{aid}/ambiental/manchas").json()["manchas"][0]
+    dados = {
+        "responsavel": "Eng.", "data_vistoria": "2026-08-02",
+        "ajustes": [{"acao": "formacao", "mancha_id": m1["mancha_id"],
+                     "assinatura": m1["assinatura"], "formacao": "nao_nativa"}],
+    }
+    assert client.post(
+        f"/api/analises/{aid}/ambiental/laudo", data={"dados": json.dumps(dados)}
+    ).status_code == 200
+    corpo = {"regime": "URBANO", "lote_min_m2": 200, "modalidade": "loteamento_aberto"}
+    com_rec = client.post(f"/api/analises/{aid}/aproveitamento", json=corpo).json()
+
+    # Simula o fluxo de reabertura: STORE limpo (restart) + /carregar da salva.
+    salvas = client.get("/api/salvas").json()
+    assert salvas, "auto-save deveria ter criado a salva"
+    STORE.clear()
+    r = client.post(f"/api/salvas/{salvas[0]['id']}/carregar")
+    assert r.status_code == 200, r.text
+    assert r.json()["analise_id"] == aid  # mesmo id de trabalho
+
+    depois = client.post(f"/api/analises/{aid}/aproveitamento", json=corpo).json()
+    assert depois["area_aproveitavel_m2"] == com_rec["area_aproveitavel_m2"]

@@ -232,6 +232,7 @@ def carregar(
         "perimetro_m": perimetro,
         "jurisdicao": jur,
         "usuario_id": usuario.id,  # Fase 13 — registro do STORE escopado ao dono (guarda de acesso)
+        "analise_id": novo_id,  # AMB-EXC — sem isto a reconciliação não aplicava no "Abrir análise"
     }
 
     # DIAGNÓSTICO VISÍVEL (nunca falhar mudo): conta o que existe vinculado a este id.
