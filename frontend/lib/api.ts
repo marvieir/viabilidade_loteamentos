@@ -2212,12 +2212,14 @@ export type ItemReconciliado = {
   leitura: string;
   efeito_m2: number;
   preservacao_m2: number;
+  efeito_otimista_m2: number;
 };
 
 export type ReconciliacaoResumo = {
   versao: number;
   itens: ItemReconciliado[];
   saldo_m2: number;
+  saldo_otimista_m2: number;
   laudo: Record<string, unknown>;
   avisos: string[];
   leitura: string;

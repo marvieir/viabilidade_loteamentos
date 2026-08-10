@@ -95,9 +95,15 @@ def _coletar_geoms(registro, fonte_veg, fonte_camadas, fonte_dem=None):
     if aid:
         snap = reconciliacao_store.vigente(reconciliacao_store.get_fonte_reconciliacao(), aid)
         if snap:
-            verde_geom, novas = ambiental_reconciliacao.aplicar_no_verde(verde_geom, snap)
+            verde_geom, novas, nao_lib = ambiental_reconciliacao.aplicar_no_verde(
+                verde_geom, snap
+            )
             if novas is not None and not novas.is_empty:
                 overlays["reconciliacao_campo"] = novas
+            if nao_lib is not None and not nao_lib.is_empty:
+                # Vedadas/preservação obrigatória: já estão DENTRO do verde (base restrita);
+                # esta chave só tira a área do POTENCIAL do cenário otimista (severidade).
+                overlays["reconciliacao_nao_liberavel"] = nao_lib
     decliv_geom = None
     if fonte_dem is not None:
         dem = fonte_dem.amostrar(gleba)

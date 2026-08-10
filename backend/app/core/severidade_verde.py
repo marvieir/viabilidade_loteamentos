@@ -22,7 +22,11 @@ from shapely.ops import transform, unary_union
 # Camadas que PROTEGEM a vegetação (supressão em geral proibida) → restrição dura.
 CAMADAS_PROTECAO = ("app", "app_massa_dagua", "uc")
 # Camadas que impedem CONSTRUIR (mesmo se a mata for suprimível, não vira área útil).
-CAMADAS_NAO_EDIFICAVEL = ("faixa_nao_edificavel", "linhas_transmissao")
+# ``reconciliacao_nao_liberavel`` (AMB-EXC): vedadas/preservação obrigatória do laudo de
+# vistoria — fora do potencial desbloqueável (cenário otimista) por decisão legal declarada.
+CAMADAS_NAO_EDIFICAVEL = (
+    "faixa_nao_edificavel", "linhas_transmissao", "reconciliacao_nao_liberavel",
+)
 
 RESSALVA = (
     "Verde fora de APP/UC PODE ser suprimível mediante laudo de engenheiro ambiental e "

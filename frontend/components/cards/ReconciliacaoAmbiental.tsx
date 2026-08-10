@@ -321,8 +321,13 @@ export function ReconciliacaoAmbiental({ analiseId }: { analiseId: string }) {
       {resumo && (
         <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
           <div className="text-xs font-extrabold text-emerald-900">
-            Reconciliação aplicada (versão {resumo.versao}) — saldo {resumo.saldo_m2 >= 0 ? "+" : ""}
-            {m2(resumo.saldo_m2)} no aproveitável
+            Reconciliação aplicada (versão {resumo.versao}) — base {resumo.saldo_m2 >= 0 ? "+" : ""}
+            {m2(resumo.saldo_m2)}
+            {resumo.saldo_otimista_m2 > 0 && (
+              <span className="ml-2 font-bold text-amber-700">
+                · cenário otimista +{m2(resumo.saldo_otimista_m2)} (se o órgão autorizar)
+              </span>
+            )}
           </div>
           <table className="mt-2 w-full text-[11px]">
             <thead>
@@ -337,8 +342,16 @@ export function ReconciliacaoAmbiental({ analiseId }: { analiseId: string }) {
                   <td className="py-1.5 pr-2 font-mono font-bold">{i.item_id}</td>
                   <td className="py-1.5 pr-2">{i.decisao}</td>
                   <td className="py-1.5 pr-2 text-slate-600">{i.leitura} <i className="text-slate-400">({i.base_legal})</i></td>
-                  <td className={`py-1.5 font-mono font-bold ${i.efeito_m2 >= 0 ? "text-emerald-700" : "text-rose-700"}`}>
-                    {i.efeito_m2 >= 0 ? "+" : ""}{m2(i.efeito_m2)}
+                  <td className="py-1.5 font-mono font-bold">
+                    {i.efeito_m2 !== 0 ? (
+                      <span className={i.efeito_m2 > 0 ? "text-emerald-700" : "text-rose-700"}>
+                        {i.efeito_m2 > 0 ? "+" : ""}{m2(i.efeito_m2)}
+                      </span>
+                    ) : i.efeito_otimista_m2 > 0 ? (
+                      <span className="text-amber-700">+{m2(i.efeito_otimista_m2)} só no otimista</span>
+                    ) : (
+                      <span className="text-slate-400">0 (segue restrita)</span>
+                    )}
                   </td>
                 </tr>
               ))}

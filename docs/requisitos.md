@@ -52,6 +52,8 @@ de produto e perfis municipais).
   Atlântica arts. 25/30/31, Pampa IN 01/2021 → perfil de UF); efeito **bidirecional** (libera
   E adiciona banhado/nascente achados em campo); histórico versionado com proveniência
   (laudo, RT, data, artigo); o aproveitável/urbanismo passam a usar a área reconciliada.
+  **Nativa "mediante autorização" NÃO conta na base** (decisão do operador, 09/08): entra só no
+  cenário otimista do Aproveitamento; vedada/preservação obrigatória fica fora até do otimista.
 
 ### RF-APR — Aproveitamento
 - **RF-APR-1** Área aproveitável = gleba − união das restrições físicas/ambientais, com memória do desconto.

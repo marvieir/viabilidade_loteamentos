@@ -102,15 +102,18 @@ def _resumo_out(snap: dict, versao: int) -> schemas.ReconciliacaoResumoOut:
         versao=versao,
         itens=[schemas.ItemReconciliadoOut(**i) for i in snap.get("itens", [])],
         saldo_m2=snap.get("saldo_m2", 0.0),
+        saldo_otimista_m2=snap.get("saldo_otimista_m2", 0.0),
         laudo=snap.get("laudo", {}),
         avisos=snap.get("avisos", []),
         liberadas_geojson=snap.get("liberadas"),
         preservacao_geojson=snap.get("preservacao"),
         novas_restricoes_geojson=snap.get("novas_restricoes"),
         leitura=(
-            "Números sob as premissas declaradas: valem SE o órgão competente autorizar a "
-            "supressão conforme o laudo (Lei 12.651, art. 26) — a autorização não é da "
-            "plataforma. A leitura de satélite original fica no histórico."
+            "A BASE só conta o que o laudo constatou NÃO ser vegetação nativa (decisão do "
+            "operador, 09/08). Nativa suprimível 'mediante autorização' entra apenas no "
+            "CENÁRIO OTIMISTA do Aproveitamento — e vale SE o órgão competente autorizar "
+            "(Lei 12.651, art. 26); a autorização não é da plataforma. Vedadas e preservação "
+            "obrigatória ficam fora até do otimista. O satélite original fica no histórico."
         ),
     )
 

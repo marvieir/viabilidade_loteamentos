@@ -2578,14 +2578,16 @@ class ItemReconciliadoOut(BaseModel):
     acao: str
     base_legal: str
     leitura: str
-    efeito_m2: float
+    efeito_m2: float                 # efeito na BASE (nativa sob autorização = 0 aqui)
     preservacao_m2: float = 0.0
+    efeito_otimista_m2: float = 0.0  # entra só no cenário otimista ("se o órgão autorizar")
 
 
 class ReconciliacaoResumoOut(BaseModel):
     versao: int
     itens: list[ItemReconciliadoOut]
     saldo_m2: float
+    saldo_otimista_m2: float = 0.0
     laudo: dict          # responsavel/registro/data_vistoria/arquivo/registrado_em
     avisos: list[str] = []
     liberadas_geojson: Optional[dict] = None

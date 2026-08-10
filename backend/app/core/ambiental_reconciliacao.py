@@ -3,14 +3,15 @@
 O laudo declara (estágio na Mata Atlântica; formação no Pampa/geral; achados de campo); a
 consequência vem da régua (``ambiental_regua``) e vira EFEITO GEOMÉTRICO determinístico:
 
-  - liberada/autorização → a mancha sai da restrição de vegetação (SOB PREMISSA rotulada:
-    vale se o órgão autorizar — a plataforma nunca autoriza);
-  - preservar ≥ pct → a mancha é DIVIDIDA: a fração legal fica restrita ("preservação
-    obrigatória", rotulada com o artigo) e o restante é liberado. Corte determinístico no
-    eixo longo do MRR; o lado preservado é o mais DISTANTE do centro da gleba (empurra a
-    preservação para a borda — prática de fundo de mata; traçado esquemático, o projeto
-    executivo define a poligonal exata);
-  - vedada → nada muda (a mancha segue restrita), registrado no resumo;
+  - liberada (laudo constatou NÃO ser vegetação nativa) → sai da restrição na BASE;
+  - autorização (nativa suprimível mediante autorização do órgão) → a BASE segue restrita
+    (DECISÃO DO OPERADOR, 09/08: autorização não é formalidade — não conta como certeza);
+    a área entra só no CENÁRIO OTIMISTA do aproveitamento, rotulada;
+  - preservar ≥ pct (Mata Atlântica urbana, arts. 30/31) → idem: base restrita; no otimista
+    entra só o complemento — a fração preservada é DIVIDIDA da mancha (corte determinístico
+    no eixo longo do MRR; lado preservado = o mais distante do centro da gleba) e fica fora
+    até do otimista;
+  - vedada (primária/avançado pós-2006) → fora da base E do otimista;
   - achado de campo (banhado/nascente/…) → NOVA restrição com base legal, ∩ gleba.
 
 Sentidos + e − no mesmo ato (bidirecional, como o operador descreveu). Determinístico
@@ -58,21 +59,30 @@ class ItemReconciliado:
     acao: str               # regua.ACAO_* ou "restricao_campo"
     base_legal: str
     leitura: str
-    efeito_m2: float        # + libera aproveitável · − restringe · 0 sem mudança
+    efeito_m2: float        # efeito na BASE: + libera · − restringe · 0 sem mudança
     preservacao_m2: float = 0.0
+    # DECISÃO DO OPERADOR (09/08): nativa "mediante autorização" NÃO conta na base — este é
+    # o quanto do item entra APENAS no cenário otimista ("se o órgão autorizar").
+    efeito_otimista_m2: float = 0.0
 
 
 @dataclass
 class Reconciliacao:
     itens: list[ItemReconciliado] = field(default_factory=list)
-    liberadas_wgs: Optional[BaseGeometry] = None       # sai da restrição de vegetação
-    preservacao_wgs: Optional[BaseGeometry] = None     # fica restrita (preservação legal)
+    liberadas_wgs: Optional[BaseGeometry] = None       # sai da restrição de vegetação (BASE)
+    preservacao_wgs: Optional[BaseGeometry] = None     # preservação obrigatória (arts. 30/31)
+    # vedadas + preservação obrigatória: fora da base E do cenário otimista.
+    nao_liberavel_wgs: Optional[BaseGeometry] = None
     novas_restricoes_wgs: Optional[BaseGeometry] = None  # achados de campo (restrição nova)
     avisos: list[str] = field(default_factory=list)
 
     @property
     def saldo_m2(self) -> float:
         return round(sum(i.efeito_m2 for i in self.itens), 2)
+
+    @property
+    def saldo_otimista_m2(self) -> float:
+        return round(sum(i.efeito_otimista_m2 for i in self.itens), 2)
 
 
 def _crs_local(lon: float, lat: float) -> CRS:
@@ -156,6 +166,7 @@ def reconciliar(
     rec = Reconciliacao()
     liberadas_l: list[BaseGeometry] = []
     preservadas_l: list[BaseGeometry] = []
+    nao_liberavel_l: list[BaseGeometry] = []
     novas_l: list[BaseGeometry] = []
     n_restr = 0
 
@@ -214,21 +225,28 @@ def reconciliar(
 
         g_l = transform(to_local, m._geom_wgs)
         if cons.acao == regua.ACAO_VEDADA:
-            efeito, pres_m2 = 0.0, 0.0
+            # Fora da base E do otimista (a lei veda para loteamento).
+            nao_liberavel_l.append(g_l)
+            efeito, pres_m2, otim = 0.0, 0.0, 0.0
         elif cons.acao == regua.ACAO_PRESERVAR:
+            # Base: segue restrita. Otimista: só o complemento da preservação obrigatória
+            # (a fração preservada fica fora até do otimista).
             pres, lib = _dividir_preservacao(g_l, float(cons.pct_preservar or 0.0), centro_l)
             preservadas_l.append(pres)
-            if not lib.is_empty:
-                liberadas_l.append(lib)
-            efeito, pres_m2 = round(lib.area, 2), round(pres.area, 2)
-        else:  # liberada / autorização — sob premissa rotulada
+            nao_liberavel_l.append(pres)
+            efeito, pres_m2, otim = 0.0, round(pres.area, 2), round(lib.area, 2)
+        elif cons.acao == regua.ACAO_AUTORIZACAO:
+            # DECISÃO DO OPERADOR (09/08): nativa suprimível "mediante autorização" NÃO conta
+            # na base — a mancha segue no verde restrito; entra só no cenário otimista.
+            efeito, pres_m2, otim = 0.0, 0.0, round(g_l.area, 2)
+        else:  # ACAO_LIBERADA — laudo constatou que NÃO é vegetação nativa
             liberadas_l.append(g_l)
-            efeito, pres_m2 = round(g_l.area, 2), 0.0
+            efeito, pres_m2, otim = round(g_l.area, 2), 0.0, 0.0
 
         rec.itens.append(ItemReconciliado(
             item_id=m.mancha_id, area_m2=m.area_m2, decisao=decisao,
             acao=cons.acao, base_legal=cons.base_legal, leitura=cons.leitura,
-            efeito_m2=efeito, preservacao_m2=pres_m2,
+            efeito_m2=efeito, preservacao_m2=pres_m2, efeito_otimista_m2=otim,
         ))
 
     def _back(parts: list[BaseGeometry]) -> Optional[BaseGeometry]:
@@ -240,6 +258,7 @@ def reconciliar(
 
     rec.liberadas_wgs = _back(liberadas_l)
     rec.preservacao_wgs = _back(preservadas_l)
+    rec.nao_liberavel_wgs = _back(nao_liberavel_l)
     rec.novas_restricoes_wgs = _back(novas_l)
     return rec
 
@@ -248,30 +267,37 @@ def reconciliar(
 
 def aplicar_no_verde(
     verde_wgs: Optional[BaseGeometry], reconciliacao_geojson: Optional[dict]
-) -> tuple[Optional[BaseGeometry], Optional[BaseGeometry]]:
+) -> tuple[Optional[BaseGeometry], Optional[BaseGeometry], Optional[BaseGeometry]]:
     """Aplica a reconciliação SALVA (dict do store) sobre a geometria de vegetação:
-    devolve ``(verde_ajustado, restricoes_extras)``. Sem reconciliação → passthrough.
+    devolve ``(verde_ajustado, restricoes_extras, nao_liberavel)``. Sem reconciliação →
+    passthrough.
 
-    ``verde_ajustado`` = verde − liberadas (a preservação obrigatória é SUBCONJUNTO do verde
-    que não foi liberado — permanece dentro dele). ``restricoes_extras`` = achados de campo
-    (tratar como APP: bloqueiam via e lote)."""
+    - ``verde_ajustado`` = verde − liberadas (só o que o laudo constatou NÃO ser nativa; o
+      restante — inclusive nativa 'mediante autorização' — permanece restrito na BASE);
+    - ``restricoes_extras`` = achados de campo (tratar como APP: bloqueiam via e lote);
+    - ``nao_liberavel`` = vedadas + preservação obrigatória (fora até do cenário OTIMISTA —
+      o chamador injeta como camada não-edificável da severidade)."""
     if not reconciliacao_geojson:
-        return verde_wgs, None
-    lib_gj = reconciliacao_geojson.get("liberadas")
-    novas_gj = reconciliacao_geojson.get("novas_restricoes")
+        return verde_wgs, None, None
+
+    def _shape_ou_none(gj):
+        if not gj:
+            return None
+        try:
+            return shape(gj)
+        except Exception:  # noqa: BLE001 — geometria salva corrompida → ignora (honesto)
+            return None
+
+    novas = _shape_ou_none(reconciliacao_geojson.get("novas_restricoes"))
+    nao_lib = _shape_ou_none(reconciliacao_geojson.get("nao_liberavel"))
+    lib = _shape_ou_none(reconciliacao_geojson.get("liberadas"))
     verde_aj = verde_wgs
-    if verde_wgs is not None and lib_gj:
+    if verde_wgs is not None and lib is not None:
         try:
-            verde_aj = verde_wgs.difference(shape(lib_gj))
-        except Exception:  # noqa: BLE001 — geometria salva corrompida → não aplica (honesto)
-            return verde_wgs, (shape(novas_gj) if novas_gj else None)
-    novas = None
-    if novas_gj:
-        try:
-            novas = shape(novas_gj)
+            verde_aj = verde_wgs.difference(lib)
         except Exception:  # noqa: BLE001
-            novas = None
-    return verde_aj, novas
+            verde_aj = verde_wgs
+    return verde_aj, novas, nao_lib
 
 
 def serializar(rec: Reconciliacao) -> dict:
@@ -279,10 +305,13 @@ def serializar(rec: Reconciliacao) -> dict:
     return {
         "itens": [i.__dict__ for i in rec.itens],
         "saldo_m2": rec.saldo_m2,
+        "saldo_otimista_m2": rec.saldo_otimista_m2,
         "avisos": list(rec.avisos),
         "liberadas": mapping(rec.liberadas_wgs) if rec.liberadas_wgs is not None else None,
         "preservacao": (mapping(rec.preservacao_wgs)
                         if rec.preservacao_wgs is not None else None),
+        "nao_liberavel": (mapping(rec.nao_liberavel_wgs)
+                          if rec.nao_liberavel_wgs is not None else None),
         "novas_restricoes": (mapping(rec.novas_restricoes_wgs)
                              if rec.novas_restricoes_wgs is not None else None),
     }

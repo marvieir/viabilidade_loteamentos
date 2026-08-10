@@ -5,6 +5,10 @@
 > laudo do cliente; a plataforma registra proveniência e aplica a régua); (2) feature de PLANOS
 > PAGOS; (3) laudo sem nº de ART/registro é ACEITO sem alarde (campo opcional; a proveniência
 > registra o que foi informado); (4) MOCKUPS antes do código.
+> **(5) DECISÃO ADICIONAL (09/08, após o 1º teste real): mancha declarada NATIVA (suprimível
+> "mediante autorização") NÃO conta na base — entra apenas no CENÁRIO OTIMISTA do
+> Aproveitamento, rotulada "se o órgão autorizar"; vedadas e preservação obrigatória ficam
+> fora até do otimista.**
 >
 > Status: rascunho para aprovação do operador (08/08/2026). Base: pesquisa legal em
 > `docs/pesquisa-legal-supressao-vegetacao.md` (2 rodadas, fontes primárias), laudo-modelo
