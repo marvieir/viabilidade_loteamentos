@@ -70,13 +70,6 @@ de produto e perfis municipais).
 - **RF-URB-7** Conformidade legal do layout (frente mínima, institucional qualificado, normas de condomínio da LUOS) com citação por item.
 - **RF-URB-8** Custo de infraestrutura paramétrico por disciplina, com BDI e padrão (econômico/médio/alto).
 - **RF-URB-9** Avaliação (rating) de propostas alimenta a memória do gerador (few-shot).
-- **RF-URB-11** **Doação mínima informada (URB-DOA, 10/08/2026):** sem LUOS carregada o motor
-  NÃO inventa mínimo de doação (piso = 0; os % do quadro são mira de mercado proposta pela IA,
-  capada pelo preset do público). Dois campos no card Urbanismo — **doação verde mín. (%)** e
-  **institucional mín. (%)** — declaram o mínimo que o usuário conhece: entram como piso
-  ROTULADO ("informação de tela, não fonte legal; verificar na prefeitura"), com LUOS
-  confirmada vêm PRÉ-PREENCHIDOS com o valor da zona e a edição só pode SUBIR o piso legal;
-  clamps de sanidade nos tetos do motor (verde ≤ 60%, institucional ≤ 30%) com aviso.
 - **RF-URB-10** Gleba **estreita/fragmentada** não degenera (caso Caverá, 07-08/08/2026): a
   grade adaptativa tem **freio de via** (não afina o quarteirão além de ~30% de via teórica),
   **ilha-faixa** (< ~2 fileiras de quarteirão na largura útil) fica no teto do perfil, coletora
@@ -88,6 +81,13 @@ de produto e perfis municipais).
   urbanizável por construção: vira verde remanescente rotulado, nunca teia de via. O quadro
   separa **"Verde remanescente (não loteável — restrição/forma)"** (linha própria, sem alerta;
   protegido da 2ª passada) da **"Sobra geométrica ⚠"** (retalho operacional a minimizar).
+- **RF-URB-11** **Doação mínima informada (URB-DOA, 10/08/2026):** sem LUOS carregada o motor
+  NÃO inventa mínimo de doação (piso = 0; os % do quadro são mira de mercado proposta pela IA,
+  capada pelo preset do público). Dois campos no card Urbanismo — **doação verde mín. (%)** e
+  **institucional mín. (%)** — declaram o mínimo que o usuário conhece: entram como piso
+  ROTULADO ("informação de tela, não fonte legal; verificar na prefeitura"), com LUOS
+  confirmada vêm PRÉ-PREENCHIDOS com o valor da zona e a edição só pode SUBIR o piso legal;
+  clamps de sanidade nos tetos do motor (verde ≤ 60%, institucional ≤ 30%) com aviso.
 
 ### RF-IMP — Importação de projeto pronto (DWG/DXF)
 - **RF-IMP-1** Wizard de 3 passos: arquivo → papel das camadas (de-para) → conferência. Conversão DWG→DXF no servidor, com saneamento de arquivos corrompidos.
