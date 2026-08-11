@@ -28,6 +28,8 @@ def resolver_diretrizes(
     perfil, zona_codigo: Optional[str], modalidade: Optional[str], publico_alvo: str,
     lote_max_m2: Optional[float] = None,
     lote_min_m2: Optional[float] = None,
+    doacao_verde_pct: Optional[float] = None,
+    doacao_inst_pct: Optional[float] = None,
 ) -> dict:
     """Resolve os limites de dimensionamento e doação pela hierarquia de fontes. Nunca chuta:
     o que a LUOS não fixa cai no mercado (rotulado) e no piso federal. ``lote_max_m2`` (Fase 11.8):
@@ -125,6 +127,58 @@ def resolver_diretrizes(
         min(max(piso_mercado, piso_lote), teto_lote),
     )
 
+    # URB-DOA (decisão do operador, 10/08/2026) — DOAÇÃO MÍNIMA INFORMADA PELO USUÁRIO (%
+    # sobre a área lotável): sem LUOS carregada o motor NÃO inventa mínimo (piso = 0; os % do
+    # quadro vêm do programa da IA como mira de mercado). Estes campos declaram o mínimo que o
+    # usuário CONHECE (rotulado, nunca fonte legal). Com LUOS confirmada o valor da zona é o
+    # piso legal — o informado só pode SUBIR acima dele, nunca reduzir. Clamps de sanidade nos
+    # tetos duros do motor (verde/lazer ≤ 60%, institucional ≤ 30%), com aviso quando clampa.
+    aviso_doacao = None
+    doacao_origem = "luos" if (split is not None) else None
+    if doacao_verde_pct is not None or doacao_inst_pct is not None:
+        base_split = dict(split or {})
+        partes_aviso: list[str] = []
+        if doacao_verde_pct is not None and float(doacao_verde_pct) > 0:
+            verde_frac = min(max(float(doacao_verde_pct), 0.0), 60.0) / 100.0
+            if float(doacao_verde_pct) > 60.0:
+                partes_aviso.append(
+                    f"verde informado ({float(doacao_verde_pct):.0f}%) acima do teto do motor "
+                    "(60%) — usando 60%"
+                )
+            piso_luos = float(base_split.get("verde") or 0.0)
+            if verde_frac < piso_luos:
+                partes_aviso.append(
+                    f"verde informado ({verde_frac * 100:.0f}%) abaixo do mínimo da zona "
+                    f"({piso_luos * 100:.0f}%) — vale o da LUOS"
+                )
+            base_split["verde"] = max(piso_luos, verde_frac)
+        if doacao_inst_pct is not None and float(doacao_inst_pct) > 0:
+            inst_frac = min(max(float(doacao_inst_pct), 0.0), 30.0) / 100.0
+            if float(doacao_inst_pct) > 30.0:
+                partes_aviso.append(
+                    f"institucional informado ({float(doacao_inst_pct):.0f}%) acima do teto do "
+                    "motor (30%) — usando 30%"
+                )
+            piso_luos_i = float(base_split.get("institucional") or 0.0)
+            if inst_frac < piso_luos_i:
+                partes_aviso.append(
+                    f"institucional informado ({inst_frac * 100:.0f}%) abaixo do mínimo da "
+                    f"zona ({piso_luos_i * 100:.0f}%) — vale o da LUOS"
+                )
+            base_split["institucional"] = max(piso_luos_i, inst_frac)
+        if base_split:
+            split = base_split
+            doacao_origem = ("luos+informado" if zona is not None else "informado_usuario")
+        extras = ("; ".join(partes_aviso) + ". ") if partes_aviso else ""
+        aviso_doacao = (
+            "Doação mínima INFORMADA PELO USUÁRIO"
+            + (f" (verde {float(doacao_verde_pct):.0f}%"
+               if doacao_verde_pct is not None else " (")
+            + (f"{' / ' if doacao_verde_pct is not None else ''}institucional "
+               f"{float(doacao_inst_pct):.0f}%" if doacao_inst_pct is not None else "")
+            + ") — informação de tela, não fonte legal; verificar na prefeitura. " + extras
+        )
+
     return {
         "fonte": fonte,
         "cobertura": cobertura,
@@ -138,9 +192,10 @@ def resolver_diretrizes(
         "apac_pct": apac_pct,  # U7 — reserva ambiental da zona (piso de verde do motor); None = fallback
         "normas": normas,  # U7 — normas urbanísticas do condomínio (requisitos p/ motor + conformidade)
         "doacao_split": split,  # frações da gleba (viário/verde/institucional)
+        "doacao_origem": doacao_origem,  # URB-DOA — luos | informado_usuario | luos+informado
         "testada_alvo_m": perf["testada"],
         "prof_alvo_m": perf["prof"],
-        "aviso": (aviso_piso or "") + (aviso_teto or "") + (
+        "aviso": (aviso_piso or "") + (aviso_teto or "") + (aviso_doacao or "") + (
             "Mínimos do município são PISO: o estudo pode propor MAIS, nunca menos. "
             "Lote/doação/verde/institucional verificados na prefeitura (art. 6º Lei 6.766)."
             if zona is not None

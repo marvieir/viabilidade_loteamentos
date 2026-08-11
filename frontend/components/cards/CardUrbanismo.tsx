@@ -125,6 +125,10 @@ export function CardUrbanismo({
   const [zona, setZona] = useState<string>("");
   const [loteMax, setLoteMax] = useState<string>(""); // Fase 11.8 — teto de lote (m²); vazio = perfil
   const [loteMin, setLoteMin] = useState<string>(""); // 27/07 — piso informado; vazio = 125 federal/zona
+  // URB-DOA (10/08) — doação mínima INFORMADA (%): sem LUOS o motor não inventa mínimo; o
+  // usuário declara o que conhece (rotulado, nunca fonte legal).
+  const [doacaoVerde, setDoacaoVerde] = useState<string>("");
+  const [doacaoInst, setDoacaoInst] = useState<string>("");
   const [criarLago, setCriarLago] = useState(false); // Fase U3 — lago no ponto baixo do DEM
   const [objetivo, setObjetivo] = useState<"rendimento" | "paisagem">("rendimento"); // Trilha 2
   const [instrucoes, setInstrucoes] = useState(""); // Mov.1 — diretrizes livres do operador
@@ -158,6 +162,16 @@ export function CardUrbanismo({
     if (!zona && zonas.length > 0) setZona(zonas[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [perfil]);
+
+  // URB-DOA — com LUOS carregada, os campos de doação vêm PRÉ-PREENCHIDOS com o valor da
+  // zona (o backend garante que edição só pode SUBIR o piso legal, nunca descer). O front
+  // só copia o número que o backend mandou — nenhum cálculo aqui (§2).
+  useEffect(() => {
+    const sp = perfil?.zonas.find((z) => z.codigo === zona)?.params.doacao_split;
+    if (sp?.verde != null) setDoacaoVerde(String(Math.round(sp.verde * 100)));
+    if (sp?.institucional != null) setDoacaoInst(String(Math.round(sp.institucional * 100)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfil, zona]);
 
   // Ao abrir a análise, recarrega o ÚLTIMO layout já gerado (snapshot salvo no backend) —
   // SEM chamar a IA. Só o botão "Regenerar" consome token. Evita refazer à toa (economia real).
@@ -200,6 +214,8 @@ export function CardUrbanismo({
     try {
       const loteMaxNum = loteMax.trim() ? Number(loteMax) : null;
       const loteMinNum = loteMin.trim() ? Number(loteMin) : null;
+      const doacaoVerdeNum = doacaoVerde.trim() ? Number(doacaoVerde) : null;
+      const doacaoInstNum = doacaoInst.trim() ? Number(doacaoInst) : null;
       const p = await proporUrbanismo(
         analiseId, tipo, publico, zona || null, undefined,
         loteMaxNum && loteMaxNum > 0 ? loteMaxNum : null,
@@ -207,7 +223,9 @@ export function CardUrbanismo({
         criarLago,
         instrucoes,
         objetivo,
-        loteMinNum && loteMinNum > 0 ? loteMinNum : null
+        loteMinNum && loteMinNum > 0 ? loteMinNum : null,
+        doacaoVerdeNum && doacaoVerdeNum > 0 ? doacaoVerdeNum : null,
+        doacaoInstNum && doacaoInstNum > 0 ? doacaoInstNum : null
       );
       setProposta(p);
       onData?.(p);
@@ -470,6 +488,33 @@ export function CardUrbanismo({
             placeholder="perfil"
             title="Tamanho máximo de lote recomendado (m²). Vazio = padrão do perfil. Nunca abaixo do piso legal."
             className="w-24 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+          />
+          {/* URB-DOA — doação mínima INFORMADA (%): sem LUOS carregada o motor não inventa
+              mínimo legal (piso = 0; os % viram mira de mercado da IA). Informe aqui o que
+              você CONHECE da LUOS — entra como piso rotulado; com LUOS confirmada só sobe. */}
+          <label className="text-sm text-slate-600">Doação verde mín. (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={60}
+            step={1}
+            value={doacaoVerde}
+            onChange={(e) => setDoacaoVerde(e.target.value)}
+            placeholder={perfil ? "diretriz" : "—"}
+            title="Percentual mínimo de área verde de doação exigido pelo município (% da área lotável). Sem LUOS carregada o motor NÃO inventa mínimo — informe o valor que você conhece (rotulado como informação de tela; verificar na prefeitura). Com LUOS confirmada, o valor da zona é o piso: aqui só sobe."
+            className="w-20 rounded-lg border border-slate-200 px-2 py-2 text-sm"
+          />
+          <label className="text-sm text-slate-600">Institucional mín. (%)</label>
+          <input
+            type="number"
+            min={0}
+            max={30}
+            step={1}
+            value={doacaoInst}
+            onChange={(e) => setDoacaoInst(e.target.value)}
+            placeholder={perfil ? "diretriz" : "—"}
+            title="Percentual mínimo de área institucional exigido pelo município (% da área lotável). Mesma regra do campo de verde: informação de tela rotulada, nunca fonte legal; com LUOS confirmada só pode subir."
+            className="w-20 rounded-lg border border-slate-200 px-2 py-2 text-sm"
           />
           {/* Trilha 2 — OBJETIVO do estudo: o cliente escolhe entre espremer lote (rendimento)
               e desenho premium (paisagem — curvas reais + cul-de-sacs + verde, padrão Urbia). */}

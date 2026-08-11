@@ -1580,6 +1580,10 @@ class ProporUrbanismoIn(BaseModel):
     # 27/07 — piso INFORMADO (sem diretriz carregada): sobe o piso acima do federal/zona;
     # abaixo do mínimo legal é ignorado com aviso curto (Lei 6.766 art. 4º, II).
     lote_min_m2: Optional[float] = Field(default=None, gt=0)
+    # URB-DOA (10/08) — doação mínima INFORMADA pelo usuário (% sobre a lotável), para quando a
+    # LUOS não está carregada: rotulada, nunca fonte legal; com LUOS confirmada só pode SUBIR.
+    doacao_verde_pct: Optional[float] = Field(default=None, ge=0, le=100)
+    doacao_inst_pct: Optional[float] = Field(default=None, ge=0, le=100)
     # Acesso marcado PELO OPERADOR no mapa ([lon, lat] WGS84): âncora DEFINITIVA do pórtico —
     # tem prioridade sobre o OSM (zona rural tem via mal mapeada; o dado do operador vence).
     acesso_ponto: Optional[list[float]] = None

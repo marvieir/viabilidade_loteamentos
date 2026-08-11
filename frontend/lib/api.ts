@@ -1958,7 +1958,9 @@ export async function proporUrbanismo(
   criarLago?: boolean, // Fase U3 — sintetizar lago no ponto baixo do DEM
   instrucoes?: string | null, // Mov.1 — diretrizes livres do operador p/ o programa
   objetivo?: "rendimento" | "paisagem" | null, // Trilha 2 — objetivo do estudo (rendimento × paisagem)
-  loteMinM2?: number | null // 27/07 — piso informado (≥125 federal; abaixo é ignorado c/ aviso)
+  loteMinM2?: number | null, // 27/07 — piso informado (≥125 federal; abaixo é ignorado c/ aviso)
+  doacaoVerdePct?: number | null, // URB-DOA — doação verde mín. % informada (sem LUOS)
+  doacaoInstPct?: number | null // URB-DOA — institucional mín. % informado (sem LUOS)
 ): Promise<PropostaUrbanistica> {
   const res = await apiFetch(
     `/api/analises/${analiseId}/urbanismo/propor`,
@@ -1972,6 +1974,8 @@ export async function proporUrbanismo(
         ...(overrides ? { overrides } : {}),
         ...(loteMaxM2 ? { lote_max_m2: loteMaxM2 } : {}),
         ...(loteMinM2 ? { lote_min_m2: loteMinM2 } : {}),
+        ...(doacaoVerdePct != null ? { doacao_verde_pct: doacaoVerdePct } : {}),
+        ...(doacaoInstPct != null ? { doacao_inst_pct: doacaoInstPct } : {}),
         ...(acessoPonto ? { acesso_ponto: acessoPonto } : {}),
         ...(criarLago ? { criar_lago: true } : {}),
         ...(instrucoes?.trim() ? { instrucoes: instrucoes.trim() } : {}),

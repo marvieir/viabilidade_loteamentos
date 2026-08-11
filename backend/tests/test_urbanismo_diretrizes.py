@@ -282,3 +282,73 @@ def test_sem_lote_minimo_na_lei_sempre_cai_no_federal_125():
     assert d["piso_lote_efetivo_m2"] == 125.0
     assert d["lote_min_zona_m2"] is None  # não encontrado ≠ zero, ≠ chute
     assert d["doacao_min_pct"] == 0.35  # o que a lei traz, vale
+
+
+# --------------------- URB-DOA — doação mínima INFORMADA pelo usuário (10/08) ---------------------
+
+def test_doacao_informada_sem_luos_vira_piso_rotulado():
+    """Sem LUOS: o motor não inventa mínimo (split=None); o valor INFORMADO vira o piso,
+    rotulado como informação de tela (nunca fonte legal)."""
+    from app.core.urbanismo_diretrizes import resolver_diretrizes
+
+    sem = resolver_diretrizes(None, None, None, "baixa")
+    assert sem["doacao_split"] is None and sem["doacao_origem"] is None
+
+    com = resolver_diretrizes(None, None, None, "baixa",
+                              doacao_verde_pct=10.0, doacao_inst_pct=5.0)
+    assert com["doacao_split"] == {"verde": 0.10, "institucional": 0.05}
+    assert com["doacao_origem"] == "informado_usuario"
+    assert "INFORMADA PELO USUÁRIO" in com["aviso"]
+    assert "verificar na prefeitura" in com["aviso"]
+
+
+def test_doacao_informada_nao_desce_abaixo_da_luos():
+    """Com LUOS confirmada o valor da zona é o PISO LEGAL: o informado só pode SUBIR."""
+    from app.core.urbanismo_diretrizes import resolver_diretrizes
+    from app.models.schemas import (
+        DoacaoSplit, ParamProv, PerfilMunicipal, ZonaParams, ZonaPerfil,
+    )
+
+    perfil = PerfilMunicipal(
+        cod_ibge="3550605", municipio="São Roque", uf="SP", status="confirmado",
+        zonas=[ZonaPerfil(codigo="Z1", params=ZonaParams(
+            doacao_split=DoacaoSplit(viario=0.10, verde=0.15, institucional=0.05)))],
+        validado_por="t", data_referencia="2026")
+
+    # informado ABAIXO do da zona → vale o da LUOS, com aviso
+    d = resolver_diretrizes(perfil, "Z1", None, "media",
+                            doacao_verde_pct=8.0, doacao_inst_pct=10.0)
+    assert d["doacao_split"]["verde"] == 0.15          # LUOS venceu (8% < 15%)
+    assert d["doacao_split"]["institucional"] == 0.10  # informado subiu (10% > 5%)
+    assert d["doacao_origem"] == "luos+informado"
+    assert "vale o da LUOS" in d["aviso"]
+
+
+def test_doacao_informada_clampa_no_teto_do_motor():
+    from app.core.urbanismo_diretrizes import resolver_diretrizes
+
+    d = resolver_diretrizes(None, None, None, "baixa",
+                            doacao_verde_pct=90.0, doacao_inst_pct=50.0)
+    assert d["doacao_split"]["verde"] == 0.60
+    assert d["doacao_split"]["institucional"] == 0.30
+    assert "acima do teto do motor" in d["aviso"]
+
+
+def test_doacao_informada_e_piso_no_motor():
+    """Ponta a ponta no motor: o piso informado (10%) força o verde de doação mesmo com a IA
+    propondo 5% de lazer (o clamp do gerar_layout usa doacao_split como piso)."""
+    from shapely.geometry import box
+
+    from app.core import urbanismo_geom as geom
+    from app.core import urbanismo_medida as medida
+    from app.core.urbanismo_diretrizes import resolver_diretrizes
+    from app.core.urbanismo_programa import programa_do_preset
+
+    dd = resolver_diretrizes(None, None, None, "baixa", doacao_verde_pct=10.0)
+    lay = geom.gerar_layout(box(0.0, 0.0, 400.0, 300.0), programa_do_preset("baixa"),
+                            diretrizes=dd)
+    med = medida.medir(lay, "baixa")
+    q = med.quadro
+    verde_reserva = q["area_verde_reserva"]["m2"] + q["sistema_lazer"]["m2"]
+    # orçamento de lazer/verde ≥ ~10% da lotável (folga p/ discretização da geometria)
+    assert verde_reserva >= 0.08 * q["area_liquida_m2"]
