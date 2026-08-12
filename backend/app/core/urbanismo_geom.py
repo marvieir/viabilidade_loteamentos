@@ -2585,12 +2585,16 @@ def gerar_layout(
     # da sobra até o alvo (nunca desfaz lote). Sobra vira verde LEGÍTIMO rotulado.
     # U7 — o piso do top-up de verde é o VERDE_PISO derivado da APAC (déficit após a mata). Na
     # paisagem/limpo usa esse piso; fora, 0. (verde_piso já embute o fallback de estilo rotulado.)
+    # URB-DOA (10/08) — o piso de doação VERDE do doacao_split (LUOS confirmada OU informado
+    # pelo usuário na tela) vale em QUALQUER traçado: é EXIGÊNCIA declarada, não estética.
+    # Sem split (pct_verde_min=0) a fórmula reduz à antiga — valores-ouro intactos.
     alvo_verde_pct = verde_piso if (usa_paisagem or limpar) else 0.0
-    if alvo_verde_pct > 0 and sobra_reg is not None and not sobra_reg.is_empty:
+    alvo_verde_m2 = max(alvo_verde_pct * aprov_area, pct_verde_min * lotavel_area)
+    if alvo_verde_m2 > 0 and sobra_reg is not None and not sobra_reg.is_empty:
         verde_atual = (verde_reservado_reg.area if verde_reservado_reg is not None else 0.0) + (
             cinturao_orig.area if cinturao_orig is not None and not cinturao_orig.is_empty else 0.0
         )
-        deficit = alvo_verde_pct * aprov_area - verde_atual
+        deficit = alvo_verde_m2 - verde_atual
         if deficit > 0:
             promovidas = []
             for peca in sorted(_componentes(sobra_reg), key=lambda g: -g.area):

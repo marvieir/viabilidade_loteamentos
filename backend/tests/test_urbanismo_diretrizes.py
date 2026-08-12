@@ -349,6 +349,7 @@ def test_doacao_informada_e_piso_no_motor():
                             diretrizes=dd)
     med = medida.medir(lay, "baixa")
     q = med.quadro
-    verde_reserva = q["area_verde_reserva"]["m2"] + q["sistema_lazer"]["m2"]
-    # orçamento de lazer/verde ≥ ~10% da lotável (folga p/ discretização da geometria)
-    assert verde_reserva >= 0.08 * q["area_liquida_m2"]
+    # URB-DOA fix (10/08): o top-up do verde honra o piso do split em QUALQUER traçado —
+    # a linha "Área verde de doação/reserva" (SEM contar lazer) chega ao piso informado,
+    # completando com sobra quando a materialização entrega menos (folga p/ discretização).
+    assert q["area_verde_reserva"]["m2"] >= 0.09 * q["area_liquida_m2"]
