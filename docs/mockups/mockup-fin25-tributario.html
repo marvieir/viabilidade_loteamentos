@@ -1,0 +1,82 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+body { background:#f8fafc; color:#0f172a; width:1240px; padding:22px 26px; }
+.mock { position:fixed; top:10px; right:12px; background:#dc2626; color:#fff; font-size:10px; font-weight:800; letter-spacing:1px; padding:4px 10px; border-radius:99px; text-transform:uppercase; z-index:9; }
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.05); padding:20px 24px; }
+h1 { font-size:17px; font-weight:800; }
+.sub { font-size:12px; color:#64748b; margin-top:3px; }
+.selo { display:inline-block; background:#1d1252; color:#fff; font-size:9.5px; font-weight:800; letter-spacing:.5px; padding:3px 10px; border-radius:99px; text-transform:uppercase; vertical-align:2px; margin-left:8px; }
+.premissas { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:14px 0; }
+.campo label { display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px; }
+.campo label i { font-style:normal; font-weight:400; color:#94a3b8; }
+.campo input { width:100%; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; font-size:13px; font-family:ui-monospace,Menlo,monospace; }
+.alerta { background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:10px 14px; font-size:12px; color:#9a3412; margin-bottom:14px; }
+.alerta b { color:#7c2d12; }
+.duas { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.regime { border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px; }
+.regime.on { border-color:#ff914d; box-shadow:0 0 0 2px #ffedd5; }
+.regime h3 { font-size:13px; font-weight:800; color:#1d1252; }
+.regime .tag { font-size:9px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.5px; }
+.kv { display:flex; justify-content:space-between; font-size:12px; padding:4.5px 0; border-bottom:1px dashed #f1f5f9; }
+.kv b { font-family:ui-monospace,Menlo,monospace; }
+.kv .lei { display:block; font-size:9.5px; color:#94a3b8; font-style:italic; }
+.total { display:flex; justify-content:space-between; align-items:baseline; margin-top:10px; padding-top:8px; border-top:2px solid #e2e8f0; }
+.total .v { font-size:20px; font-weight:800; font-family:ui-monospace,Menlo,monospace; color:#1d1252; }
+.total .p { font-size:11px; color:#64748b; }
+.melhor { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:12px 16px; margin-top:14px; display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px; align-items:center; }
+.melhor .r { font-size:12.5px; color:#166534; }
+.melhor .r b { display:block; font-size:13px; }
+.mini { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; }
+.miniv { font-size:16px; font-weight:800; font-family:ui-monospace,Menlo,monospace; color:#1d1252; }
+.rodape { font-size:10.5px; color:#94a3b8; margin-top:14px; line-height:1.6; }
+</style></head><body>
+<div class="mock">Mockup — não é o produto</div>
+<div class="card">
+  <h1>Tributos — comparador de regimes <span class="selo">FIN2-5</span></h1>
+  <div class="sub">A conta é POR LOTE, com os números do SEU estudo (67 lotes · VGV R$ 8,04 mi · lote médio R$ 120 mil).
+  Cada linha cita o dispositivo. Não é parecer tributário — valide com seu contador/tributarista.</div>
+
+  <div class="premissas">
+    <div class="campo"><label>Carga atual (% receita) <i>· presumido típico</i></label><input value="6,73"></div>
+    <div class="campo"><label>ITBI + laudêmio pagos (R$) <i>· aquisição</i></label><input value="48.000"></div>
+    <div class="campo"><label>Contrapartidas urb./amb. (R$)</label><input value="350.000"></div>
+    <div class="campo"><label>Alíquota padrão de referência (%) <i>· IBS+CBS</i></label><input value="28"></div>
+  </div>
+
+  <div class="alerta">⏳ <b>Janela de decisão:</b> loteamento com REGISTRO protocolado até <b>31/12/2028</b> pode optar pela
+  transição (CBS 3,65% definitiva, sem créditos — LC 214/2025, art. 486). Depois disso, vale o regime novo abaixo.</div>
+
+  <div class="duas">
+    <div class="regime">
+      <div class="tag">Cenário A</div>
+      <h3>Atual / transição (art. 486)</h3>
+      <div class="kv"><span>IRPJ+CSLL (presumido 8%/12%)<span class="lei">Lei 9.249/95 — inalterado pela Reforma</span></span><b>≈ 3,08%</b></div>
+      <div class="kv"><span>PIS/COFINS → CBS transição<span class="lei">LC 214/2025, art. 486 (registro até 2028)</span></span><b>3,65%</b></div>
+      <div class="kv"><span>Sem redutores e sem créditos<span class="lei">condição da opção definitiva</span></span><b>—</b></div>
+      <div class="total"><span class="p">Carga total sobre o VGV</span><span class="v">R$ 541 mil · 6,73%</span></div>
+    </div>
+    <div class="regime on">
+      <div class="tag">Cenário B</div>
+      <h3>Regime novo (IBS/CBS — específico de imóveis)</h3>
+      <div class="kv"><span>Base por lote: preço − redutor de ajuste<span class="lei">terreno+ITBI+contrapartidas, IPCA — arts. 257-258</span></span><b>120,0 → 96,4 mil</b></div>
+      <div class="kv"><span>− Redutor social (lote residencial)<span class="lei">R$ 30 mil/lote, 1ª alienação — art. 259</span></span><b>96,4 → 66,4 mil</b></div>
+      <div class="kv"><span>Alíquota: 28% × redução de 50%<span class="lei">regime específico de bens imóveis</span></span><b>14%</b></div>
+      <div class="kv"><span>IRPJ+CSLL (presumido — inalterado)</span><b>≈ 3,08%</b></div>
+      <div class="total"><span class="p">Carga total sobre o VGV</span><span class="v">R$ 870 mil · 10,8%</span></div>
+    </div>
+  </div>
+
+  <div class="melhor">
+    <div class="r"><b>Neste estudo, a transição (art. 486) economiza R$ 329 mil</b>
+    Registrar o loteamento até 31/12/2028 preserva essa opção.</div>
+    <div><div class="mini">Breakeven</div><div class="miniv">R$ 74 mil/lote</div>
+    <div style="font-size:10px;color:#64748b">abaixo disso, o regime novo vence (redutor social pesa mais)</div></div>
+    <div><div class="mini">Carga por lote (A × B)</div><div class="miniv">8,1 × 13,0 mil</div></div>
+  </div>
+
+  <div class="rodape">Proveniência: LC 214/2025 (arts. 257-259, 486) · Lei 9.249/95 (presumido) · alíquota padrão de
+  referência é PREMISSA (regulamentação em evolução — Comitê Gestor IBS). Leituras sob as premissas declaradas;
+  correção IPCA informada como premissa. RET 4%: possível apenas com lote vinculado a construção + patrimônio de
+  afetação (Lei 14.382/2022) — verificar elegibilidade com tributarista.</div>
+</div>
+</body></html>
