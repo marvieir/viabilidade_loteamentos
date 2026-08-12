@@ -77,6 +77,7 @@ mindmap
         Cenários de venda e curva rampa
         Obra por disciplina com pico
         MTIR ROE exposição média e estático
+        Comparador da Reforma LC 214 por lote
       Localização RF-LOC
       AI Portfolio Insights RF-PORT
         Compara as áreas do usuário

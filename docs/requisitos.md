@@ -116,6 +116,7 @@ de produto e perfis municipais).
 - **RF-FIN-4** *(FIN-2)* Ritmo de vendas com curva declarada (linear/rampa de lançamento/custom) e até 3 CENÁRIOS nomeados de venda — mesmo VGV, indicadores lado a lado (exposição/payback no fluxo; VPL/TIR por cenário na Econômica).
 - **RF-FIN-5** *(FIN-2)* Cronograma físico-financeiro da obra por disciplina (início/duração/curva por disciplina; prevalece sobre o valor único) com pico de desembolso exposto.
 - **RF-FIN-6** *(FIN-2)* Indicadores adicionais: MTIR (à TMA), ROE nominal/anualizado, exposição média + tempo no negativo, e quadro de viabilidade ESTÁTICA (custos÷VGV com composição obra/terreno/demais, custo por lote).
+- **RF-FIN-7** *(FIN2-5)* Comparador tributário da Reforma (LC 214/2025): cenário A (atual/transição art. 486) × cenário B (IBS/CBS com redutor de ajuste rateado por lote — arts. 257-258 — e redutor social de R$ 30.000/lote residencial — art. 259, base nunca negativa), breakeven do preço de lote, alerta da janela de registro até 31/12/2028, proveniência por linha. O cenário escolhido pode alimentar a linha de tributos do fluxo. Recurso de PLANO PAGO (gate no servidor; bloqueado → só o item bloqueado aparece). Não é parecer tributário.
 
 ### RF-LOC — Localização
 - **RF-LOC-1** Contexto socioeconômico IBGE (população, PIB per capita, domicílios, faixa etária) — informativo.

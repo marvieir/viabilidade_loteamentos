@@ -1203,7 +1203,60 @@ export interface PremissasFinanceira {
   confirmar_inadimplencia_alta?: boolean;
   aquisicao?: Record<string, unknown>;
   custos?: Record<string, unknown>;
-  tributos?: { regime?: string; aliquota_pct?: number };
+  tributos?: {
+    regime?: string;
+    aliquota_pct?: number; // FRAÇÃO (0.0673 = 6,73%)
+    // FIN2-5 — comparador da Reforma (R$ absolutos; *_pct em 0-100)
+    itbi_laudemio?: number;
+    contrapartidas?: number;
+    aliquota_padrao_ref_pct?: number;
+    correcao_acumulada_pct?: number;
+    lotes_residenciais?: number;
+    cenario_fluxo?: "atual" | "ibs_cbs";
+  };
+}
+
+// FIN2-5 — comparador tributário (LC 214/2025). Gate bloqueado → só `gate` vem preenchido.
+export interface ComponenteTrib {
+  rotulo: string;
+  detalhe: string;
+  valor: number;
+  valor_fmt: string;
+  pct_vgv: number | null;
+  base_legal: string;
+}
+export interface RegimeTrib {
+  codigo: "atual_transicao" | "ibs_cbs";
+  rotulo: string;
+  componentes: ComponenteTrib[];
+  carga_total: number;
+  carga_total_fmt: string;
+  carga_por_lote: number;
+  carga_por_lote_fmt: string;
+  pct_efetivo_vgv: number | null;
+}
+export interface ComparativoTributario {
+  gate: {
+    status: "liberado" | "previa" | "bloqueado";
+    previa_dias: number;
+    dias_restantes: number | null;
+    motivo: string;
+  };
+  regimes: RegimeTrib[];
+  melhor: "atual_transicao" | "ibs_cbs" | "empate" | null;
+  economia: number | null;
+  economia_fmt: string | null;
+  diferenca_pp: number | null;
+  breakeven: {
+    preco_lote: number | null;
+    preco_lote_fmt: string | null;
+    leitura: string;
+  } | null;
+  alerta_janela: string | null;
+  leitura: string | null;
+  premissas: Record<string, unknown>;
+  avisos: string[];
+  proveniencia: string;
 }
 
 // Perfil da mesa de vendas (4.1 — financiado/PRICE).
@@ -1333,6 +1386,8 @@ export interface Financeira {
   cenarios?: CenarioFin[];
   obra_pico?: { mes: number; valor: number; valor_fmt: string } | null;
   estatico?: EstaticoFin | null;
+  // FIN2-5 — comparador tributário (null em snapshots antigos)
+  comparativo_tributario?: ComparativoTributario | null;
   fluxo_vendas: FluxoVenda[];
   fluxo: LinhaFluxo[];
   fluxo_resumo_anual: ResumoAnual[];

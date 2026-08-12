@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import {
   calcularFinanceira,
   type Aproveitamento,
+  type ComparativoTributario,
   type Economica,
   type Financeira,
 } from "@/lib/api";
@@ -68,6 +69,10 @@ type Form = {
   comissao_pct: number; // %
   // tributos
   aliquota_pct: number; // %
+  // FIN2-5 — comparador da Reforma (R$ absolutos; alíquota de referência em %)
+  itbi_laudemio: number;
+  contrapartidas: number;
+  aliquota_padrao_ref: number; // %
   inadimplencia_pct: number; // %
   margem_referencia_pct: number; // %
   capital_disponivel: number; // 0 = não informado
@@ -81,7 +86,8 @@ const PADRAO: Form = {
   modo: "financiado", entrada_pct: 15, n_parcelas: 36, usarDisciplinas: false,
   urb_valor: 30000, urb_inicio: 1, urb_duracao: 6, projetos: 280000, topografia: 100000,
   admin_mensal: 10000, marketing_pct: 2, comissao_pct: 5,
-  aliquota_pct: 5.93, inadimplencia_pct: 0, margem_referencia_pct: 20, capital_disponivel: 0,
+  aliquota_pct: 5.93, itbi_laudemio: 0, contrapartidas: 0, aliquota_padrao_ref: 28,
+  inadimplencia_pct: 0, margem_referencia_pct: 20, capital_disponivel: 0,
 };
 
 const MESA_PADRAO: LinhaMesa[] = [
@@ -180,7 +186,13 @@ export function CardFinanceira({
         marketing: { pct_vgv_proprio: f.marketing_pct / 100, inicio_mes: f.inicio_mes, duracao_meses: Math.max(1, Math.round(f.duracao_meses / 2)) },
         comissao_pct: f.comissao_pct / 100,
       },
-      tributos: { regime: "presumido", aliquota_pct: f.aliquota_pct / 100 },
+      tributos: {
+        regime: "presumido", aliquota_pct: f.aliquota_pct / 100,
+        // FIN2-5 — comparador da Reforma (o backend calcula; aqui só premissas declaradas)
+        ...(f.itbi_laudemio > 0 ? { itbi_laudemio: f.itbi_laudemio } : {}),
+        contrapartidas: f.contrapartidas,
+        aliquota_padrao_ref_pct: f.aliquota_padrao_ref,
+      },
     };
   }
 
@@ -533,6 +545,23 @@ export function CardFinanceira({
               <Campo rotulo="Margem de referência (%)" ajuda="Margem que você considera boa. Vira o critério verde do semáforo." badge valor={f.margem_referencia_pct} on={(v) => set("margem_referencia_pct", v)} />
               <Campo rotulo="Capital disponível (R$) — opcional" ajuda="Quanto de caixa você tem. Se informado, o semáforo compara com a exposição máxima." valor={f.capital_disponivel} on={(v) => set("capital_disponivel", v)} />
             </div>
+            {/* FIN2-5 — premissas do comparador da Reforma (resultado no passo Resultado) */}
+            <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+              <p className="text-xs font-semibold text-slate-700">
+                Comparador da Reforma Tributária (LC 214/2025)
+                <span className="ml-2 rounded-full bg-marinho-900 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">FIN2-5</span>
+              </p>
+              <p className="text-[11px] text-slate-500">
+                Compara a transição (art. 486, registro até 31/12/2028) com o regime novo
+                (IBS/CBS com redutores POR LOTE). A carga atual acima é o cenário A; declare
+                abaixo o que entra no redutor de ajuste. O resultado aparece no passo Resultado.
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                <Campo rotulo="ITBI + laudêmio pagos (R$)" ajuda="Pagos na aquisição do terreno — entram no redutor de ajuste (arts. 257-258)." valor={f.itbi_laudemio} on={(v) => set("itbi_laudemio", v)} />
+                <Campo rotulo="Contrapartidas urb./amb. (R$)" ajuda="Pagas ao poder público para viabilizar o empreendimento — redutor de ajuste." valor={f.contrapartidas} on={(v) => set("contrapartidas", v)} />
+                <Campo rotulo="Alíquota padrão de referência (%)" ajuda="PREMISSA (regulamentação em evolução). A alienação usa 50% dela." badge valor={f.aliquota_padrao_ref} on={(v) => set("aliquota_padrao_ref", v)} />
+              </div>
+            </div>
             <Parcial rotulo="Imposto estimado" valor={prev ? (prev.blocos.find((b) => b.bloco === "tributos")?.total_fmt ?? "R$ 0,00") : undefined} />
           </Passo>
         )}
@@ -688,6 +717,9 @@ function Dashboard({ d, econ }: { d: Financeira; econ?: Economica | null }) {
         </div>
       )}
 
+      {/* FIN2-5 — comparador tributário (backend calcula; aqui só renderiza) */}
+      {d.comparativo_tributario && <ComparadorTributario comp={d.comparativo_tributario} />}
+
       {/* Semáforo */}
       <div className="rounded-xl border border-slate-200 p-4">
         <p className="mb-2 text-sm font-semibold text-slate-800">Leitura sob as premissas declaradas</p>
@@ -739,6 +771,104 @@ function Dashboard({ d, econ }: { d: Financeira; econ?: Economica | null }) {
       </details>
 
       <Notas itens={d.avisos} />
+    </div>
+  );
+}
+
+/* ---------- FIN2-5 — comparador tributário (só renderiza o JSON do backend, §2) ---------- */
+function ComparadorTributario({ comp }: { comp: ComparativoTributario }) {
+  // Gate bloqueado: mostra APENAS o item bloqueado (decisão do operador, 11/08).
+  if (comp.gate.status === "bloqueado") {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <p className="text-sm font-semibold text-slate-800">🔒 Comparador da Reforma Tributária (LC 214/2025)</p>
+        <p className="mt-1 text-xs text-slate-600">
+          Recurso dos planos pagos — a prévia gratuita encerrou. Compare a transição (art. 486)
+          com o regime novo (IBS/CBS com redutores por lote) e veja o breakeven do seu estudo.{" "}
+          <a className="font-bold text-laranja-600 underline" href="/planos-mvp">Conhecer os planos</a>
+        </p>
+      </div>
+    );
+  }
+  if (!comp.regimes.length) return null; // sem lotes/VGV — nada a comparar
+  const NOME: Record<string, string> = { atual_transicao: "a transição (art. 486)", ibs_cbs: "o regime novo (IBS/CBS)", empate: "empate" };
+  return (
+    <div className="rounded-xl border border-slate-200 p-4">
+      <p className="mb-1 text-sm font-semibold text-slate-800">
+        Comparador da Reforma Tributária (LC 214/2025)
+        <span className="ml-2 rounded-full bg-marinho-900 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">FIN2-5</span>
+      </p>
+      <p className="mb-3 text-[11px] text-slate-500">
+        Conta POR LOTE com os números deste estudo. Cada linha cita o dispositivo. Não é
+        parecer tributário — valide com seu contador/tributarista.
+      </p>
+      {comp.gate.status === "previa" && (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">
+          Prévia gratuita: {comp.gate.dias_restantes} dia(s) restante(s).
+        </p>
+      )}
+      {comp.alerta_janela && (
+        <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">⏳ {comp.alerta_janela}</p>
+      )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        {comp.regimes.map((r) => {
+          const vence = comp.melhor === r.codigo;
+          return (
+            <div key={r.codigo} className={`rounded-lg border p-3 ${vence ? "border-laranja-400 ring-2 ring-laranja-100" : "border-slate-200"}`}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Cenário {r.codigo === "atual_transicao" ? "A" : "B"}{vence ? " · menor carga" : ""}
+              </p>
+              <p className="text-sm font-bold text-marinho-900">{r.rotulo}</p>
+              <ul className="mt-2 space-y-1.5">
+                {r.componentes.map((c) => (
+                  <li key={c.rotulo} className="border-b border-dashed border-slate-100 pb-1.5 text-xs">
+                    <div className="flex justify-between gap-2">
+                      <span className="text-slate-700">{c.rotulo}</span>
+                      <b className="whitespace-nowrap text-slate-800">{c.valor_fmt}</b>
+                    </div>
+                    <p className="text-[10px] text-slate-500">{c.detalhe}</p>
+                    <p className="text-[10px] italic text-slate-400">{c.base_legal}</p>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-2 flex items-baseline justify-between border-t-2 border-slate-200 pt-2">
+                <span className="text-[11px] text-slate-500">Carga total sobre o VGV</span>
+                <span className="text-base font-bold text-marinho-900">
+                  {r.carga_total_fmt}
+                  {r.pct_efetivo_vgv != null && <span className="ml-1 text-xs font-semibold text-slate-500">· {(r.pct_efetivo_vgv * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%</span>}
+                </span>
+              </div>
+              <p className="text-right text-[10px] text-slate-400">{r.carga_por_lote_fmt} por lote</p>
+            </div>
+          );
+        })}
+      </div>
+      {comp.leitura && (
+        <div className="mt-3 grid items-center gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 sm:grid-cols-[2fr_1fr]">
+          <p className="text-xs text-emerald-800">
+            <b>{comp.leitura}</b>
+            {comp.melhor && comp.melhor !== "empate" && comp.diferenca_pp != null && (
+              <span className="mt-0.5 block text-[11px]">
+                Diferença de {Math.abs(comp.diferenca_pp).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} p.p. do VGV a favor de {NOME[comp.melhor]}.
+              </span>
+            )}
+          </p>
+          {comp.breakeven && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase text-slate-500">Breakeven</p>
+              <p className="text-sm font-bold text-marinho-900">{comp.breakeven.preco_lote_fmt ?? "—"}</p>
+              <p className="text-[10px] text-slate-500">{comp.breakeven.leitura}</p>
+            </div>
+          )}
+        </div>
+      )}
+      <details className="mt-2 text-[11px] text-slate-500">
+        <summary className="cursor-pointer font-medium text-slate-600">Premissas e avisos ({comp.avisos.length})</summary>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4">
+          {comp.avisos.map((a) => <li key={a}>{a}</li>)}
+        </ul>
+        <p className="mt-1 italic">{comp.proveniencia}</p>
+      </details>
     </div>
   );
 }

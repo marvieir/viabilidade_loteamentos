@@ -1,4 +1,15 @@
-# Fase FIN2-5 — Comparador tributário do loteamento (SPEC, AGUARDA APROVAÇÃO)
+# Fase FIN2-5 — Comparador tributário do loteamento (IMPLEMENTADA 11/08/2026)
+
+> **Decisões do operador (11/08):** (1) escopo v1 APROVADO; (2) comparador como painel
+> ADICIONAL, mantendo o passo Tributos atual; (3) recurso de PLANO PAGO — bloqueado,
+> mostra apenas o item bloqueado (com convite aos planos).
+> **Notas de implementação:** a "carga atual" do cenário A é o próprio campo
+> `aliquota_pct` do passo Tributos (fonte única; default 5,93% rotulado preservado —
+> compat total; 6,73% é o típico COM adicional de IRPJ, o usuário declara). O campo
+> `regime` do contrato virou `cenario_fluxo` ("atual" | "ibs_cbs") para não colidir com
+> o `regime` fiscal já existente. Correção IPCA = campo `correcao_acumulada_pct`
+> declarável (determinismo). Código: `core/tributario.py`, gate `FIN25_GATE_DIR`,
+> testes `test_tributario.py` (valores-ouro fechados à mão no docstring).
 
 > Base: `docs/pesquisa-legal-tributaria.md` (10/08/2026, fontes primárias + doutrina).
 > Janela de mercado validada pelo relatório Lotenet (caso #5, score 4.15): "o loteador

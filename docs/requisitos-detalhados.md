@@ -166,8 +166,27 @@ média e tempo no vermelho; e a Financeira entrega o quadro ESTÁTICO (a conta d
 estruturada). Tudo aditivo — sem cenários/disciplinas o comportamento é idêntico ao
 anterior (ouros preservados).
 
-- Código: `routers/financeira.py`, `routers/economica.py`, `core/financeira*.py`, `core/economica*.py`, `routers/localizacao.py`.
-- Testes: `test_financeira*.py`, `test_economica.py`, `test_fin2_onda_a.py`.
+**FIN2-5 — Comparador da Reforma Tributária (11/08).** O passo Tributos ganhou um
+comparador de regimes com a conta POR LOTE (base legal em
+`docs/pesquisa-legal-tributaria.md`): **cenário A** = carga atual declarada sobre a
+receita (o mesmo campo de sempre), decomposta em IRPJ+CSLL do presumido (Lei 9.249/95 —
+a Reforma não mexe) + PIS/COFINS→CBS 3,65% da transição (LC 214/2025, art. 486 — vale
+para loteamento com REGISTRO protocolado até 31/12/2028); **cenário B** = regime novo:
+base por lote = preço − redutor de AJUSTE rateado (terreno da compra + ITBI/laudêmio +
+contrapartidas, com correção DECLARADA — arts. 257-258) − redutor SOCIAL de R$ 30.000
+por lote residencial (art. 259; base nunca negativa), alíquota = padrão de referência
+(premissa, default 28%) × 50%. Sai a carga total e por lote nos dois cenários, quem
+vence e por quanto, e o BREAKEVEN analítico do preço de lote (abaixo dele o regime novo
+vence — os redutores pesam mais no lote popular). O usuário pode mandar o cenário B
+alimentar a linha de tributos do fluxo (`cenario_fluxo=ibs_cbs`). Cada linha cita o
+dispositivo; ressalva fixa: não é parecer tributário. Aquisição por permuta NÃO entra
+como redutor (estrutura — consulte tributarista; rotulado). **Plano pago**: gate no
+servidor (prévia de 30 dias, padrão portfólio, `FIN25_GATE_DIR`); bloqueado → o JSON sai
+só com o gate e a tela mostra apenas o item bloqueado com o convite aos planos (decisão
+do operador, 11/08).
+
+- Código: `routers/financeira.py`, `routers/economica.py`, `core/financeira*.py`, `core/tributario.py`, `core/economica*.py`, `routers/localizacao.py`.
+- Testes: `test_financeira*.py`, `test_economica.py`, `test_fin2_onda_a.py`, `test_tributario.py`.
 
 ## RF-PORT — AI Portfolio Insights
 
