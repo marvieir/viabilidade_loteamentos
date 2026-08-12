@@ -1090,6 +1090,39 @@ class CustosIn(BaseModel):
 class TributosIn(BaseModel):
     regime: Literal["presumido", "real", "outro"] = "presumido"
     aliquota_pct: float = 0.0593  # default ROTULADO (não é RET) — proveniência no bloco
+    # ---- FIN2-5 — comparador de regimes (Reforma Tributária, LC 214/2025) ----
+    # ATENÇÃO às escalas: aliquota_pct é FRAÇÃO (compat. Fase 4); os campos novos *_pct
+    # são 0-100 (padrão URB-DOA) — o router converte. Valores em R$ são absolutos.
+    itbi_laudemio: Optional[float] = Field(
+        default=None, ge=0,
+        description="ITBI + laudêmio pagos na aquisição (R$). None = deriva da aquisição "
+        "declarada (itbi_pct × valor da compra), rotulado.",
+    )
+    contrapartidas: float = Field(
+        default=0.0, ge=0,
+        description="Contrapartidas urbanísticas/ambientais pagas ao poder público (R$) — "
+        "LC 214/2025, art. 257.",
+    )
+    aliquota_padrao_ref_pct: float = Field(
+        default=28.0, ge=0, le=100,
+        description="Alíquota padrão de referência IBS+CBS (%) — PREMISSA rotulada; a "
+        "alienação usa 50% dela (regime específico de imóveis).",
+    )
+    correcao_acumulada_pct: float = Field(
+        default=0.0, ge=0, le=1000,
+        description="Correção acumulada (IPCA, %) do redutor de ajuste — premissa "
+        "declarada, sem consulta de índice ao vivo (determinismo).",
+    )
+    lotes_residenciais: Optional[int] = Field(
+        default=None, ge=0,
+        description="Nº de lotes com direito ao redutor social (art. 259). None = todos.",
+    )
+    cenario_fluxo: Literal["atual", "ibs_cbs"] = Field(
+        default="atual",
+        description="Qual cenário alimenta a linha de tributos do fluxo de caixa. "
+        "'atual' = comportamento de sempre (aliquota_pct); 'ibs_cbs' = carga efetiva do "
+        "cenário B (plano pago).",
+    )
 
 
 class PremissasFinanceiraIn(BaseModel):
@@ -1277,6 +1310,54 @@ class EstaticoOut(BaseModel):
     composicao: dict = {}  # bloco -> fração do VGV (obra/terreno/demais…)
 
 
+# ----- FIN2-5 — comparador tributário (LC 214/2025) — proveniência POR LINHA -----
+
+
+class ComponenteTributarioOut(BaseModel):
+    rotulo: str
+    detalhe: str = ""
+    valor: float
+    valor_fmt: str
+    pct_vgv: Optional[float] = None  # fração 0-1 sobre o VGV (quando aplicável)
+    base_legal: str
+
+
+class RegimeTributarioOut(BaseModel):
+    codigo: Literal["atual_transicao", "ibs_cbs"]
+    rotulo: str
+    componentes: list[ComponenteTributarioOut] = []
+    carga_total: float
+    carga_total_fmt: str
+    carga_por_lote: float
+    carga_por_lote_fmt: str
+    pct_efetivo_vgv: Optional[float] = None  # fração 0-1
+
+
+class BreakevenTributarioOut(BaseModel):
+    """Preço de lote em que os regimes se igualam (None = um deles vence sempre)."""
+
+    preco_lote: Optional[float] = None
+    preco_lote_fmt: Optional[str] = None
+    leitura: str
+
+
+class ComparativoTributarioOut(BaseModel):
+    """Gate bloqueado → só ``gate`` preenchido (padrão AMB-EXC): o servidor decide."""
+
+    gate: "PortfolioGateOut"
+    regimes: list[RegimeTributarioOut] = []
+    melhor: Optional[Literal["atual_transicao", "ibs_cbs", "empate"]] = None
+    economia: Optional[float] = None
+    economia_fmt: Optional[str] = None
+    diferenca_pp: Optional[float] = None  # (B − A) em p.p. do VGV
+    breakeven: Optional[BreakevenTributarioOut] = None
+    alerta_janela: Optional[str] = None
+    leitura: Optional[str] = None
+    premissas: dict = {}
+    avisos: list[str] = []
+    proveniencia: str = ""
+
+
 class FinanceiraOut(BaseModel):
     caso_base: CasoBaseOut
     vgv: VgvOut
@@ -1295,6 +1376,8 @@ class FinanceiraOut(BaseModel):
     cenarios: list[CenarioResumoOut] = []
     obra_pico: Optional[ObraPicoOut] = None
     estatico: Optional[EstaticoOut] = None
+    # FIN2-5 — comparador tributário (aditivo; None em snapshots antigos):
+    comparativo_tributario: Optional[ComparativoTributarioOut] = None
 
 # ----- Fase 5 — Econômica (avalia o fluxo da Financeira: VPL/TIR/paybacks/curva) -----
 
@@ -2601,3 +2684,6 @@ class ReconciliacaoResumoOut(BaseModel):
 
 
 ManchasAmbientaisOut.model_rebuild()  # resolve a forward ref de ReconciliacaoResumoOut
+# FIN2-5 — resolve a forward ref "PortfolioGateOut" (definido depois da Financeira):
+ComparativoTributarioOut.model_rebuild()
+FinanceiraOut.model_rebuild()
