@@ -1,0 +1,67 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+body { background:#f8fafc; color:#0f172a; width:1240px; padding:22px 26px; }
+.mock { position:fixed; top:10px; right:12px; background:#dc2626; color:#fff; font-size:10px; font-weight:800; letter-spacing:1px; padding:4px 10px; border-radius:99px; text-transform:uppercase; z-index:9; }
+.card { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.05); padding:20px 24px; }
+h1 { font-size:17px; font-weight:800; }
+.sub { font-size:12px; color:#64748b; margin-top:3px; }
+.selo { display:inline-block; background:#1d1252; color:#fff; font-size:9.5px; font-weight:800; letter-spacing:.5px; padding:3px 10px; border-radius:99px; text-transform:uppercase; vertical-align:2px; margin-left:8px; }
+.btn { display:inline-block; background:#ff914d; color:#fff; font-size:12px; font-weight:700; padding:8px 16px; border-radius:8px; margin:12px 0; }
+.kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:12px 0; }
+.kpi { border:1px solid #e2e8f0; border-radius:10px; padding:10px 14px; }
+.kpi .r { font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+.kpi .v { font-size:18px; font-weight:800; font-family:ui-monospace,Menlo,monospace; color:#1d1252; }
+.kpi .s { font-size:10px; color:#94a3b8; }
+.kpi.rose { border-color:#fecdd3; background:#fff1f2; }
+.alerta { background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:10px 14px; font-size:12px; color:#9a3412; margin:12px 0; }
+.alerta b { color:#7c2d12; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { background:#f8fafc; color:#64748b; font-size:10px; text-transform:uppercase; letter-spacing:.5px; text-align:right; padding:8px 10px; border-bottom:1px solid #e2e8f0; }
+th:first-child, td:first-child { text-align:left; }
+td { text-align:right; padding:7px 10px; border-bottom:1px dashed #f1f5f9; font-family:ui-monospace,Menlo,monospace; color:#334155; }
+td:first-child { font-family:inherit; font-weight:600; color:#1d1252; }
+tr.tot td { border-top:2px solid #e2e8f0; font-weight:800; color:#1d1252; }
+.disc { margin-top:16px; border:1px solid #bbf7d0; background:#f0fdf4; border-radius:10px; padding:12px 16px; font-size:12px; color:#166534; }
+.disc b { display:block; font-size:13px; }
+.rodape { font-size:10.5px; color:#94a3b8; margin-top:14px; line-height:1.6; }
+</style></head><body>
+<div class="mock">Mockup — não é o produto</div>
+<div class="card">
+  <h1>Custo de Infra — Terraplenagem estimada <span class="selo">URB-TERRA</span></h1>
+  <div class="sub">Corte/aterro POR QUADRA do último urbanismo (67 lotes), com platô balanceado — a cota de
+  plataforma que iguala corte e aterro dentro de cada quadra. Elevação: DEM Copernicus 30&nbsp;m (triagem, não projeto).</div>
+
+  <span class="btn">⛰ Estimar corte/aterro do estudo</span>
+
+  <div class="kpis">
+    <div class="kpi"><div class="r">Corte total</div><div class="v">18.420 m³</div><div class="s">material a escavar</div></div>
+    <div class="kpi"><div class="r">Aterro total</div><div class="v">14.180 m³</div><div class="s">material a compactar</div></div>
+    <div class="kpi"><div class="r">Movimentação</div><div class="v">32.600 m³</div><div class="s">corte + aterro (vira quantidade da disciplina)</div></div>
+    <div class="kpi rose"><div class="r">Balanço (corte − aterro)</div><div class="v">+4.240 m³</div><div class="s">sobra de material → bota-fora</div></div>
+  </div>
+
+  <div class="alerta">⚠ <b>Custo oculto provável:</b> o desbalanço de <b>4.240 m³ (13% da movimentação — acima do
+  limiar de 10%)</b> indica necessidade de <b>bota-fora</b> (transporte + destino licenciado) que a diária da máquina
+  não cobre. Confirme DMT e destino com o projetista — este é o estouro clássico apontado pelo mercado.</div>
+
+  <table>
+    <thead><tr><th>Quadra</th><th>Área (m²)</th><th>Platô (cota m)</th><th>Corte (m³)</th><th>Aterro (m³)</th><th>Movimentação (m³)</th></tr></thead>
+    <tbody>
+      <tr><td>Q1</td><td>8.410</td><td>512,4</td><td>2.130</td><td>1.980</td><td>4.110</td></tr>
+      <tr><td>Q2</td><td>7.980</td><td>514,1</td><td>3.480</td><td>1.120</td><td>4.600</td></tr>
+      <tr><td>Q3</td><td>9.240</td><td>509,8</td><td>1.870</td><td>2.640</td><td>4.510</td></tr>
+      <tr><td>Q4</td><td>8.865</td><td>511,0</td><td>4.320</td><td>2.010</td><td>6.330</td></tr>
+      <tr><td>Q5 …</td><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+      <tr class="tot"><td>Total (9 quadras)</td><td>74.310</td><td>—</td><td>18.420</td><td>14.180</td><td>32.600</td></tr>
+    </tbody>
+  </table>
+
+  <div class="disc"><b>Disciplina Terraplanagem — base R$/m³ (novo)</b>
+  32.600 m³ × R$ 28,00/m³ (SEU perfil de custos, âncora SICRO) = <b>R$ 912.800</b> — antes: R$/m² “chutado” sem volume.
+  O valor pré-preenche a linha "Terraplenagem" do cronograma da obra (FIN2-2).</div>
+
+  <div class="rodape">Proveniência: DEM Copernicus GLO-30 (DSM 30 m — inclui vegetação: pode SUPERESTIMAR corte sob mata) ·
+  método: platô balanceado por quadra · viário fora da v1 (rotulado) · sem DEM → INDISPONÍVEL, nunca zero.
+  O custo unitário R$/m³ é sempre do seu perfil — a plataforma estima VOLUME, não preço. Triagem (§1-A), não projeto executivo.</div>
+</div>
+</body></html>
