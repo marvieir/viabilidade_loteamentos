@@ -1,0 +1,224 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><style>
+* { margin:0; padding:0; box-sizing:border-box; font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+body { background:#e2e8f0; width:980px; padding:18px 0; color:#0f172a; }
+.mock { position:fixed; top:8px; right:10px; background:#dc2626; color:#fff; font-size:10px; font-weight:800; letter-spacing:1px; padding:4px 10px; border-radius:99px; text-transform:uppercase; z-index:9; }
+.pg { width:920px; min-height:1180px; background:#fff; margin:0 auto 20px; padding:44px 52px 60px; position:relative; box-shadow:0 2px 8px rgba(15,23,42,.18); }
+.rodape { position:absolute; left:52px; right:52px; bottom:20px; border-top:1px solid #e2e8f0; padding-top:6px; font-size:9px; color:#94a3b8; display:flex; justify-content:space-between; }
+h1 { font-size:30px; font-weight:800; color:#1d1252; }
+h2 { font-size:17px; font-weight:800; color:#1d1252; margin-bottom:10px; border-left:4px solid #ff914d; padding-left:10px; }
+h3 { font-size:12.5px; font-weight:700; color:#334155; margin:12px 0 6px; }
+.marca { font-size:13px; font-weight:800; color:#ff914d; letter-spacing:1px; }
+.ress { background:#fff7ed; border:1.5px solid #fed7aa; border-radius:10px; padding:12px 16px; font-size:11.5px; color:#9a3412; margin:16px 0; }
+.kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 0; }
+.kpi { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; }
+.kpi .r { font-size:9.5px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:.5px; }
+.kpi .v { font-size:17px; font-weight:800; font-family:ui-monospace,Menlo,monospace; color:#1d1252; }
+.kpi .s { font-size:9.5px; color:#94a3b8; }
+.sema { display:grid; gap:6px; margin:12px 0; }
+.sema div { display:grid; grid-template-columns:16px 170px 110px 1fr; gap:10px; align-items:center; font-size:12px; }
+.dot { width:13px; height:13px; border-radius:3px; }
+table { width:100%; border-collapse:collapse; font-size:11px; margin:8px 0; }
+th { background:#f8fafc; color:#64748b; font-size:9px; text-transform:uppercase; letter-spacing:.4px; text-align:right; padding:6px 8px; border-bottom:1px solid #e2e8f0; }
+th:first-child, td:first-child { text-align:left; }
+td { text-align:right; padding:5px 8px; border-bottom:1px dashed #f1f5f9; font-family:ui-monospace,Menlo,monospace; color:#334155; }
+td:first-child { font-family:inherit; font-weight:600; color:#1d1252; }
+tr.tot td { border-top:2px solid #e2e8f0; font-weight:800; }
+.duas { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+.leg { display:flex; gap:12px; font-size:10px; color:#475569; margin-top:4px; flex-wrap:wrap; }
+.leg i { display:inline-block; width:11px; height:11px; border-radius:2px; margin-right:4px; vertical-align:-1px; }
+.selo { display:inline-block; background:#fef3c7; color:#92400e; font-size:9px; font-weight:800; padding:2.5px 9px; border-radius:99px; text-transform:uppercase; letter-spacing:.4px; }
+.nota { font-size:10px; color:#94a3b8; margin-top:6px; line-height:1.5; }
+.capa-meta { margin-top:14px; font-size:13px; color:#475569; line-height:1.9; }
+</style></head><body>
+<div class="mock">Mockup — não é o produto</div>
+
+<!-- PÁGINA 1 — capa + sumário executivo -->
+<div class="pg">
+  <div style="display:flex; justify-content:space-between; align-items:baseline;">
+    <span class="marca">voaz.app</span>
+    <span style="font-size:11px;color:#94a3b8">relatório do estudo · 16/08/2026</span>
+  </div>
+  <div style="margin-top:60px">
+    <p style="font-size:12px;font-weight:700;color:#ff914d;text-transform:uppercase;letter-spacing:1.5px">Relatório de pré-análise — apresentação a investidores</p>
+    <h1 style="margin-top:6px">Gleba Santo Antônio do Descoberto/GO</h1>
+    <p class="capa-meta">Área bruta <b>21,26 ha</b> (medida geodésica) · 67 lotes no estudo de massa · perfil baixa renda<br>
+    Preparado por <b>Cliente Exemplo Empreendimentos</b> · régua legal: cobertura PARCIAL_UF (rotulada)</p>
+  </div>
+  <div class="ress"><b>Leitura de TRIAGEM sob os dados e premissas informados</b> — este relatório NÃO é laudo técnico,
+  parecer jurídico nem veredito de viabilidade. Cada seção cita a fonte e a data do dado; ausência de achado não
+  significa ausência do problema. Projetos exigem os profissionais habilitados (art. 6º, Lei 6.766/79).</div>
+
+  <h2 style="margin-top:26px">Sumário executivo</h2>
+  <div class="kpis">
+    <div class="kpi"><div class="r">Área aproveitável</div><div class="v">13,48 ha</div><div class="s">após restrições (63%)</div></div>
+    <div class="kpi"><div class="r">Lotes do estudo</div><div class="v">67</div><div class="s">média 372 m² · 4,9 lotes/ha</div></div>
+    <div class="kpi"><div class="r">VGV do estudo</div><div class="v">R$ 8,04 mi</div><div class="s">67 × R$ 120 mil (premissa)</div></div>
+    <div class="kpi"><div class="r">Resultado nominal</div><div class="v">R$ 2,41 mi</div><div class="s">margem 34% s/ VGV próprio</div></div>
+    <div class="kpi"><div class="r">Exposição máxima</div><div class="v">-R$ 1,18 mi</div><div class="s">no mês 7</div></div>
+    <div class="kpi"><div class="r">VPL @ TMA 12%</div><div class="v">R$ 986 mil</div><div class="s">moeda constante</div></div>
+    <div class="kpi"><div class="r">TIR real</div><div class="v">20,3% a.a.</div><div class="s">única · payback desc. 41 m</div></div>
+    <div class="kpi"><div class="r">Risco jurídico</div><div class="v">Médio</div><div class="s">1 ônus ativo (R-5) na matrícula</div></div>
+  </div>
+
+  <h3>Semáforo por dimensão</h3>
+  <div class="sema">
+    <div><span class="dot" style="background:#10b981"></span><b>Aproveitamento</b><span style="color:#059669;font-weight:800">FAVORÁVEL</span><span style="color:#64748b">13,48 ha aproveitáveis após a união das restrições</span></div>
+    <div><span class="dot" style="background:#ef4444"></span><b>Ambiental</b><span style="color:#dc2626;font-weight:800">RESTRIÇÃO</span><span style="color:#64748b">mata consolidada + APP de curso d'água + declividade ≥30% — detalhe na seção 4</span></div>
+    <div><span class="dot" style="background:#f59e0b"></span><b>Financeiro-econômico</b><span style="color:#d97706;font-weight:800">ATENÇÃO</span><span style="color:#64748b">exposição supera o capital informado — estruturar funding</span></div>
+    <div><span class="dot" style="background:#f59e0b"></span><b>Jurídico</b><span style="color:#d97706;font-weight:800">MÉDIO</span><span style="color:#64748b">ônus R-5 ativo; certidões fiscais pendentes no checklist</span></div>
+    <div><span class="dot" style="background:#64748b"></span><b>Localização</b><span style="color:#475569;font-weight:800">INFORMATIVA</span><span style="color:#64748b">contexto socioeconômico do município (IBGE)</span></div>
+  </div>
+  <p class="nota">Cada luz reflete apenas o que a dimensão reportou, sob as premissas declaradas na seção 11.</p>
+  <div class="rodape"><span>voaz.app · pré-análise de triagem — não é laudo nem veredito de viabilidade (§1-A)</span><span>pág. 1/11</span></div>
+</div>
+
+<!-- PÁGINA 2 — urbanismo: planta + quadro -->
+<div class="pg">
+  <h2>6 · Urbanismo — estudo de massa <span class="selo">esquemático</span></h2>
+  <p style="font-size:11.5px;color:#64748b;margin-bottom:10px">Gerado pelo motor determinístico da plataforma (variante vencedora entre 5) e MEDIDO por cálculo
+  geodésico. É pré-análise de triagem: não substitui o projeto urbanístico (art. 6º, Lei 6.766/79).</p>
+  <svg viewBox="0 0 620 430" xmlns="http://www.w3.org/2000/svg" style="width:100%"><path d="M 30,60 L 300,18 L 560,44 L 585,300 L 420,398 L 60,380 Z" fill="#fafaf9" stroke="#0f172a" stroke-width="2.5" stroke-dasharray="7 4"/><path d="M 60,66 L 300,28 L 545,52 L 548,92 L 70,102 Z" fill="#bbf7d0" stroke="#16a34a"/><ellipse cx="505" cy="330" rx="48" ry="30" fill="#bae6fd" stroke="#0284c7"/><rect x="92" y="314" width="118" height="56" fill="#ddd6fe" stroke="#7c3aed"/><rect x="510" y="120" width="52" height="80" fill="#bbf7d0" stroke="#16a34a"/><rect x="72" y="104" width="14" height="276" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="282" y="100" width="16" height="290" fill="#cbd5e1" stroke="#64748b" stroke-width=".7"/><rect x="494" y="104" width="14" height="260" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="76" y="198" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="286" y="186" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="76" y="298" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="286" y="286" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="90" y="120" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="120" y="120" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="150" y="120" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="180" y="120" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="210" y="120" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="240" y="120" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="90" y="158" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="120" y="158" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="150" y="158" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="180" y="158" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="210" y="158" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="240" y="158" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="300" y="108" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="330" y="108" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="360" y="108" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="390" y="108" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="420" y="108" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="450" y="108" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="300" y="146" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="330" y="146" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="360" y="146" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="390" y="146" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="420" y="146" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="450" y="146" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="90" y="220" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="120" y="220" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="150" y="220" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="180" y="220" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="210" y="220" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="240" y="220" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="90" y="258" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="120" y="258" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="150" y="258" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="180" y="258" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="210" y="258" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="240" y="258" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="300" y="208" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="330" y="208" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="360" y="208" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="390" y="208" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="420" y="208" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="450" y="208" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="300" y="246" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="330" y="246" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="360" y="246" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="390" y="246" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="420" y="246" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="450" y="246" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="300" y="308" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="330" y="308" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="360" y="308" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="390" y="308" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="420" y="308" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="450" y="308" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="300" y="346" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="330" y="346" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="360" y="346" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="390" y="346" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="420" y="346" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="450" y="346" width="28" height="36" fill="#ffedd5" stroke="#9a3412" stroke-width=".7"/><rect x="278" y="386" width="24" height="10" fill="#1d1252"/></svg>
+  <div class="leg">
+    <span><i style="background:#ffedd5;border:1px solid #9a3412"></i>lotes (67)</span>
+    <span><i style="background:#e2e8f0"></i>viário local</span>
+    <span><i style="background:#cbd5e1"></i>coletora</span>
+    <span><i style="background:#bbf7d0"></i>verde/lazer</span>
+    <span><i style="background:#ddd6fe"></i>institucional</span>
+    <span><i style="background:#bae6fd"></i>lago (estudo)</span>
+    <span><i style="background:#1d1252"></i>pórtico</span>
+  </div>
+  <div class="duas" style="margin-top:14px">
+    <div>
+      <h3>Quadro de áreas</h3>
+      <table>
+        <tr><th>Uso</th><th>m²</th><th>% líquida</th></tr>
+        <tr><td>Lotes (vendável)</td><td>24.921</td><td>52,4%</td></tr>
+        <tr><td>Sistema viário</td><td>11.407</td><td>24,0%</td></tr>
+        <tr><td>Verde / lazer</td><td>7.133</td><td>15,0%</td></tr>
+        <tr><td>Institucional</td><td>2.377</td><td>5,0%</td></tr>
+        <tr><td>Verde remanescente</td><td>12.850</td><td>—</td></tr>
+        <tr><td>Sobra técnica</td><td>1.710</td><td>3,6%</td></tr>
+        <tr class="tot"><td>Área líquida do estudo</td><td>47.548</td><td>100%</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Indicadores</h3>
+      <table>
+        <tr><td>Lotes</td><td>67 (média 372 m²)</td></tr>
+        <tr><td>Janela legal do lote</td><td>[200 m² zona · sem teto]</td></tr>
+        <tr><td>Viário</td><td>3.120 m lineares</td></tr>
+        <tr><td>Densidade</td><td>4,9 lotes/ha bruto</td></tr>
+        <tr><td>Doação (verde+inst.)</td><td>20,0% — diretriz informada</td></tr>
+        <tr><td>Variantes geradas</td><td>5 (vencedora: função de valor)</td></tr>
+      </table>
+      <p class="nota">Proveniência: layout v3 de 16/08/2026 · lote mínimo da ZONA (LUOS confirmada pelo usuário)
+      · números medidos por pyproj.Geod, nunca pela IA.</p>
+    </div>
+  </div>
+  <div class="rodape"><span>voaz.app · pré-análise de triagem — não é laudo nem veredito de viabilidade (§1-A)</span><span>pág. 6/11</span></div>
+</div>
+
+<!-- PÁGINA 3 — mapa de calor -->
+<div class="pg">
+  <h2>7 · Valorização lote a lote <span class="selo">régua relativa do estudo</span></h2>
+  <p style="font-size:11.5px;color:#64748b;margin-bottom:10px">Score POSICIONAL de cada lote no traçado (esquina, frente para o verde, proximidade da coletora,
+  amenidades) — a mesma régua exibida no aplicativo. É comparação RELATIVA entre os lotes do estudo, não avaliação de mercado.</p>
+  <svg viewBox="0 0 620 430" xmlns="http://www.w3.org/2000/svg" style="width:100%"><path d="M 30,60 L 300,18 L 560,44 L 585,300 L 420,398 L 60,380 Z" fill="#fafaf9" stroke="#0f172a" stroke-width="2.5" stroke-dasharray="7 4"/><path d="M 60,66 L 300,28 L 545,52 L 548,92 L 70,102 Z" fill="#bbf7d0" stroke="#16a34a"/><ellipse cx="505" cy="330" rx="48" ry="30" fill="#bae6fd" stroke="#0284c7"/><rect x="92" y="314" width="118" height="56" fill="#ddd6fe" stroke="#7c3aed"/><rect x="510" y="120" width="52" height="80" fill="#bbf7d0" stroke="#16a34a"/><rect x="72" y="104" width="14" height="276" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="282" y="100" width="16" height="290" fill="#cbd5e1" stroke="#64748b" stroke-width=".7"/><rect x="494" y="104" width="14" height="260" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="76" y="198" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="286" y="186" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="76" y="298" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="286" y="286" width="208" height="12" fill="#e2e8f0" stroke="#94a3b8" stroke-width=".7"/><rect x="90" y="120" width="28" height="36" fill="#15803d" stroke="#78716c" stroke-width=".6"/><rect x="120" y="120" width="28" height="36" fill="#15803d" stroke="#78716c" stroke-width=".6"/><rect x="150" y="120" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="180" y="120" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="210" y="120" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="240" y="120" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="90" y="158" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="120" y="158" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="150" y="158" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="180" y="158" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="210" y="158" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="240" y="158" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="300" y="108" width="28" height="36" fill="#15803d" stroke="#78716c" stroke-width=".6"/><rect x="330" y="108" width="28" height="36" fill="#15803d" stroke="#78716c" stroke-width=".6"/><rect x="360" y="108" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="390" y="108" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="420" y="108" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="450" y="108" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="300" y="146" width="28" height="36" fill="#15803d" stroke="#78716c" stroke-width=".6"/><rect x="330" y="146" width="28" height="36" fill="#15803d" stroke="#78716c" stroke-width=".6"/><rect x="360" y="146" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="390" y="146" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="420" y="146" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="450" y="146" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="90" y="220" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="120" y="220" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="150" y="220" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="180" y="220" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="210" y="220" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="240" y="220" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="90" y="258" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="120" y="258" width="28" height="36" fill="#4ade80" stroke="#78716c" stroke-width=".6"/><rect x="150" y="258" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="180" y="258" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="210" y="258" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="240" y="258" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="300" y="208" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="330" y="208" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="360" y="208" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="390" y="208" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="420" y="208" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="450" y="208" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="300" y="246" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="330" y="246" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="360" y="246" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="390" y="246" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="420" y="246" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="450" y="246" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="300" y="308" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="330" y="308" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="360" y="308" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="390" y="308" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="420" y="308" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="450" y="308" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="300" y="346" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="330" y="346" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="360" y="346" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="390" y="346" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="420" y="346" width="28" height="36" fill="#fdba74" stroke="#78716c" stroke-width=".6"/><rect x="450" y="346" width="28" height="36" fill="#fde047" stroke="#78716c" stroke-width=".6"/><rect x="278" y="386" width="24" height="10" fill="#1d1252"/></svg>
+  <div class="leg">
+    <span><i style="background:#15803d"></i>A+ · premium (12 lotes)</span>
+    <span><i style="background:#4ade80"></i>A · alto (18 lotes)</span>
+    <span><i style="background:#fde047"></i>B · médio (24 lotes)</span>
+    <span><i style="background:#fdba74"></i>C · base (13 lotes)</span>
+  </div>
+  <div class="duas" style="margin-top:14px">
+    <div>
+      <h3>Distribuição por faixa</h3>
+      <table>
+        <tr><th>Faixa</th><th>Lotes</th><th>Drivers dominantes</th></tr>
+        <tr><td>A+</td><td>12</td><td>frente-verde + esquina</td></tr>
+        <tr><td>A</td><td>18</td><td>frente-verde ou esquina</td></tr>
+        <tr><td>B</td><td>24</td><td>rua interna, perto do lazer</td></tr>
+        <tr><td>C</td><td>13</td><td>miolo de quadra</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Como ler</h3>
+      <p style="font-size:11px;color:#475569;line-height:1.6">A régua orienta a TABELA DE PREÇOS (quais lotes suportam ágio) e a ordem de
+      lançamento. O investidor vê onde está o valor dentro do produto — ex.: as duas
+      fileiras de frente para o verde norte concentram o premium deste estudo.</p>
+      <p class="nota">Pesos por público (baixa renda) do perfil da plataforma; função de valor publicada no app.</p>
+    </div>
+  </div>
+  <div class="rodape"><span>voaz.app · pré-análise de triagem — não é laudo nem veredito de viabilidade (§1-A)</span><span>pág. 7/11</span></div>
+</div>
+
+<!-- PÁGINA 4 — financeiro + econômica -->
+<div class="pg">
+  <h2>8-9 · Financeiro e Econômica <span class="selo">sob as premissas declaradas</span></h2>
+  <div class="kpis">
+    <div class="kpi"><div class="r">VGV</div><div class="v">R$ 8,04 mi</div><div class="s">próprio R$ 6,43 mi (permuta 20%)</div></div>
+    <div class="kpi"><div class="r">Custos totais</div><div class="v">R$ 4,02 mi</div><div class="s">50% do VGV · R$ 60 mil/lote</div></div>
+    <div class="kpi"><div class="r">Pico da obra</div><div class="v">R$ 410 mil</div><div class="s">mês 5 (pavimentação)</div></div>
+    <div class="kpi"><div class="r">Tributos</div><div class="v">6,73%</div><div class="s">cenário atual — comparador LC 214 no anexo</div></div>
+  </div>
+  <h3>Fluxo de caixa anual (entradas × saídas × acumulado)</h3>
+  <svg viewBox="0 0 560 220" xmlns="http://www.w3.org/2000/svg" style="width:100%"><line x1="40" y1="158" x2="552" y2="158" stroke="#94a3b8"/><rect x="60" y="133" width="24" height="25" fill="#34d399"/><rect x="87" y="105" width="24" height="53" fill="#fda4af"/><text x="85" y="174" font-size="11" fill="#64748b" text-anchor="middle">ano 1</text><rect x="144" y="99" width="24" height="59" fill="#34d399"/><rect x="171" y="94" width="24" height="64" fill="#fda4af"/><text x="169" y="174" font-size="11" fill="#64748b" text-anchor="middle">ano 2</text><rect x="228" y="85" width="24" height="73" fill="#34d399"/><rect x="255" y="116" width="24" height="42" fill="#fda4af"/><text x="253" y="174" font-size="11" fill="#64748b" text-anchor="middle">ano 3</text><rect x="312" y="105" width="24" height="53" fill="#34d399"/><rect x="339" y="138" width="24" height="20" fill="#fda4af"/><text x="337" y="174" font-size="11" fill="#64748b" text-anchor="middle">ano 4</text><rect x="396" y="122" width="24" height="36" fill="#34d399"/><rect x="423" y="147" width="24" height="11" fill="#fda4af"/><text x="421" y="174" font-size="11" fill="#64748b" text-anchor="middle">ano 5</text><rect x="480" y="136" width="24" height="22" fill="#34d399"/><rect x="507" y="151" width="24" height="7" fill="#fda4af"/><text x="505" y="174" font-size="11" fill="#64748b" text-anchor="middle">ano 6</text><polyline points="85,173 169,176 253,160 337,141 421,127 505,119" fill="none" stroke="#1d1252" stroke-width="2.5"/><circle cx="85" cy="173" r="3" fill="#1d1252"/><circle cx="169" cy="176" r="3" fill="#1d1252"/><circle cx="253" cy="160" r="3" fill="#1d1252"/><circle cx="337" cy="141" r="3" fill="#1d1252"/><circle cx="421" cy="127" r="3" fill="#1d1252"/><circle cx="505" cy="119" r="3" fill="#1d1252"/></svg>
+  <div class="leg"><span><i style="background:#34d399"></i>entradas</span><span><i style="background:#fda4af"></i>saídas</span><span><i style="background:#1d1252"></i>acumulado</span></div>
+  <div class="duas" style="margin-top:12px">
+    <div>
+      <h3>Cenários de venda</h3>
+      <table>
+        <tr><th>Cenário</th><th>Resultado</th><th>Exposição</th><th>VPL</th></tr>
+        <tr><td>Conservador · 15 m</td><td>2,18 mi</td><td>-1,44 mi</td><td>702 mil</td></tr>
+        <tr><td><b>Base · 10 m</b></td><td>2,41 mi</td><td>-1,18 mi</td><td>986 mil</td></tr>
+        <tr><td>Otimista · 7 m</td><td>2,55 mi</td><td>-0,97 mi</td><td>1,14 mi</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Curva VPL × TMA</h3>
+      <svg viewBox="0 0 560 170" xmlns="http://www.w3.org/2000/svg" style="width:100%"><line x1="36" y1="120" x2="550" y2="120" stroke="#94a3b8"/><polyline points="36,36 49,38 61,40 74,42 86,44 99,46 112,49 124,51 137,54 149,57 162,59 175,62 187,65 200,67 212,70 225,73 238,76 250,79 263,82 275,84 288,87 301,90 313,93 326,96 338,99 351,102 364,105 376,109 389,112 401,115 414,118 427,121 439,124 452,127 464,131 477,134 490,137 502,140 515,143 527,147 540,150" fill="none" stroke="#ff914d" stroke-width="2.5"/><circle cx="423" cy="120" r="4.5" fill="#1d1252"/><text x="423" y="140" font-size="11.5" font-weight="700" fill="#1d1252" text-anchor="middle">TIR 20,3% a.a.</text><text x="40" y="24" font-size="11" fill="#64748b">VPL (R$)</text><text x="546" y="138" font-size="11" fill="#64748b" text-anchor="end">TMA (% a.a.)</text></svg>
+    </div>
+  </div>
+  <p class="nota">Premissas completas (preço, curva, mesa, inadimplência, custos com origem declarado×default) na seção 11.
+  Fluxo nominal; avaliação em moeda constante com TMA real declarada de 12% a.a. Não é recomendação de investimento.</p>
+  <div class="rodape"><span>voaz.app · pré-análise de triagem — não é laudo nem veredito de viabilidade (§1-A)</span><span>pág. 8/11</span></div>
+</div>
+
+<!-- PÁGINA 5 — ambiental + jurídico (resumo do formato) -->
+<div class="pg">
+  <h2>4 · Ambiental &nbsp;·&nbsp; 10 · Jurídico <span class="selo">formato — demais seções idem</span></h2>
+  <div class="duas">
+    <div>
+      <h3>Restrições mapeadas (camada → área → fonte)</h3>
+      <table>
+        <tr><th>Camada</th><th>Área</th><th>Fonte · data</th></tr>
+        <tr><td>Mata (severidade)</td><td>4,81 ha</td><td>WorldCover 2021 × MapBiomas c.9</td></tr>
+        <tr><td>APP curso d'água</td><td>1,66 ha</td><td>Lei 12.651, art. 4º · buffer 30 m</td></tr>
+        <tr><td>Declividade ≥30%</td><td>0,94 ha</td><td>Copernicus GLO-30 · Lei 6.766 art. 3º</td></tr>
+        <tr><td>Reserva legal (CAR)</td><td>1,12 ha</td><td>SICAR · sobreposição declarada</td></tr>
+        <tr class="tot"><td>União (sem dupla contagem)</td><td>7,78 ha</td><td>36,6% da gleba</td></tr>
+      </table>
+      <h3>Vistoria de campo (se houver)</h3>
+      <p style="font-size:11px;color:#475569;line-height:1.6">Laudo do RT de 14/08 liberou 1,28 ha do "verde a verificar"
+      (constatado antropizado — base) e manteve 0,4 ha como nativa sob autorização (só cenário otimista). Histórico versionado.</p>
+    </div>
+    <div>
+      <h3>Risco jurídico consolidado: MÉDIO</h3>
+      <table>
+        <tr><th>Matrícula</th><th>Área</th><th>Achados</th></tr>
+        <tr><td>M-12.345 (CRI local)</td><td>18,1 ha</td><td>ônus R-5 ativo (hipoteca)</td></tr>
+        <tr><td>M-9.876</td><td>3,2 ha</td><td>sem ônus · averbação de reserva</td></tr>
+        <tr class="tot"><td>Soma × KMZ</td><td>21,3 ha</td><td>divergência 0,2% ✓</td></tr>
+      </table>
+      <h3>Checklist de diligência</h3>
+      <p style="font-size:11px;color:#475569;line-height:1.6">14 itens · 9 anexados ✓ · 5 pendentes (certidões fiscais do
+      proprietário PJ, negativa trabalhista). Cada ficha foi CONFIRMADA por humano; a IA apenas propôs a leitura.</p>
+      <p class="nota">Dimensão sem documento → o relatório estampa "NÃO ANALISADA" (nunca omite).</p>
+    </div>
+  </div>
+  <div class="ress" style="margin-top:18px"><b>Seções completas do relatório:</b> 1 capa · 2 sumário executivo · 3 gleba e contexto
+  (mapa, declividade, socioeconômico) · 4 ambiental · 5 aproveitamento (cascata bruta→aproveitável→diretriz) · 6 urbanismo ·
+  7 valorização · 8 financeiro · 9 econômica · 10 jurídico · 11 premissas, fontes e avisos (tudo com origem e data).</div>
+  <div class="rodape"><span>voaz.app · pré-análise de triagem — não é laudo nem veredito de viabilidade (§1-A)</span><span>pág. 10/11</span></div>
+</div>
+</body></html>
