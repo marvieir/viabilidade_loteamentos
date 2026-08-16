@@ -1,4 +1,11 @@
-# Fase LAUDO-INV — Relatório do estudo para investidores (SPEC, AGUARDA APROVAÇÃO)
+# Fase LAUDO-INV — Relatório do estudo para investidores (APROVADA 16/08/2026, EM IMPLEMENTAÇÃO)
+
+> **Decisões do operador (16/08):** (1) estrutura de 11 seções e formato página
+> imprimível → PDF APROVADOS; (2) recurso **só do plano pago** — usuário do gratuito que
+> abrir vê a mensagem de que apenas o plano pago pode ver (SEM prévia de 30 dias, ao
+> contrário do padrão portfólio; liberação manual do admin enquanto não há billing);
+> (3) **white-label leve** aprovado: nome do cliente na capa ("Preparado por"), editável
+> na tela, com espaço reservado para logo (upload de logo = fase B).
 
 > Pedido do operador (16/08/2026): o export de laudo atual sai só com o semáforo; os
 > clientes precisam de um **relatório detalhado da análise da área para mostrar a
