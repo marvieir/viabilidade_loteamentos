@@ -26,6 +26,8 @@ export function TopBar({
   gerandoLaudo,
   onExcel,
   gerandoExcel,
+  onRelatorio,
+  gerandoRelatorio,
   onSalvar,
   salvando,
   jaSalva,
@@ -40,6 +42,8 @@ export function TopBar({
   gerandoLaudo?: boolean;
   onExcel?: () => void;
   gerandoExcel?: boolean;
+  onRelatorio?: () => void; // LAUDO-INV — relatório para investidores (plano pago)
+  gerandoRelatorio?: boolean;
   onSalvar?: () => void;
   salvando?: boolean;
   jaSalva?: boolean;
@@ -51,7 +55,7 @@ export function TopBar({
     jur?.municipio && jur?.uf
       ? `${jur.municipio} / ${jur.uf}`
       : jur?.uf || "Jurisdição federal";
-  const exportando = gerandoLaudo || gerandoExcel;
+  const exportando = gerandoLaudo || gerandoExcel || gerandoRelatorio;
   const iniciais = (usuario?.nome || usuario?.email || "?")
     .split(/[\s@.]+/)
     .filter(Boolean)
@@ -115,7 +119,7 @@ export function TopBar({
                 {salvando ? "Salvando…" : jaSalva ? "Atualizar" : "Salvar"}
               </Button>
             )}
-            {(onLaudo || onExcel) && (
+            {(onLaudo || onExcel || onRelatorio) && (
               <Menu
                 botao={
                   <Button variant="secondary" disabled={exportando}>
@@ -137,6 +141,12 @@ export function TopBar({
                   <MenuItem onClick={onExcel} disabled={gerandoExcel}>
                     <IconDownload width={14} height={14} className="text-slate-400" />
                     Planilha (Excel)
+                  </MenuItem>
+                )}
+                {onRelatorio && (
+                  <MenuItem onClick={onRelatorio} disabled={gerandoRelatorio}>
+                    <IconDownload width={14} height={14} className="text-slate-400" />
+                    Relatório p/ investidores
                   </MenuItem>
                 )}
               </Menu>

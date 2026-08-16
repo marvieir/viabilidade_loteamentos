@@ -233,6 +233,26 @@ renderizam. Um teste varre o texto inteiro proibindo "viável/aprovado" (§1-A).
 
 - Testes: `test_laudo*.py` (inclui a regex anti-veredito), `test_trilha.py`.
 
+**LAUDO-INV — Relatório para investidores (16/08).** O export de triagem ganhou o irmão
+grande: um relatório multi-página que o cliente apresenta a investidores. O front repassa
+os MESMOS JSONs do laudo (§2) e o backend (`core/relatorio.py`) compõe sem recalcular:
+identificação do STORE, semáforo e seções do MESMO compositor do laudo, KPIs do sumário
+executivo (valores já formatados pelas dimensões) e os snapshots ricos dos stores —
+urbanismo (planta + heatmap, sem chaves privadas), financeira, econômica e reconciliação
+ambiental vigente. O front renderiza páginas A4 (`RelatorioInvestidores.tsx`): capa com
+white-label leve ("Preparado por", lembrado no navegador), sumário executivo, detalhe por
+dimensão com proveniência, PLANTA do estudo de massa e MAPA DE VALORIZAÇÃO lote a lote
+desenhados dos GeoJSON (mesmas cores de quintil do app; projeção só de exibição), fluxo
+anual, curva VPL×TMA e a página de premissas/fontes/avisos — rodapé §1-A em todas; botão
+"Salvar PDF" imprime pelo navegador. **Plano pago SEM prévia** (decisão do operador):
+gratuito recebe do servidor só o gate e vê a mensagem; admin libera manualmente
+(`PUT /relatorio/liberacao/{usuario_id}`, store `LAUDOINV_GATE_DIR`). O regex de
+linguagem proibida virou fonte única em `core/laudo.py` (`RE_LINGUAGEM_PROIBIDA`) e o
+compositor é auditado por ele. Laudo simples (PDF) e Excel continuam intocados.
+
+- Código: `core/relatorio.py`, `routers/relatorio.py`, front `components/relatorio/RelatorioInvestidores.tsx`.
+- Testes: `test_relatorio.py` (gate sem prévia, composição com stores, linguagem, liberação admin).
+
 ## RF-CONTA — Contas e admin
 
 **Como funciona.** JWT com refresh automático no front (sessão não cai no meio da análise);

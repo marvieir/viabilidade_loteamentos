@@ -98,6 +98,9 @@ de produto e perfis municipais).
 - **RF-IMP-6** Textos do desenho (ÁREA VERDE/INSTITUCIONAL/LAZER) classificam faces — com teto de credibilidade (face desproporcional vira pendência, não uso).
 - **RF-IMP-7** Quem importa declara o público-alvo do projeto (alimenta INTEL-4); pendências viram pinos clicáveis no mapa.
 
+### RF-REL — Relatório para investidores
+- **RF-REL-1** *(LAUDO-INV, 16/08/2026)* Relatório detalhado do estudo em páginas A4 imprimíveis (PDF pelo navegador): capa white-label leve ("Preparado por" editável), sumário executivo com KPIs e semáforo, seções por dimensão com proveniência, planta do estudo de massa e mapa de valorização lote a lote (mesma régua do app), fluxo anual e curva VPL×TMA, premissas/fontes/avisos. Composição PURA dos snapshots (zero recálculo); linguagem §1-A auditada (regex único em `core/laudo.py`); dimensão não rodada sai "NÃO ANALISADA". Recurso de PLANO PAGO sem prévia — gratuito vê a mensagem; liberação manual do admin. O laudo simples e o Excel continuam como estão.
+
 ### RF-LUOS — Diretriz municipal
 - **RF-LUOS-1** Extração assistida da LUOS por IA a partir de PDF(s) — **múltiplos documentos** numa extração (lei + anexos); a IA lê e PROPÕE com citação (artigo/página/trecho); nada entra no cálculo sem **confirmação humana**.
 - **RF-LUOS-2** Índices por zona (lote mínimo, doação e split, CA, recuos, APAC…) + normas urbanísticas de condomínio no nível do município.

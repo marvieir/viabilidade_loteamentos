@@ -29,7 +29,8 @@ import { CardFinanceira } from "@/components/cards/CardFinanceira";
 import { CardEconomica } from "@/components/cards/CardEconomica";
 import { CardLocalizacao } from "@/components/cards/CardLocalizacao";
 import { IconMap } from "@/components/Icons";
-import { gerarLaudo, gerarLaudoExcel, publicarExemplo } from "@/lib/api";
+import { gerarLaudo, gerarLaudoExcel, gerarRelatorio, publicarExemplo } from "@/lib/api";
+import { RelatorioInvestidores } from "@/components/relatorio/RelatorioInvestidores";
 import type {
   Ambiental,
   Analise,
@@ -41,6 +42,7 @@ import type {
   JuridicoDocumental,
   Localizacao,
   PerfilMunicipal,
+  RelatorioInv,
   Vegetacao,
 } from "@/lib/api";
 
@@ -73,6 +75,9 @@ export default function Home() {
   const [sinal, setSinal] = useState(0);
   const [gerandoLaudo, setGerandoLaudo] = useState(false);
   const [gerandoExcel, setGerandoExcel] = useState(false);
+  // LAUDO-INV — relatório para investidores (plano pago): JSON composto → overlay imprimível.
+  const [relatorio, setRelatorio] = useState<RelatorioInv | null>(null);
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
   // Fase 12.2 — "Minhas análises": id da análise salva carregada (PUT vs POST) + salvando.
   const [salvaId, setSalvaId] = useState<string | null>(null);
   // Snapshot dos RESULTADOS da salva aberta — reidrata os cards sem reprocessar.
@@ -166,6 +171,47 @@ export default function Home() {
       alert(e instanceof Error ? e.message : "Falha ao gerar o laudo.");
     } finally {
       setGerandoLaudo(false);
+    }
+  }
+
+  // LAUDO-INV — relatório para investidores: mesmos JSONs do laudo + white-label leve.
+  // O backend compõe (gate pago decidido no servidor); aqui só renderizamos o overlay.
+  async function onRelatorio() {
+    if (!analise) return;
+    setGerandoRelatorio(true);
+    try {
+      const nome = window.prompt(
+        "Nome na capa (“Preparado por”) — deixe vazio para omitir:",
+        usuarioRelatorio()
+      );
+      if (nome === null) return; // cancelou
+      try {
+        if (nome.trim()) localStorage.setItem("relatorio_preparado_por", nome.trim());
+      } catch { /* storage indisponível — segue sem lembrar */ }
+      const r = await gerarRelatorio(analise.analise_id, {
+        aproveitamento: dadosAprov,
+        ambiental: dadosAmb,
+        vegetacao: dadosVerde,
+        declividade: dadosDecliv,
+        juridico: dadosJuridico,
+        financeira: dadosFinanceira,
+        economica: dadosEconomica,
+        localizacao: dadosLocalizacao,
+        urbanismo: dadosUrb,
+        preparado_por: nome.trim() || null,
+      });
+      setRelatorio(r);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Falha ao compor o relatório.");
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  }
+  function usuarioRelatorio(): string {
+    try {
+      return localStorage.getItem("relatorio_preparado_por") ?? "";
+    } catch {
+      return "";
     }
   }
 
@@ -307,10 +353,21 @@ export default function Home() {
         onPublicarExemplo={onPublicarExemplo}
         onExcel={onExcel}
         gerandoExcel={gerandoExcel}
+        onRelatorio={onRelatorio}
+        gerandoRelatorio={gerandoRelatorio}
         onSalvar={onSalvar}
         salvando={salvando}
         jaSalva={salvaId !== null}
       />
+
+      {/* LAUDO-INV — overlay imprimível do relatório (bloqueado → mensagem de plano pago) */}
+      {relatorio && (
+        <RelatorioInvestidores
+          rel={relatorio}
+          glebaGeojson={analise?.geometria.geojson ?? null}
+          onFechar={() => setRelatorio(null)}
+        />
+      )}
 
       {!analise ? (
         <UploadHero onAnalise={onAnalise} onCarregar={onCarregarSalva} recarregar={recarregarSalvas} />

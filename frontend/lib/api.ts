@@ -305,6 +305,67 @@ export async function gerarLaudoExcel(
   return res.blob();
 }
 
+// ----- LAUDO-INV — relatório detalhado para investidores (plano pago) -----
+export interface ItemRel {
+  rotulo: string;
+  valor: string;
+  proveniencia: string | null;
+}
+export interface SecaoRel {
+  chave: string;
+  titulo: string;
+  analisada: boolean;
+  luz: string;
+  itens: ItemRel[];
+  avisos: string[];
+}
+export interface RelatorioInv {
+  gate: {
+    status: "liberado" | "previa" | "bloqueado";
+    motivo: string;
+    dias_restantes: number | null;
+  };
+  analise_id: string;
+  titulo: string;
+  preparado_por: string | null;
+  data_geracao: string;
+  ressalva_capa: string;
+  rodape: string;
+  identificacao: Record<string, unknown>;
+  kpis: ItemRel[];
+  semaforo: { dimensao: string; luz: string; justificativa: string }[];
+  secoes: SecaoRel[];
+  dimensoes: Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  urbanismo_snapshot: Record<string, any> | null;
+  financeira_snapshot: {
+    premissas?: Record<string, unknown>;
+    resultado?: Financeira;
+  } | null;
+  economica_snapshot: {
+    premissas?: Record<string, unknown>;
+    resultado?: Economica;
+  } | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  reconciliacao_ambiental: Record<string, any> | null;
+  nao_analisadas: string[];
+  avisos: string[];
+  proveniencia_consolidada: { dimensao: string; fonte: string }[];
+}
+
+// Compõe o relatório (JSON — o front renderiza a página imprimível; §2, zero recálculo).
+export async function gerarRelatorio(
+  analiseId: string,
+  corpo: Record<string, unknown>
+): Promise<RelatorioInv> {
+  const res = await apiFetch(`/api/analises/${analiseId}/relatorio`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(corpo),
+  });
+  return jsonOrThrow(res);
+}
+
 // Autocomplete por NOME sobre a malha local (offline). O código IBGE volta no
 // payload para resolver internamente — o usuário nunca digita nem vê o código.
 // U9 — levantamento planialtimétrico (curvas de nível reais) no nível da gleba.
