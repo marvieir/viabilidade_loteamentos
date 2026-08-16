@@ -132,8 +132,19 @@ resposta passa por validação **tolerante** (Pydantic com coerção: "1,5"→1,
 página "8-9"→8) — falha de formato gera dump de diagnóstico, nunca perde a extração inteira.
 O perfil nasce `proposto` e só entra no cálculo após o PUT de confirmação humana.
 
+**LUOS-ISO (12/08/2026) — perfil POR USUÁRIO.** O operador flagrou em produção que o
+perfil confirmado era GLOBAL por município (desenho mono-operador da Fase 1.8): a LUOS
+que um cliente confirmava aparecia pré-carregada para qualquer outro cliente com gleba no
+mesmo município — e podia ser sobrescrita por qualquer um, mudando silenciosamente os
+números legais dos estudos alheios (9 perfis de clientes distintos no volume). Correção
+(opção A, decisão do operador): o perfil agora é gravado em
+`{PERFIL_MUNICIPAL_DIR}/{usuario_id}/{cod_ibge}.json` — cada cliente só vê e usa a LUOS
+que ele mesmo confirmou, em todos os pontos que a consomem (aproveitamento, urbanismo,
+conformidade, trilha). Os arquivos antigos da raiz ficam inertes (nada apagado, nada
+servido); quem precisar re-confirma a própria LUOS.
+
 - Código: `core/extrator_luos.py`, `routers/perfil.py`, `core/perfil_municipal.py`, schemas `ParamProv/ZonaPerfil/NormasUrbanisticas` (validação tolerante em `models/schemas.py`).
-- Testes: `test_perfil_luos.py` (stub offline — sem rede nem chave).
+- Testes: `test_perfil_luos.py` (stub offline — sem rede nem chave), `test_luos_isolamento.py` (isolamento entre usuários + legado inerte).
 
 ## RF-JUR — Jurídico
 

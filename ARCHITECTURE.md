@@ -159,6 +159,12 @@ e rotula a cobertura:
 
 O relatório estampa o nível e diz explicitamente o que não foi considerado.
 
+**Escopo do perfil municipal (LUOS-ISO, 12/08/2026):** o perfil confirmado é **por
+USUÁRIO** (`{PERFIL_MUNICIPAL_DIR}/{usuario_id}/{cod_ibge}.json`) — a LUOS que um
+cliente confirma alimenta apenas os cálculos DELE. O desenho original (global por
+município, era mono-operador) vazava dados entre clientes e permitia sobrescrita
+cruzada; os arquivos da era global ficam inertes na raiz do volume.
+
 ### Backbone de dados nacional (carrega uma vez, pipeline de download — não agente)
 - **Malha geométrica IBGE** — polígonos dos ~5.570 municípios, **nível intermediário**
   (cheia é lenta no point-in-polygon; muito simplificada erra na divisa). Usada só para

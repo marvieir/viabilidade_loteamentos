@@ -103,6 +103,7 @@ de produto e perfis municipais).
 - **RF-LUOS-2** Índices por zona (lote mínimo, doação e split, CA, recuos, APAC…) + normas urbanísticas de condomínio no nível do município.
 - **RF-LUOS-3** Valor sem citação não é confirmável; perfil confirmado carrega quem validou e quando.
 - **RF-LUOS-4** Documento de outro município é ignorado com aviso, nunca misturado.
+- **RF-LUOS-5** *(LUOS-ISO, 12/08/2026)* O perfil confirmado é **POR USUÁRIO**: cada cliente só vê e usa a LUOS que ele mesmo confirmou; a confirmação de um usuário nunca aparece nem sobrescreve o cálculo de outro. (Correção do desenho mono-operador da Fase 1.8, que gravava o perfil global por município — achado do operador em produção.)
 
 ### RF-JUR — Jurídico documental
 - **RF-JUR-1** Extração assistida de matrículas e certidões (PDF/imagens), multi-matrícula, com gate humano por ficha.
