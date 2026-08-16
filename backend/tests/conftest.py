@@ -244,6 +244,8 @@ def _vegetacao_auto_off(monkeypatch, tmp_path):
     monkeypatch.setenv("VIAS_OSM_AUTO", "0")
     # FIN2-5 — gate do comparador tributário escreve em tmp (default é volume /data).
     monkeypatch.setenv("FIN25_GATE_DIR", str(tmp_path / "fin25_gate"))
+    # LAUDO-INV — gate do relatório para investidores (idem).
+    monkeypatch.setenv("LAUDOINV_GATE_DIR", str(tmp_path / "relatorio_gate"))
     # Rate limiting DESLIGADO nos testes (eles fazem muitos logins/registros). Religado no teste
     # específico de rate limit. O limiter é singleton criado no import → seta o atributo direto.
     from app.core.ratelimit import limiter

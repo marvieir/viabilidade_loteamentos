@@ -25,6 +25,15 @@ RODAPE_1A = (
     "agrimensor/engenheiro, projeto de urbanista nem aprovação da prefeitura (§1-A)."
 )
 
+# §1-A — auditoria de LINGUAGEM: nada que a plataforma compõe pode prometer. Regex único
+# (antes vivia duplicado em 7 testes) usado pelos testes do laudo/urbanismo e pelo
+# compositor do relatório de investidores (LAUDO-INV). Case-insensitive por segurança.
+import re as _re  # noqa: E402 — junto da constante que o usa
+
+RE_LINGUAGEM_PROIBIDA = _re.compile(
+    r"aprovad\w*|viáve\w*|viave\w*|garantid\w*|com certeza", _re.IGNORECASE
+)
+
 
 # ----- Acesso defensivo a dicts aninhados (o laudo recebe JSON cru das dimensões) -----
 def _get(d, *path):

@@ -45,6 +45,7 @@ from app.routers import (
     localizacao,
     perfil,
     portfolio,
+    relatorio,
     salvas,
     trilha,
     urbanismo,
@@ -164,6 +165,7 @@ app.include_router(financeira.router, prefix="/api")
 app.include_router(economica.router, prefix="/api")
 app.include_router(localizacao.router, prefix="/api")
 app.include_router(laudo.router, prefix="/api")
+app.include_router(relatorio.router, prefix="/api")  # LAUDO-INV — relatório p/ investidores (pago)
 app.include_router(urbanismo.router, prefix="/api")
 app.include_router(custo_infra.router, prefix="/api")
 app.include_router(trilha.router, prefix="/api")  # Fase UX-1 — Trilha da Análise

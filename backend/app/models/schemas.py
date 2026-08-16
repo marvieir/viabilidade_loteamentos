@@ -1632,6 +1632,43 @@ class LaudoData(BaseModel):
     proveniencia_consolidada: list[FonteConsolidada]
 
 
+# ----- LAUDO-INV — relatório detalhado para investidores (fase-laudo-inv.md) -----
+
+
+class RelatorioIn(LaudoIn):
+    """Corpo do POST do relatório: as MESMAS dimensões do laudo (o front repassa o que o
+    backend devolveu, §2) + white-label leve da capa (decisão do operador, 16/08)."""
+
+    preparado_por: Optional[str] = None  # nome do cliente na capa ("Preparado por")
+    titulo_estudo: Optional[str] = None  # None → "Gleba {município}/{UF}"
+
+
+class RelatorioOut(BaseModel):
+    """Relatório para investidores — composição PURA dos snapshots (zero recálculo).
+    Gate de PLANO PAGO sem prévia (decisão do operador, 16/08): bloqueado → só ``gate``
+    preenchido e o front mostra a mensagem de recurso pago."""
+
+    gate: "PortfolioGateOut"
+    analise_id: str = ""
+    titulo: str = ""
+    preparado_por: Optional[str] = None
+    data_geracao: str = ""
+    ressalva_capa: str = ""
+    rodape: str = ""
+    identificacao: dict = {}
+    kpis: list[ItemLaudo] = []  # sumário executivo (valores JÁ formatados das dimensões)
+    semaforo: list[LuzSemaforo] = []
+    secoes: list[SecaoLaudo] = []  # resumos executivos (mesma composição do laudo)
+    dimensoes: dict = {}  # ecos dos JSONs das dimensões (detalhes de cada seção)
+    urbanismo_snapshot: Optional[dict] = None  # último snapshot do store (planta+heatmap)
+    financeira_snapshot: Optional[dict] = None  # {"premissas", "resultado"} do store
+    economica_snapshot: Optional[dict] = None
+    reconciliacao_ambiental: Optional[dict] = None  # vigente do AMB-EXC (se houver)
+    nao_analisadas: list[str] = []
+    avisos: list[str] = []
+    proveniencia_consolidada: list[FonteConsolidada] = []
+
+
 # ===================== Fase 9 — Urbanismo (estudo de massa por IA) =====================
 # IA na BORDA propõe o PROGRAMA; o Python MEDE toda a geometria e todos os números (§2).
 # Rótulo "ESTUDO DE MASSA ESQUEMÁTICO" + avisos §1-A em TODA saída.
@@ -2687,3 +2724,4 @@ ManchasAmbientaisOut.model_rebuild()  # resolve a forward ref de ReconciliacaoRe
 # FIN2-5 — resolve a forward ref "PortfolioGateOut" (definido depois da Financeira):
 ComparativoTributarioOut.model_rebuild()
 FinanceiraOut.model_rebuild()
+RelatorioOut.model_rebuild()  # LAUDO-INV — mesma forward ref de gate
