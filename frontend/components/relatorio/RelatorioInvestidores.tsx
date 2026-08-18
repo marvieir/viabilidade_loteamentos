@@ -191,7 +191,7 @@ export function RelatorioInvestidores({ rel, glebaGeojson, onFechar }: {
 }) {
   if (rel.gate.status === "bloqueado") {
     return (
-      <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-900/50 p-4" onClick={onFechar}>
+      <div className="fixed inset-0 z-[1200] grid place-items-center bg-slate-900/50 p-4" onClick={onFechar}>
         <div className="max-w-md rounded-xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
           <p className="text-base font-bold text-marinho-900">🔒 Relatório para investidores</p>
           <p className="mt-2 text-sm text-slate-600">
@@ -223,7 +223,7 @@ export function RelatorioInvestidores({ rel, glebaGeojson, onFechar }: {
   ];
 
   return (
-    <div className="rel-root fixed inset-0 z-[100] overflow-y-auto bg-slate-300/95 py-5">
+    <div className="rel-root fixed inset-0 z-[1200] overflow-y-auto bg-slate-300/95 py-5">
       {/* barra de ações — some na impressão */}
       <div className="rel-acoes sticky top-0 z-10 mx-auto mb-4 flex w-[900px] items-center justify-between rounded-lg bg-marinho-900 px-4 py-2.5 text-white shadow-lg">
         <p className="text-sm font-semibold">Relatório para investidores — pré-visualização</p>
