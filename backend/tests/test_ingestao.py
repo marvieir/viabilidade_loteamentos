@@ -136,18 +136,52 @@ def test_c6_linha_autointersec_recusa(client):
     assert body["diagnostico"]["motivo"] == "auto_intersecao"
 
 
-# 7) Arquivo CAD real (PERIMETRO_SAO_ROQUE.kml) → 422, multiplas_linhas, 50 linhas / 0 polígonos.
-def test_c7_sao_roque_topografia_cad(client):
+# 7) Arquivo CAD real (PERIMETRO_SAO_ROQUE.kml): 50 segmentos que FECHAM um contorno
+# único → costura determinística (ING-CAD, 18/08 — antes era recusa multiplas_linhas).
+def test_c7_sao_roque_costurado(client):
     conteudo = (FIXTURES / "PERIMETRO_SAO_ROQUE.kml").read_bytes()
     r = _post(client, conteudo, nome="PERIMETRO_SAO_ROQUE.kml")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["origem_geometria"]["rota"] == "LINHAS_COSTURADAS"
+    assert abs(data["geometria"]["area_m2"] - 77_900) < 2_000  # ≈7,79 ha do CAD real
+    assert any("RECONSTRUÍDO" in a for a in data["avisos"])  # nunca em silêncio
+
+
+# 7b) Caso-ouro do operador (18/08): gleba em 26 segmentos + divisões internas + traço de
+# estrada solto → costura fecha 8 faces, união = contorno único de ≈14,5 ha.
+def test_c7b_kmz_cad_do_operador_costurado(client):
+    conteudo = (FIXTURES / "kmz_cad_linhas.kmz").read_bytes()
+    r = _post(client, conteudo, nome="IMAGEM_3.kmz")
+    assert r.status_code == 200, r.text
+    data = r.json()
+    assert data["origem_geometria"]["rota"] == "LINHAS_COSTURADAS"
+    assert abs(data["geometria"]["area_m2"] - 145_400) < 3_000  # ≈14,54 ha
+    assert any("RECONSTRUÍDO" in a for a in data["avisos"])
+
+
+# 7c) Múltiplas linhas que NÃO fecham contorno → segue a recusa diagnóstica (honesta).
+def test_c7c_linhas_sem_fechamento_recusa(client):
+    paralelas = [
+        [(-47.10, -23.52), (-47.08, -23.52)],
+        [(-47.10, -23.51), (-47.08, -23.51)],
+    ]
+    r = _post(client, make_kmz_linhas(paralelas))
     assert r.status_code == 422, r.text
     body = r.json()
-    assert body["erro"] == "geometria_nao_ingerivel"
     assert body["rota"] == "TOPOGRAFIA_CAD"
     assert body["diagnostico"]["motivo"] == "multiplas_linhas"
-    assert body["diagnostico"]["n_linhas"] == 50
-    assert body["diagnostico"]["n_poligonos"] == 0
-    assert "orientacao" in body
+
+
+# 7d) Dois contornos FECHADOS e desconexos → ambíguo (qual é a gleba?) → recusa, nunca chute.
+def test_c7d_contornos_desconexos_recusa(client):
+    def quadrado(x0, y0, d=0.01):
+        cantos = [(x0, y0), (x0 + d, y0), (x0 + d, y0 + d), (x0, y0 + d)]
+        return [[cantos[i], cantos[(i + 1) % 4]] for i in range(4)]
+
+    r = _post(client, make_kmz_linhas(quadrado(-47.10, -23.52) + quadrado(-46.90, -23.40)))
+    assert r.status_code == 422, r.text
+    assert r.json()["diagnostico"]["motivo"] == "multiplas_linhas"
 
 
 # 8) Robustez de namespace: xmlns="" e KML 2.1 têm geometrias detectadas.
@@ -181,7 +215,9 @@ def test_c9_proveniencia_presente(client):
     for conteudo in (make_kmz([RET_RETANGULO]), make_kmz_linhas([LINHA_FECHADA])):
         data = _post(client, conteudo).json()
         og = data["origem_geometria"]
-        assert og["rota"] in ("POLYGON_DIRETO", "LINHA_FECHAVEL", "POLYGON_REPARADO")
+        assert og["rota"] in (
+            "POLYGON_DIRETO", "LINHA_FECHAVEL", "POLYGON_REPARADO", "LINHAS_COSTURADAS"
+        )
         assert og["descricao"]
 
 

@@ -3,20 +3,29 @@
 Adaptador a montante do motor de geometria (que permanece puro: Polygon entra → área
 sai). Decide, de forma determinística e sem inventar, entre três rotas:
 
-  POLYGON_DIRETO  — ≥1 <Polygon>: usa direto (vários → o maior, com aviso no router).
-  LINHA_FECHAVEL  — exatamente 1 <LineString> simples, fechada ou com gap ≤ tolerância:
-                    fecha (declarando o gap) e converte em polígono.
-  TOPOGRAFIA_CAD  — demais casos sem polígono (multi-linha, linha aberta além da
-                    tolerância, auto-intersectada): recusa COM DIAGNÓSTICO → Fase 1.6.
+  POLYGON_DIRETO    — ≥1 <Polygon>: usa direto (vários → o maior, com aviso no router).
+  LINHA_FECHAVEL    — exatamente 1 <LineString> simples, fechada ou com gap ≤ tolerância:
+                      fecha (declarando o gap) e converte em polígono.
+  LINHAS_COSTURADAS — ≥2 <LineString> SEM polígono (export CAD segmentado): costura
+                      determinística (união → poligonização → união das faces). Só
+                      aceita quando o resultado é UM polígono conexo — aí não há
+                      adivinhação: as linhas fecham um contorno único e as internas
+                      são divisões. Sempre com AVISO declarando a reconstrução.
+                      (Caso real do operador, 18/08: gleba em 26 segmentos.)
+  TOPOGRAFIA_CAD    — demais casos sem polígono (linhas que não fecham contorno único,
+                      linha aberta além da tolerância, auto-intersectada): recusa COM
+                      DIAGNÓSTICO → Fase 1.6.
 
-Regras invioláveis: nunca fechar linha em silêncio (sempre declarar o gap); nunca
-adivinhar qual linha é o perímetro quando há várias; recusa sempre diagnóstica.
+Regras invioláveis: nunca fechar linha em silêncio (sempre declarar o gap/reconstrução);
+nunca ESCOLHER entre contornos ambíguos (2+ regiões desconexas → recusa); recusa sempre
+diagnóstica.
 """
 
 from dataclasses import dataclass, field
 
 from pyproj import Geod
 from shapely.geometry import LineString, Polygon
+from shapely.ops import linemerge, polygonize, unary_union
 
 from app.core import kmz
 
@@ -146,6 +155,32 @@ def _linha_unica(
     )
 
 
+def _costurar_linhas(linhas: list[list[tuple[float, float]]]) -> tuple[Polygon, int] | None:
+    """Costura determinística de export CAD segmentado: união das linhas (noding nos
+    cruzamentos) → costura de trechos (linemerge) → poligonização das faces fechadas →
+    união das faces. Aceita SOMENTE quando o resultado é UM polígono conexo e válido —
+    duas ou mais regiões desconexas seriam adivinhação (regra inviolável) → ``None`` e a
+    recusa diagnóstica segue. Não há snap/tolerância: os vértices precisam coincidir
+    (como o CAD exporta); gap real entre segmentos → não fecha → recusa honesta."""
+    try:
+        geoms = [LineString(c) for c in linhas if len(c) >= 2]
+        if len(geoms) < 2:
+            return None
+        faces = list(polygonize(linemerge(unary_union(geoms))))
+    except Exception:  # noqa: BLE001 — geometria patológica → recusa diagnóstica adiante
+        return None
+    faces = [f for f in faces if not f.is_empty and f.area > 0]
+    if not faces:
+        return None
+    uniao = unary_union(faces)
+    if uniao.geom_type != "Polygon":
+        return None  # regiões desconexas: qual é a gleba? Não adivinhamos.
+    uniao = uniao.buffer(0)  # limpeza topológica (mesma do reparo de polígonos)
+    if uniao.is_empty or not uniao.is_valid or uniao.geom_type != "Polygon" or uniao.area == 0:
+        return None
+    return uniao, len(faces)
+
+
 def _reparar_poligonos(poligonos: list[Polygon]) -> tuple[list[Polygon], bool, list[str]]:
     """Repara <Polygon> auto-interseccionados via ``buffer(0)`` — determinístico e (no caso
     típico de export de CAD) preservando a área. Decisão do operador (Fase 1.8): reparar com
@@ -242,10 +277,31 @@ def ingerir(
         )
 
     if n_lin >= 2:
+        costurado = _costurar_linhas(conteudo_kml.linhas)
+        if costurado is not None:
+            poly, n_faces = costurado
+            return Ingestao(
+                ok=True,
+                rota="LINHAS_COSTURADAS",
+                descricao=(
+                    f"perímetro reconstruído de {n_lin} segmentos de linha "
+                    f"({n_faces} face(s) fechada(s) unidas)"
+                ),
+                poligonos=[poly],
+                avisos=[
+                    f"Perímetro RECONSTRUÍDO automaticamente de {n_lin} segmentos de "
+                    f"linha do arquivo (costura determinística: os segmentos fecham "
+                    f"{n_faces} face(s), unidas num contorno único). Linhas internas de "
+                    "divisão foram tratadas como divisões, não como limite. CONFIRA a "
+                    "área e o traçado no mapa antes de confiar nos números."
+                ],
+                pontos=list(conteudo_kml.pontos or []),
+            )
         return _recusa(
             "TOPOGRAFIA_CAD",
             "multiplas_linhas",
-            f"arquivo de topografia/CAD: {n_lin} linhas, {n_poly} polígonos",
+            f"arquivo de topografia/CAD: {n_lin} linhas, {n_poly} polígonos "
+            "(os segmentos não fecham um contorno único)",
             n_poly,
             n_lin,
             n_pts,

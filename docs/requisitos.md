@@ -36,6 +36,7 @@ de produto e perfis municipais).
 - **RF-ENT-4** Detectar município/UF/código IBGE pela geometria (malha IBGE), com correção manual.
 - **RF-ENT-5** Auto-salvar a análise no upload; upsert em "Minhas análises" (um trabalho = uma linha).
 - **RF-ENT-6** Receber levantamento planialtimétrico (DWG/DXF) no nível da gleba.
+- **RF-ENT-7** *(ING-CAD, 18/08/2026)* KMZ de CAD com o perímetro em MÚLTIPLOS segmentos de linha (sem `<Polygon>`): costura determinística — união → poligonização → união das faces. Aceita SOMENTE quando resulta um contorno único e conexo (linhas internas viram divisões, nunca limite); sempre com aviso declarando a reconstrução; contornos desconexos ou que não fecham seguem na recusa diagnóstica.
 
 ### RF-AMB — Pré-análise ambiental
 - **RF-AMB-1** Cruzar a gleba com camadas oficiais: APP/hidrografia (ANA), unidades de conservação (ICMBio), mineração (SIGMINE/ANM), Reserva Legal (SICAR/CAR), domínio Mata Atlântica (IBGE), malha fundiária (SIGEF/SNCI), massa d'água. Cada alerta com fonte e data.

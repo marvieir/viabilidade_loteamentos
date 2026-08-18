@@ -21,6 +21,16 @@ graus". O município vem de apontar o centróide na malha do IBGE. Vários KMZ v
 unidos numa geometria só antes de tudo. No upload, a análise já nasce salva (auto-save) e o
 salvar manual só atualiza a mesma linha (upsert pelo id de trabalho `_analise_id`).
 
+**ING-CAD (18/08) — costura de CAD segmentado.** KMZ exportado de CAD costuma trazer o
+perímetro em dezenas de segmentos de linha (o caso do operador: 26 segmentos, 0
+polígonos — e o CAD real de São Roque, 50 segmentos, recusado desde a Fase 1.5). A
+ingestão agora costura deterministicamente: união das linhas (com nós nos cruzamentos) →
+costura de trechos → poligonização das faces fechadas → união das faces. Se o resultado
+é UM contorno conexo, ele vira a gleba — as linhas internas são tratadas como divisões,
+e o aviso declara a reconstrução ("confira área e traçado"). Sem fechamento ou com 2+
+regiões desconexas (qual seria a gleba? não adivinhamos), permanece a recusa
+diagnóstica. Sem snap/tolerância entre segmentos: vértice que não coincide é gap real.
+
 - Código: `core/ingestao.py`, `core/geometria.py`, `core/jurisdicao.py`, `routers/analises.py`, `routers/salvas.py`, `core/levantamento.py` (DWG do levantamento).
 - Testes: `test_ingestao.py`, `test_geometria.py`, `test_auto_salvar.py`, `test_agrupamento.py`.
 

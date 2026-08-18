@@ -54,9 +54,12 @@ class LevantamentoOut(BaseModel):
 
 
 class OrigemGeometriaOut(BaseModel):
-    """Proveniência da rota de ingestão (Fase 1.5; POLYGON_REPARADO desde a 1.8)."""
+    """Proveniência da rota de ingestão (Fase 1.5; POLYGON_REPARADO desde a 1.8;
+    LINHAS_COSTURADAS desde ING-CAD, 18/08 — export CAD segmentado costurado)."""
 
-    rota: Literal["POLYGON_DIRETO", "LINHA_FECHAVEL", "POLYGON_REPARADO"]
+    rota: Literal[
+        "POLYGON_DIRETO", "LINHA_FECHAVEL", "POLYGON_REPARADO", "LINHAS_COSTURADAS"
+    ]
     descricao: str
 
 
